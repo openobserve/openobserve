@@ -2295,7 +2295,15 @@ export class PipelinesPage {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
-        await this.streamNameLabel.fill(streamName);
+        // Clear existing value first so pressSequentially appends into an empty
+        // field (not after a previous stream name). fill('') on a QSelect input
+        // resets the filter; if the popup closes, pressSequentially reopens it
+        // via its internal focus step.
+        await this.streamNameLabel.fill('');
+        // Use pressSequentially with delay to simulate real typing, which properly
+        // triggers Quasar's autocomplete input events (unlike fill() which sets the
+        // value atomically and may not trigger Quasar's filtering in CI).
+        await this.streamNameLabel.pressSequentially(streamName, { delay: 35 });
         // Wait for the matching option to appear after Quasar autocomplete filtering
         await this.page.waitForFunction(
             (name) => Array.from(document.querySelectorAll('[role="option"]')).some(el => el.textContent.trim() === name),
@@ -2410,26 +2418,40 @@ export class PipelinesPage {
             }
 
             const allLabels = new Set();
-            const step = container.clientHeight;
             const prevScrollTop = container.scrollTop;
 
-            // Scroll from top to bottom in increments of one viewport height
+            // Wait for virtual-scroll to compute full dimensions after any
+            // filter/search change. scrollHeight reflects the total virtual
+            // content — if it's only ~1x clientHeight, there's nothing to
+            // scroll through yet (Quasar hasn't finished re-rendering).
+            for (let wait = 0; wait < 100; wait++) {
+                if (container.scrollHeight > container.clientHeight * 1.2) break;
+                await new Promise(r => requestAnimationFrame(r));
+            }
+
+            // Scroll through the container in half-viewport increments.
+            // Setting scrollTop alone may not trigger Quasar's virtual-scroll
+            // reconciliation in CI; dispatching a native scroll event helps.
+            const step = Math.max(Math.floor(container.clientHeight / 2), 50);
+
             for (let pos = 0; pos <= container.scrollHeight; pos += step) {
                 container.scrollTop = pos;
+                container.dispatchEvent(new Event('scroll'));
                 await new Promise(r => requestAnimationFrame(r));
                 // Extra frame to let Quasar virtual-scroll re-render
                 await new Promise(r => requestAnimationFrame(r));
                 container.querySelectorAll('.field_label').forEach(lbl => {
-                    allLabels.add(lbl.textContent);
+                    if (lbl.textContent) allLabels.add(lbl.textContent);
                 });
             }
 
             // Scroll to the very bottom to catch any remaining rows
             container.scrollTop = container.scrollHeight;
+            container.dispatchEvent(new Event('scroll'));
             await new Promise(r => requestAnimationFrame(r));
             await new Promise(r => requestAnimationFrame(r));
             container.querySelectorAll('.field_label').forEach(lbl => {
-                allLabels.add(lbl.textContent);
+                if (lbl.textContent) allLabels.add(lbl.textContent);
             });
 
             // Restore scroll position
