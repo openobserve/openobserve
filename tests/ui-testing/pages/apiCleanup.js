@@ -295,65 +295,6 @@ class APICleanup {
     }
 
     /**
-     * Create a minimal dashboard via API for use in report tests
-     * @param {string} dashboardName - Unique name for the dashboard
-     * @param {string} folderId - Folder ID (defaults to "default")
-     * @returns {Promise<Object>} { success, dashboard, error }
-     */
-    async createDashboardViaApi(dashboardName, folderId = 'default') {
-        testLogger.info('Creating dashboard via API', { dashboardName, folderId });
-
-        try {
-            const payload = {
-                version: 8,
-                title: dashboardName,
-                description: 'Auto-created for E2E test',
-                tabs: [{
-                    tabId: 'default',
-                    name: 'Default',
-                    panels: []
-                }]
-            };
-
-            const response = await this._fetch(
-                `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': this.authHeader,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                }
-            );
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                testLogger.error('Failed to create dashboard via API', { dashboardName, status: response.status, body: errorBody });
-                return { success: false, error: `HTTP ${response.status}: ${errorBody}` };
-            }
-
-            const result = await response.json();
-            // MetaDashboard nests the actual data under the version key (e.g., "v8")
-            const inner = result[`v${result.version}`] || result;
-            const tabs = (inner.tabs || [{ tabId: 'default', name: 'Default' }]).map(t => ({
-                tab_id: t.tabId || t.tab_id || 'default'
-            }));
-            const dashboard = {
-                dashboard_id: inner.dashboardId || inner.dashboard_id,
-                title: inner.title,
-                tabs
-            };
-
-            testLogger.info('Dashboard created via API', { dashboardName, dashboardId: dashboard.dashboard_id });
-            return { success: true, dashboard };
-        } catch (error) {
-            testLogger.error('Failed to create dashboard via API', { dashboardName, error: error.message });
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
      * Fetch all reports
      * @returns {Promise<Array>} Array of report objects
      */
@@ -410,7 +351,7 @@ class APICleanup {
 
     /**
      * Create a report via API (v2) in the default folder.
-     * Creates a temporary dashboard, uses it as the report source, then deletes the dashboard.
+     * Fetches the first available dashboard and uses it as the report source.
      * @param {string} reportName - Unique name for the report
      * @param {string} folderId - Folder ID to create the report in (defaults to "default")
      * @returns {Promise<Object>} Result with { success, reportName, error }
@@ -419,15 +360,24 @@ class APICleanup {
         testLogger.info('Creating report via API', { reportName, folderId });
 
         try {
-            // Step 1: Create a temporary dashboard to use as the report source
-            const tempDashboardName = `temp_dashboard_${Date.now()}`;
-            const dashResult = await this.createDashboardViaApi(tempDashboardName, folderId);
-            if (!dashResult.success) {
-                return { success: false, error: `Failed to create temp dashboard: ${dashResult.error}` };
+            // Step 1: Fetch dashboards from the folder to get a dashboard ID
+            const dashboards = await this.fetchDashboardsInFolder(folderId);
+            if (dashboards.length === 0) {
+                testLogger.error('No dashboards found in folder, cannot create report', { folderId });
+                return { success: false, error: 'No dashboards available' };
             }
 
-            const dashboard = dashResult.dashboard;
-            testLogger.info('Using temp dashboard for report', { dashboardId: dashboard.dashboard_id, title: dashboard.title });
+            const dashboard = dashboards[0];
+            // Unwrap MetaDashboard if data is nested under version key (e.g., "v8")
+            const inner = dashboard[`v${dashboard.version}`] || dashboard;
+            if (!inner.dashboardId && !inner.dashboard_id) {
+                testLogger.error('Dashboard missing required fields', { dashboard });
+                return { success: false, error: 'Dashboard missing dashboard_id' };
+            }
+
+            const dashboardId = inner.dashboardId || inner.dashboard_id;
+            const dashboardTabs = inner.tabs || [{ tabId: 'default' }];
+            testLogger.info('Using dashboard for report', { dashboardId, title: inner.title });
 
             // Step 2: Build the report payload
             const payload = {
@@ -435,8 +385,8 @@ class APICleanup {
                 description: '',
                 dashboards: [{
                     folder: folderId,
-                    dashboard: dashboard.dashboard_id,
-                    tabs: [dashboard.tabs?.[0]?.tab_id || 'default'],
+                    dashboard: dashboardId,
+                    tabs: [dashboardTabs[0]?.tabId || dashboardTabs[0]?.tab_id || 'default'],
                     variables: [],
                     timerange: {
                         type: 'relative',
