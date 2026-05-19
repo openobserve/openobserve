@@ -34,6 +34,7 @@ function onEnter(el: Element, done: () => void) {
   const height = htmlEl.scrollHeight
   htmlEl.style.transition = 'height 0.25s ease-out, opacity 0.25s ease-out'
   requestAnimationFrame(() => {
+    if (!htmlEl.isConnected) { done(); return }
     htmlEl.style.height = `${height}px`
     htmlEl.style.opacity = '1'
   })
@@ -51,10 +52,14 @@ function onLeave(el: Element, done: () => void) {
   htmlEl.style.overflow = 'hidden'
   htmlEl.style.transition = 'height 0.2s ease-out, opacity 0.2s ease-out'
   requestAnimationFrame(() => {
+    if (!htmlEl.isConnected) { done(); return }
     htmlEl.style.height = '0'
     htmlEl.style.opacity = '0'
   })
-  htmlEl.addEventListener('transitionend', done, { once: true })
+  htmlEl.addEventListener('transitionend', () => {
+    htmlEl.style.opacity = ''
+    done()
+  }, { once: true })
 }
 
 const canClick = computed<boolean>(() => {
