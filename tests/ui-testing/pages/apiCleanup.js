@@ -295,6 +295,65 @@ class APICleanup {
     }
 
     /**
+     * Create a minimal dashboard via API for use in report tests
+     * @param {string} dashboardName - Unique name for the dashboard
+     * @param {string} folderId - Folder ID (defaults to "default")
+     * @returns {Promise<Object>} { success, dashboard, error }
+     */
+    async createDashboardViaApi(dashboardName, folderId = 'default') {
+        testLogger.info('Creating dashboard via API', { dashboardName, folderId });
+
+        try {
+            const payload = {
+                version: 8,
+                title: dashboardName,
+                description: 'Auto-created for E2E test',
+                tabs: [{
+                    tabId: 'default',
+                    name: 'Default',
+                    panels: []
+                }]
+            };
+
+            const response = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                testLogger.error('Failed to create dashboard via API', { dashboardName, status: response.status, body: errorBody });
+                return { success: false, error: `HTTP ${response.status}: ${errorBody}` };
+            }
+
+            const result = await response.json();
+            // MetaDashboard nests the actual data under the version key (e.g., "v8")
+            const inner = result[`v${result.version}`] || result;
+            const tabs = (inner.tabs || [{ tabId: 'default', name: 'Default' }]).map(t => ({
+                tab_id: t.tabId || t.tab_id || 'default'
+            }));
+            const dashboard = {
+                dashboard_id: inner.dashboardId || inner.dashboard_id,
+                title: inner.title,
+                tabs
+            };
+
+            testLogger.info('Dashboard created via API', { dashboardName, dashboardId: dashboard.dashboard_id });
+            return { success: true, dashboard };
+        } catch (error) {
+            testLogger.error('Failed to create dashboard via API', { dashboardName, error: error.message });
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Fetch all reports
      * @returns {Promise<Array>} Array of report objects
      */
@@ -351,7 +410,7 @@ class APICleanup {
 
     /**
      * Create a report via API (v2) in the default folder.
-     * Fetches the first available dashboard and uses it as the report source.
+     * Creates a temporary dashboard, uses it as the report source, then deletes the dashboard.
      * @param {string} reportName - Unique name for the report
      * @param {string} folderId - Folder ID to create the report in (defaults to "default")
      * @returns {Promise<Object>} Result with { success, reportName, error }
@@ -360,15 +419,15 @@ class APICleanup {
         testLogger.info('Creating report via API', { reportName, folderId });
 
         try {
-            // Step 1: Fetch dashboards from the default folder to get a dashboard ID
-            const dashboards = await this.fetchDashboardsInFolder(folderId);
-            if (dashboards.length === 0) {
-                testLogger.error('No dashboards found in folder, cannot create report', { folderId });
-                return { success: false, error: 'No dashboards available' };
+            // Step 1: Create a temporary dashboard to use as the report source
+            const tempDashboardName = `temp_dashboard_${Date.now()}`;
+            const dashResult = await this.createDashboardViaApi(tempDashboardName, folderId);
+            if (!dashResult.success) {
+                return { success: false, error: `Failed to create temp dashboard: ${dashResult.error}` };
             }
 
-            const dashboard = dashboards[0];
-            testLogger.info('Using dashboard for report', { dashboardId: dashboard.dashboard_id, title: dashboard.title });
+            const dashboard = dashResult.dashboard;
+            testLogger.info('Using temp dashboard for report', { dashboardId: dashboard.dashboard_id, title: dashboard.title });
 
             // Step 2: Build the report payload
             const payload = {
@@ -394,13 +453,10 @@ class APICleanup {
                 title: `Test Report ${reportName}`,
                 message: '',
                 orgId: this.org,
-                start: Date.now(),
                 frequency: { interval: 1, type: 'once', cron: '' },
                 timezone: 'UTC',
                 timezoneOffset: 0,
                 lastTriggeredAt: null,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
                 owner: this.email,
                 lastEditedBy: this.email
             };
@@ -960,19 +1016,15 @@ class APICleanup {
 
             const text = await response.text();
 
-            if (response.ok) {
-                return { code: 200, message: text };
-            }
-
             try {
                 const jsonResult = JSON.parse(text);
-                return jsonResult;
+                return { code: response.ok ? 200 : response.status, message: jsonResult.message || text };
             } catch {
                 return { code: response.status, message: text };
             }
         } catch (error) {
             testLogger.error('Failed to delete report folder', { folderId, error: error.message });
-            return { code: 500, error: error.message };
+            return { code: 500, message: error.message, error: error.message };
         }
     }
 
@@ -1013,8 +1065,13 @@ class APICleanup {
             }
 
             testLogger.info('Report folders cleanup completed', { deletedCount, failedCount });
+
+            if (failedCount > 0) {
+                throw new Error(`Failed to delete ${failedCount} report folder(s)`);
+            }
         } catch (error) {
             testLogger.error('Report folders cleanup failed', { error: error.message });
+            throw error;
         }
     }
 
