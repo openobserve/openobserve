@@ -510,60 +510,9 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
   // ======================================================================
   // Bug #6443: Duplicate realtime pipeline validation
-  // Fix: API returns 400 when creating realtime pipeline for a stream
-  //      that already has one. Message: "A realtime pipeline with
-  //      same source stream already exists"
+  // Test moved to API test suite: tests/api-testing/tests/test_pipeline.py
+  //   → test_bug6443_duplicate_realtime_pipeline_rejection
   // ======================================================================
-
-  const DUPLICATE_TEST_STREAM = "e2e_dup_realtime_test";
-
-  test("Bug #6443: should reject duplicate realtime pipeline for same stream", {
-    tag: ['@smoke', '@P0', '@bug6443', '@pipelineRegression']
-  }, async () => {
-    testLogger.info('Testing: duplicate realtime pipeline rejection');
-
-    const pipelinePage = pageManager.pipelinesPage;
-
-    // Step 1: Ingest data to create a test stream
-    await pipelinePage.bulkIngestToStreams([DUPLICATE_TEST_STREAM], logsdata);
-    testLogger.info(`Ingested data to stream: ${DUPLICATE_TEST_STREAM}`);
-
-    // Step 2: Create first realtime pipeline via page object
-    const firstResult = await pipelinePage.createRealtimePipeline(
-      'e2e_dup_pipeline_first',
-      DUPLICATE_TEST_STREAM
-    );
-    expect(firstResult.status).toBe(200);
-    const firstPipelineId = firstResult.data.pipeline_id || firstResult.data.id;
-    expect(firstPipelineId).toBeTruthy();
-
-    let secondPipelineId = null;
-    try {
-      // Step 3: Attempt duplicate for same stream
-      const duplicateResult = await pipelinePage.createRealtimePipeline(
-        'e2e_dup_pipeline_second',
-        DUPLICATE_TEST_STREAM
-      );
-
-      // Capture ID before assertions so we can clean up if duplicate unexpectedly succeeds
-      secondPipelineId = duplicateResult.data?.pipeline_id || duplicateResult.data?.id;
-
-      // Step 4: Verify API rejected with StreamInUse
-      expect(duplicateResult.status).toBe(400);
-      expect(duplicateResult.data.message).toContain(
-        'A realtime pipeline with same source stream already exists'
-      );
-
-      testLogger.info('Test passed: duplicate realtime pipeline correctly rejected');
-    } finally {
-      // Step 5: Always clean up both pipelines
-      const deleteResult = await pipelinePage.deletePipelineById(firstPipelineId);
-      expect([200, 204]).toContain(deleteResult.status);
-      if (secondPipelineId) {
-        await pipelinePage.deletePipelineById(secondPipelineId);
-      }
-    }
-  });
 
   // ======================================================================
   // Bug #6558: Pipeline Query node fields section not scrollable

@@ -1440,3 +1440,165 @@ def test_e2e_pipeline_history(create_session, base_url):
     print("✓ All pipeline history API endpoints validated")
     print("✓ Filtering, pagination, and time range parameters working correctly")
     print("✓ Error handling for invalid requests validated")
+
+
+def test_bug6443_duplicate_realtime_pipeline_rejection(create_session, base_url, org_id):
+    """Bug #6443: API should return 400 when creating a realtime pipeline for a
+    stream that already has one. Message: "A realtime pipeline with same source
+    stream already exists".
+    """
+    import time
+
+    session = create_session
+    url = base_url
+
+    stream_name = "e2e_dup_realtime_api_test"
+    first_pipeline_name = "e2e_dup_pipeline_api_first"
+    second_pipeline_name = "e2e_dup_pipeline_api_second"
+
+    # Step 1: Ingest data to create the test stream
+    log_payload = [
+        {
+            "level": "INFO",
+            "message": "Bug 6443 test message",
+            "timestamp": "2026-05-19T10:00:00Z",
+            "service": "test-service",
+        }
+    ]
+    resp_ingest = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json",
+        json=log_payload,
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp_ingest.status_code == 200, (
+        f"Expected 200 for ingestion, got {resp_ingest.status_code}"
+    )
+    time.sleep(2)
+
+    # Step 2: Create first realtime pipeline — expect 200
+    import uuid
+    node_id = str(uuid.uuid4())
+
+    pipeline_payload = {
+        "name": first_pipeline_name,
+        "enabled": False,
+        "source": {
+            "source_type": "realtime",
+            "org_id": org_id,
+            "stream_name": stream_name,
+            "stream_type": "logs",
+        },
+        "nodes": [
+            {
+                "id": node_id + "-in",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 0, "y": 0},
+                "io_type": "input",
+            },
+            {
+                "id": node_id + "-out",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 0, "y": 100},
+                "io_type": "output",
+            },
+        ],
+        "edges": [
+            {
+                "id": f"e{node_id}",
+                "source": node_id + "-in",
+                "target": node_id + "-out",
+            }
+        ],
+        "org": org_id,
+    }
+
+    resp_create_first = session.post(
+        f"{url}api/{org_id}/pipelines",
+        json=pipeline_payload,
+    )
+    assert resp_create_first.status_code == 200, (
+        f"Expected 200 for first realtime pipeline, got {resp_create_first.status_code}: "
+        f"{resp_create_first.content.decode()}"
+    )
+    first_data = resp_create_first.json()
+    first_pipeline_id = first_data.get("pipeline_id") or first_data.get("id")
+    assert first_pipeline_id, f"No pipeline_id in response: {first_data}"
+    print(f"First pipeline created: {first_pipeline_id}")
+
+    # Step 3: Attempt duplicate realtime pipeline for same stream — expect 400
+    node_id_2 = str(uuid.uuid4())
+    duplicate_payload = {
+        "name": second_pipeline_name,
+        "enabled": False,
+        "source": {
+            "source_type": "realtime",
+            "org_id": org_id,
+            "stream_name": stream_name,
+            "stream_type": "logs",
+        },
+        "nodes": [
+            {
+                "id": node_id_2 + "-in",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 0, "y": 0},
+                "io_type": "input",
+            },
+            {
+                "id": node_id_2 + "-out",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 0, "y": 100},
+                "io_type": "output",
+            },
+        ],
+        "edges": [
+            {
+                "id": f"e{node_id_2}",
+                "source": node_id_2 + "-in",
+                "target": node_id_2 + "-out",
+            }
+        ],
+        "org": org_id,
+    }
+
+    resp_duplicate = session.post(
+        f"{url}api/{org_id}/pipelines",
+        json=duplicate_payload,
+    )
+    assert resp_duplicate.status_code == 400, (
+        f"Expected 400 for duplicate realtime pipeline, got {resp_duplicate.status_code}: "
+        f"{resp_duplicate.content.decode()}"
+    )
+    dup_data = resp_duplicate.json()
+    assert "A realtime pipeline with same source stream already exists" in dup_data.get(
+        "message", ""
+    ), f"Expected 'StreamInUse' message, got: {dup_data}"
+    print(f"Duplicate pipeline correctly rejected: {dup_data.get('message')}")
+
+    # Step 4: Cleanup — delete the first pipeline
+    resp_delete = session.delete(f"{url}api/{org_id}/pipelines/{first_pipeline_id}")
+    assert resp_delete.status_code in [200, 204], (
+        f"Expected 200/204 for delete, got {resp_delete.status_code}"
+    )
+    print(f"Cleaned up pipeline: {first_pipeline_id}")
+
+    print("\n=== Bug #6443 test completed successfully! ===")

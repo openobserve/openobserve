@@ -1435,102 +1435,6 @@ export class PipelinesPage {
     }
 
     /**
-     * Create a realtime pipeline with full stream params in source.
-     * Used to test duplicate realtime pipeline validation (Bug #6443).
-     * @param {string} pipelineName - Name for the pipeline
-     * @param {string} streamName - Source stream name
-     * @returns {Promise<{status: number, data: any}>}
-     */
-    async createRealtimePipeline(pipelineName, streamName) {
-        const orgId = process.env.ORGNAME || 'default';
-        const basicAuth = Buffer.from(
-            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-        ).toString('base64');
-        const headers = {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json',
-        };
-        const nodeId = `n${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-        const payload = {
-            name: pipelineName,
-            enabled: false,
-            source: {
-                source_type: 'realtime',
-                org_id: orgId,
-                stream_name: streamName,
-                stream_type: 'logs',
-            },
-            nodes: [
-                {
-                    id: `${nodeId}-in`,
-                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
-                    position: { x: 0, y: 0 },
-                    io_type: 'input',
-                },
-                {
-                    id: `${nodeId}-out`,
-                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
-                    position: { x: 0, y: 100 },
-                    io_type: 'output',
-                },
-            ],
-            edges: [{ id: `e${nodeId}`, source: `${nodeId}-in`, target: `${nodeId}-out` }],
-        };
-
-        testLogger.info('Creating realtime pipeline via API', { pipelineName, streamName });
-
-        try {
-            const baseUrl = process.env.ZO_BASE_URL;
-            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(payload),
-            });
-            const data = await response.json();
-            testLogger.info('Realtime pipeline API response', { status: response.status, data });
-            return { status: response.status, data };
-        } catch (error) {
-            testLogger.error('Failed to create realtime pipeline', { pipelineName, error: error.message });
-            return { status: 500, error: error.message };
-        }
-    }
-
-    /**
-     * Delete a pipeline by ID via API.
-     * @param {string} pipelineId - Pipeline ID to delete
-     * @returns {Promise<{status: number, data: any}>}
-     */
-    async deletePipelineById(pipelineId) {
-        const orgId = process.env.ORGNAME || 'default';
-        const basicAuth = Buffer.from(
-            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-        ).toString('base64');
-        const headers = {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json',
-        };
-
-        testLogger.info('Deleting pipeline by ID', { pipelineId });
-
-        try {
-            const baseUrl = process.env.ZO_BASE_URL;
-            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines/${pipelineId}`, {
-                method: 'DELETE',
-                headers,
-            });
-            const data = response.status !== 204
-                ? await response.json()
-                : { code: 204, message: 'Pipeline deleted' };
-            testLogger.info('Delete pipeline response', { status: response.status, data });
-            return { status: response.status, data };
-        } catch (error) {
-            testLogger.error('Failed to delete pipeline', { pipelineId, error: error.message });
-            return { status: 500, error: error.message };
-        }
-    }
-
-    /**
      * Explore a stream and interact with log details, then navigate to pipeline
      * @param {string} streamName - Name of the stream to explore
      */
@@ -2214,13 +2118,13 @@ export class PipelinesPage {
      */
     async expectBuildQuerySectionCollapsed() {
         // Build Query content (stream type, stream name, field list) is hidden
-        await expect(this.pipelineFieldSearchInput).toBeHidden({ timeout: 8000 });
+        await expect(this.pipelineFieldSearchInput).toBeHidden({ timeout: 5000 });
         testLogger.info('Build Query section is collapsed');
     }
 
     async expectBuildQuerySectionVisible() {
         // Build Query content (stream type, stream name, field list) is visible
-        await expect(this.pipelineFieldSearchInput).toBeVisible({ timeout: 8000 });
+        await expect(this.pipelineFieldSearchInput).toBeVisible({ timeout: 5000 });
         testLogger.info('Build Query section is visible');
     }
 
@@ -2230,22 +2134,9 @@ export class PipelinesPage {
      */
     async expandBuildQuerySection() {
         await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
-        // Check if already expanded by looking at the Stream Type field
-        // (always inside the Build Query content area when expanded)
         const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
         if (!isExpanded) {
-            // Click the keyboard_arrow_up icon inside the Build Query header
-            // to trigger the Vue toggle handler
-            await this.page.evaluate(() => {
-                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
-                for (const h of headers) {
-                    if (h.textContent && h.textContent.includes('Build Query')) {
-                        const icon = h.querySelector('.q-icon');
-                        if (icon) icon.click();
-                        break;
-                    }
-                }
-            });
+            await this.buildQuerySectionButton.click();
             testLogger.info('Build Query section expanded');
         } else {
             testLogger.info('Build Query section already expanded');
@@ -2259,16 +2150,7 @@ export class PipelinesPage {
         await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
         const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
         if (isExpanded) {
-            await this.page.evaluate(() => {
-                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
-                for (const h of headers) {
-                    if (h.textContent && h.textContent.includes('Build Query')) {
-                        const icon = h.querySelector('.q-icon');
-                        if (icon) icon.click();
-                        break;
-                    }
-                }
-            });
+            await this.buildQuerySectionButton.click();
             testLogger.info('Build Query section collapsed');
         }
     }
@@ -2424,7 +2306,11 @@ export class PipelinesPage {
             // filter/search change. scrollHeight reflects the total virtual
             // content — if it's only ~1x clientHeight, there's nothing to
             // scroll through yet (Quasar hasn't finished re-rendering).
-            for (let wait = 0; wait < 100; wait++) {
+            // Use Promise.race with a 2-second timeout to fail fast instead
+            // of an unbounded busy-wait loop.
+            const MAX_WAIT_MS = 2000;
+            const start = Date.now();
+            while (Date.now() - start < MAX_WAIT_MS) {
                 if (container.scrollHeight > container.clientHeight * 1.2) break;
                 await new Promise(r => requestAnimationFrame(r));
             }
@@ -2478,15 +2364,15 @@ export class PipelinesPage {
         // clearing the filter. In a virtual-scroll table the rendered label count
         // is always ~viewport size, so we must wait for Quasar to recompute the
         // full scroll dimensions before counting.
-        await this.page.waitForFunction(() => {
+        const expanded = await this.page.waitForFunction(() => {
             const container = document.querySelector('[data-test="log-search-index-list-fields-table"] .q-table__middle, [data-test="log-search-index-list-fields-table"] .q-virtual-scroll__container');
             if (!container) return false;
-            // scrollHeight must be large enough to indicate the full list is loaded
-            // (more than 1.2x the clientHeight, meaning content overflows)
             return container.scrollHeight > container.clientHeight * 1.2;
-        }, null, { timeout: 8000 }).catch(() => {
-            testLogger.info('Field list scrollHeight expansion wait timed out — continuing with current count');
-        });
+        }, null, { timeout: 8000 }).catch(() => false);
+
+        if (!expanded) {
+            throw new Error('Field list scrollHeight did not expand after clearing search — virtual-scroll may not have reloaded the full list');
+        }
         // Extra animation frame to let Quasar finish re-rendering visible rows
         await this.page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
         testLogger.info('Field list search cleared');
