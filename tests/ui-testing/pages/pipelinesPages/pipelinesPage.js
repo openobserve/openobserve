@@ -2295,30 +2295,17 @@ export class PipelinesPage {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
-        // Clear the input to reset Quasar autocomplete state, then wait
-        // for the dropdown to show all options before typing the new value.
-        // This ensures the filter runs with a clean slate on re-selection.
-        await this.streamNameLabel.fill('');
-        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
-        // Wait for the option to appear after Quasar autocomplete filtering
+        // Wait for the matching option to appear after Quasar autocomplete filtering
         await this.page.waitForFunction(
             (name) => Array.from(document.querySelectorAll('[role="option"]')).some(el => el.textContent.trim() === name),
             streamName,
-            { timeout: 8000 }
+            { timeout: 10000 }
         );
         // Click via Playwright locator to dispatch full mouse events (mousedown + mouseup + click)
         // which Quasar's q-item component needs to trigger selection.
-        const options = this.page.getByRole("option");
-        const optCount = await options.count();
-        for (let i = 0; i < optCount; i++) {
-            const text = await options.nth(i).textContent();
-            if (text.trim() === streamName) {
-                await options.nth(i).click();
-                break;
-            }
-        }
-        await this.page.waitForTimeout(500);
+        const opt = this.page.getByRole('option', { name: streamName, exact: true });
+        await opt.click({ timeout: 5000 });
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -2414,8 +2401,8 @@ export class PipelinesPage {
 
         // Get the total count by scrolling through virtual-scroll positions.
         // Quasar q-table with virtual-scroll only renders the visible window
-        // (~21 rows). We scroll to bottom and collect labels from both
-        // positions to deduplicate and get the true total.
+        // (~21 rows). We scroll incrementally through the container and
+        // collect labels at each position to get the true total.
         const count = await this.pipelineFieldTable.evaluate(async (el) => {
             const container = el.querySelector('.q-table__middle, .q-virtual-scroll__container');
             if (!container) {
@@ -2423,30 +2410,30 @@ export class PipelinesPage {
             }
 
             const allLabels = new Set();
-
-            // Collect from current (top) position
-            container.querySelectorAll('.field_label').forEach(lbl => {
-                allLabels.add(lbl.textContent);
-            });
-
-            // Scroll to bottom and poll for stable row count
+            const step = container.clientHeight;
             const prevScrollTop = container.scrollTop;
-            container.scrollTop = container.scrollHeight;
 
-            let stableCount = -1;
-            for (let i = 0; i < 10; i++) {
+            // Scroll from top to bottom in increments of one viewport height
+            for (let pos = 0; pos <= container.scrollHeight; pos += step) {
+                container.scrollTop = pos;
                 await new Promise(r => requestAnimationFrame(r));
-                const currentLabels = container.querySelectorAll('.field_label');
-                if (currentLabels.length === stableCount) break;
-                stableCount = currentLabels.length;
+                // Extra frame to let Quasar virtual-scroll re-render
+                await new Promise(r => requestAnimationFrame(r));
+                container.querySelectorAll('.field_label').forEach(lbl => {
+                    allLabels.add(lbl.textContent);
+                });
             }
 
+            // Scroll to the very bottom to catch any remaining rows
+            container.scrollTop = container.scrollHeight;
+            await new Promise(r => requestAnimationFrame(r));
+            await new Promise(r => requestAnimationFrame(r));
             container.querySelectorAll('.field_label').forEach(lbl => {
                 allLabels.add(lbl.textContent);
             });
 
             // Restore scroll position
-            container.scrollTop = prevScrollTop;
+            container.scrollTop = Math.min(prevScrollTop, container.scrollHeight);
 
             return allLabels.size;
         });
