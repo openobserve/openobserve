@@ -209,17 +209,37 @@ pub async fn get_latest_sessions(
     //
     // Detect schema generation up front so both Phase 1 (session-id column)
     // and Phase 2 (token/cost columns) pick consistent names.
+    // Validate that the stream schema actually contains a session identifier
+    // column. If neither gen_ai_conversation_id nor llm_session_id is present,
+    // return an empty result immediately rather than running a doomed query.
     let stream_type = StreamType::Traces;
-    let has_gen_ai_fields = super::schema_compat::stream_has_gen_ai_fields(
+    let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
         stream_name.as_str(),
         stream_type,
     )
     .await;
-    let llm_cols = if has_gen_ai_fields {
-        super::schema_compat::LlmColumns::current()
-    } else {
-        super::schema_compat::LlmColumns::legacy()
+    let has_gen_ai_fields = schema
+        .as_ref()
+        .map(|s| super::schema_compat::has_gen_ai_fields(s))
+        .unwrap_or(false);
+    let llm_cols = match &schema {
+        Some(s) if has_gen_ai_fields => super::schema_compat::LlmColumns::current(),
+        Some(s) if s.field_with_name("llm_session_id").is_ok() => {
+            super::schema_compat::LlmColumns::legacy()
+        }
+        Some(_) => {
+            return MetaHttpResponse::json(PaginatedResponse {
+                took: 0,
+                total: 0,
+                from,
+                size,
+                hits: vec![],
+                trace_id,
+                function_error: String::new(),
+            });
+        }
+        None => super::schema_compat::LlmColumns::legacy(),
     };
     let session_id_col = llm_cols.session_id;
     let user_id_opt = Some(user_id.to_string());
@@ -336,7 +356,24 @@ pub async fn get_latest_sessions(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
+
+    // Check which optional gen_ai/llm fields actually exist in the schema
+    // to avoid query errors for streams with partial schemas.
+    let has_input_messages = schema
+        .as_ref()
+        .map(|s| s.field_with_name("gen_ai_input_messages").is_ok())
+        .unwrap_or(has_gen_ai_fields);
+    let has_llm_input = schema
+        .as_ref()
+        .map(|s| s.field_with_name("llm_input").is_ok())
+        .unwrap_or(!has_gen_ai_fields);
+
     let query_sql = if has_gen_ai_fields {
+        let first_msg_clause = if has_input_messages {
+            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')"
+        } else {
+            "''"
+        };
         format!(
             "SELECT trace_id, \
             max(user_id) as user_id,
@@ -347,7 +384,7 @@ pub async fn get_latest_sessions(
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            {first_msg_clause} as gen_ai_input_messages \
             FROM \"{stream_name}\" \
             WHERE trace_id IN ('{trace_ids_sql}') \
             GROUP BY trace_id"
@@ -357,6 +394,11 @@ pub async fn get_latest_sessions(
         // names. user.id is stored as the flattened `llm_user_id` column,
         // tokens/cost use the `llm_usage_tokens_*` / `llm_usage_cost_total`
         // shape, and the messages column is `llm_input`.
+        let first_msg_clause = if has_llm_input {
+            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')"
+        } else {
+            "''"
+        };
         format!(
             "SELECT trace_id, \
             max(llm_user_id) as user_id,
@@ -367,7 +409,7 @@ pub async fn get_latest_sessions(
             sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
             sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
+            {first_msg_clause} as gen_ai_input_messages \
             FROM \"{stream_name}\" \
             WHERE trace_id IN ('{trace_ids_sql}') \
             GROUP BY trace_id"
