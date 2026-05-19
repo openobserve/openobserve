@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:py-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
       <!-- Left: FolderList -->
       <div
@@ -253,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :global-filter="filterQuery"
             :show-global-filter="false"
+            :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
