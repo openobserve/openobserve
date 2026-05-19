@@ -98,26 +98,21 @@
           <OSelect
             v-model="field.type"
             :options="dataTypes"
-            :popup-content-style="{ textTransform: 'lowercase' }"
             class="tw:py-2"
             label-key="label"
             value-key="value"
             clearable
-            borderless
-            dense
-            use-input
-            fill-input
-            hide-selected
             style="width: 250px"
             :placeholder="
               !isDataTypeFocused && (!field.type || field.type.length === 0)
                 ? t('logStream.dataType') + ' *'
                 : ''
             "
-            :rules="[(val: any) => !!val || t('logStream.dataTypeRequired')]"
-            @update:model-value="emits('input:update', 'conditions', field)"
+            :error="!!fieldDataTypeErrors[index]"
+            :error-message="fieldDataTypeErrors[index] || ''"
+            @update:model-value="fieldDataTypeErrors[index] = ''; emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
-            @blur="handleDataTypeBlur"
+            @blur="handleDataTypeBlur(); !field.type && (fieldDataTypeErrors[index] = t('logStream.dataTypeRequired'))"
           />
         </div>
         <div class="tw:ml-0" style="margin-bottom: 8px">
@@ -222,6 +217,7 @@ const store = useStore();
 
 const { t } = useI18n();
 const fieldNameErrors = ref<string[]>([]);
+const fieldDataTypeErrors = ref<string[]>([]);
 
 const isFocused = ref(false);
 //repetitive need to refactor
@@ -298,8 +294,14 @@ const validate = () => {
     if (!field.name.trim()) {
       fieldNameErrors.value[index] = t("logStream.fieldRequired");
     }
+    if (props.visibleInputs.data_type && !field.type) {
+      fieldDataTypeErrors.value[index] = t("logStream.dataTypeRequired");
+    }
   });
-  return fields.every((field) => field.name.trim());
+  return fields.every(
+    (field) =>
+      field.name.trim() && (!props.visibleInputs.data_type || field.type),
+  );
 };
 
 // Expose methods and data for testing

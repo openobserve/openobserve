@@ -72,13 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   v-bind:readonly="isEditingReport"
                   v-bind:disable="isEditingReport"
-                  :rules="[
-                    (val: any) =>
-                      !!val
-                        ? isValidResourceName(val) ||
-                          `Characters like :, ?, /, #, and spaces are not allowed.`
-                        : t('common.nameRequired'),
-                  ]"
+                  :error="!!nameError"
+                  :error-message="nameError"
+                  @update:model-value="nameError = ''"
                   tabindex="0"
                   style="width: 330px"
                 >
@@ -500,16 +496,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           type="text"
                           outlined
-                          :rules="[
-                            (val: any) =>
-                              !!val.length
-                                ? cronError.length
-                                  ? cronError
-                                  : true
-                                : 'Field is required!',
-                          ]"
+                          :error="!!cronError"
+                          :error-message="cronError"
                           style="width: 100%"
-                          debounce="400"
+                          :debounce="400"
                           @update:model-value="validateFrequency"
                         />
                       </div>
@@ -574,7 +564,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           class="showLabelOnTop"
                           type="number"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!intervalError"
+                          :error-message="intervalError"
+                          @update:model-value="intervalError = ''"
                           style="width: 100%"
                         />
                       </div>
@@ -588,11 +580,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
                           :label="'Frequency *'"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
                           class="tw:pt-2 tw:pb-0 showLabelOnTop no-case"
-                          behavior="menu"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!periodError"
+                          :error-message="periodError"
+                          @update:model-value="periodError = ''"
                           style="width: 100% !important"
                         />
                       </div>
@@ -986,6 +977,9 @@ const tabError = ref("");
 const timezoneError = ref("");
 const titleError = ref("");
 const recipientsError = ref("");
+const nameError = ref("");
+const intervalError = ref("");
+const periodError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -1449,6 +1443,18 @@ const saveReport = async () => {
 };
 
 const validateReportData = async (): Promise<boolean> => {
+  if (!formData.value.name) {
+    nameError.value = t('common.nameRequired');
+    step.value = 1;
+    return false;
+  }
+  if (!isValidResourceName(formData.value.name)) {
+    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
+    step.value = 1;
+    return false;
+  }
+  nameError.value = '';
+
   if (!formData.value.dashboards[0].folder) {
     folderError.value = t('validation.required');
     step.value = 1;
@@ -1511,6 +1517,20 @@ const validateReportData = async (): Promise<boolean> => {
   }
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
+    if (formData.value.frequency.type === "custom") {
+      if (!frequency.value.custom.interval) {
+        intervalError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      intervalError.value = '';
+      if (!frequency.value.custom.period) {
+        periodError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      periodError.value = '';
+    }
     step.value = 2;
     return false;
   }

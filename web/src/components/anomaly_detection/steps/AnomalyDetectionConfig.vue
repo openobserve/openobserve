@@ -194,7 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="config.detection_function"
                 :options="detectionFunctions"
-                :rules="[(v) => !!v || 'Detection function is required']"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
                 style="width: 110px"
@@ -207,19 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 v-model="config.detection_function_field"
                 :options="filteredDetectionFields"
-                use-input
-                input-debounce="200"
                 :placeholder="
                   config.detection_function_field
                     ? ''
                     : t('alerts.anomaly.fieldPlaceholder')
                 "
                 :loading="loadingFields"
-                :rules="[(v) => !!v || 'Field is required']"
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
                 style="width: 140px"
-                @filter="filterDetectionFieldOptions"
               >
                 <template #no-option>
                   <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
@@ -479,7 +474,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model.number="config.training_window_days"
                 type="number"
                 :min="1"
-                :rules="[(v) => v >= 1 || 'Minimum 1 day']"
                 data-test="anomaly-training-window"
                 class="alert-v3-input"
                 style="width: 87px"
