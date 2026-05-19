@@ -3818,6 +3818,7 @@
     "shadowBannerPrefix": "The rules below are shadowed by",
     "shadowBannerSuffix": "— overridden by a higher-priority rule and won't be used for cost calculations.",
     "shadowedTooltip": "Shadowed by \"{name}\" — overridden by a higher-priority rule and won't be used for cost calculations",
+    "shadowedWarningBanner": "The rules below are shadowed by \"{name}\" — overridden by a higher-priority rule and won't be used for cost calculations.",
     "overflowMore": "more",
     "errLoadModels": "Failed to load models",
     "errUpdate": "Failed to update",

@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTable
         ref="qTableRef"
         data-test="model-pricing-list-table"
-        :data="displayRows"
+        :data="filteredModels"
         :columns="columns"
         row-key="id"
         :selected-ids="selectedIds"
@@ -123,23 +123,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
+        tree
+        tree-column-id="name"
+        :get-row-warning="(row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <template #tree-warning="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:text-sm tw:leading-none">
+            <OIcon name="warning-amber" size="sm" class="shadowed-icon" />
+            <span class="tw:leading-tight">
+              {{
+                t("modelPricing.shadowedWarningBanner", { name: row.name })
+              }}
+            </span>
+          </div>
+        </template>
         <template #cell-name="{ row }">
           <div class="row items-center no-wrap tree-node-content">
-            <div class="tree-icon-wrapper">
-              <OIcon
-                v-if="row.children?.length > 0"
-                :name="
-                  expandedParents.has(row.id)
-                    ? 'expand-more'
-                    : 'chevron-right'
-                "
-                size="xs"
-                class="cursor-pointer tree-expand-icon"
-                @click.stop="toggleExpand(row.id)"
-              />
-            </div>
             <span
               v-if="getSource(row) === 'built_in'"
               class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
@@ -190,16 +190,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1">
             <code
               class="text-caption pattern-code o2-table-cell-content"
-              :class="{ 'shadowed-pattern': row.__type === 'child' }"
+              :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
             <OIcon
-              v-if="row.__type === 'child'"
+              v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
               class="tw:shrink-0 shadowed-icon"
-             />
-              <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: row._parentName })" />
+            >
+              <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
+            </OIcon>
           </div>
         </template>
         <template #cell-pricing="{ row }">
@@ -568,6 +569,26 @@ const allModels = computed(() => {
   return result;
 });
 
+/** Set of model ids that are children of some parent (= shadowed rows). */
+const childIds = computed(() => {
+  const ids = new Set<string>();
+  for (const m of models.value) {
+    for (const c of m.children ?? []) ids.add(c.id);
+  }
+  return ids;
+});
+
+function isChildRow(row: any): boolean {
+  return !!(row && childIds.value.has(row.id));
+}
+
+function getParentName(row: any): string {
+  for (const m of models.value) {
+    if (m.children?.some((c: any) => c.id === row.id)) return m.name;
+  }
+  return "";
+}
+
 const columns: OTableColumnDef[] = [
   {
     id: "name",
@@ -588,6 +609,7 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
     meta: { align: "left" },
+    size: 300,
   },
   {
     id: "actions",
@@ -654,29 +676,13 @@ const filteredModels = computed(() => {
   return items;
 });
 
-// ── Parent-children expand/collapse ──────────────────────────────────────────
-
-const expandedParents = ref(new Set<string>());
-
-function toggleExpand(id: string) {
-  const next = new Set(expandedParents.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  expandedParents.value = next;
-}
-
-/** Flat list for OTable — injects child rows under expanded parents. */
-const displayRows = computed(() => {
-  const rows: any[] = [];
-  for (const m of filteredModels.value) {
-    rows.push(m);
-    if (expandedParents.value.has(m.id) && m.children?.length) {
-      for (const child of m.children) {
-        rows.push({ ...child, __type: 'child', _parentName: m.name });
-      }
-    }
+/** Names of parents that shadow at least one child — used to gate the warning row. */
+const shadowingParentNames = computed(() => {
+  const names = new Set<string>();
+  for (const m of models.value) {
+    if (m.children?.length) names.add(m.name);
   }
-  return rows;
+  return names;
 });
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
