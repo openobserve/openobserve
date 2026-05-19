@@ -15,9 +15,14 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Arc, LazyLock as Lazy},
+    sync::{
+        Arc, LazyLock as Lazy,
+        atomic::{AtomicI64, Ordering},
+    },
+    time::Instant,
 };
 
+use config::metrics;
 use dashmap::DashMap;
 use datafusion::{
     common::Statistics,
@@ -36,8 +41,9 @@ pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
 /// Collected statistics for files
 /// Cache is invalided when file size or last modification has changed
 pub struct FileStatisticsCache {
-    statistics: DashMap<String, (ObjectMeta, Arc<Statistics>)>,
+    statistics: DashMap<String, (ObjectMeta, Arc<Statistics>, usize)>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
+    current_memory: AtomicI64,
 }
 
 impl FileStatisticsCache {
@@ -45,6 +51,7 @@ impl FileStatisticsCache {
         Self {
             statistics: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
+            current_memory: AtomicI64::new(0),
         }
     }
 
@@ -53,64 +60,67 @@ impl FileStatisticsCache {
     }
 
     pub fn memory_size(&self) -> usize {
-        let mut total_size = 0;
+        self.current_memory.load(Ordering::Relaxed).max(0) as usize
+    }
 
-        // Size of the struct itself
-        total_size += std::mem::size_of::<Self>();
+    fn estimate_entry_size(key: &str, meta: &ObjectMeta, stats: &Statistics) -> usize {
+        // Key is stored both in the DashMap and the eviction queue
+        let mut size = (std::mem::size_of::<String>() + key.len()) * 2;
 
-        // Size of DashMap entries
-        for entry in self.statistics.iter() {
-            let (key, (meta, stats)) = entry.pair();
-
-            // Key string
-            total_size += std::mem::size_of::<String>() + key.len();
-
-            // ObjectMeta
-            total_size += std::mem::size_of::<ObjectMeta>();
-            // Path string in ObjectMeta
-            total_size += meta.location.as_ref().len();
-            // Optional e_tag
-            if let Some(ref etag) = meta.e_tag {
-                total_size += std::mem::size_of::<String>() + etag.len();
-            }
-            // Optional version
-            if let Some(ref version) = meta.version {
-                total_size += std::mem::size_of::<String>() + version.len();
-            }
-
-            // Arc<Statistics> - estimate size
-            // Statistics contains num_rows, total_byte_size, and column_statistics
-            total_size += std::mem::size_of::<Statistics>();
-
-            // Column statistics size estimation
-            for col in &stats.column_statistics {
-                total_size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
-                // add min_value, max_value, sum_value
-                total_size += col.min_value.get_value().map(|v| v.size()).unwrap_or(0);
-                total_size += col.max_value.get_value().map(|v| v.size()).unwrap_or(0);
-                total_size += col.sum_value.get_value().map(|v| v.size()).unwrap_or(0);
-            }
+        size += std::mem::size_of::<ObjectMeta>();
+        size += meta.location.as_ref().len();
+        if let Some(ref etag) = meta.e_tag {
+            size += std::mem::size_of::<String>() + etag.len();
+        }
+        if let Some(ref version) = meta.version {
+            size += std::mem::size_of::<String>() + version.len();
         }
 
-        // Size of VecDeque<String> in cacher
-        let cacher_guard = self.cacher.lock();
-        total_size += std::mem::size_of::<VecDeque<String>>();
-        for key in cacher_guard.iter() {
-            total_size += std::mem::size_of::<String>() + key.len();
+        size += std::mem::size_of::<Statistics>();
+        size += std::mem::size_of::<usize>(); // tracked entry size field
+
+        for col in &stats.column_statistics {
+            size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
+            size += col.min_value.get_value().map(|v| v.size()).unwrap_or(0);
+            size += col.max_value.get_value().map(|v| v.size()).unwrap_or(0);
+            size += col.sum_value.get_value().map(|v| v.size()).unwrap_or(0);
         }
-        drop(cacher_guard);
 
-        // DashMap overhead (approximate)
-        // DashMap uses sharding internally, estimate based on typical overhead
-        // This is an approximation since we can't access internal shards
-        let estimated_shards = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(8)
-            .min(128); // DashMap typically uses CPU count for shards
-        let dashmap_overhead = estimated_shards * std::mem::size_of::<parking_lot::RwLock<()>>();
-        total_size += dashmap_overhead;
+        size
+    }
 
-        total_size
+    fn evict(&self, max_bytes: usize) {
+        let start = Instant::now();
+        let mut warned = false;
+        let mut w = self.cacher.lock();
+        while self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 && !w.is_empty() {
+            if !warned {
+                log::warn!(
+                    "FileStatisticsCache is full ({} bytes > {} bytes), evicting oldest entries",
+                    self.current_memory.load(Ordering::Relaxed),
+                    max_bytes,
+                );
+                warned = true;
+            }
+            let batch = (w.len() / 20).max(1).min(w.len());
+            let mut removed_total = 0i64;
+            for k in w.drain(0..batch) {
+                if let Some((_, (_, _, size))) = self.statistics.remove(&k) {
+                    removed_total += size as i64;
+                }
+            }
+            if removed_total > 0 {
+                self.current_memory
+                    .fetch_sub(removed_total, Ordering::Relaxed);
+            }
+        }
+        drop(w);
+        metrics::QUERY_PARQUET_METADATA_CACHE_GC_COUNT
+            .with_label_values::<&str>(&[])
+            .inc();
+        metrics::QUERY_PARQUET_METADATA_CACHE_GC_TIME
+            .with_label_values::<&str>(&[])
+            .observe(start.elapsed().as_millis() as f64);
     }
 
     fn format_key(&self, k: &Path) -> String {
@@ -135,43 +145,57 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
     /// Get cached metadata for file location.
     fn get(&self, k: &Path) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
-        self.statistics.get(&k).map(|s| {
-            let (meta, statistics) = s.value();
-            CachedFileMetadata::new(meta.clone(), statistics.clone(), None)
-        })
+        match self.statistics.get(&k) {
+            Some(s) => {
+                metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
+                    .with_label_values::<&str>(&[])
+                    .inc();
+                let (meta, statistics, _) = s.value();
+                Some(CachedFileMetadata::new(
+                    meta.clone(),
+                    statistics.clone(),
+                    None,
+                ))
+            }
+            None => {
+                metrics::QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL
+                    .with_label_values::<&str>(&[])
+                    .inc();
+                None
+            }
+        }
     }
 
     /// Save collected file statistics
     fn put(&self, k: &Path, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
-        let mut w = self.cacher.lock();
+        let entry_size = Self::estimate_entry_size(&k, &value.meta, &value.statistics);
 
-        let max_entries = config::get_config()
-            .limit
-            .datafusion_file_stat_cache_max_entries;
-        if w.len() >= max_entries {
-            // release 10% of the cache
-            log::warn!("FileStatisticsCache is full, releasing 10% of the cache");
-            for _ in 0..(max_entries / 10) {
-                if let Some(k) = w.pop_front() {
-                    self.statistics.remove(&k);
-                } else {
-                    break;
-                }
-            }
+        let old = self.statistics.insert(
+            k.clone(),
+            (value.meta.clone(), value.statistics.clone(), entry_size),
+        );
+        let old_size = old.as_ref().map(|(_, _, s)| *s).unwrap_or(0);
+        let delta = entry_size as i64 - old_size as i64;
+        self.current_memory.fetch_add(delta, Ordering::Relaxed);
+
+        self.cacher.lock().push_back(k);
+
+        let max_bytes = config::get_config().limit.datafusion_file_stat_cache_max_size;
+        if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
+            self.evict(max_bytes);
         }
-        w.push_back(k.clone());
-        drop(w);
-        self.statistics
-            .insert(k, (value.meta.clone(), value.statistics.clone()))
-            .map(|(meta, stats)| CachedFileMetadata::new(meta, stats, None))
+
+        old.map(|(meta, stats, _)| CachedFileMetadata::new(meta, stats, None))
     }
 
     fn remove(&self, k: &Path) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
-        self.statistics
-            .remove(&k)
-            .map(|(_, (meta, stats))| CachedFileMetadata::new(meta, stats, None))
+        self.statistics.remove(&k).map(|(_, (meta, stats, size))| {
+            self.current_memory
+                .fetch_sub(size as i64, Ordering::Relaxed);
+            CachedFileMetadata::new(meta, stats, None)
+        })
     }
 
     fn contains_key(&self, k: &Path) -> bool {
@@ -184,7 +208,9 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
     }
 
     fn clear(&self) {
-        self.statistics.clear()
+        self.statistics.clear();
+        self.cacher.lock().clear();
+        self.current_memory.store(0, Ordering::Relaxed);
     }
     fn name(&self) -> String {
         "FileStatisticsCache".to_string()
@@ -197,7 +223,7 @@ impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileSt
 
         for entry in &self.statistics {
             let path = Path::from(entry.key().as_str());
-            let (object_meta, stats) = entry.value();
+            let (object_meta, stats, _) = entry.value();
             entries.insert(
                 path,
                 FileStatisticsCacheEntry {
@@ -276,9 +302,9 @@ mod tests {
     fn test_memory_size_calculation() {
         let cache = FileStatisticsCache::new();
 
-        // Empty cache should have some base size
+        // Empty cache tracks zero memory
         let empty_size = cache.memory_size();
-        assert!(empty_size > 0);
+        assert_eq!(empty_size, 0);
 
         // Add some entries
         for i in 0..10 {
@@ -321,6 +347,10 @@ mod tests {
             cache.len(),
             filled_size,
         );
+
+        // After clearing, tracked memory must return to zero
+        cache.clear();
+        assert_eq!(cache.memory_size(), 0);
     }
 
     #[test]
