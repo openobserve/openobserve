@@ -207,11 +207,9 @@ pub async fn get_latest_sessions(
     // So we must: get session→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate usage totals.
     //
-    // Detect schema generation up front so both Phase 1 (session-id column)
-    // and Phase 2 (token/cost columns) pick consistent names.
-    // Validate that the stream schema actually contains a session identifier
-    // column. If neither gen_ai_conversation_id nor llm_session_id is present,
-    // return an empty result immediately rather than running a doomed query.
+    // Use ValidatedLlmSchema (Tier 1) for column-name resolution and optional
+    // field detection. Session handler keeps its own SQL shape (Phase 1 groups
+    // by session_id; Phase 2 queries by trace_id; ordering is done in Rust).
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -219,16 +217,32 @@ pub async fn get_latest_sessions(
         stream_type,
     )
     .await;
-    let has_gen_ai_fields = schema
-        .as_ref()
-        .map(|s| super::schema_compat::has_gen_ai_fields(s))
-        .unwrap_or(false);
-    let llm_cols = match &schema {
-        Some(s) if has_gen_ai_fields => super::schema_compat::LlmColumns::current(),
-        Some(s) if s.field_with_name("llm_session_id").is_ok() => {
-            super::schema_compat::LlmColumns::legacy()
-        }
-        Some(_) => {
+    let validated = match schema.as_ref() {
+        Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
+            Ok(v) => {
+                // Verify a session identifier column actually exists — even if
+                // all required LLM fields pass, we cannot run a session query
+                // without something to group by.
+                if s.field_with_name(v.columns.session_id).is_err() {
+                    return MetaHttpResponse::json(PaginatedResponse {
+                        took: 0,
+                        total: 0,
+                        from,
+                        size,
+                        hits: vec![],
+                        trace_id,
+                        function_error: String::new(),
+                    });
+                }
+                Some(v)
+            }
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        },
+        None => Some(super::schema_compat::ValidatedLlmSchema::fallback(false)),
+    };
+    let validated = match validated {
+        Some(v) => v,
+        None => {
             return MetaHttpResponse::json(PaginatedResponse {
                 took: 0,
                 total: 0,
@@ -239,9 +253,8 @@ pub async fn get_latest_sessions(
                 function_error: String::new(),
             });
         }
-        None => super::schema_compat::LlmColumns::legacy(),
     };
-    let session_id_col = llm_cols.session_id;
+    let session_id_col = validated.columns.session_id;
     let user_id_opt = Some(user_id.to_string());
 
     // Phase 1: Get paginated session list with trace_ids per session
@@ -357,22 +370,13 @@ pub async fn get_latest_sessions(
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
 
-    // Check which optional gen_ai/llm fields actually exist in the schema
-    // to avoid query errors for streams with partial schemas.
-    let has_input_messages = schema
-        .as_ref()
-        .map(|s| s.field_with_name("gen_ai_input_messages").is_ok())
-        .unwrap_or(has_gen_ai_fields);
-    let has_llm_input = schema
-        .as_ref()
-        .map(|s| s.field_with_name("llm_input").is_ok())
-        .unwrap_or(!has_gen_ai_fields);
-
-    let query_sql = if has_gen_ai_fields {
-        let first_msg_clause = if has_input_messages {
-            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')"
+    // Build Phase 2 SQL using ValidatedLlmSchema for column names and optional
+    // field presence (the session handler keeps its own SQL shape).
+    let query_sql = if validated.has_gen_ai {
+        let first_msg_clause = if validated.has_input_messages {
+            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
         } else {
-            "''"
+            "''".to_string()
         };
         format!(
             "SELECT trace_id, \
@@ -390,14 +394,10 @@ pub async fn get_latest_sessions(
             GROUP BY trace_id"
         )
     } else {
-        // Legacy `_o2_llm` schema (pre-PR #11626): columns live under `llm_*`
-        // names. user.id is stored as the flattened `llm_user_id` column,
-        // tokens/cost use the `llm_usage_tokens_*` / `llm_usage_cost_total`
-        // shape, and the messages column is `llm_input`.
-        let first_msg_clause = if has_llm_input {
-            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')"
+        let first_msg_clause = if validated.has_input_messages {
+            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')".to_string()
         } else {
-            "''"
+            "''".to_string()
         };
         format!(
             "SELECT trace_id, \

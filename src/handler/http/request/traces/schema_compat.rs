@@ -29,6 +29,8 @@
 //! for a sentinel new-schema column (`gen_ai_usage_input_tokens`) in the
 //! cached Arrow schema.
 
+use std::fmt;
+
 use arrow_schema::Schema;
 use config::meta::stream::StreamType;
 
@@ -36,6 +38,30 @@ use crate::service::traces::otel::attributes::OtelAttributes;
 
 /// Sentinel column whose presence indicates the new `gen_ai_*` schema.
 const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
+
+/// Required fields for the new (gen_ai_*) schema. If any are missing, the
+/// query is rejected with a clear error.
+const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
+    "gen_ai_usage_input_tokens",
+    "gen_ai_usage_output_tokens",
+    "gen_ai_usage_cost",
+    "gen_ai_response_model",
+];
+
+/// Optional fields for the new (gen_ai_*) schema. Missing optional fields
+/// produce `None` in the API response; the column is omitted from SQL.
+const OPTIONAL_GEN_AI_FIELDS: &[&str] = &["gen_ai_input_messages", "gen_ai_output_messages"];
+
+/// Required fields for the legacy (llm_*) schema.
+const REQUIRED_LLM_FIELDS: &[&str] = &[
+    "llm_usage_tokens_input",
+    "llm_usage_tokens_output",
+    "llm_usage_cost_total",
+    "llm_model_name",
+];
+
+/// Optional fields for the legacy (llm_*) schema.
+const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output"];
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///
@@ -76,14 +102,8 @@ pub(super) fn has_gen_ai_fields(schema: &Schema) -> bool {
 }
 
 /// Pick the column-name layout for a given schema.
-///
-/// Intentionally test-only today: production call sites read `has_gen_ai_fields`
-/// from the cached schema asynchronously and pick the layout directly to avoid
-/// reborrowing the `Arc<Schema>` (see `stream_has_gen_ai_fields`). This pure
-/// helper exists so the mapping rule can be unit-tested against synthetic
-/// schemas without touching the global cache.
-#[cfg(test)]
-fn columns_for(schema: &Schema) -> LlmColumns {
+#[allow(dead_code)]
+pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
     if has_gen_ai_fields(schema) {
         LlmColumns::current()
     } else {
@@ -104,6 +124,101 @@ pub(super) async fn stream_has_gen_ai_fields(
         .await
         .map(|s| has_gen_ai_fields(&s))
         .unwrap_or(false)
+}
+
+/// Validated schema metadata for an LLM trace stream.
+///
+/// Produced by [`validate_llm_schema`], this struct carries:
+/// - the schema generation (gen_ai vs legacy)
+/// - the column-name layout (session_id, user_id)
+/// - which optional fields are actually present
+///
+/// Callers use this to build SQL queries that reference only columns that
+/// truly exist, and to decide whether to omit optional fields from the
+/// API response.
+#[derive(Debug, Clone)]
+pub(super) struct ValidatedLlmSchema {
+    pub(super) has_gen_ai: bool,
+    pub(super) columns: LlmColumns,
+    pub(super) has_input_messages: bool,
+    #[allow(dead_code)]
+    pub(super) has_output_messages: bool,
+}
+
+impl ValidatedLlmSchema {
+    /// Create a default fallback when no cached schema is available.
+    ///
+    /// Assumes required fields are present (the stream was marked LLM) and
+    /// marks optional fields as absent to avoid referencing unknown columns.
+    pub(super) fn fallback(has_gen_ai: bool) -> Self {
+        Self {
+            has_gen_ai,
+            columns: if has_gen_ai {
+                LlmColumns::current()
+            } else {
+                LlmColumns::legacy()
+            },
+            has_input_messages: false,
+            has_output_messages: false,
+        }
+    }
+}
+
+/// Error returned when a required LLM field is missing from the stream schema.
+#[derive(Debug)]
+pub(super) struct LlmSchemaError {
+    pub field_name: &'static str,
+    pub stream_name: String,
+}
+
+impl fmt::Display for LlmSchemaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Missing required LLM field '{}' in stream '{}'",
+            self.field_name, self.stream_name
+        )
+    }
+}
+
+/// Validate that an LLM stream's schema has all required fields.
+///
+/// Checks for the schema-appropriate required fields (gen_ai_* or llm_*)
+/// and returns an error if any are missing. Optional fields are reported
+/// so callers can omit them from SQL when absent.
+pub(super) fn validate_llm_schema(
+    schema: &Schema,
+    stream_name: &str,
+) -> Result<ValidatedLlmSchema, LlmSchemaError> {
+    let has_gen_ai = has_gen_ai_fields(schema);
+    let (required_fields, optional_fields) = if has_gen_ai {
+        (REQUIRED_GEN_AI_FIELDS, OPTIONAL_GEN_AI_FIELDS)
+    } else {
+        (REQUIRED_LLM_FIELDS, OPTIONAL_LLM_FIELDS)
+    };
+
+    for &field in required_fields {
+        if schema.field_with_name(field).is_err() {
+            return Err(LlmSchemaError {
+                field_name: field,
+                stream_name: stream_name.to_string(),
+            });
+        }
+    }
+
+    let has_input_messages = schema.field_with_name(optional_fields[0]).is_ok();
+    let has_output_messages = schema.field_with_name(optional_fields[1]).is_ok();
+
+    Ok(ValidatedLlmSchema {
+        has_gen_ai,
+        columns: if has_gen_ai {
+            LlmColumns::current()
+        } else {
+            LlmColumns::legacy()
+        },
+        has_input_messages,
+        has_output_messages,
+    })
 }
 
 #[cfg(test)]
@@ -175,5 +290,125 @@ mod tests {
         // than guess from partial migrations.
         let schema = schema_with(&["trace_id", "gen_ai_usage_cost"]);
         assert!(!has_gen_ai_fields(&schema));
+    }
+
+    #[test]
+    fn valid_gen_ai_schema_passes_validation() {
+        let schema = schema_with(&[
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+            "gen_ai_conversation_id",
+            "gen_ai_input_messages",
+            "gen_ai_output_messages",
+        ]);
+        let result = validate_llm_schema(&schema, "test_stream");
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(v.has_gen_ai);
+        assert_eq!(v.columns, LlmColumns::current());
+        assert!(v.has_input_messages);
+        assert!(v.has_output_messages);
+    }
+
+    #[test]
+    fn valid_legacy_schema_passes_validation() {
+        let schema = schema_with(&[
+            "llm_usage_tokens_input",
+            "llm_usage_tokens_output",
+            "llm_usage_cost_total",
+            "llm_model_name",
+            "llm_session_id",
+            "llm_input",
+        ]);
+        let result = validate_llm_schema(&schema, "test_stream");
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(!v.has_gen_ai);
+        assert_eq!(v.columns, LlmColumns::legacy());
+        assert!(v.has_input_messages);
+        assert!(!v.has_output_messages);
+    }
+
+    #[test]
+    fn missing_required_gen_ai_field_returns_error() {
+        // Missing gen_ai_usage_cost
+        let schema = schema_with(&[
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_response_model",
+        ]);
+        let result = validate_llm_schema(&schema, "my_stream");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.field_name, "gen_ai_usage_cost");
+        assert_eq!(err.stream_name, "my_stream");
+        assert!(err.to_string().contains("gen_ai_usage_cost"));
+        assert!(err.to_string().contains("my_stream"));
+    }
+
+    #[test]
+    fn missing_required_legacy_field_returns_error() {
+        // Missing llm_model_name
+        let schema = schema_with(&[
+            "llm_usage_tokens_input",
+            "llm_usage_tokens_output",
+            "llm_usage_cost_total",
+            "llm_session_id",
+        ]);
+        let result = validate_llm_schema(&schema, "legacy_stream");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.field_name, "llm_model_name");
+    }
+
+    #[test]
+    fn optional_gen_ai_fields_missing_are_reported_as_absent() {
+        // All required fields present, but no optional fields
+        let schema = schema_with(&[
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+        ]);
+        let result = validate_llm_schema(&schema, "test_stream");
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(v.has_gen_ai);
+        assert!(!v.has_input_messages);
+        assert!(!v.has_output_messages);
+    }
+
+    #[test]
+    fn optional_legacy_fields_missing_are_reported_as_absent() {
+        let schema = schema_with(&[
+            "llm_usage_tokens_input",
+            "llm_usage_tokens_output",
+            "llm_usage_cost_total",
+            "llm_model_name",
+        ]);
+        let result = validate_llm_schema(&schema, "test_stream");
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(!v.has_gen_ai);
+        assert!(!v.has_input_messages);
+        assert!(!v.has_output_messages);
+    }
+
+    #[test]
+    fn fallback_assumes_required_present_optional_absent() {
+        let fallback = ValidatedLlmSchema::fallback(true);
+        assert!(fallback.has_gen_ai);
+        assert_eq!(fallback.columns, LlmColumns::current());
+        assert!(!fallback.has_input_messages);
+        assert!(!fallback.has_output_messages);
+    }
+
+    #[test]
+    fn fallback_legacy_uses_llm_columns() {
+        let fallback = ValidatedLlmSchema::fallback(false);
+        assert!(!fallback.has_gen_ai);
+        assert_eq!(fallback.columns, LlmColumns::legacy());
     }
 }
