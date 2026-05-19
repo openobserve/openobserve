@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="pause-job-btn"
                   icon-left="pause"
                 >
-                  <q-tooltip>Job</q-tooltip>
+                  <OTooltip content="Job" />
                 </OButton>
                 <OButton
                   v-if="canResumeJob(row)"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="resume-job-btn"
                   icon-left="play-arrow"
                 >
-                  <q-tooltip>Resume Job</q-tooltip>
+                  <OTooltip content="Resume Job" />
                 </OButton>
                 <OButton
                   v-if="canEditJob(row.status)"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="edit-job-btn"
                   icon-left="edit"
                 >
-                  <q-tooltip>Edit Job</q-tooltip>
+                  <OTooltip content="Edit Job" />
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="view-job-btn"
                   icon-left="visibility"
                 >
-                  <q-tooltip>View Details</q-tooltip>
+                  <OTooltip content="View Details" />
                 </OButton>
                 <OButton
                   v-if="canDeleteJob(row.status)"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="delete-job-btn"
                   icon-left="delete"
                 >
-                  <q-tooltip>Delete Job</q-tooltip>
+                  <OTooltip content="Delete Job" />
                 </OButton>
                 <OButton
                   v-if="row.error"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="error-indicator-btn"
                   icon-left="error"
                 >
-                  <q-tooltip>Error: {{ row.error }}</q-tooltip>
+                  <OTooltip :content="`Error: ${row.error}`" />
                 </OButton>
               </div>
             </template>

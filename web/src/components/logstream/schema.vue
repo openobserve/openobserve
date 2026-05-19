@@ -457,9 +457,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="q-mb-md" v-if="isDialogOpen">
-                    <q-card class="add-fields-card">
+                    <OCard class="add-fields-card">
                       <!-- Header Section -->
-                      <q-card-section
+                      <OCardSection
                         class="q-pa-none"
                         style="padding: 4px 16px 4px 16px"
                       >
@@ -475,9 +475,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                         </div>
-                      </q-card-section>
+                      </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
-                      <q-card-section
+                      <OCardSection
                         class="q-pa-none"
                         style="
                           flex: 1;
@@ -497,8 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @add="addSchemaField"
                           @remove="removeSchemaField"
                         />
-                      </q-card-section>
-                    </q-card>
+                      </OCardSection>
+                    </OCard>
                   </div>
 
                   <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -534,12 +534,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text">
                             {{ row.name }}
-                            <q-tooltip
+                            <OTooltip
                               v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </q-tooltip>
+                              :content="row.name"
+                              content-class="tw:text-[12px]"
+                            />
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -550,9 +549,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :alt="t('logStream.envQuickModeMsg')"
                               class="tw:w-[20px] tw:h-[20px]"
                             />
-                            <q-tooltip class="tw:text-[12px] tw:w-[200px]">
-                              {{ t("logStream.envQuickModeMsg") }}
-                            </q-tooltip>
+                            <OTooltip
+                              :content="t('logStream.envQuickModeMsg')"
+                              content-class="tw:text-[12px] tw:w-[200px]"
+                            />
                           </span>
                         </div>
                       </template>
@@ -1123,6 +1123,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -1171,6 +1173,8 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
+    OCard,
+    OCardSection,
     OCheckbox,
   },
   setup({ modelValue }) {

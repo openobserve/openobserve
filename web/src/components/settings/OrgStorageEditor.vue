@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stepper -->
     <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
     <div style="max-width: 720px;">
-      <q-form ref="storageForm" @submit="submitStorage">
+      <OForm ref="storageForm" :default-values="{}" @submit="submitStorage">
         <OStepper
           v-model="step"
           ref="stepper"
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </q-form>
+      </OForm>
     </div>
     </div>
   </div>
@@ -407,6 +407,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{

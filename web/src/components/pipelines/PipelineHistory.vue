@@ -151,27 +151,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_realtime="{ row }">
-            <OIcon
-              :name="row.is_realtime ? 'check-circle' : 'schedule'"
-              :color="row.is_realtime ? 'positive' : 'grey'"
-              size="xs"
-            >
-              <q-tooltip>
-                {{ row.is_realtime ? "Real-time" : "Scheduled" }}
-              </q-tooltip>
-            </OIcon>
+            <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
+              <OIcon
+                :name="row.is_realtime ? 'check-circle' : 'schedule'"
+                :color="row.is_realtime ? 'positive' : 'grey'"
+                size="xs"
+              />
+            </OTooltip>
           </template>
 
           <template #cell-is_silenced="{ row }">
-            <OIcon
-              :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-              :color="row.is_silenced ? 'grey' : 'positive'"
-              size="md"
-            >
-              <q-tooltip>
-                {{ row.is_silenced ? "Silenced" : "Not Silenced" }}
-              </q-tooltip>
-            </OIcon>
+            <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
+              <OIcon
+                :name="row.is_silenced ? 'volume-off' : 'volume-up'"
+                :color="row.is_silenced ? 'grey' : 'positive'"
+                size="md"
+              />
+            </OTooltip>
           </template>
 
           <template #cell-duration="{ row }">
@@ -179,23 +175,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_partial="{ row }">
-            <OIcon
+            <OTooltip
               v-if="
                 row.is_partial !== null &&
                 row.is_partial !== undefined
               "
-              :name="row.is_partial ? 'warning' : 'check-circle'"
-              :color="row.is_partial ? 'warning' : 'positive'"
-              size="xs"
+              :content="row.is_partial ? 'Partial Results' : 'Complete Results'"
             >
-              <q-tooltip>
-                {{
-                  row.is_partial
-                    ? "Partial Results"
-                    : "Complete Results"
-                }}
-              </q-tooltip>
-            </OIcon>
+              <OIcon
+                :name="row.is_partial ? 'warning' : 'check-circle'"
+                :color="row.is_partial ? 'warning' : 'positive'"
+                size="xs"
+              />
+            </OTooltip>
             <span v-else>-</span>
           </template>
 

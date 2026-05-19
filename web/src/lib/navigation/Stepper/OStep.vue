@@ -21,6 +21,47 @@ const isActive = computed<boolean>(() => context?.value.modelValue === props.nam
 const isVertical = computed<boolean>(() => context?.value.orientation === 'vertical')
 const animated = computed<boolean>(() => context?.value.animated ?? true)
 
+// ── Height transition hooks (like OCollapsible) ─────────────────────────
+function onBeforeEnter(el: Element) {
+  const htmlEl = el as HTMLElement
+  htmlEl.style.height = '0'
+  htmlEl.style.opacity = '0'
+  htmlEl.style.overflow = 'hidden'
+}
+
+function onEnter(el: Element, done: () => void) {
+  const htmlEl = el as HTMLElement
+  const height = htmlEl.scrollHeight
+  htmlEl.style.transition = 'height 0.25s ease-out, opacity 0.25s ease-out'
+  requestAnimationFrame(() => {
+    if (!htmlEl.isConnected) { done(); return }
+    htmlEl.style.height = `${height}px`
+    htmlEl.style.opacity = '1'
+  })
+  htmlEl.addEventListener('transitionend', () => {
+    htmlEl.style.height = ''
+    htmlEl.style.overflow = ''
+    htmlEl.style.transition = ''
+    done()
+  }, { once: true })
+}
+
+function onLeave(el: Element, done: () => void) {
+  const htmlEl = el as HTMLElement
+  htmlEl.style.height = `${htmlEl.scrollHeight}px`
+  htmlEl.style.overflow = 'hidden'
+  htmlEl.style.transition = 'height 0.2s ease-out, opacity 0.2s ease-out'
+  requestAnimationFrame(() => {
+    if (!htmlEl.isConnected) { done(); return }
+    htmlEl.style.height = '0'
+    htmlEl.style.opacity = '0'
+  })
+  htmlEl.addEventListener('transitionend', () => {
+    htmlEl.style.opacity = ''
+    done()
+  }, { once: true })
+}
+
 const canClick = computed<boolean>(() => {
   if (!props.done) return false
   const stepNav = props.navigable
@@ -166,8 +207,15 @@ const triggerClasses = computed<string>(() => {
 
       <!-- Content panel (visible only when active) -->
       <div class="tw:mt-2 tw:min-w-0">
-        <Transition v-if="animated" name="o-step-fade" mode="out-in">
-          <div v-if="isActive" key="step-content">
+        <Transition
+          v-if="animated"
+          :css="false"
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @leave="onLeave"
+          mode="out-in"
+        >
+          <div v-if="isActive" :key="name">
             <slot />
           </div>
         </Transition>
@@ -183,10 +231,17 @@ const triggerClasses = computed<string>(() => {
     The header indicators are rendered by OStepper from registered metadata.
   -->
   <template v-else>
-    <Transition v-if="animated" name="o-step-fade" mode="out-in">
+    <Transition
+      v-if="animated"
+      :css="false"
+      @before-enter="onBeforeEnter"
+      @enter="onEnter"
+      @leave="onLeave"
+      mode="out-in"
+    >
       <div
         v-if="isActive"
-        key="step-content"
+        :key="name"
         class="o-step-content tw:w-full tw:min-w-0"
         role="region"
         :aria-label="`${title}`"
@@ -206,14 +261,4 @@ const triggerClasses = computed<string>(() => {
 </template>
 
 <style scoped>
-/* Fade transition for step content panels */
-.o-step-fade-enter-active,
-.o-step-fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-
-.o-step-fade-enter-from,
-.o-step-fade-leave-to {
-  opacity: 0;
-}
 </style>

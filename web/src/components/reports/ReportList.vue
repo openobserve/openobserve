@@ -17,19 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="q-pa-none flex flex-col"
+    class="tw:flex tw:flex-col"
+    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- Header bar -->
-    <div class="tw:w-full tw:px-[0.625rem] q-pt-xs">
-      <div class="card-container">
+    <div class="tw:shrink-0 tw:px-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div class="q-table__title tw:font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
           </div>
 
-          <div class="flex q-ml-auto tw:ps-2 items-center">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Scheduled / Cached tabs -->
             <div class="app-tabs-container q-mr-sm">
               <app-tabs
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
+              class="tw:ml-2 tw:w-[200px]"
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
@@ -54,25 +55,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
 
             <!-- All Folders toggle -->
-            <div class="tw:ml-2">
-              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
-                <OSwitch
-                  data-test="report-list-search-across-folders-toggle"
-                  v-model="searchAcrossFolders"
-                  :label="t('dashboard.allFolders') || 'All Folders'"
-                />
-              </OTooltip>
-            </div>
+            <OSwitch
+              data-test="report-list-search-across-folders-toggle"
+              v-model="searchAcrossFolders"
+              size="lg"
+              class="tw:ml-2 tw:flex tw:items-center tw:py-[0.45rem] tw:px-[0.375rem] tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
+            >
+              <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
+              <template #tooltip>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
+              </template>
+            </OSwitch>
 
             <OButton
               data-test="report-list-add-report-btn"
               variant="primary"
-              size="sm-action"
+              size="sm"
               class="q-ml-sm"
               @click="createNewReport"
             >
@@ -83,48 +86,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Splitter: folder list left, table right -->
+    <!-- Body: folder list left, table right -->
     <div
-      class="full-width report-list-table"
-      style="height: calc(100vh - 118px)"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 118px)"
-        data-test="report-list-splitter"
-      >
-        <!-- Left: folder list -->
-        <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <FolderList
-                type="reports"
-                @update:activeFolderId="updateActiveFolderId"
-              />
-            </div>
-          </div>
-        </template>
-
-        <!-- Right: report table -->
-        <template #after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Left: FolderList -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="reports"
+            @update:activeFolderId="updateActiveFolderId"
+          />
+        </div>
+      </div>
+      <!-- Right: Table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
                 :columns="columns"
                 row-key="report_id"
                 pagination="client"
+                :page-size="pageSize"
+                :page-size-options="pageSizeOptions"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                style="width: 100%"
-                :style="
-                  hasVisibleRows
-                    ? 'width: 100%; height: calc(100vh - 124px)'
-                    : 'width: 100%'
-                "
+                width="100%"
+                :show-global-filter="false"
+                :default-columns="false"
               >
                 <template #empty>
                   <NoData />
@@ -238,10 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
-            </div>
-          </div>
-        </template>
-      </q-splitter>
+        </div>
+      </div>
     </div>
 
     <!-- Single delete confirm -->

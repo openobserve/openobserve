@@ -10,7 +10,6 @@
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
-    class="lucide lucide-corner-down-right-icon lucide-corner-down-right"
   >
     <!-- Curved path instead of sharp corner -->
     <path d="M4 4 C4 15, 20 15, 20 15" />

@@ -220,7 +220,6 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
@@ -889,7 +888,6 @@ export default defineComponent({
       limitNumberOfSeriesWarningMessage,
       errorMessage,
       "warning": "warning",
-      symOutlinedDataInfoAlert,
       currentTabId,
       currentPanelId,
       showLegendsDialog,

@@ -58,6 +58,7 @@
                       argIndex,
                     )
                   "
+                  icon-key="icon"
                   class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
@@ -161,12 +162,6 @@ import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import {
-  symOutlinedFunction,
-  symOutlinedTitle,
-  symOutlined123,
-  symOutlinedList,
-} from "@quasar/extras/material-symbols-outlined";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default {
@@ -414,7 +409,12 @@ export default {
       );
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
-      return argsValidation[adjustedIndex]?.type || [];
+      const types = argsValidation[adjustedIndex]?.type || [];
+      // Inject icon name for each option so dropdown items show icons
+      return types.map((t: any) => ({
+        ...t,
+        icon: getIconBasedOnArgType(t.value),
+      }));
     };
 
     // watcher on functionName
@@ -475,15 +475,15 @@ export default {
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
-          return symOutlinedList;
+          return "list";
         case "function":
-          return symOutlinedFunction;
+          return "function";
         case "string":
-          return symOutlinedTitle;
+          return "title";
         case "number":
-          return symOutlined123;
+          return "123";
         case "histogramInterval":
-          return "bar_chart";
+          return "bar-chart";
       }
     };
 

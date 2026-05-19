@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:rounded-md q-pa-none tw:overflow-hidden" data-test="iam-page">
+  <div class="tw:rounded-md q-pa-none tw:overflow-hidden" data-test="iam-page" style="height: calc(100vh - var(--navbar-height));">
     <q-splitter
       v-model="splitterModel"
       unit="px"

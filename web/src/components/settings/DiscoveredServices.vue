@@ -250,9 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="row.logs_streams.length > 0"
                   class="telemetry-badge telemetry-sm telemetry-logs"
                 >
-                  <q-tooltip class="tw:text-xs">{{
-                    row.logs_streams.join(", ")
-                  }}</q-tooltip>
+                  <OTooltip
+                    :content="row.logs_streams.join(', ')"
+                    content-class="tw:text-xs"
+                  />
                   {{
                     t("settings.correlation.logsWithCount", {
                       count: row.logs_streams.length,
@@ -265,9 +266,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="row.traces_streams.length > 0"
                   class="telemetry-badge telemetry-sm telemetry-traces"
                 >
-                  <q-tooltip class="tw:text-xs">{{
-                    row.traces_streams.join(", ")
-                  }}</q-tooltip>
+                  <OTooltip
+                    :content="row.traces_streams.join(', ')"
+                    content-class="tw:text-xs"
+                  />
                   {{
                     t("settings.correlation.tracesWithCount", {
                       count: row.traces_streams.length,
@@ -280,9 +282,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="row.metrics_streams.length > 0"
                   class="telemetry-badge telemetry-sm telemetry-metrics"
                 >
-                  <q-tooltip class="tw:text-xs">{{
-                    row.metrics_streams.join(", ")
-                  }}</q-tooltip>
+                  <OTooltip
+                    :content="row.metrics_streams.join(', ')"
+                    content-class="tw:text-xs"
+                  />
                   {{
                     t("settings.correlation.metricsWithCount", {
                       count: row.metrics_streams.length,

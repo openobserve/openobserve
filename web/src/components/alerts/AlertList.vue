@@ -186,22 +186,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span>{{ computedName(row.name) }}</span>
                   </div>
-                  <q-tooltip
+                  <OTooltip
                     v-if="row.name?.length > 30"
-                    class="alert-name-tooltip"
-                  >
-                    {{ row.name }}
-                  </q-tooltip>
+                    :content="row.name"
+                    content-class="alert-name-tooltip"
+                  />
                 </template>
 
                 <template #cell-owner="{ row }">
                   {{ computedOwner(row.owner) }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="row.owner?.length > 15"
-                    class="alert-name-tooltip"
-                  >
-                    {{ row.owner }}
-                  </q-tooltip>
+                    :content="row.owner"
+                    content-class="alert-name-tooltip"
+                  />
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">
@@ -369,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @select="triggerAlert(row)"
                         >
                           <template #icon-left>
-                            <OIcon size="sm" :name="symOutlinedSoundSampler" />
+                            <OIcon size="sm" name="sound-sampler" />
                           </template>
                           Trigger Detection
                         </ODropdownItem>
@@ -390,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
-                          <OIcon size="sm" :name="symOutlinedSoundSampler" />
+                          <OIcon size="sm" name="sound-sampler" />
                         </template>
                         {{ t("alerts.triggerAlert") }}
                       </ODropdownItem>
@@ -696,7 +694,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
-import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
@@ -2763,7 +2760,6 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteAlerts,
       confirmBulkDelete,
-      symOutlinedSoundSampler,
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,
