@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import OInput from "@/lib/forms/Input/OInput.vue";
+  import OIcon from "@/lib/core/Icon/OIcon.vue";
   import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
