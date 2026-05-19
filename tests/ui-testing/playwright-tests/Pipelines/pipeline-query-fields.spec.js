@@ -121,11 +121,11 @@ test.describe("Pipeline Query Node - Field List", { tag: ['@all', '@pipelines', 
     expect(scrollBefore.scrollable).toBe(true);
 
     // Collapse Build Query
-    await pipelinePage.expandBuildQuerySection();
-    await pipelinePage.expectSqlEditorHidden();
+    await pipelinePage.collapseBuildQuerySection();
+    await pipelinePage.expectBuildQuerySectionCollapsed();
     // Re-expand Build Query
     await pipelinePage.expandBuildQuerySection();
-    await pipelinePage.expectSqlEditorVisible();
+    await pipelinePage.expectBuildQuerySectionVisible();
 
     const scrollAfter = await pipelinePage.verifyPipelineFieldListScrollable();
     expect(scrollAfter.scrollable).toBe(true);

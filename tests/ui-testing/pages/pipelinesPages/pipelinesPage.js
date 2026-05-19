@@ -104,7 +104,7 @@ export class PipelinesPage {
         // Scheduled Pipeline Dialog selectors
         this.scheduledPipelineTabs = page.locator('[data-test="scheduled-pipeline-tabs"]');
         this.scheduledPipelineSqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-        this.buildQuerySection = page.getByText('Build Query').first();
+        this.buildQuerySectionButton = page.getByText('Build Query').first();
         this.streamTypeLabel = page.getByLabel(/Stream Type/i);
         this.streamNameLabel = page.getByLabel(/Stream Name/i);
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
@@ -2210,24 +2210,18 @@ export class PipelinesPage {
     }
 
     /**
-     * Wait for SQL editor to be hidden (e.g., after collapsing Build Query)
+     * Wait for Build Query content (stream type, field list) to be hidden
      */
-    async expectSqlEditorHidden() {
-        // Quasar q-expansion-item collapses via height animation + overflow:hidden,
-        // not by hiding child elements, so we check getClientRects instead.
-        // getClientRects returns an empty list when the element is not rendered
-        // (e.g., inside a parent with zero height + overflow: hidden).
-        await this.scheduledPipelineSqlEditor.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        await this.page.waitForFunction(
-            (selector) => {
-                const el = document.querySelector(selector);
-                if (!el) return true;
-                return el.getClientRects().length === 0;
-            },
-            '[data-test="scheduled-pipeline-sql-editor"]',
-            { timeout: 5000 }
-        );
-        testLogger.info('SQL editor is collapsed');
+    async expectBuildQuerySectionCollapsed() {
+        // Build Query content (stream type, stream name, field list) is hidden
+        await expect(this.pipelineFieldSearchInput).toBeHidden({ timeout: 8000 });
+        testLogger.info('Build Query section is collapsed');
+    }
+
+    async expectBuildQuerySectionVisible() {
+        // Build Query content (stream type, stream name, field list) is visible
+        await expect(this.pipelineFieldSearchInput).toBeVisible({ timeout: 8000 });
+        testLogger.info('Build Query section is visible');
     }
 
     /**
@@ -2235,9 +2229,48 @@ export class PipelinesPage {
      * Replaces: await page.getByText('Build Query').first().click()
      */
     async expandBuildQuerySection() {
-        await this.buildQuerySection.waitFor({ state: 'visible', timeout: 5000 });
-        await this.buildQuerySection.click();
-        testLogger.info('Build Query section expanded');
+        await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
+        // Check if already expanded by looking at the Stream Type field
+        // (always inside the Build Query content area when expanded)
+        const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
+        if (!isExpanded) {
+            // Click the keyboard_arrow_up icon inside the Build Query header
+            // to trigger the Vue toggle handler
+            await this.page.evaluate(() => {
+                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
+                for (const h of headers) {
+                    if (h.textContent && h.textContent.includes('Build Query')) {
+                        const icon = h.querySelector('.q-icon');
+                        if (icon) icon.click();
+                        break;
+                    }
+                }
+            });
+            testLogger.info('Build Query section expanded');
+        } else {
+            testLogger.info('Build Query section already expanded');
+        }
+    }
+
+    /**
+     * Collapse the Build Query section (for tests that verify collapse/expand)
+     */
+    async collapseBuildQuerySection() {
+        await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
+        if (isExpanded) {
+            await this.page.evaluate(() => {
+                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
+                for (const h of headers) {
+                    if (h.textContent && h.textContent.includes('Build Query')) {
+                        const icon = h.querySelector('.q-icon');
+                        if (icon) icon.click();
+                        break;
+                    }
+                }
+            });
+            testLogger.info('Build Query section collapsed');
+        }
     }
 
     /**
@@ -2268,27 +2301,22 @@ export class PipelinesPage {
         await this.streamNameLabel.fill('');
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
-        // Wait for an option whose trimmed text content exactly matches.
-        // getByRole name matching with exact:true may fail when option
-        // labels include extra context (e.g. size, type).
+        // Find and click the matching option inside waitForFunction to avoid
+        // race conditions: the option might re-render between the DOM check
+        // and the Playwright locator click.
         await this.page.waitForFunction(
             (name) => {
                 const options = document.querySelectorAll('[role="option"]');
-                return Array.from(options).some(el => el.textContent.trim() === name);
+                const match = Array.from(options).find(el => el.textContent.trim() === name);
+                if (match) {
+                    match.click();
+                    return true;
+                }
+                return false;
             },
             streamName,
-            { timeout: 5000 }
+            { timeout: 8000 }
         );
-        // Find and click the option with exact trimmed text content.
-        const options = this.page.getByRole("option");
-        const optCount = await options.count();
-        for (let i = 0; i < optCount; i++) {
-            const text = await options.nth(i).textContent();
-            if (text.trim() === streamName) {
-                await options.nth(i).click();
-                break;
-            }
-        }
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -2375,14 +2403,43 @@ export class PipelinesPage {
         const fieldTable = this.pipelineFieldTable;
         await fieldTable.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Wait for at least one field label to appear, then count.
-        // Zero-match queries are a valid state — timeout means count is 0, not an error.
-        const fieldLocator = this.pipelineFieldTable.locator('.field_label');
-        const hasFields = await fieldLocator.first().waitFor({ state: 'visible', timeout: 10000 })
-            .then(() => true)
-            .catch(() => false);
+        // Wait for at least one field label to appear.
+        await this.pipelineFieldTable.locator('.field_label').first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => {})
+            .catch(() => {});
 
-        const count = hasFields ? await fieldLocator.count() : 0;
+        // Get the total count by scrolling through virtual-scroll positions.
+        // Quasar q-table with virtual-scroll only renders the visible window
+        // (~21 rows). We scroll to bottom and collect labels from both
+        // positions to deduplicate and get the true total.
+        const count = await this.pipelineFieldTable.evaluate(async (el) => {
+            const container = el.querySelector('.q-table__middle, .q-virtual-scroll__container');
+            if (!container) {
+                return el.querySelectorAll('.field_label').length;
+            }
+
+            const allLabels = new Set();
+
+            // Collect from current (top) position
+            container.querySelectorAll('.field_label').forEach(lbl => {
+                allLabels.add(lbl.textContent);
+            });
+
+            // Scroll to bottom and collect
+            const prevScrollTop = container.scrollTop;
+            container.scrollTop = container.scrollHeight;
+            await new Promise(r => requestAnimationFrame(r));
+
+            container.querySelectorAll('.field_label').forEach(lbl => {
+                allLabels.add(lbl.textContent);
+            });
+
+            // Restore scroll position
+            container.scrollTop = prevScrollTop;
+
+            return allLabels.size;
+        });
+
         if (count === 0) {
             testLogger.info('Pipeline field count: 0 (no matching fields)');
         } else {
@@ -2397,16 +2454,6 @@ export class PipelinesPage {
     async clearPipelineFieldSearch() {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
-        // Scroll the virtual-scroll table to trigger full rendering after
-        // the filter reset. Without scrolling, only the visible batch
-        // (~21 rows) is rendered, making the restored count inaccurate.
-        await this.pipelineFieldTable.evaluate((el) => {
-            const scrollContainer = el.querySelector('.q-table__middle, .q-virtual-scroll__container');
-            if (scrollContainer) {
-                scrollContainer.scrollTop = scrollContainer.scrollHeight;
-                scrollContainer.scrollTop = 0;
-            }
-        });
         // Wait for the field list count to stabilize after clearing.
         await this.page.waitForFunction(() => {
             const table = document.querySelector('[data-test="log-search-index-list-fields-table"]');
