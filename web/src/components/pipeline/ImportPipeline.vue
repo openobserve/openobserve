@@ -1448,7 +1448,6 @@ export default defineComponent({
       t,
       importJson,
       router,
-      q,
       baseImportRef,
       pipelineErrorsToDisplay,
       pipelineCreators,

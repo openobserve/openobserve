@@ -475,7 +475,6 @@ export default defineComponent({
 
     return {
       t,
-      q,
       disableColor,
       formData,
       addJSTransformForm,
