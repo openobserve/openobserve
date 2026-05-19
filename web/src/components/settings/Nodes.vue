@@ -17,13 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="tw:rounded-md">
-    <q-splitter
-      v-model="splitterModel"
+    <OSplitter
+      :model-value="splitterModel"
+      @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
       style="overflow: hidden; height: calc(100vh - 64px)"
     >
-      <template v-slot:before>
+      <template #before>
         <div class="tw:pt-2 tw:mt-4 tw:flex tw:flex-col" style="height: calc(100vh - 64px)">
           <div class="sticky-header tw:px-2 tw:shrink-0">
             <span class="tw:m-0 tw:p-2" style="font-size: 18px">
@@ -418,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-      <template v-slot:after>
+      <template #after>
         <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
         <div class="tw:flex tw:w-full tw:pt-2 flex tw:items-center tw:shrink-0">
           <div
@@ -518,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
@@ -550,6 +551,7 @@ import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -565,6 +567,7 @@ export default defineComponent({
     OIcon,
     OBadge,
     OCollapsible,
+    OSplitter,
     OTable,
   },
   setup() {
@@ -1077,13 +1080,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
 .badge-region {
   background-color: #ede9fe;
   line-height: 23px;
@@ -1146,11 +1142,6 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
-.nodes-list-table .q-table tr th {
-  background-color: #f2f2f2 !important;
-  color: #000000;
-}
-
 tr.status-row > td:first-child {
   position: relative;
 }
@@ -1183,24 +1174,4 @@ span.status-prepare {
   border-left: 5px solid #ffab00 !important;
 }
 
-.node-list-filter-table {
-  max-height: 200px;
-  overflow: auto;
-
-  .q-table__top {
-    padding: 0px !important;
-  }
-
-  .q-table__control {
-    width: 100% !important;
-  }
-
-  td {
-    padding: 0 0 0 7px !important;
-
-    &::before {
-      background: none !important;
-    }
-  }
-}
 </style>

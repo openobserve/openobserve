@@ -106,76 +106,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
           :show-global-filter="false"
+          expansion="single"
+          expand-on-row-click
+          v-model:expanded-ids="expandedIds"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 200px)"
         >
-          <template v-slot:body="props">
-            <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                <template v-if="col.name === 'expand'">
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                    >
-                      <OIcon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand-more' : 'expand-less'"
-                        size="xs"
-                      />
-                    </OButton>
+          <template #expansion="{ row }">
+            <div class="expanded-details tw:p-3">
+              <div class="tw:text-sm tw:font-medium tw:mb-2">
+                Source Map Files ({{ row.files.length }})
+              </div>
+              <ul
+                class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                style="max-height: 400px; overflow-y: auto;"
+              >
+                <li
+                  v-for="(file, index) in row.files"
+                  :key="index"
+                  data-test="source-maps-file-item"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                >
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
+                    <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
                   </div>
-                </template>
-                <template v-else-if="col.name === 'actions'">
-                  <OButton
-                    :data-test="`source-maps-${props.row.service}-delete`"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    title="Delete"
-                    @click="confirmDeleteSourceMap(props.row)"
-                  >
-                    <OIcon name="delete" size="sm" />
-                  </OButton>
-                </template>
-                <template v-else>
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    {{ col.value }}
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
+                    <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
                   </div>
-                </template>
-              </q-td>
-            </q-tr>
-            <q-tr v-show="expandedRow === getRowKey(props.row)" :props="props">
-              <q-td colspan="100%">
-                <div class="expanded-details tw:p-3">
-                  <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-2">
-                    Source Map Files ({{ props.row.files.length }})
-                  </div>
-                  <ul
-                    class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
-                    style="max-height: 400px; overflow-y: auto;"
-                  >
-                    <li
-                      v-for="(file, index) in props.row.files"
-                      :key="index"
-                      data-test="source-maps-file-item"
-                      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
-                    >
-                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                        <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
-                        <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
-                      </div>
-                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                        <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
-                        <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </q-td>
-            </q-tr>
+                </li>
+              </ul>
+            </div>
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">
@@ -353,18 +319,10 @@ const addNewEnvironment = (val: string, done: (item?: string) => void) => {
 const isLoading = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
-const expandedRow = ref<string | null>(null);
+const expandedIds = ref<string[]>([]);
 
 // Table columns
 const columns: OTableColumnDef[] = [
-  {
-    id: "expand",
-    header: "#",
-    accessorKey: "id",
-    meta: { align: "left" },
-    sortable: false,
-    size: 60,
-  },
   {
     id: "service",
     header: "Service",
@@ -487,15 +445,6 @@ const groupSourceMaps = () => {
 // Apply filters
 const applyFilters = () => {
   fetchSourceMaps();
-};
-
-// Toggle expand/collapse
-const toggleExpand = (row: any) => {
-  if (expandedRow.value === row.id) {
-    expandedRow.value = null;
-  } else {
-    expandedRow.value = row.id;
-  }
 };
 
 // Format timestamp

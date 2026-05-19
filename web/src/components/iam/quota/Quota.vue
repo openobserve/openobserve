@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty />
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
-          <q-td v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
+          <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
             <div
               v-if="value != '-'"
               contenteditable="true"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ changedValues[row.module_name]?.[col] ?? value }}
             </div>
             <div v-else>-</div>
-          </q-td>
+          </div>
           <template v-else>
             {{ value }}
           </template>

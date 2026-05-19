@@ -289,7 +289,7 @@ export default defineComponent({
     // Delete
     // -----------------------------------------------------------------------
     const confirmDeleteToolset = (row: any) => {
-      confirmDelete.value = { visible: true, data: tw:flex };
+      confirmDelete.value = { visible: true, data: row };
     };
 
     const cancelDelete = () => {

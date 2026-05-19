@@ -70,7 +70,7 @@
                     min-width: 200px;
                     width: 300px;
                     max-width: 300px;
-                    border: 1px solid var(--q-separator-color);
+                    border: 1px solid var(--o2-border);
                   "
                 >
                   <ODropdownItem

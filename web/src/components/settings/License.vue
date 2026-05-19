@@ -78,25 +78,25 @@
           <OCard>
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_info") }}</div>
-              <q-markup-table flat bordered dense class="compact-table">
+              <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
                 <tbody>
-                  <tr>
-                    <td class="text-weight-bold">
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.installation_id") }}
                     </td>
-                    <td>{{ licenseData.installation_id }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr>
-                    <td class="text-weight-bold">
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.license_id") }}
                     </td>
-                    <td>{{ licenseData.license.license_id }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr>
-                    <td class="text-weight-bold">
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.status_lbl") }}
                     </td>
-                    <td>
+                    <td class="tw:px-3 tw:py-2">
                       <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                         {{
                           licenseData?.expired
@@ -106,27 +106,27 @@
                       </OBadge>
                     </td>
                   </tr>
-                  <tr>
-                    <td class="text-weight-bold">
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.create_at_lbl") }}
                     </td>
-                    <td>{{ formatDate(licenseData.license.created_at) }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr>
-                    <td class="text-weight-bold">
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.expires_at_lbl") }}
                     </td>
-                    <td>{{ formatDate(licenseData.license.expires_at) }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
-                  <tr>
-                    <td class="text-weight-bold">{{ t("about.company") }}</td>
-                    <td>{{ licenseData.license.company }}</td>
+                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key">
-                    <td class="text-weight-bold">
+                  <tr v-if="licenseData.key" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.license_key") }}
                     </td>
-                    <td>
+                    <td class="tw:px-3 tw:py-2">
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
@@ -141,26 +141,26 @@
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_name">
-                    <td class="text-weight-bold">
+                  <tr v-if="licenseData.license.contact_name" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.contact_name") }}
                     </td>
-                    <td>{{ licenseData.license.contact_name }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_name }}</td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_email">
-                    <td class="text-weight-bold">
+                  <tr v-if="licenseData.license.contact_email" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.contact_email") }}
                     </td>
-                    <td>{{ licenseData.license.contact_email }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="text-weight-bold">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.environment_type") }}
                     </td>
-                    <td>{{ licenseData.license.environment_type }}</td>
+                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.environment_type }}</td>
                   </tr>
                 </tbody>
-              </q-markup-table>
+              </table>
               <div class="tw:mt-3 tw:flex tw:gap-3">
                 <OButton
                   variant="primary"

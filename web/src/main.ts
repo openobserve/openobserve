@@ -14,17 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
-import { Quasar, AppFullscreen } from "quasar";
-import "quasar/src/css/index.sass";
-import "@quasar/extras/roboto-font/roboto-font.css";
-import "@quasar/extras/material-icons/material-icons.css";
-import "@quasar/extras/material-icons-outlined/material-icons-outlined.css";
-
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
 import i18n from "./locales";
-import "./styles/quasar-overrides.scss";
 import "./styles/tailwind.css";
 import config from "./aws-exports";
 import configService from "./services/config";
@@ -42,13 +35,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const app = createApp(App);
 const router = createRouter(store);
 
-app
-  .use(Quasar, {
-    plugins: {
-      AppFullscreen,
-    },
-  })
-  .use(i18n);
+app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);

@@ -184,13 +184,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :color="row.is_partial ? 'warning' : 'positive'"
               size="xs"
             >
-              <q-tooltip>
-                {{
+              <OTooltip
+                :content="
                   row.is_partial
-                    ? "Partial Results"
-                    : "Complete Results"
-                }}
-              </q-tooltip>
+                    ? 'Partial Results'
+                    : 'Complete Results'
+                "
+              />
             </OIcon>
             <span v-else>-</span>
           </template>

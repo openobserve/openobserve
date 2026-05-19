@@ -200,62 +200,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else>
               <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
                     <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.lincese_id_lbl") }}</td>
-                        <td>{{ licenseData.license.license_id }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.lincese_id_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.status_lbl") }}</td>
-                        <td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.status_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">
                           <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                             {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
                           </OBadge>
                         </td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.create_at_lbl") }}</td>
-                        <td>{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.create_at_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                       </tr>
                       <tr>
-                        <td class="tw:font-semibold">{{ t("about.expires_at_lbl") }}</td>
-                        <td>
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.expires_at_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">
                           <div class="tw:flex tw:items-center tw:justify-start tw:gap-4">
                             <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
                           </div>
                         </td>
                       </tr>
                     </tbody>
-                  </q-markup-table>
+                  </table>
                 </div>
 
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
                     <thead>
                       <tr>
-                        <th colspan="2" class="tw:text-center tw:font-semibold">{{ t("about.usage_limits") }}</th>
+                        <th colspan="2" class="tw:text-center tw:font-semibold tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.usage_limits") }}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_type") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_type") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_limit") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_limit") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
-                        <td class="tw:font-semibold">{{ t("about.today_usage") }}</td>
-                        <td>
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.today_usage") }}</td>
+                        <td class="tw:px-3 tw:py-2">
                           <span :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500 tw:font-bold' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''">
                             {{ licenseData.ingestion_used.toFixed(2) }}%
                           </span>
                         </td>
                       </tr>
                     </tbody>
-                  </q-markup-table>
+                  </table>
                 </div>
               </div>
             </div>

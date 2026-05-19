@@ -20,13 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 tw:py-2 o2-management-header">
       {{ t("settings.header") }}
     </div> -->
-      <q-splitter
+      <OSplitter
       class="logs-splitter-smooth tw:overflow-hidden"
-      v-model="splitterModel"
+      :model-value="splitterModel"
+      @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 400]"
       unit="px"
     >
-      <template v-slot:before>
+      <template #before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1 tw:overflow-hidden">
           <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
             <div class="flex tw:h-[calc(100vh-50px)]">
@@ -259,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
       </template>
 
-      <template v-slot:after>
+      <template #after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
             <div
               class="card-container tw:h-[calc(100vh-var(--navbar-height)-15px)] tw:overflow-auto"
@@ -268,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           </div>
       </template>
-    </q-splitter>
+    </OSplitter>
 
   </div>
 </template>
@@ -294,6 +295,7 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 export default defineComponent({
   name: "AppSettings",
   components: {
@@ -301,6 +303,7 @@ export default defineComponent({
     ORouteTab,
     OButton,
     OIcon,
+    OSplitter,
 },
   setup() {
     const { t } = useI18n();

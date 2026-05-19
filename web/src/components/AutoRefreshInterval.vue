@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator />
+        <hr class="tw:border-0 tw:border-t tw:border-solid tw:border-[var(--o2-border)] tw:my-0" />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
           <div
             v-for="(item, j) in items"

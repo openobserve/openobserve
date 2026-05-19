@@ -180,7 +180,7 @@ import {
   toRaw,
   watch,
 } from "vue";
-import { type QTableProps, QTable } from "quasar";
+
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
@@ -343,7 +343,7 @@ export default defineComponent({
       data: null as any,
     });
 
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
+
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
@@ -369,7 +369,6 @@ export default defineComponent({
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
     };
     const filterQuery = ref("");
 
@@ -424,7 +423,7 @@ export default defineComponent({
       return durationFormatter(averageQueryDuration); // You can also return the total if needed
     };
 
-    const columns = ref<QTableProps["columns"]>([
+    const columns = ref<{ name: string; label: string; field: string; align?: string; sortable?: boolean }[]>([
       {
         name: "#",
         label: "#",
@@ -816,7 +815,6 @@ export default defineComponent({
       isMetaOrg,
       resultTotal,
       selectedPerPage,
-      qTable,
       rowsQuery,
       filteredQueries,
       selectedRow,

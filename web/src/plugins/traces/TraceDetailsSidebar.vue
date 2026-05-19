@@ -691,34 +691,28 @@ class="tw:h-5! tw:text-[0.75rem]!">
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length">
-            <q-virtual-scroll
-              type="table"
-              ref="searchTableRef"
-              style="max-height: 20rem"
-              :items="spanLinks"
-              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+          <div v-if="spanLinks.length" class="tw:overflow-auto tw:max-h-[20rem]">
+            <table
+              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:w-full"
               data-test="trace-details-sidebar-links-table"
             >
-              <template v-slot:before>
-                <thead
-                  class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
-                >
-                  <tr>
-                    <th
-                      v-for="(col, index) in linkColumns"
-                      :key="'result_' + index"
-                      class="table-header"
-                      :data-test="`trace-events-table-th-${col.label}`"
-                    >
-                      {{ col.label }}
-                    </th>
-                  </tr>
-                </thead>
-              </template>
-
-              <template v-slot="{ item: row, index }">
+              <thead
+                class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)]"
+              >
+                <tr>
+                  <th
+                    v-for="(col, index) in linkColumns"
+                    :key="'result_' + index"
+                    class="table-header"
+                    :data-test="`trace-events-table-th-${col.label}`"
+                  >
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 <tr
+                  v-for="(row, index) in spanLinks"
                   :data-test="`trace-event-detail-link-${index}`"
                   :key="'expand_' + index"
                   @click="openReferenceTrace('span', row)"
@@ -736,8 +730,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     </div>
                   </td>
                 </tr>
-              </template>
-            </q-virtual-scroll>
+              </tbody>
+            </table>
           </div>
           <div
             v-else
