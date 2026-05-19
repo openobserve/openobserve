@@ -42,32 +42,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
             <div class="tw:flex tw:flex-col">
-              <q-expansion-item
+              <OCollapsible
                 v-if="
                   regionRows.length > 0 &&
                   store.state.zoConfig.super_cluster_enabled
                 "
-                expand-separator
+                variant="sidebar"
+                :model-value="sectionOpen.region"
+                @update:model-value="(v) => (sectionOpen.region = v)"
                 :label="t('nodes.region')"
-                class="text-subtitle1 nodes-filter-list"
               >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <div class="q-pa-none q-ma-none">
-                      <OInput
-                        data-test="nodes-region-filter-search-input"
-                        v-model="filterRegionQuery"
-                        clearable
-                        debounce="1"
-                        :placeholder="t('nodes.searchRegion')"
-                        class="full-width filter-input"
-                      >
-                        <template #prepend>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                      </OInput>
-                    </div>
-                    <OTable
+                <div class="tw:p-0">
+                  <OInput
+                    data-test="nodes-region-filter-search-input"
+                    v-model="filterRegionQuery"
+                    clearable
+                    :debounce="1"
+                    :placeholder="t('nodes.searchRegion')"
+                    class="full-width filter-input"
+                  >
+                    <template #prepend>
+                      <OIcon name="search" size="sm" />
+                    </template>
+                  </OInput>
+                  <OTable
                       data-test="nodes-region-table"
                       :data="visibleRegionRows"
                       :columns="filterOTableColumns"
@@ -404,9 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxWaittime"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
             </div>
             <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0">

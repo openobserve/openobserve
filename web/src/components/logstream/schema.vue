@@ -1363,7 +1363,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </div>
     <div v-else class="q-pa-md">
       <h5>Wait while loading...</h5>
     </div>

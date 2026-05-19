@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </li>
                 </ul>
-              </q-expansion-item>
+              </OCollapsible>
             </div>
           </div>
         </div>
