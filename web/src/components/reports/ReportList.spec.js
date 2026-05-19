@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import { nextTick, ref } from 'vue';
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
@@ -217,7 +216,7 @@ describe("ReportList Component", () => {
     wrapper = mount(ReportList, {
       global: {
         plugins: [
-          [Quasar, { platform }],
+          [{ platform }],
           [i18n]
         ],
         provide: {
@@ -306,7 +305,7 @@ describe("ReportList Component", () => {
 
       const newWrapper = mount(ReportList, {
         global: {
-          plugins: [[Quasar, { platform }], [i18n]],
+          plugins: [[{ platform }], [i18n]],
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
@@ -345,7 +344,7 @@ describe("ReportList Component", () => {
       // Create new wrapper to trigger onBeforeMount
       const newWrapper = mount(ReportList, {
         global: {
-          plugins: [[Quasar, { platform }], [i18n]],
+          plugins: [[{ platform }], [i18n]],
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,

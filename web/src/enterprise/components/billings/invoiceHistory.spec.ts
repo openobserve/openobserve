@@ -15,7 +15,6 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";

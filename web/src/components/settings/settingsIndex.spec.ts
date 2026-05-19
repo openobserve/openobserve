@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Quasar } from 'quasar';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';

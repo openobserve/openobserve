@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import { nextTick } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
@@ -154,7 +153,7 @@ function mountComponent() {
 
   const wrapper = mount(ReportList, {
     global: {
-      plugins: [[Quasar, { platform }], i18n],
+      plugins: [[{ platform }], i18n],
       provide: { store, platform, router: mockRouter },
       mocks: { $router: mockRouter },
       stubs: {

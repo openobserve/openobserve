@@ -16,7 +16,6 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Plans from "./plans.vue";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";

@@ -144,7 +144,7 @@ describe("TestFunction Component", () => {
     // Mount component
     wrapper = mount(TestFunction, {
       global: {
-        plugins: [i18n, Quasar],
+        plugins: [i18n],
         provide: {
           store: mockStore,
           router: mockRouter
