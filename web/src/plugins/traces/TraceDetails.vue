@@ -2333,12 +2333,17 @@ export default defineComponent({
           if (maxDepth < depth) maxDepth = depth;
         }
       };
+
+      // Handle multiple root nodes - process each root span to ensure
+      // all root services appear in the service map
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
+
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
         maxDepth,
+        true, // Enable multi-root handling for trace service maps
       );
     };
 
