@@ -60,23 +60,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OSelect
                 v-model="stream_name"
-                :options="filteredStreams"
-                label-key="label"
-                value-key="value"
+                :options="indexOptions"
                 :label="t('alerts.stream_name') + ' *'"
                 :loading="isFetchingStreams"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                class="tw:py-2 showLabelOnTop no-case tw:w-full"
-                use-input
-                hide-selected
-                fill-input
-                @filter="filterStreams"
-                behavior="menu"
-                @input-debounce="100"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                :option-disable="(option: any) => option.isDisable"
-                @input-value="handleDynamicStreamName"
+                searchable
+                :creatable="selectedNodeType === 'output'"
+                :error="!!streamNameError"
+                :error-message="streamNameError"
+                @update:model-value="streamNameError = ''"
+                @create="handleCreateStreamName"
+                data-test="input-node-stream-name-select"
               />
 
               <OSwitch
@@ -130,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="input-node-stream-save-btn"
               variant="primary"
               size="sm-action"
-              type="submit"
+              @click="saveStream"
             >{{ t('alerts.save') }}</OButton>
           </div>
         </div>
@@ -202,23 +195,25 @@ const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
 
-const filteredStreams: Ref<string[]> = ref([]);
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
-const indexOptions = ref([]);
+const streamNameError = ref("");
+const indexOptions = ref<{ label: string; value: string; disabled: boolean }[]>([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const outputStreamTypes = ["logs", "metrics", "traces", "enrichment_tables"];
-const stream_name = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })
-    ?.stream_name || { label: "", value: "", isDisable: false },
-);
-const dynamic_stream_name = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })
-    ?.stream_name || { label: "", value: "", isDisable: false },
+
+// Normalize any legacy object-shaped stream_name to a plain string
+const _existingStreamName = (pipelineObj.currentSelectedNodeData?.data as any)?.stream_name;
+const stream_name = ref<string>(
+  typeof _existingStreamName === "string"
+    ? _existingStreamName
+    : (typeof _existingStreamName === "object" && _existingStreamName
+        ? (_existingStreamName.value ?? _existingStreamName.label ?? "")
+        : ""),
 );
 
 const appendData = ref(
@@ -249,7 +244,7 @@ watch(
   ) => {
     if (newStreamType && newCreateNewStream == oldCreateNewStream) {
       // Only reset if createNewStream has changed
-      stream_name.value = { label: "", value: "", isDisable: false };
+      stream_name.value = "";
     }
     getStreamList();
   },
@@ -298,27 +293,7 @@ function sanitizeStaticPart(str: string): string[] {
   return str.split("").map((char) => (/[a-zA-Z0-9]/.test(char) ? char : "_"));
 }
 
-watch(
-  () => dynamic_stream_name.value,
-  () => {
-    if (
-      dynamic_stream_name.value !== null &&
-      dynamic_stream_name.value !== "" &&
-      selectedNodeType.value === "output"
-    ) {
-      const rawValue =
-        typeof dynamic_stream_name.value === "object" &&
-        dynamic_stream_name.value.hasOwnProperty("value")
-          ? dynamic_stream_name.value.value
-          : dynamic_stream_name.value;
 
-      const sanitized = sanitizeStreamName(rawValue as string);
-
-      dynamic_stream_name.value = sanitized;
-      saveDynamicStream();
-    }
-  },
-);
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty(
     "stream_type",
@@ -346,7 +321,11 @@ async function getStreamList() {
     }
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
-    indexOptions.value = res.list.map((data: any) => data.name);
+    indexOptions.value = res.list.map((stream: any) => ({
+      label: stream.name,
+      value: stream.name,
+      disabled: stream.isDisable || false,
+    }));
   } finally {
     isFetchingStreams.value = false;
   }
@@ -355,24 +334,10 @@ const updateStreams = () => {
   getStreamList();
 };
 
-const handleDynamicStreamName = (val: any) => {
+const handleCreateStreamName = (val: string) => {
   val = val.replace(/-/g, "_");
-  dynamic_stream_name.value = { label: val, value: val, isDisable: false };
-};
-
-const saveDynamicStream = () => {
-  if (
-    typeof dynamic_stream_name.value == "object" &&
-    dynamic_stream_name.value.hasOwnProperty("value") &&
-    dynamic_stream_name.value.hasOwnProperty("label")
-  ) {
-    const { label, value } = dynamic_stream_name.value;
-    stream_name.value = { label: label, value: value, isDisable: false };
-  }
-  //this condition will never be true but we are keeping it for future reference
-  else {
-    stream_name.value = dynamic_stream_name.value;
-  }
+  const sanitized = sanitizeStreamName(val);
+  if (sanitized) stream_name.value = sanitized;
 };
 
 const filteredStreamTypes = computed(() => {
@@ -382,7 +347,7 @@ const filteredStreamTypes = computed(() => {
 const getLogStream = async (data: any) => {
   data.name = data.name.replace(/-/g, "_");
 
-  stream_name.value = { label: data.name, value: data.name, isDisable: false };
+  stream_name.value = data.name;
   stream_type.value = data.stream_type;
   if (createNewStream.value) {
     createNewStream.value = false;
@@ -434,8 +399,8 @@ const saveStream = () => {
   // Validate pipeline configuration
 
   const streamNodeData: any = {
-    stream_type: stream_type,
-    stream_name: stream_name,
+    stream_type: stream_type.value,
+    stream_name: stream_name.value,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
@@ -444,55 +409,16 @@ const saveStream = () => {
     streamNodeData.meta = { append_data: appendData.value.toString() };
   }
 
-  if (
-    typeof stream_name.value === "object" &&
-    stream_name.value !== null &&
-    stream_name.value.hasOwnProperty("value") &&
-    stream_name.value.value === ""
-  ) {
-    toast({
-      message: "Please select Stream from the list",
-      position: "bottom-center",
-      timeout: 2000,
-    });
+  if (!stream_name.value) {
+    streamNameError.value = t('validation.required');
     return;
   }
+  streamNameError.value = '';
   addNode(streamNodeData);
   emit("cancel:hideform");
 };
 
-const filterStreams = (val: string, update: any) => {
-  const streamType =
-    pipelineObj.currentSelectedNodeData.data.stream_type || "logs";
-  if (
-    pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&
-    pipelineObj.currentSelectedNodeData.type === "input"
-  ) {
-    const filtered = streams.value[streamType]
-      ?.filter((stream: any) => {
-        return stream.name.toLowerCase().includes(val.toLowerCase());
-      })
-      .map((stream: any) => ({
-        label: stream.name,
-        value: stream.name, // Use a unique identifier if needed
-        isDisable: stream.isDisable,
-      }));
-    filteredStreams.value = filtered;
-  } else {
-    const filtered = streams.value[streamType]
-      .filter((stream: any) => {
-        return stream.name.toLowerCase().includes(val.toLowerCase());
-      })
-      .map((stream: any) => ({
-        label: stream.name,
-        value: stream.name, // Use a unique identifier if needed
-        isDisable: false,
-      }));
-    filteredStreams.value = filtered;
-  }
 
-  update();
-};
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -517,26 +443,23 @@ defineExpose({
   sanitizeStaticPart,
   getStreamList,
   updateStreams,
-  handleDynamicStreamName,
-  saveDynamicStream,
+  handleCreateStreamName,
   getLogStream,
   openCancelDialog,
   openDeleteDialog,
   deleteNode,
   saveStream,
-  filterStreams,
   filterColumns,
   // Expose reactive variables for testing
-  filteredStreams,
   createNewStream,
   isUpdating,
   isFetchingStreams,
+  streamNameError,
   indexOptions,
   schemaList,
   streams,
   usedStreams,
   stream_name,
-  dynamic_stream_name,
   appendData,
   stream_type,
   selectedNodeType,

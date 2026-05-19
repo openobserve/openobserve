@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
-            :options="filteredStreams"
+            :options="indexOptions"
             :loading="isFetchingStreams"
             class="no-case alert-v3-field stream-name-select"
             :class="streamNameError ? 'field-error' : ''"
