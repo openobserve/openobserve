@@ -78,6 +78,10 @@ impl FileStatisticsCache {
 
         size += std::mem::size_of::<Statistics>();
         size += std::mem::size_of::<usize>(); // tracked entry size field
+        // Arc<Statistics> header (strong + weak counter) and DashMap bucket
+        // overhead (hash + slot metadata). Conservative fixed overhead per
+        // entry so the memory budget is not systematically underestimated.
+        size += 64;
 
         for col in &stats.column_statistics {
             size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
@@ -179,7 +183,13 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         let delta = entry_size as i64 - old_size as i64;
         self.current_memory.fetch_add(delta, Ordering::Relaxed);
 
-        self.cacher.lock().push_back(k);
+        // Only queue the key for eviction when it's a fresh insertion.
+        // When `old.is_some()` the key is already present in `cacher`
+        // (it hasn't been drained yet, otherwise stats wouldn't hold it),
+        // so pushing again would create a duplicate tombstone.
+        if old.is_none() {
+            self.cacher.lock().push_back(k);
+        }
 
         let max_bytes = config::get_config()
             .limit
