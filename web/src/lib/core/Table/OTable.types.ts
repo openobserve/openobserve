@@ -153,6 +153,21 @@ export interface OTableProps<TData = any> {
   /** For tree/grouping: returns sub-rows of a given row */
   getSubRows?: (row: TData) => TData[];
 
+  // ── Tree mode (parent + nested children, inline chevron, optional warning row) ──
+  /**
+   * Enables tree mode. When true, OTable flattens parents + their children
+   * (when expanded) into the visible row list, renders an inline chevron in the
+   * tree column, and optionally renders a warning row between a parent and its
+   * children. State is managed internally; use `:expanded-ids` to control it.
+   */
+  tree?: boolean;
+  /** Children accessor for tree mode (defaults to `row.children`). */
+  getChildren?: (row: TData) => TData[] | undefined;
+  /** Per-parent predicate — when true and the parent is expanded, OTable renders the `#tree-warning` slot row before its children. */
+  getRowWarning?: (row: TData) => boolean;
+  /** Id of the column that should host the inline chevron + indent. Defaults to the first non-action column. */
+  treeColumnId?: string;
+
   // ── Virtual Scroll ──
   virtualScroll?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
@@ -312,6 +327,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** Expanded row content — scoped to { row } */
   expansion?: (props: { row: Row<TData> }) => any;
+  /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
+  "tree-warning"?: (props: { row: TData }) => any;
 }
 
 // ── Exposed (template ref) ────────────────────────────────────────

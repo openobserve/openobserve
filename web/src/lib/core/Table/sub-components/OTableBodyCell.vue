@@ -2,10 +2,11 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { OTableTreeContextKey } from "../composables/useTableTree";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -126,6 +127,25 @@ const highlightedHtml = computed(() => {
   return raw ? sanitize(raw) : null;
 });
 
+// ── Tree mode: inline chevron + indent for the designated tree column ──
+const treeCtx = inject(OTableTreeContextKey, null);
+const isTreeColumn = computed(
+  () =>
+    !!treeCtx?.value?.enabled &&
+    treeCtx.value.treeColumnId === props.cell.column.id,
+);
+const treeMeta = computed(() => {
+  if (!isTreeColumn.value) return null;
+  return treeCtx?.value?.getMeta(props.row.original) ?? null;
+});
+const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
+
+function onTreeToggle(event: MouseEvent) {
+  event.stopPropagation();
+  if (!treeCtx?.value || !treeMeta.value?.hasChildren) return;
+  treeCtx.value.toggle(props.row.original);
+}
+
 function handleClick() {
   emit("cell-click", {
     columnId: props.cell.column.id,
@@ -146,27 +166,77 @@ function handleClick() {
       isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
       wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
+      isTreeColumn ? 'o2-tree-cell' : '',
+      isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
+      isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
+      isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
     ]"
     :style="cellStyle"
     @click="handleClick"
   >
-    <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
-    <!-- Custom cell render via TanStack FlexRender -->
-    <FlexRender
-      v-else-if="cell.column.columnDef.cell"
-      :render="cell.column.columnDef.cell"
-      :props="cell.getContext()"
-    />
-    <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
-    <span
-      v-else-if="highlightedHtml"
-      class="tw:text-text-primary tw:text-sm"
-      v-html="highlightedHtml"
-    />
-    <!-- Default: plain text -->
-    <span v-else class="tw:text-text-primary tw:text-sm">
-      {{ displayValue }}
-    </span>
+    <!-- Tree-mode wrapper: indent + chevron + cell content -->
+    <div
+      v-if="isTreeColumn"
+      class="tw:flex tw:items-center tw:gap-1 tw:min-w-0"
+      :style="{ paddingLeft: `${treeIndentPx}px` }"
+    >
+      <span class="o2-table-tree-chevron-slot">
+        <button
+          v-if="treeMeta?.hasChildren"
+          type="button"
+          class="o2-table-tree-chevron"
+          :data-test="`o2-table-tree-toggle-${cell.column.id}`"
+          :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
+          @click="onTreeToggle"
+        >
+          <OIcon
+            :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'"
+            size="xs"
+          />
+        </button>
+        <span
+          v-else-if="treeMeta && treeMeta.parentId !== null"
+          class="o2-table-tree-endpoint"
+          aria-hidden="true"
+        />
+      </span>
+      <div class="tw:flex-1 tw:min-w-0">
+        <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+        <FlexRender
+          v-else-if="cell.column.columnDef.cell"
+          :render="cell.column.columnDef.cell"
+          :props="cell.getContext()"
+        />
+        <span
+          v-else-if="highlightedHtml"
+          class="tw:text-text-primary tw:text-sm"
+          v-html="highlightedHtml"
+        />
+        <span v-else class="tw:text-text-primary tw:text-sm">
+          {{ displayValue }}
+        </span>
+      </div>
+    </div>
+
+    <template v-else>
+      <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+      <!-- Custom cell render via TanStack FlexRender -->
+      <FlexRender
+        v-else-if="cell.column.columnDef.cell"
+        :render="cell.column.columnDef.cell"
+        :props="cell.getContext()"
+      />
+      <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
+      <span
+        v-else-if="highlightedHtml"
+        class="tw:text-text-primary tw:text-sm"
+        v-html="highlightedHtml"
+      />
+      <!-- Default: plain text -->
+      <span v-else class="tw:text-text-primary tw:text-sm">
+        {{ displayValue }}
+      </span>
+    </template>
 
     <!-- Cell copy button (visible on hover) -->
     <button
@@ -181,3 +251,87 @@ function handleClick() {
     </button>
   </td>
 </template>
+
+<style scoped>
+.o2-table-tree-chevron-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.o2-table-tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-secondary, #6b7280);
+}
+.o2-table-tree-chevron:hover {
+  background: var(--color-table-row-hover-bg, rgba(0, 0, 0, 0.05));
+  color: var(--color-text-primary);
+}
+/* Small square endpoint marker on leaf child rows, sits at the line junction */
+.o2-table-tree-endpoint {
+  width: 7px;
+  height: 7px;
+  background-color: var(--q-primary, #6366f1);
+  opacity: 0.75;
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px var(--color-table-cell-bg, #fff);
+  z-index: 3;
+  position: relative;
+}
+
+/* ── Tree connector lines (parent ↓ children) ────────────────── */
+.o2-tree-cell {
+  position: relative;
+}
+
+/* Vertical line going down from below the chevron, on expanded parent rows */
+.o2-tree-parent-expanded::after {
+  content: "";
+  position: absolute;
+  left: calc(8px + 9px); /* td px-2 (8px) + half chevron-slot (9px) */
+  top: calc(50% + 9px);
+  bottom: 0;
+  width: 1.5px;
+  background-color: var(--q-primary, #6366f1);
+  opacity: 0.55;
+  z-index: 1;
+}
+
+/* Vertical + horizontal connector on child rows */
+.o2-tree-child::before {
+  content: "";
+  position: absolute;
+  left: calc(8px + 9px);
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background-color: var(--q-primary, #6366f1);
+  opacity: 0.55;
+  z-index: 1;
+}
+.o2-tree-child.o2-tree-last-child::before {
+  bottom: 50%;
+}
+.o2-tree-child::after {
+  content: "";
+  position: absolute;
+  left: calc(8px + 9px);
+  top: 50%;
+  width: 14px;
+  height: 1.5px;
+  background-color: var(--q-primary, #6366f1);
+  opacity: 0.55;
+  z-index: 1;
+}
+</style>

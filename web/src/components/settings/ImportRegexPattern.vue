@@ -530,7 +530,6 @@ export default defineComponent({
       t,
       importJson,
       router,
-      q,
       baseImportRef,
       regexPatternErrorsToDisplay,
       activeTab,

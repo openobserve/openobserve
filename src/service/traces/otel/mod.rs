@@ -230,12 +230,9 @@ mod tests {
             Some("conv-123")
         );
 
-        // 8. Model parameters should be extracted
-        assert!(span_attributes.contains_key(O2Attributes::MODEL_PARAMETERS));
-        let params = span_attributes.get(O2Attributes::MODEL_PARAMETERS).unwrap();
-        assert!(params.is_object());
-        assert!(params.get("temperature").is_some());
-        assert!(params.get("max_tokens").is_some());
+        // 8. Model parameters should be present as individual gen_ai.request.* scalars
+        assert!(span_attributes.contains_key("gen_ai.request.temperature"));
+        assert!(span_attributes.contains_key("gen_ai.request.max_tokens"));
 
         // 9. LLM input/output should be present
         assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
@@ -506,7 +503,8 @@ mod tests {
                 .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
-        assert!(span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS));
+        assert!(span_attrs.contains_key("gen_ai.request.temperature"));
+        assert!(span_attrs.contains_key("gen_ai.request.max_tokens"));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_OUTPUT_TOKENS));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_COST));
@@ -810,23 +808,14 @@ mod tests {
             "Total cost should be > 0"
         );
 
-        // 6. Model parameters (stored as HashMap<String, String> → JSON object with string values)
+        // 6. Model parameters as individual gen_ai.request.* scalars
         assert!(
-            span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS),
-            "Should have model parameters"
+            span_attrs.contains_key("gen_ai.request.temperature"),
+            "Should have gen_ai.request.temperature"
         );
-        let params = span_attrs.get(O2Attributes::MODEL_PARAMETERS).unwrap();
         assert!(
-            params.is_object(),
-            "Model parameters should be a JSON object"
-        );
-        assert_eq!(
-            params.get("temperature").and_then(|v| v.as_str()),
-            Some("0.7")
-        );
-        assert_eq!(
-            params.get("max_tokens").and_then(|v| v.as_str()),
-            Some("4096")
+            span_attrs.contains_key("gen_ai.request.max_tokens"),
+            "Should have gen_ai.request.max_tokens"
         );
 
         // 7. User/session metadata

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, ref, toRef, useSlots, watch } from "vue";
+import { computed, provide, ref, toRef, useSlots, watch } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
@@ -10,6 +10,7 @@ import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
 import { useTableExpansion } from "./composables/useTableExpansion";
+import { useTableTree, OTableTreeContextKey } from "./composables/useTableTree";
 import { useTableFiltering } from "./composables/useTableFiltering";
 import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
@@ -86,6 +87,24 @@ function handleGlobalFilterChange(value: string) {
   }
 }
 
+// ── Tree mode ───────────────────────────────────────────────────
+const tree = useTableTree<TData>(
+  {
+    get tree() { return props.tree; },
+    get data() { return props.data; },
+    get expandedIds() { return props.expandedIds; },
+    rowKey: props.rowKey,
+    getChildren: props.getChildren,
+    getRowWarning: props.getRowWarning,
+    treeColumnId: props.treeColumnId,
+    get columns() { return props.columns; },
+  },
+  emit as any,
+);
+
+// Provide the computed (a reactive ref). Consumers `inject` and read `.value`.
+provide(OTableTreeContextKey, tree.context);
+
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
@@ -96,7 +115,7 @@ const {
   columnSizeVars,
 } = useTableCore<TData>(
   {
-    get data() { return props.data; },
+    get data() { return tree.enabled.value ? tree.flatRows.value : props.data; },
     get columns() { return props.columns; },
     get pageSize() { return props.pageSize; },
     sortBy: props.sortBy,
@@ -453,6 +472,11 @@ defineExpose({
           <!-- Expansion slot -->
           <template v-if="slots.expansion" #expansion="expSlotProps">
             <slot name="expansion" :row="expSlotProps.row" />
+          </template>
+
+          <!-- Tree-mode warning row slot -->
+          <template v-if="slots['tree-warning']" #tree-warning="warnSlotProps">
+            <slot name="tree-warning" :row="warnSlotProps.row" />
           </template>
         </OTableBody>
 

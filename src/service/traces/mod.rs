@@ -1177,8 +1177,6 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
         otel::attributes::GenAiAttributes::USAGE_OUTPUT_TOKENS,
         otel::attributes::GenAiAttributes::INPUT_MESSAGES,
         otel::attributes::GenAiAttributes::OUTPUT_MESSAGES,
-        otel::attributes::O2Attributes::INPUT,
-        otel::attributes::O2Attributes::OUTPUT,
         otel::attributes::LangfuseAttributes::INPUT,
         otel::attributes::LangfuseAttributes::OUTPUT,
     ];
@@ -1956,17 +1954,20 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_llm_stream_hashmap_o2_attrs() {
-        use crate::service::traces::otel::attributes::O2Attributes;
+    fn test_detect_llm_stream_hashmap_gen_ai_attrs() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::INPUT.to_string(), json!("prompt"));
+        map.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), json!("prompt"));
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::OUTPUT.to_string(), json!("completion"));
+        map.insert(
+            GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+            json!("completion"),
+        );
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
     }
 
