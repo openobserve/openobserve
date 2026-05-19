@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: auto"
   >
     <div id="tracesSecondLevel" class="full-height">
-      <q-splitter
+      <OSplitter
         :class="[
           'traces-horizontal-splitter full-height',
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
-        horizontal
+        :horizontal="true"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.54rem]!'
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="traces-search-result-container relative-position tw:h-full"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <q-splitter
+            <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
@@ -304,10 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </div>
 </template>
@@ -377,6 +377,7 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -2316,7 +2317,7 @@ watch(
     font-size: 12px !important;
   }
 
-  .q-splitter__after {
+  .o-splitter__after {
     overflow: hidden;
   }
 
@@ -2350,13 +2351,13 @@ watch(
     padding-top: 0px !important;
   }
 
-  .traces-horizontal-splitter .q-splitter__before {
+  .traces-horizontal-splitter .o-splitter__before {
     z-index: auto;
     overflow: visible;
   }
 
   .traces-horizontal-splitter.hide-splitter-separator
-    > .q-splitter__separator {
+    > .o-splitter__separator {
     background: transparent !important;
     border: none !important;
   }

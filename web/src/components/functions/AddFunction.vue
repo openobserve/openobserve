@@ -44,11 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
         }"
       >
-        <q-splitter
+        <OSplitter
           v-model="splitterModel"
-          :limits="[30, Infinity]"
+          :limits="[30, 100]"
           class="tw:overflow-hidden tw:w-full"
-          reverse
+          :horizontal="false"
         >
           <template v-slot:before>
             <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max card-container tw:h-[calc(100vh-128px)]">
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
       <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
         <O2AIChat :style="{
@@ -165,6 +165,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -193,6 +194,7 @@ export default defineComponent({
     },
   },
   components: {
+    OSplitter,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

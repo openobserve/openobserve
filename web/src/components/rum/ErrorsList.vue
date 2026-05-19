@@ -17,11 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page">
     <SearchBar></SearchBar>
-    <q-splitter
+    <OSplitter
       class="logs-horizontal-splitter full-height"
       v-model="splitterModel"
       unit="px"
-      vertical
     >
       <template #before>
         <IndexList></IndexList>
@@ -49,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
@@ -58,6 +57,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "@/plugins/traces/IndexList.vue";

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%; height: 100%; overflow: hidden"
   >
     <div style="width: 100%; height: 100%">
-      <q-splitter
+      <OSplitter
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
         @update:modelValue="layoutSplitterUpdated"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panelId="panelId"
           />
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </div>
 </template>
@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
@@ -73,6 +74,7 @@ export default defineComponent({
     ),
     MarkdownRenderer,
     OIcon,
+    OSplitter,
   },
   name: "CustomMarkdownEditor",
   props: {

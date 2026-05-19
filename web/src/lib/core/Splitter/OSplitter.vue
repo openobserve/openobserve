@@ -15,7 +15,8 @@
       :class="[
         'o-splitter__before',
         'tw:overflow-hidden',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        horizontal ? 'tw:w-full' : 'tw:h-full',
+        beforeClass
       ]"
       :style="beforeStyle"
     >
@@ -31,13 +32,13 @@
         'tw:select-none',
         'tw:transition-colors',
         'hover:tw:bg-[var(--o2-border-input)]',
-        'tw:absolute',
+        'tw:relative',
         'tw:z-10',
         disable ? 'tw:cursor-not-allowed tw:opacity-50' : '',
         horizontal ? 'tw:h-[4px] tw:w-full tw:cursor-row-resize!' : 'tw:w-[4px] tw:h-full tw:cursor-col-resize!',
         separatorClass
       ]"
-      :style="[separatorStyle, separatorPosition]"
+      :style="[separatorStyle]"
       :tabindex="disable ? -1 : 0"
       @mousedown="!disable && onMouseDown($event)"
       @keydown="!disable && handleKeyDown($event)"
@@ -55,10 +56,9 @@
     <div
       :class="[
         'o-splitter__after',
-        'tw:overflow-hidden',
+        'tw:overflow-hidden tw:flex-1',
         horizontal ? 'tw:w-full' : 'tw:h-full'
       ]"
-      :style="afterStyle"
     >
       <slot name="after" />
     </div>
@@ -77,7 +77,8 @@ const props = withDefaults(defineProps<OSplitterProps>(), {
   disable: false,
   separator: true,
   separatorClass: '',
-  separatorStyle: () => ({})
+  separatorStyle: () => ({}),
+  beforeClass: '',
 })
 
 const emit = defineEmits<OSplitterEmits>()

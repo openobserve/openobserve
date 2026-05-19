@@ -118,11 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Dashboard Content with Sidebar -->
       <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden">
-        <q-splitter
+        <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
           class="full-height tw:w-full analysis-splitter-smooth"
           @update:model-value="onSplitterUpdate"
+          horizontal
         >
           <!-- LEFT: Dimension Selector Sidebar -->
           <template #before>
@@ -297,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
   </ODrawer>
 </template>
@@ -329,6 +330,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),

@@ -23,13 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="store.state.isAiChatEnabled ? 'tw:w-[75%]' : 'tw:w-[100%]'"
         style="height: 100% !important"
       >
-        <q-splitter
+        <OSplitter
           v-model="splitterModel"
           style="width: 100%"
           class="o2-custom-splitter"
         >
           <template #before>
-            <q-splitter
+            <OSplitter
               v-model="sideBarSplitterModel"
               style="width: 100%; height: calc(100vh - 90px) !important"
               class="full-height"
@@ -901,7 +901,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </template>
           <template #separator>
             <OButton
@@ -1080,7 +1080,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
 
         <!-- query-eidtor-part -->
       </div>
@@ -1148,6 +1148,7 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -2703,10 +2704,10 @@ defineExpose({
 <style lang="scss">
 .scheduled-pipeline-container {
   height: 100%;
-  .q-splitter__before {
+  .o-splitter__before {
     overflow: hidden;
   }
-  .q-splitter__after {
+  .o-splitter__after {
     overflow: hidden;
   }
 
@@ -2795,7 +2796,7 @@ defineExpose({
   }
 }
 .o2-custom-splitter {
-  > .q-splitter__separator {
+  > .o-splitter__separator {
     width: 0.625rem; // 10px
     z-index: 999 !important;
     height: 100%;

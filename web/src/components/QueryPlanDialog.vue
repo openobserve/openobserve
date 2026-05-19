@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onClose()"
   >
     <div class="query-plan-content full-height tw:p-0">
-      <q-splitter v-model="splitterPosition" class="full-height">
+      <OSplitter v-model="splitterPosition" :horizontal="false" class="full-height">
         <!-- Left Pane: SQL Query -->
         <template #before>
           <div class="sql-query-pane full-height">
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </ODialog>
 </template>
@@ -202,6 +202,7 @@ import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -210,6 +211,7 @@ export default defineComponent({
   name: "QueryPlanDialog",
   components: {
     OSeparator,
+    OSplitter,
     OTabs,
     OTab,
     OTabPanels,

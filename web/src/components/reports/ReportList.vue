@@ -88,10 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full report-list-table"
       style="height: calc(100vh - 118px)"
     >
-      <q-splitter
+      <OSplitter
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
+        :horizontal="false"
         style="height: calc(100vh - 118px)"
         data-test="report-list-splitter"
       >
@@ -241,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
 
     <!-- Single delete confirm -->
@@ -300,6 +301,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const MoveAcrossFolders = defineAsyncComponent(

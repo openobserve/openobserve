@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Metrics Tab Panel -->
         <OTabPanel name="metrics" layout="flex-col">
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
-          <q-splitter
+          <OSplitter
             v-model="splitterModel"
             class="tw:flex-1 full-height tw:w-full"
           >
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </template>
-          </q-splitter>
+          </OSplitter>
         </OTabPanel>
 
         <!-- Traces Tab Panel -->
@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:h-full tw:flex tw:flex-col metrics-correlation-dashboard"
       >
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
-        <q-splitter
+        <OSplitter
           v-model="splitterModel"
           class="tw:flex-1 full-height tw:w-full"
         >
@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
 
       <div v-if="activeTab == 'traces'" class="tw:h-full">
@@ -1162,6 +1162,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 

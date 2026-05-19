@@ -1196,11 +1196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
-        <q-splitter
+        <OSplitter
           class="logs-search-splitter tw:h-full!"
-          no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
+          :horizontal="false"
         >
           <template #before>
             <div
@@ -1345,7 +1345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
       <OButton
         :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
@@ -1882,6 +1882,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -2028,6 +2029,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     OSeparator,
+    OSplitter,
     OButtonGroup,
     ODialog,
     ODropdown,

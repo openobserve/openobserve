@@ -60,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <q-splitter
+      <OSplitter
         class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
         v-model="splitterModel"
         unit="px"
-        vertical
+        :horizontal="true"
       >
         <template #before>
           <div class="card-container tw:p-[0.325rem] tw:h-full">
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </template>
     <template v-else>
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
@@ -177,6 +177,7 @@ import {
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   formatDuration,
   b64DecodeUnicode,

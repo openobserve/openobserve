@@ -1,10 +1,11 @@
 <template>
   <div class="tw:rounded-md tw:p-0 tw:overflow-hidden" data-test="iam-page">
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="px"
       :limits="[0, 300]"
-      class="tw:overflow-hidden logs-splitter-smooth"
+      :horizontal="false"
+      class="tw:overflow-hidden"
       style="height: 100%;"
     >
       <template v-slot:before>
@@ -39,7 +40,7 @@
           </div>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
@@ -54,7 +55,7 @@ import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { resolveTab } from "@/utils/routeTabMaps";
 import OButton from "@/lib/core/Button/OButton.vue";
-
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
