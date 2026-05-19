@@ -181,10 +181,12 @@ const allTabs = computed(() => [
   {
     label: t("modelPricing.fileUploadTab"),
     value: "import_json_file",
+    icon: "upload",
   },
   {
     label: t("modelPricing.urlImportTab"),
     value: "import_json_url",
+    icon: "link",
   },
 ]);
 

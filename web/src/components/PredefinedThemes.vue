@@ -242,6 +242,7 @@ import { hexToRgba, applyThemeColors } from "@/utils/theme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
+const $q = useQuasar();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");

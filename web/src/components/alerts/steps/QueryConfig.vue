@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <OIcon
                       :name="showFilters ? 'expand-more' : 'chevron-right'"
-                      size="14px"
+                      size="sm"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     />
                     <!-- Review your SQL query hint -->
@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon
                   :name="showFilters ? 'expand-more' : 'chevron-right'"
-                  size="14px"
+                  size="sm"
                   :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 />
                 <!-- Review your SQL query hint -->
@@ -677,7 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="top" style="font-size:11px;white-space:pre-wrap;word-break:break-word;">{{ sqlQueryErrorMsg }}</OTooltip>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               >
-                <template #prepend>
+                <template #icon-left>
                   <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>

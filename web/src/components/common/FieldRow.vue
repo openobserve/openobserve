@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :name="field.isInterestingField ? 'info' : 'info-outline'"
           :class="theme === 'dark' ? '' : 'light-dimmed'"
           style="margin-right: 0.375rem"
-          size="1.1rem"
+          size="sm"
           :title="
             field.isInterestingField
               ? 'Remove from interesting fields'
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
           @click.stop="$emit('add-to-filter', `${field.name}=''`)"
         >
-          <OIcon name="add" size="0.8rem" />
+          <OIcon name="add" size="xs" />
         </OButton>
       </span>
       <OIcon
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         name="visibility"
         style="margin-right: 0.375rem"
-        size="1.1rem"
+        size="sm"
         title="Add field to table"
         class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showVisibilityToggle && isFieldSelected"
         name="visibility-off"
         style="margin-right: 0.375rem"
-        size="1.1rem"
+        size="sm"
         title="Remove field from table"
         class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
         v-if="showQuickMode && field.name !== timestampColumn"
         :name="field.isInterestingField ? 'info' : 'info-outline'"
-        size="1.1rem"
+        size="sm"
         :title="
           field.isInterestingField
             ? 'Remove from interesting fields'

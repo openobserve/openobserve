@@ -120,9 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <h5 class="text-center">
                         <OIcon
-                          name="warning"
-                          size="10rem"
-                        /><br />
+                          name="warning" style="width: 10rem; height: 10rem;" /><br />
                         <div
                           data-test="logs-search-filter-error-message"
                           style="white-space: pre-line"
@@ -378,9 +376,7 @@ size="md" />
             <div>
               <OIcon
                 name="history"
-                size="100px"
-                class="search-history-empty__icon"
-              />
+                class="search-history-empty__icon" style="width: 100px; height: 100px;" />
             </div>
             <div class="text-h4 search-history-empty__title">
               Search history is not enabled.

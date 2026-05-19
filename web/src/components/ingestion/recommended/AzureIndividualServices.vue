@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:max-w-md"
         data-test="azure-integration-search"
       >
-        <template #prepend>
+        <template #icon-left>
           <OIcon name="search" size="sm" />
         </template>
       </OInput>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="filteredIntegrations.length === 0"
       class="tw:text-center tw:py-12 empty-state"
     >
-      <OIcon name="search-off" size="3rem" class="tw:mb-2" />
+      <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 

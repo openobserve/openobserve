@@ -49,7 +49,7 @@
               placeholder="Search"
               clearable
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="search" size="sm" />
               </template>
             </OInput>

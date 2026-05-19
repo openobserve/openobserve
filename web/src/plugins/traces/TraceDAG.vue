@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
-      <OIcon name="info" size="48px" />
+      <OIcon name="info" style="width: 48px; height: 48px;" />
       <div class="q-mt-md text-grey-7">No DAG data available</div>
     </div>
 

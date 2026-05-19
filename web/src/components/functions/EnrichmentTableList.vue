@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="no-border o2-search-input"
                 :placeholder="t('function.searchEnrichmentTable')"
               >
-                <template #prepend>
+                <template #icon-left>
                   <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>

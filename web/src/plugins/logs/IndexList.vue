@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="stream-type-badge tw:shrink-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="16px" />
+        <OIcon :name="streamTypeIcon" size="sm" />
         <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="tw:flex-1 tw:min-w-0">

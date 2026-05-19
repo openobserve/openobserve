@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs dashboard-query-visibility-icon"
                 @click.stop="toggleQueryVisibility(index)"
                 style="cursor: pointer"
-                size="18px"
+                size="sm"
                 :data-test="`dashboard-panel-query-tab-visibility-${index}`"
                />
                 <OTooltip

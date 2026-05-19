@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon
           name="info"
-          size="1rem"
+          size="sm"
           class="material-symbols-outlined q-mr-xs"
         />
         {{ t("rum.learnWebVitalsLabel") }}

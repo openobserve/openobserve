@@ -102,8 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('user.role') + ' *'"
             :options="roles"
             class="showLabelOnTop tw:mt-2"
-            emit-value
-            map-options
             :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
           />
@@ -119,8 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filterdOption"
             class="showLabelOnTop tw:mt-2"
             multiple
-            emit-value
-            map-options
             use-input
             @filter="filterFn"
             data-test="user-custom-role-field"

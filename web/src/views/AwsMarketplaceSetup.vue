@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="setup-container q-pa-xl">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <OIcon name="warning" size="80px" />
+        <OIcon name="warning" style="width: 80px; height: 80px;" />
         <h5 class="q-mt-md">No Marketplace Token Found</h5>
         <p class="text-grey-7">
           Please start the registration process from AWS Marketplace.
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <OIcon name="error" size="80px" />
+        <OIcon name="error" style="width: 80px; height: 80px;" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
         <OButton
           variant="primary"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <OIcon name="cloud" size="60px" />
+        <OIcon name="cloud" style="width: 60px; height: 60px;" />
         <h4 class="q-mt-md">Complete AWS Marketplace Setup</h4>
         <p class="text-grey-7 q-mb-lg">
           Link your AWS Marketplace subscription to an organization
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <OIcon name="check-circle" size="80px" />
+        <OIcon name="check-circle" style="width: 80px; height: 80px;" />
         <h4 class="q-mt-md">Subscription Activated!</h4>
         <p class="text-grey-7">
           Your AWS Marketplace subscription is now active.
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <OIcon name="error" size="80px" />
+        <OIcon name="error" style="width: 80px; height: 80px;" />
         <h5 class="q-mt-md">Payment Failed</h5>
         <p class="text-grey-7">
           There was an issue with your AWS Marketplace payment. Please check

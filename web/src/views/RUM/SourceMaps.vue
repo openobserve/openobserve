@@ -117,11 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
-                      :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
                     >
-                      <q-icon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
-                        size="14px"
+                      <OIcon
+                        :name="expandedRow !== getRowKey(props.row) ? 'expand-more' : 'expand-less'"
+                        size="xs"
                       />
                     </OButton>
                   </div>
@@ -134,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Delete"
                     @click="confirmDeleteSourceMap(props.row)"
                   >
-                    <q-icon :name="outlinedDelete" size="16px" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                 </template>
                 <template v-else>

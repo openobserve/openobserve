@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="no-border o2-search-input"
             :placeholder="t('modelPricing.searchPlaceholder')"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <OIcon name="monetization-on" size="48px" />
+            <OIcon name="monetization-on" style="width: 48px; height: 48px;" />
             <div class="text-subtitle1 text-grey-7 q-mt-sm">
               {{ t("modelPricing.noModels") }}
             </div>

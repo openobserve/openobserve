@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
     <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-      <OIcon name="error-outline" size="64px" />
+      <OIcon name="error-outline" style="width: 64px; height: 64px;" />
       <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
     </div>
   </ODrawer>
@@ -226,6 +226,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
+
+const $q = useQuasar();
 
 interface Props {
   modelValue: boolean;

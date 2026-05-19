@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-4">
           <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
             {{ t("alerts.deduplication.fingerprintFields") }}
-            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
+            <OIcon name="info" size="sm" class="q-ml-xs cursor-pointer" />
               <OTooltip
                 :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                 side="right"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-4">
           <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
             {{ t("alerts.deduplication.timeWindow") }}
-            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
+            <OIcon name="info" size="sm" class="q-ml-xs cursor-pointer" />
               <OTooltip
                 :content="t('alerts.deduplication.timeWindowTooltip')"
                 side="right"

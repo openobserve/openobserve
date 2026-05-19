@@ -86,7 +86,7 @@
               class="q-ml-sm log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
           </template>
           <ODropdownItem

@@ -43,7 +43,7 @@
         </div>
         <OIcon
           class="q-mr-xs"
-          size="15px"
+          size="sm"
           name="close"
           style="cursor: pointer"
           @click="removeDrilldownByIndex(index)"

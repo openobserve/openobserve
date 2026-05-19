@@ -194,9 +194,9 @@ class="q-mr-xs" />
                 class="q-mr-xs log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="14px" /></OButton
+                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" /></OButton
               ><b>
-                <OIcon name="warning" size="15px" />
+                <OIcon name="warning" size="sm" />
                 {{ t("search.functionErrorLabel") }}</b
               >
             </div>
@@ -343,7 +343,7 @@ class="q-mr-xs" />
                         ? 'expand-more'
                         : 'chevron-right'
                     "
-                    size="14px"
+                    size="sm"
                 /></OButton>
 
                 <template

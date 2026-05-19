@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             data-test="add-action-script-cron-info"
                             name="info"
-                            size="17px"
+                            size="sm"
                             class="q-ml-xs cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("actions.serviceAccount") + " *" }}
                       <OIcon
                         name="info"
-                        size="17px"
+                        size="sm"
                         class="q-ml-xs cursor-pointer"
                         :class="
                           store.state.theme === 'dark'

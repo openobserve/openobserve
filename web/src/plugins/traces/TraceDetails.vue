@@ -318,8 +318,8 @@ size="sm">
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
                 >
-                  <template v-slot:prepend>
-                    <OIcon name="search" size="1rem" />
+                  <template v-slot:icon-left>
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -409,7 +409,7 @@ size="xs"
               >
                 <template #icon-left
                   ><OIcon name="play-circle"
-size="14px"
+size="sm"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
               </OButton>
@@ -699,9 +699,8 @@ size="14px"
               >
                 <OIcon
                   name="table-chart"
-                  size="48px"
-                  style="margin-bottom: 16px"
-                />
+                  style="margin-bottom: 16px; width: 48px; height: 48px;"
+                 />
                 <div
                   style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
                 >

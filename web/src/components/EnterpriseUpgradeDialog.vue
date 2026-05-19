@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <OIcon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <OIcon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <OIcon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand-more' : 'chevron-right'"
-                size="1rem"
+                size="sm"
               />
             </span>
             {{ field.name }}
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="field.isInterestingField ? 'info' : 'info-outline'"
               :class="theme === 'dark' ? '' : 'light-dimmed'"
               style="margin-right: 0.375rem"
-              size="1.1rem"
+              size="sm"
               :title="
                 field.isInterestingField
                   ? 'Remove from interesting fields'
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showVisibilityToggle && !isFieldSelected"
             name="visibility"
             style="margin-right: 0.375rem"
-            size="1.1rem"
+            size="sm"
             title="Add field to table"
             @click.stop="$emit('toggle-field', field)"
           />
@@ -85,14 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="visibility-off"
             style="margin-right: 0.375rem"
             title="Remove field from table"
-            size="1.1rem"
+            size="sm"
             @click.stop="$emit('toggle-field', field)"
           />
           <OIcon
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode"
             :name="field.isInterestingField ? 'info' : 'info-outline'"
-            size="1.1rem"
+            size="sm"
             :title="
               field.isInterestingField
                 ? 'Remove from interesting fields'

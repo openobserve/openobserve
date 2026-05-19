@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!editColumnOrder || editColumnOrder.length === 0"
         class="text-center q-pa-xl text-grey-6"
       >
-        <OIcon name="view-column" size="48px" class="q-mb-md" />
+        <OIcon name="view-column" class="q-mb-md" style="width: 48px; height: 48px;" />
         <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-caption">
           {{ t("dashboard.columnsDefaultOrder") }}

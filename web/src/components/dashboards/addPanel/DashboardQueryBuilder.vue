@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
                 </OButton>
                 <ODropdown>
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
                 </OButton>
                 <ODropdown>
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
-                <OIcon name="drag-indicator" size="13px" />
+                <OIcon name="drag-indicator" size="xs" />
               </template>
             </OButton>
             <ODropdown>
@@ -574,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
-                  <OIcon name="drag-indicator" size="13px" />
+                  <OIcon name="drag-indicator" size="xs" />
                 </template>
               </OButton>
               <ODropdown>

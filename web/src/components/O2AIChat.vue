@@ -59,7 +59,7 @@
                     placeholder="Search chat history"
                     class="tw:mt-1"
                   >
-                    <template #prepend>
+                    <template #icon-left>
                       <OIcon name="search" size="sm" />
                     </template>
                   </OInput>
@@ -404,7 +404,7 @@
                               ? 'error'
                               : 'check-circle'
                         "
-                        size="14px"
+                        size="sm"
                         :color="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
@@ -445,7 +445,7 @@
                             ? 'expand-less'
                             : 'expand-more'
                         "
-                        size="16px"
+                        size="sm"
                         class="expand-icon"
                       />
                     </div>
@@ -891,7 +891,7 @@
                             ? 'expand-less'
                             : 'expand-more'
                         "
-                        size="16px"
+                        size="sm"
                         class="expand-icon"
                       />
                     </div>
@@ -1338,7 +1338,7 @@
                       ? 'check-circle'
                       : 'radio-button-unchecked'
                   "
-                  size="14px"
+                  size="sm"
                   :color="
                     !isAutoNavigationEnabled
                       ? store.state.theme == 'dark'

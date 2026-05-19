@@ -506,7 +506,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>
@@ -610,7 +610,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>
@@ -695,7 +695,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>
@@ -768,7 +768,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>
@@ -841,7 +841,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>
@@ -915,7 +915,7 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io - type)"
-          size="1.5em"
+          size="md"
           class="q-my-sm q-mr-sm"
         />
       </div>

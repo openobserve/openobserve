@@ -250,7 +250,7 @@
         >
           <OIcon
             name="lightbulb"
-            size="40px"
+            size="xl"
             class="tw:text-orange-400"
           />
           <div

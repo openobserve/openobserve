@@ -175,8 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
                         class="q-py-sm showLabelOnTop no-case"
-                        map-options
-                        emit-value
                         use-input
                         hide-selected
                         fill-input
@@ -210,8 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
                         class="q-py-sm showLabelOnTop no-case"
-                        emit-value
-                        map-options
                         use-input
                         hide-selected
                         fill-input
@@ -245,8 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
                         class="q-py-sm showLabelOnTop"
-                        emit-value
-                        map-options
                         use-input
                         hide-selected
                         fill-input
@@ -330,8 +324,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               { label: 'PNG (Image)', value: 'png' },
                               { label: 'CSV (Data)', value: 'csv' },
                             ]"
-                            emit-value
-                            map-options
                             :label="t('reports.reportType')"
                             color="input-border"
                             class="showLabelOnTop"
@@ -350,8 +342,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="
                               attachmentTypeOptions(dashboard.report_type)
                             "
-                            emit-value
-                            map-options
                             :label="t('reports.attachmentType')"
                             color="input-border"
                             class="showLabelOnTop"
@@ -417,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? 'expand-less'
                                 : 'expand-more'
                             "
-                            size="18px"
+                            size="sm"
                             class="q-mr-xs"
                           />
                           <span class="text-bold text-grey-8">{{
@@ -535,7 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("reports.cronExpression") + " *" }}
                           <OIcon
                             name="info"
-                            size="17px"
+                            size="sm"
                             class="q-ml-xs cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
@@ -594,7 +584,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           use-input
                           @filter="timezoneFilterFn"
                           input-debounce="0"
-                          emit-value
                           fill-input
                           hide-selected
                           :label="t('logStream.timezone') + ' *'"
@@ -669,7 +658,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :popup-content-style="{ textTransform: 'capitalize' }"
                           color="input-border"
                           class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                          emit-value
                           behavior="menu"
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           style="width: 100% !important"
@@ -717,7 +705,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           use-input
                           @filter="timezoneFilterFn"
                           input-debounce="0"
-                          emit-value
                           fill-input
                           hide-selected
                           :label="t('logStream.timezone') + ' *'"

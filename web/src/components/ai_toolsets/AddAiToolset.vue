@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-input tw:flex-1"
               :type="header.visible ? 'text' : 'password'"
             >
-              <template #append>
+              <template #icon-right>
                 <OIcon
                   :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-input tw:flex-1"
               :type="env.visible ? 'text' : 'password'"
             >
-              <template #append>
+              <template #icon-right>
                 <OIcon
                   :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"

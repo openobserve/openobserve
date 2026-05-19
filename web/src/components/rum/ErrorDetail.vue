@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ column.error_handling }}
       </div>
-      <OIcon name="schedule" size="0.875rem" class="text-grey-8" />
+      <OIcon name="schedule" size="sm" class="text-grey-8" />
       <span class="q-pl-xs text-grey-8">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>

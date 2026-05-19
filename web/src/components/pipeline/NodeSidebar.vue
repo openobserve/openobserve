@@ -62,7 +62,7 @@ export default {
               alt=""
               class="node-icon-img"
             />
-            <OIcon v-else size="1.3em" :name="node.icon" />
+            <OIcon v-else size="md" :name="node.icon" />
             <OSeparator vertical class="node-separator" />
           </div>
           <div class="node-label tw:w-[70px]">{{ node.label }}</div>

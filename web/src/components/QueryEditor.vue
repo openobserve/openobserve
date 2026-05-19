@@ -35,7 +35,7 @@
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
-          <template #prepend>
+          <template #icon-left>
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
           </template>
         </OInput>

@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
       <OIcon
         name="error"
-        size="1rem"
+        size="sm"
         class="tw:text-[var(--o2-status-error-text)]"
       />
       <span
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="
                 expandedEvents[String(row._index)] ? 'expand-more' : 'chevron-right'
               "
-              size="14px"
+              size="sm"
             />
           </OButton>
           <span>{{ formatTimestamp(row) }}</span>

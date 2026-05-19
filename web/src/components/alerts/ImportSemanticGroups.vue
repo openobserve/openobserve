@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="!isImporting && !diffData"
           class="card-container q-pa-lg text-center"
         >
-          <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
+          <OIcon name="cloud-upload" class="q-mb-md" style="width: 64px; height: 64px;" />
           <div class="text-h6 text-grey-7 q-mb-sm">
             Upload a JSON file to get started
           </div>

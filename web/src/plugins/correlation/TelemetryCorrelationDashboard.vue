@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('search.searchField')"
                       clearable
                     >
-                      <template #prepend>
+                      <template #icon-left>
                         <OIcon name="search" size="xs" />
                       </template>
                     </OInput>
@@ -206,13 +206,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   ? 'chevron-right'
                                   : 'expand-more'
                               "
-                              size="0.875rem"
+                              size="sm"
                               class="tw:mr-0.5"
                             />
                             <OIcon
                               v-if="typeof group.icon === 'string'"
                               :name="group.icon"
-                              size="0.875rem"
+                              size="sm"
                             />
                             <span>{{ group.label }}</span>
                             <OBadge
@@ -469,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
-                <OIcon name="hub" size="1.25rem" />
+                <OIcon name="hub" size="md" />
                 <div class="tw:flex tw:flex-col">
                   <span class="tw:text-sm tw:font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
@@ -640,7 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('search.searchField')"
                 clearable
               >
-                <template #prepend>
+                <template #icon-left>
                   <OIcon name="search" size="xs" />
                 </template>
               </OInput>
@@ -673,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? 'chevron-right'
                                 : 'expand-more'
                             "
-                            size="0.875rem"
+                            size="sm"
                             class="tw:mr-0.5"
                           />
                           <component
@@ -684,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
-                            size="0.875rem"
+                            size="sm"
                           />
                           <span>{{ group.label }}</span>
                           <OBadge
@@ -882,9 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="error-outline"
-            size="3.75rem"
-            class="tw:mb-4"
-          />
+            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
           <div class="tw:text-base tw:mb-2">
             {{ t("correlation.tracesError") }}
           </div>
@@ -943,7 +941,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
-              <OIcon name="hub" size="1.25rem" />
+              <OIcon name="hub" size="md" />
               <div class="tw:flex tw:flex-col">
                 <span class="tw:text-sm tw:font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
@@ -990,9 +988,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="search-off"
-            size="3.75rem"
-            class="tw:mb-4"
-          />
+            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
           <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
           <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
             {{ t("correlation.noTracesDescription", { service: serviceName }) }}
@@ -1006,9 +1002,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="account-tree"
-            size="3.75rem"
-            class="tw:mb-4"
-          />
+            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
           <div class="tw:text-base">
             {{ t("correlation.correlatedTraces") }}
           </div>
@@ -1029,7 +1023,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       clearable
       class="tw:w-full tw:mb-3"
     >
-      <template #prepend>
+      <template #icon-left>
         <OIcon name="search" size="sm" />
       </template>
     </OInput>
@@ -1054,7 +1048,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="typeof group.icon === 'string'"
                   :name="group.icon"
-                  size="0.875rem"
+                  size="sm"
                 />
                 <span>{{ group.label }}</span>
                 <OBadge

@@ -148,7 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="relativePeriod"
                       :options="relativePeriodsSelect"
-                      emit-value
                       @update:model-value="onCustomPeriodSelect"
                     >
                       <template v-slot:selected-item>

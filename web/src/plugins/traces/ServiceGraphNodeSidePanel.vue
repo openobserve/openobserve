@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-node-panel-view-related-btn"
             >
               View Related
-              <OIcon name="arrow-drop-down" size="1rem" />
+              <OIcon name="arrow-drop-down" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
@@ -84,14 +84,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 v-if="chip.type === 'duration'"
                 name="schedule"
-                size="0.8rem"
+                size="xs"
                 class="tw:text-[var(--o2-latency-p95)]"
               />
               <!-- Error chip icon -->
               <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
-                size="0.8rem"
+                size="xs"
                 class="tw:text-[var(--o2-status-error-text)]"
               />
               <span
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
-                <OIcon name="close" size="0.65rem" />
+                <OIcon name="close" size="xs" />
               </OButton>
             </div>
 
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="viewInTraces"
             >
               <template #icon-left>
-                <OIcon name="search" size="0.8rem" />
+                <OIcon name="search" size="xs" />
               </template>
               View Traces
             </OButton>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   data-test="service-graph-node-panel-workload-fields-btn"
                 >
-                  <OIcon name="tune" size="1.1rem" />
+                  <OIcon name="tune" size="sm" />
                   <OTooltip :content="t('common.resources')" />
                 </OButton>
               </template>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <OIcon name="search" size="0.8rem" />
+                        <OIcon name="search" size="xs" />
                         <OTooltip content="View in Traces" />
                       </OButton>
                     </template>
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <OIcon name="search" size="0.8rem" />
+                        <OIcon name="search" size="xs" />
                         <OTooltip content="View in Traces" />
                       </OButton>
                     </template>

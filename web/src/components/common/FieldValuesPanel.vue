@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="valueSearchTerm = ''"
         >
           <template #icon-left>
-            <OIcon name="search" size="0.75rem" />
+            <OIcon name="search" size="xs" />
           </template>
         </OInput>
       </div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
-          <OIcon name="close" size="0.6rem" />
+          <OIcon name="close" size="xs" />
         </OButton>
       </div>
       <div

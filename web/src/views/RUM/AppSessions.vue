@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-action_play="{ row }">
                     <OIcon
                       name="play-circle-filled"
-                      size="1.5rem"
+                      size="md"
                       class="cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>

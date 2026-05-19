@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 >
                   <div class="tw:flex tw:justify-between tw:items-center">
                     <div class="tw:flex tw:items-center tw:gap-2">
-                      <OIcon :name="getDimIcon(dim.dimension)" :color="getDimColor(dim.dimension)" size="14px" />
+                      <OIcon :name="getDimIcon(dim.dimension)" :color="getDimColor(dim.dimension)" size="sm" />
                       <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
                       <OBadge
