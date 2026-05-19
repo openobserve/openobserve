@@ -229,7 +229,13 @@ pub struct TopKHeap {
 
 impl TopKHeap {
     /// `order_by_cols`: all ORDER BY columns as (name, is_descending), in query order.
+    /// `k=0` is invalid (heap would never accept any row); falls back to `ZO_QUERY_DEFAULT_LIMIT`.
     pub fn new(k: usize, order_by_cols: &[(String, bool)]) -> Self {
+        let k = if k == 0 {
+            config::get_config().limit.query_default_limit as usize
+        } else {
+            k
+        };
         Self {
             heap: BinaryHeap::with_capacity(k + 1),
             k,
@@ -749,5 +755,100 @@ mod tests {
             .collect();
 
         assert_eq!(timestamps, vec![3000, 2000, 1000]);
+    }
+
+    // ── TopKHeap tests ────────────────────────────────────────────────────────
+
+    fn make_hits(pairs: &[(&str, i64)]) -> Vec<Value> {
+        pairs
+            .iter()
+            .map(|(level, cnt)| json!({"level": level, "cnt": cnt}))
+            .collect()
+    }
+
+    #[test]
+    fn test_topk_heap_zero_k_falls_back_to_default_limit() {
+        // k=0 is invalid — heap would never accept rows. Must fall back to query_default_limit.
+        let mut heap = TopKHeap::new(0, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(0);
+        assert!(
+            !result.is_empty(),
+            "k=0 must fall back to default limit, not drop all rows"
+        );
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_bounded_keeps_top_k() {
+        // k=2 DESC: should keep the 2 largest cnt values
+        let mut heap = TopKHeap::new(2, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 382)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+        assert_eq!(result[1]["cnt"].as_i64().unwrap(), 382);
+    }
+
+    #[test]
+    fn test_topk_heap_unlimited_keeps_all() {
+        // size==-1 path: heap_k == query_default_limit (e.g. 1000), all 3 hits fit
+        let k = 1000; // mirrors ZO_QUERY_DEFAULT_LIMIT default
+        let mut heap = TopKHeap::new(k, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 382)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_from_skips_correctly() {
+        // from=1: skip first sorted row
+        let k = 1000;
+        let mut heap = TopKHeap::new(k, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(1); // skip rank-0 (955)
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 382);
+    }
+
+    #[test]
+    fn test_topk_heap_asc_order() {
+        // is_descending=false → ASC sort
+        let mut heap = TopKHeap::new(1000, &[("cnt".to_string(), false)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 100);
+        assert_eq!(result[2]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_multiple_partitions_unlimited() {
+        // Simulates multi-partition push with size==-1 (k = default limit)
+        let mut heap = TopKHeap::new(1000, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955)])); // partition 1
+        heap.push_hits(make_hits(&[("error", 382)])); // partition 2
+        heap.push_hits(make_hits(&[("warn", 100)])); // partition 3
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_unlimited_non_ts_order_by() {
+        // Non-ts ORDER BY with size==-1 (e.g. plain aggregate query, not CTE):
+        // heap_k == query_default_limit, all rows from all partitions must survive.
+        // Note: CTE queries now short-circuit via is_aggregate=true and never reach
+        // the TopKHeap path.
+        let mut heap = TopKHeap::new(1000, &[("level_count".to_string(), true)]);
+        heap.push_hits(vec![
+            json!({"level": "info",  "level_count": 955}),
+            json!({"level": "error", "level_count": 382}),
+        ]);
+        heap.push_hits(vec![json!({"level": "warn", "level_count": 100})]);
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3, "all rows must survive with unlimited size");
+        assert_eq!(result[0]["level"].as_str().unwrap(), "info");
+        assert_eq!(result[0]["level_count"].as_i64().unwrap(), 955);
     }
 }
