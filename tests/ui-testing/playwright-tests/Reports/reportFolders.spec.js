@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
 
 const timestamp = Date.now();
 const FOLDER_A = `test_folder_a_${timestamp}`;
@@ -44,8 +45,22 @@ test.describe("Report Folders", () => {
   test("P1: Create a report from scratch via API and verify it is visible", {
     tag: ['@reportFolders', '@functional', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Creating test report via API');
+    testLogger.info('Creating dashboard via API for report');
 
+    // Create a dashboard via API helper (from dashCreation.js)
+    const dashResult = await createDashboardViaApi(
+      pm.apiCleanup,
+      `dash_${Date.now()}`
+    );
+    if (!dashResult.success) {
+      throw new Error(`Failed to create dashboard: ${dashResult.error}`);
+    }
+    testLogger.info(`Dashboard "${dashResult.dashboard.dashboard_id}" created via API`);
+
+    // Navigate to reports
+    await pm.reportFoldersPage.navigateToReports();
+
+    testLogger.info('Creating test report via API');
     const result = await pm.apiCleanup.createReportViaApi(REPORT_A);
     if (!result.success) {
       throw new Error(`Failed to create test report: ${result.error}`);
@@ -215,6 +230,9 @@ test.describe("Report Folders", () => {
     const foldersBefore = await pm.apiCleanup.fetchReportFolders();
     expect(Array.isArray(foldersBefore)).toBeTruthy();
     await pm.apiCleanup.cleanupReportFolders(['test_folder_', 'test_special_']);
+
+    // Delete dashboards created during tests
+    await pm.apiCleanup.cleanupDashboards();
 
     testLogger.info('Cleanup completed');
   });
