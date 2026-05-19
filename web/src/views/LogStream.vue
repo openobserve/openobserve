@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><OIcon name="description" size="xs" class="tw:shrink-0"
+                    ><OIcon name="search" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
@@ -124,29 +124,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #cell-actions="{ row }">
-              <OButton
-                icon-left="search"
-                :title="t('logStream.explore')"
-                data-test="log-stream-explore-btn"
-                variant="ghost"
-                size="icon-sm"
-                @click="exploreStream({ row })"
-              />
-              <OButton
-                icon-left="description"
-                :title="t('logStream.schemaHeader')"
-                data-test="log-stream-schema-btn"
-                variant="ghost"
-                size="icon-sm"
-                @click="listSchema({ row })"
-              />
-              <OButton
-                icon-left="delete"
-                :title="t('logStream.delete')"
-                variant="ghost-destructive"
-                size="icon-sm"
-                @click="confirmDeleteAction({ row })"
-              />
+               <div class="tw:flex tw:items-center actions-container">
+                <OButton
+                  icon-left="search"
+                  :title="t('logStream.explore')"
+                  data-test="log-stream-explore-btn"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="exploreStream({ row })"
+                />
+                <OButton
+                  icon-left="description"
+                  :title="t('logStream.schemaHeader')"
+                  data-test="log-stream-schema-btn"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="listSchema({ row })"
+                />
+                <OButton
+                  icon-left="delete"
+                  :title="t('logStream.delete')"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="confirmDeleteAction({ row })"
+                />
+              </div>
             </template>
 
             <template #empty>
@@ -252,7 +254,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -280,6 +281,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -300,7 +302,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -346,7 +347,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 50,
+        size: 67,
         meta: { align: "left" },
       },
       {
@@ -395,7 +396,7 @@ export default defineComponent({
         id: "actions",
         header: t("user.actions"),
         isAction: true,
-        size: 150,
+        size: 120,
         meta: { align: "center", cellClass: "actions-column" },
       },
     ]);
@@ -453,8 +454,8 @@ export default defineComponent({
         loadingState.value = true;
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading streams...",
         });
         logStream.value = [];
@@ -527,8 +528,8 @@ export default defineComponent({
           })
           .catch((err) => {
             if (err.response?.status != 403) {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   err.response?.data?.message ||
                   "Error while fetching streams.",
@@ -588,8 +589,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Stream deleted successfully.",
             });
             removeStream(deleteStreamName, deleteStreamType);
@@ -599,8 +599,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: "Error while deleting stream.",
             });
           }
@@ -635,15 +634,13 @@ export default defineComponent({
           );
 
           if (successfulDeletions.length > 0) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `Deleted ${successfulDeletions.length} streams successfully.`,
             });
           }
 
           if (failedDeletions.length > 0) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: `Failed to delete ${failedDeletions.length} streams.`,
             });
           }
@@ -658,8 +655,7 @@ export default defineComponent({
         })
         .catch((error) => {
           if (error.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message:
                 error.response?.data?.message ||
                 "Error while deleting streams.",
@@ -705,10 +701,9 @@ export default defineComponent({
       const dateTime: { period?: string; from?: number; to?: number } = {};
 
       if (stream.stream_type === "enrichment_tables") {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Redirecting to explorer...",
-          color: "secondary",
         });
 
         await getStream(stream.name, stream.stream_type, true)

@@ -1025,12 +1025,13 @@
 
 .paginator-section {
   line-height: 1.5rem; // 24px - more compact
-  max-height: 1.5rem; // 24px
+  max-height: 2rem; // Allow OPagination's compact buttons (1.75rem) to fit
   border-radius: 0.5rem;
   padding: 0.125rem 0.25rem; // Compact padding
   background: rgba(255, 255, 255, 0.1); // Glassmorphic
   backdrop-filter: blur(10px);
   margin-top: 0.4rem;
+  overflow: visible;
 
   .q-btn {
     padding: 0.125rem 0.25rem;
@@ -1038,6 +1039,23 @@
     font-size: 0.75rem;
     border-radius: 0.25rem;
     line-height: 1rem;
+  }
+
+  // OPagination (O2 component) compact sizing
+  .o-pagination__btn {
+    padding: 0.125rem 0.25rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    min-width: 1.5rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 0.25rem !important;
+    line-height: 1rem !important;
+
+    .material-icons,
+    .material-icons-outlined {
+      font-size: 1rem !important;
+      line-height: 1rem !important;
+    }
   }
 }
 

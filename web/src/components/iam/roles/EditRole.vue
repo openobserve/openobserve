@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col full-height" data-test="edit-role-page">
+  <div class="tw:flex tw:flex-col tw:pb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 0.2rem);" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
@@ -112,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
-                  <template #prepend>
-                    <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <template #icon-left>
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="toggleHelpSection"
                     />
                   </div>
-                  <q-separator class="q-mt-sm q-mb-md" />
+                  <OSeparator class="tw:mt-2 tw:mb-4" />
                   <div class="q-mt-sm q-px-sm">
                     <div>
                       Configure access with JSON objects specifying "object"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full tw:flex-shrink-0"
+        class="flex justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
@@ -280,7 +280,6 @@ import {
   getResourcePermission,
   getRoleUsers,
 } from "@/services/iam";
-import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
@@ -305,6 +304,8 @@ import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -324,7 +325,6 @@ const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
 
 const store = useStore();
 
@@ -461,12 +461,11 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
-      q.notify({
+      toast({
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       router.push({
@@ -2211,8 +2210,8 @@ const saveRole = () => {
       payload.remove_users.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -2228,8 +2227,8 @@ const saveRole = () => {
     .then(async (res) => {
       // combine permissionsHash and selectedPermissionsHash
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated role successfully!`,
         timeout: 3000,
       });
@@ -2269,8 +2268,8 @@ const saveRole = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error while updating role!`,
           timeout: 3000,
         });

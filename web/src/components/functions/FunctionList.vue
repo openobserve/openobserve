@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selection="multiple"
               v-model:selected-ids="selectedFunctionIds"
               :show-global-filter="false"
-              :default-columns="false"
               width="100%"
               :style="hasVisibleRows
                   ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
@@ -70,30 +69,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-actions="{ row }">
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('function.updateTitle')"
-                  data-test="function-list-edit-function-btn"
-                  @click="showAddUpdateFn({ row })"
-                  icon-left="edit"
-                />
-                <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  :title="t('function.delete')"
-                  data-test="function-list-delete-function-btn"
-                  @click="showDeleteDialogFn({ row })"
-                  icon-left="delete"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="'Associated Pipelines'"
-                  @click="getAssociatedPipelines({ row })"
-                >
-                  <OIcon name="account-tree" size="xs" />
-                </OButton>
+                <div class="tw:flex tw:items-center actions-container">
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    :title="t('function.updateTitle')"
+                    data-test="function-list-edit-function-btn"
+                    @click="showAddUpdateFn({ row })"
+                    icon-left="edit"
+                  />
+                  <OButton
+                    variant="ghost-destructive"
+                    size="icon-circle-sm"
+                    :title="t('function.delete')"
+                    data-test="function-list-delete-function-btn"
+                    @click="showDeleteDialogFn({ row })"
+                    icon-left="delete"
+                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    :title="'Associated Pipelines'"
+                    @click="getAssociatedPipelines({ row })"
+                  >
+                    <OIcon name="account-tree" size="xs" />
+                  </OButton>
+                </div>
               </template>
 
               <template #bottom="scope">
@@ -185,7 +186,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -203,6 +203,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "functionList",
@@ -227,7 +228,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -247,6 +247,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
+        sortable: false,
         size: 67,
         meta: { align: "left" },
       },
@@ -255,7 +256,7 @@ export default defineComponent({
         accessorKey: "name",
         header: t("function.name"),
         sortable: true,
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "actions",
@@ -280,8 +281,8 @@ export default defineComponent({
     };
 
     const getJSTransforms = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading functions...",
       });
 
@@ -330,8 +331,8 @@ export default defineComponent({
 
           dismiss();
           if (err?.response?.status && err?.response?.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling function.",
               timeout: 2000,
             });
@@ -441,15 +442,15 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
             getJSTransforms();
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -457,15 +458,14 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response.data.code == 409) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
               timeout: 10000,
               actions: [
                 {
                   label: "View",
-                  color: "white",
                   handler: () => {
                     forceRemoveFunction(err.response.data["message"]);
                   },
@@ -475,8 +475,8 @@ export default defineComponent({
             return;
           }
           if (err.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response.data["message"]) ||
                 "Function deletion failed.",
@@ -563,16 +563,16 @@ export default defineComponent({
     };
 
     const bulkDeleteFunctions = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting functions...",
         timeout: 0,
       });
 
       try {
         if (selectedFunctions.value.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No functions selected for deletion",
             timeout: 2000,
           });
@@ -600,30 +600,30 @@ export default defineComponent({
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} function(s)`,
               timeout: 3000,
             });
           } else {
             // All successful
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} function(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
           // Fallback success message
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedFunctions.value.length} function(s) deleted successfully`,
             timeout: 2000,
           });
@@ -639,8 +639,8 @@ export default defineComponent({
         // Show error message from response if available
         const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });

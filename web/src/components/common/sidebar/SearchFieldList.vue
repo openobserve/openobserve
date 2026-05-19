@@ -11,7 +11,6 @@
         :page-size="50"
         :current-page="currentPage"
         :page-size-options="[50]"
-        expansion="single"
         :expanded-ids="expandedIds"
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
@@ -19,16 +18,15 @@
       >
         <!-- Field row: render field name with expand chevron when expandable -->
         <template #field-row="{ row }">
-          <template v-if="isExpandable(row)">
-            <span class="field-type-container">
-              <OIcon
-                class="field-expand-icon"
-                :name="expandedRows[row.name] ? 'expand-less' : 'expand-more'"
-                size="1rem"
-              />
-            </span>
-          </template>
-          <span class="field_label ellipsis tw:flex tw:items-center">
+          <span class="field-type-container">
+            <OIcon
+              v-if="isExpandable(row)"
+              class="field-expand-icon"
+              :name="expandedRows[row.name] ? 'expand-less' : 'expand-more'"
+              size="1rem"
+            />
+          </span>
+          <span class="field_label ellipsis tw:flex tw:items-center" :title="row.name">
             {{ row.name }}
           </span>
         </template>
@@ -57,7 +55,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="q-pl-md q-pr-xs q-py-xs">
+          <div class="tw:pl-2 tw:pr-1 tw:py-1">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -75,10 +73,7 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div
-            v-if="bottomProps.totalPages > 1"
-            class="field-list-pagination"
-          >
+          <div v-if="bottomProps.totalPages > 1" class="field-list-pagination">
             <OTooltip
               side="left"
               align="center"
@@ -94,13 +89,19 @@
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
-            <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
+            <template
+              v-for="page in visiblePagesForTotal(bottomProps)"
+              :key="page"
+            >
               <OButton
-                :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
+                :variant="
+                  bottomProps.currentPage === page ? 'primary' : 'ghost'
+                "
                 size="icon-panel"
                 class="pagination-page-btn"
                 @click="setPage(page)"
-              >{{ page }}</OButton>
+                >{{ page }}</OButton
+              >
             </template>
             <OButton
               variant="ghost-primary"
@@ -122,7 +123,6 @@
 import { computed, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -130,6 +130,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   fields: {
@@ -176,7 +177,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -238,7 +238,25 @@ function onRowClick(row: any) {
 }
 
 function onExpandedIdsChange(ids: string[]) {
-  expandedIds.value = ids;
+  const prevIds = new Set(expandedIds.value);
+  const newIds = new Set(ids);
+
+  // Collapse rows that were removed
+  for (const id of prevIds) {
+    if (!newIds.has(id)) {
+      closeField(id);
+    }
+  }
+
+  // Expand rows that were added — fetch field values
+  for (const id of newIds) {
+    if (!prevIds.has(id)) {
+      const row = (props.fields as any[]).find((f: any) => f.name === id);
+      if (row && isExpandable(row)) {
+        openFilterCreator(row);
+      }
+    }
+  }
 }
 
 function openFilterCreator({ name, ftsKey, stream_name }: any) {
@@ -389,13 +407,9 @@ const handleAddMultipleSearchTerms = (
   action: string,
 ) => {
   const joinOp = action === "include" ? " or " : " and ";
-  const expressions = values.map((v) =>
-    buildExpression(fieldName, v, action),
-  );
+  const expressions = values.map((v) => buildExpression(fieldName, v, action));
   addSearchTerm(
-    expressions.length > 1
-      ? `(${expressions.join(joinOp)})`
-      : expressions[0],
+    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
   );
 };
 
@@ -409,7 +423,7 @@ const addSearchTerm = (term: string) => {
 
 const copyContentValue = (value: string) => {
   navigator.clipboard.writeText(value);
-  $q.notify({ type: "positive", message: "Value copied to clipboard" });
+  toast({ variant: "success", message: "Value copied to clipboard" });
 };
 </script>
 
@@ -455,18 +469,17 @@ const copyContentValue = (value: string) => {
   }
 
   .field_label {
-    font-size: 0.825rem;
-    position: relative;
-    display: inline;
-    left: 0;
+    font-size: 0.75rem;
+    flex: 1;
+    min-width: 0;
   }
 
   .field-type-container {
-    min-width: 12px;
-    max-width: 12px;
-    margin-right: 8px;
+    width: 1.25rem;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
+    justify-content: center;
   }
 }
 </style>

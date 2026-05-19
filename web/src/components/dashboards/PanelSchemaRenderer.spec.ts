@@ -26,8 +26,7 @@ vi.mock("quasar", async (importOriginal) => {
     Quasar: actual.Quasar,
     Dialog: {
       create: vi.fn(),
-    },
-    Notify: {
+    }: {
       create: vi.fn(),
     },
     exportFile: vi.fn().mockReturnValue(true),

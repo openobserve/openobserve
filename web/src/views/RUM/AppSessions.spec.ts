@@ -212,14 +212,8 @@ describe("AppSessions.vue", () => {
               '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             props: ["modelValue", "unit", "vertical"],
           },
-          QAvatar: {
-            template: '<div class="q-avatar" v-bind="$attrs"><slot /></div>',
-          },
           QIcon: {
             template: '<span class="OIcon" v-bind="$attrs"></span>',
-          },
-          QSpinnerHourglass: {
-            template: '<div class="q-spinner-hourglass" v-bind="$attrs"></div>',
           },
           DateTime: {
             template:
@@ -289,7 +283,7 @@ describe("AppSessions.vue", () => {
       wrapper.vm.isLoading.push(true);
       await nextTick();
 
-      expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
+      expect(wrapper.find('[data-test="app-sessions-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Hold on tight, we're fetching sessions.",
       );
@@ -657,9 +651,7 @@ describe("AppSessions.vue", () => {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QAvatar: { template: "<div><slot /></div>" },
             QIcon: { template: "<span></span>" },
-            QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
@@ -801,9 +793,7 @@ describe("AppSessions.vue", () => {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QAvatar: { template: "<div><slot /></div>" },
             QIcon: { template: "<span></span>" },
-            QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },

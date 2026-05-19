@@ -98,18 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template v-else>
-                <q-expansion-item
-                  dense
-                  switch-toggle-side
-                  :label="row.name"
-                  expand-icon-class="field-expansion-icon"
-                  expand-icon="expand_more"
-                  expanded-icon="expand_less"
-                  @before-show="
-                    (event: any) => openFilterCreator(event, row)
-                  "
+                <OCollapsible
+                  variant="sidebar"
+                  class="metric-expansion-item"
+                  :model-value="openMetricRows[row.name] === true"
+                  @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
-                  <template v-slot:header>
+                  <template #trigger>
                     <div
                       class="flex content-center ellipsis"
                       :title="row.name"
@@ -129,8 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
-                  <q-card>
-                    <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+                  <div class="q-pl-md q-pr-xs q-py-xs">
                       <div class="filter-values-container">
                         <div
                           v-show="
@@ -231,9 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </q-list>
                         </div>
                       </div>
-                    </q-card-section>
-                  </q-card>
-                </q-expansion-item>
+                  </div>
+                </OCollapsible>
               </template>
             </div>
           </template>
@@ -266,10 +259,10 @@ import {
   onMounted,
   computed,
   nextTick,
+  reactive,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
@@ -286,19 +279,20 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
   components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
-    OIcon, OTable,
+    OIcon, OTable, OCollapsible,
 },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const quasar = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(props.metricsList || []);
     const selectedMetricLabels = ref([]);
@@ -419,8 +413,8 @@ export default defineComponent({
             }
           })
           .catch(() => {
-            quasar.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while fetching field values",
             });
           })
@@ -428,8 +422,8 @@ export default defineComponent({
             metricLabelValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
-        quasar.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }
@@ -478,6 +472,7 @@ export default defineComponent({
         });
     };
 
+    const openMetricRows = reactive<Record<string, boolean>>({});
     const openFilterCreator = (event: any, { name }: any) => {
       metricLabelValues.value[name] = {
         isLoading: true,
@@ -529,6 +524,7 @@ export default defineComponent({
       visibleMetricLabels,
       filterMetricLabels,
       openFilterCreator,
+      openMetricRows,
       metricLabelValues,
       onMetricChange,
       metricsIconMapping,
@@ -787,19 +783,15 @@ export default defineComponent({
     width: 100%;
     table-layout: fixed;
 
-    .q-expansion-item {
-      .q-item {
-        display: flex;
-        align-items: center;
-        padding: 0;
-        height: 25px !important;
-        min-height: 25px !important;
-      }
+    .metric-expansion-item {
+      &:hover {
+        .field_overlay {
+          visibility: visible;
 
-      .q-item__section--avatar {
-        min-width: 12px;
-        max-width: 12px;
-        margin-right: 8px;
+          .OIcon {
+            opacity: 1;
+          }
+        }
       }
 
       .filter-values-container {
@@ -809,25 +801,6 @@ export default defineComponent({
           .q-focus-helper {
             background: none !important;
           }
-        }
-      }
-
-      .q-item-type {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
-
-            .OIcon {
-              opacity: 1;
-            }
-          }
-        }
-      }
-
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
         }
       }
     }
@@ -846,7 +819,7 @@ export default defineComponent({
 
     .field_list {
       &.selected {
-        .q-expansion-item {
+        .metric-expansion-item {
           background-color: rgba(89, 96, 178, 0.3);
         }
 

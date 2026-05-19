@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="tw:rounded-md logPage" id="logPage">
+  <div class="tw:rounded-md logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -436,7 +436,6 @@ import {
   onUnmounted,
   toRaw,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -656,7 +655,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
     const {
@@ -1162,7 +1160,20 @@ export default defineComponent({
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
-          await restoreUrlQueryParams(dashboardPanelData);
+          // If the org in the URL doesn't match the currently selected org, the
+          // URL params are stale (race condition: router.push from updateOrganization
+          // hasn't finished when the new component mounts due to :key change).
+          // In that case skip URL param restoration so the old stream is not carried
+          // over to the new org.
+          const urlOrgId = router.currentRoute.value.query
+            .org_identifier as string;
+          const isOrgMismatch =
+            !!urlOrgId &&
+            urlOrgId !== store.state.selectedOrganization.identifier;
+
+          if (!isOrgMismatch) {
+            await restoreUrlQueryParams(dashboardPanelData);
+          }
 
           if (
             store.state.zoConfig?.auto_query_enabled &&
@@ -1337,6 +1348,7 @@ export default defineComponent({
     // Helper function for organization change
     function handleOrganizationChange() {
       searchObj.loading = true;
+      resetStreamData();
       loadLogsData();
     }
 

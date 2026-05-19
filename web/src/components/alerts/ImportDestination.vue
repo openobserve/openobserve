@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Destination Errors Section -->
           <div
@@ -312,13 +312,14 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "ImportDestination",
@@ -351,7 +352,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const { isActionsEnabled } = useActions();
 
     const baseImportRef = ref<any>(null);
@@ -586,10 +586,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -611,10 +610,9 @@ export default defineComponent({
       }
 
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported destination(s)`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -651,10 +649,9 @@ export default defineComponent({
         }
         return false;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Destination please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;
@@ -924,6 +921,7 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
     OInput,
     OSelect,

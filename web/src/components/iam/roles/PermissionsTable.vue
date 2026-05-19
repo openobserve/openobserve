@@ -38,23 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span> No Permissions Selected </span>
       </div>
       <div
-        data-test="edit-role-permissions-table-no-resources-title"
-        v-if="level && !parent.is_loading && !getFilteredRows.length"
-        class="q-py-sm text-left text-subtitle text-grey-9"
-        :style="{
-          paddingLeft: level
-            ? parent.has_entities
-              ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
-            : '',
-        }"
-      >
-        No Resources Present
-      </div>
-      <div
         data-test="edit-role-permissions-table-loading-resources-loader"
         v-show="parent.expand && parent.is_loading"
         class="flex items-center"
@@ -106,20 +89,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           :show-global-filter="false"
           dense
+          pagination="none"
           :virtual-scroll="false"
           expansion="multiple"
           :expanded-ids="expandedRowIds"
+          :show-header="level === 0"
+          :get-row-expansion-enabled="(row: any) => !!row.has_entities"
+          @update:expanded-ids="handleOTableExpansionChange"
         >
-          <template #cell-expand="{ row }">
-            <OIcon
-              v-if="row.has_entities"
-              :data-test="`edit-role-permissions-table-body-row-${row.name}-col-expand-icon`"
-              :name="expandedRowIds.includes(row.name) ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
-              size="sm"
-              class="cursor-pointer"
-              :title="t('common.expand')"
-              @click="toggleRowExpand(row)"
-            />
+          <template #cell-display_name="{ row }">
+            <span :style="{ paddingLeft: level > 0 ? `${level * 20}px` : undefined }">{{ row.display_name }}</span>
           </template>
           <template v-for="col in permissionColumnIds" :key="col" #[`cell-${col}`]="{ row }">
             <OCheckbox
@@ -144,6 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </template>
+          <template #empty>
+            <div v-if="level === 0" class="tw:py-16 tw:flex tw:justify-center tw:items-center">
+              <NoData />
+            </div>
+            <div v-else class="tw:py-2 tw:px-4 tw:text-sm tw:text-text-secondary">
+              No Resources Present
+            </div>
+          </template>
         </OTable>
       </div>
     </div>
@@ -157,6 +144,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   selectedPermissionsHash: {
@@ -203,30 +191,17 @@ const permissionColumnIds = computed(() =>
 
 const expandedRowIds = ref<string[]>([]);
 
-function toggleRowExpand(row: any) {
-  const isExpanding = !expandedRowIds.value.includes(row.name);
-  if (isExpanding) {
-    expandedRowIds.value.push(row.name);
-    // Emit to parent so it fetches entities for this resource
-    emits("expand:row", row);
-  } else {
-    const idx = expandedRowIds.value.indexOf(row.name);
-    expandedRowIds.value.splice(idx, 1);
-    row.expand = false; // sync with parent's row.expand
-  }
+
+function handleOTableExpansionChange(ids: string[]) {
+  const newlyExpanded = ids.filter((id) => !expandedRowIds.value.includes(id));
+  expandedRowIds.value = ids;
+  newlyExpanded.forEach((id) => {
+    const row = props.rows.find((r: any) => r.name === id);
+    if (row) emits("expand:row", row);
+  });
 }
 
 const columns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "expand",
-    header: "",
-    accessorKey: "expand",
-    cell: (info: any) => info.getValue(),
-    size: 37,
-    minSize: 32,
-    maxSize: 48,
-    meta: { align: "center", compactPadding: true },
-  },
   {
     id: "display_name",
     header: t("quota.moduleName"),

@@ -58,7 +58,7 @@
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
-            <q-separator class="tw:h-[29px] tw:w-[1px]" />
+            <OSeparator class="tw:h-[29px] tw:w-[1px]" />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
@@ -158,6 +158,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Props {
   // Query props

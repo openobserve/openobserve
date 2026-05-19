@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="text-center text-h6 tw:py-2">Output Messages</div>
-                  <q-separator class="q-mx-md q-mt-md" />
+                  <OSeparator class="tw:mx-4 tw:mt-4" />
                   <div class="error-report-container">
                     <div class="text-center q-pa-md text-grey-6">
                       No messages to display
@@ -220,25 +220,28 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "BaseImport",
   components: {
+    OSeparator,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
     OButton,
+    OInput,
     OIcon,
     OFile,
-},
+  },
   props: {
     // Title for the import page
     title: {
@@ -336,7 +339,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const q = useQuasar();
 
     // State
     const jsonStr = ref<any>("");
@@ -432,10 +434,9 @@ export default defineComponent({
                     : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
-                  q.notify({
+                  toast({
                     message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
+                    position: "bottom-center",
                     timeout: 2000,
                   });
                   resolve([]);
@@ -477,27 +478,24 @@ export default defineComponent({
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
-              q.notify({
+              toast({
                 message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 2000,
               });
             }
           } catch (parseError) {
-            q.notify({
+            toast({
               message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
           }
         }
       } catch (error) {
-        q.notify({
+        toast({
           message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       }

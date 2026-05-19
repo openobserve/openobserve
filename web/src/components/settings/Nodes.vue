@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-pt-sm tw:mt-4" style="height: calc(100vh - 80px)">
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px">
-              {{ t("nodes.filter_header") }} <OIcon name="filter-list" size="sm" />
+              {{ t("nodes.filter_header") }}
+              <OIcon name="filter-list" size="sm" />
               <div class="float-right">
                 <a
                   class="cursor-pointer text-caption tw:underline"
@@ -85,35 +86,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                     </OTable>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                v-if="
-                  clusterRows.length > 0 &&
-                  store.state.zoConfig.super_cluster_enabled
-                "
-                expand-separator
-                :label="t('nodes.cluster')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <div class="q-pa-none q-ma-none">
-                      <OInput
-                        data-test="nodes-cluster-filter-search-input"
-                        v-model="filterClusterQuery"
-                        clearable
-                        debounce="1"
-                        :placeholder="t('nodes.searchCluster')"
-                        class="full-width filter-input"
-                      >
-                        <template #prepend>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                      </OInput>
-                    </div>
+                <OCollapsible
+                  v-if="
+                    clusterRows.length > 0 &&
+                    store.state.zoConfig.super_cluster_enabled
+                  "
+                  variant="sidebar"
+                  :model-value="sectionOpen.cluster"
+                  @update:model-value="(v) => (sectionOpen.cluster = v)"
+                  :label="t('nodes.cluster')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
+                    <OInput
+                      data-test="nodes-cluster-filter-search-input"
+                      v-model="filterClusterQuery"
+                      clearable
+                      :debounce="1"
+                      :placeholder="t('nodes.searchCluster')"
+                      class="full-width filter-input"
+                    >
+                      <template #prepend>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                    </OInput>
                     <OTable
                       data-test="nodes-cluster-table"
                       :data="visibleClusterRows"
@@ -133,18 +132,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                     </OTable>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                v-if="nodetypeRows.length > 0"
-                expand-separator
-                :label="t('nodes.nodetype')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
+                <OCollapsible
+                  v-if="nodetypeRows.length > 0"
+                  variant="sidebar"
+                  :model-value="sectionOpen.nodetype"
+                  @update:model-value="(v) => (sectionOpen.nodetype = v)"
+                  :label="t('nodes.nodetype')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
                     <OTable
                       data-test="nodes-nodetype-table"
                       :data="nodetypeRows"
@@ -157,18 +156,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :default-columns="false"
                       @update:selected-ids="handleSelectedNodetypeIdsUpdate"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                v-if="statusesRows.length > 0"
-                expand-separator
-                :label="t('nodes.status')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
+                <OCollapsible
+                  v-if="statusesRows.length > 0"
+                  variant="sidebar"
+                  :model-value="sectionOpen.status"
+                  @update:model-value="(v) => (sectionOpen.status = v)"
+                  :label="t('nodes.status')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
                     <OTable
                       data-test="nodes-status-table"
                       :data="statusesRows"
@@ -185,20 +184,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span
                           :class="`status-${row.name.toLowerCase()}`"
                           class="q-mr-xs"
-                        ></span>{{ row.name }}
+                        ></span
+                        >{{ row.name }}
                       </template>
                     </OTable>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.cpuusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.cpu"
+                  @update:model-value="(v) => (sectionOpen.cpu = v)"
+                  :label="t('nodes.cpuusage')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
                     <div class="row items-center q-gutter-sm q-ml-xs">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
@@ -230,17 +230,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxCPUUsage"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.memoryusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.memory"
+                  @update:model-value="(v) => (sectionOpen.memory = v)"
+                  :label="t('nodes.memoryusage')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
                     <div class="row items-center q-gutter-sm q-ml-xs">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
@@ -272,17 +272,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="maxMemoryUsage"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.tcpusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.tcp"
+                  @update:model-value="(v) => (sectionOpen.tcp = v)"
+                  :label="t('nodes.tcpusage')"
+                  class="tw:mt-2"
+                >
+                  <div class="tw:p-0">
                     <OCheckbox
                       type="checkbox"
                       v-model="establishedToggle"
@@ -440,11 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="search" size="sm" class="o2-search-input-icon" />
               </template>
             </OInput>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="getData(true)"
-            >
+            <OButton variant="outline" size="sm-action" @click="getData(true)">
               {{ t("common.refresh") }}
             </OButton>
           </div>
@@ -496,11 +492,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-tcp="{ row }">
-            {{ row.tcp_conns }} (E:{{
-              row.tcp_conns_established
-            }}, C:{{ row.tcp_conns_close_wait }}, T:{{
-              row.tcp_conns_time_wait
-            }})
+            {{ row.tcp_conns }} (E:{{ row.tcp_conns_established }}, C:{{
+              row.tcp_conns_close_wait
+            }}, T:{{ row.tcp_conns_time_wait }})
           </template>
 
           <template #cell-cpu="{ row }">
@@ -531,6 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import {
   defineComponent,
+  reactive,
   ref,
   onMounted,
   watch,
@@ -539,7 +534,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -555,6 +549,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -568,13 +564,24 @@ export default defineComponent({
     ORange,
     OIcon,
     OBadge,
+    OCollapsible,
     OTable,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+
+    const sectionOpen = reactive({
+      region: false,
+      cluster: false,
+      nodetype: false,
+      status: false,
+      cpu: false,
+      memory: false,
+      tcp: false,
+    });
+
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
     const loading = ref(false);
@@ -582,7 +589,12 @@ export default defineComponent({
     const filterQuery = ref("");
 
     const filterOTableColumns: OTableColumnDef[] = [
-      { id: "name", header: "Name", accessorKey: "name", meta: { align: "left" } },
+      {
+        id: "name",
+        header: "Name",
+        accessorKey: "name",
+        meta: { align: "left" },
+      },
     ];
 
     const computedOTableColumns = computed(() => {
@@ -673,15 +685,21 @@ export default defineComponent({
     };
     const handleSelectedClusterIdsUpdate = (ids: string[]) => {
       const map = new Map(clusterRows.value.map((c: any) => [c.name, c]));
-      selectedClusters.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+      selectedClusters.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
     };
     const handleSelectedNodetypeIdsUpdate = (ids: string[]) => {
       const map = new Map(nodetypeRows.value.map((n: any) => [n.name, n]));
-      selectedNodetypes.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+      selectedNodetypes.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
     };
     const handleSelectedStatusIdsUpdate = (ids: string[]) => {
       const map = new Map(statusesRows.value.map((s: any) => [s.name, s]));
-      selectedStatuses.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+      selectedStatuses.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
     };
 
     const cpuUsage = ref({
@@ -810,8 +828,8 @@ export default defineComponent({
 
     const getData = (filterFlag: boolean = false) => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
       });
 
@@ -846,8 +864,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch nodes. Please try again.",
@@ -993,7 +1011,10 @@ export default defineComponent({
     };
     const visibleClusterRows = computed(() => {
       if (!filterClusterQuery.value) return clusterRows.value || [];
-      return filterClusterData(clusterRows.value || [], filterClusterQuery.value);
+      return filterClusterData(
+        clusterRows.value || [],
+        filterClusterQuery.value,
+      );
     });
 
     return {
@@ -1049,6 +1070,7 @@ export default defineComponent({
       filterClusterData,
       visibleClusterRows,
       flattenObject,
+      sectionOpen,
     };
   },
 });
@@ -1160,12 +1182,5 @@ export default defineComponent({
       background: none !important;
     }
   }
-}
-
-.nodes-filter-list .q-item__label {
-  font-weight: 500 !important;
-}
-.text-subtitle1 {
-  font-size: 14px !important;
 }
 </style>

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
     <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div
               v-else-if="correlationError"
               class="tw:text-base tw:text-red-500"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
-    <q-separator v-if="tab === 'json' || tab === 'table'" />
+    <OSeparator v-if="tab === 'json' || tab === 'table'" />
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
@@ -399,7 +399,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -419,6 +419,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 const defaultValue: any = () => {
   return {
     data: {},
@@ -428,6 +430,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
+    OSeparator,
     OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
     OIcon,
     OTable,
@@ -519,7 +522,6 @@ export default defineComponent({
     const { searchObj } = searchState();
     const {fnParsedSQL, hasAggregation} = logsUtils();
 
-    const $q = useQuasar();
 
     // Watch for initialTab prop changes to update tab
     watch(
@@ -656,8 +658,8 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log)).then(() =>
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Content Copied Successfully!",
           timeout: 1000,
         }),

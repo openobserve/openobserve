@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
@@ -35,7 +34,7 @@ vi.mock("@/utils/cookies", () => ({
 }));
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 describe("Header Component", () => {

@@ -50,7 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
-        <OSpinner size="md" class="tw:mx-auto tw:block" />
+        <OSpinner
+          size="md"
+          class="tw:mx-auto tw:block"
+          data-test="performance-summary-loading-indicator"
+        />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>

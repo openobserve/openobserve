@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Action Buttons -->
         <div class="row q-gutter-sm">
@@ -195,13 +195,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const props = defineProps({
   traceId: {
@@ -222,7 +224,6 @@ const props = defineProps({
   },
 });
 
-const q = useQuasar();
 const router = useRouter();
 
 const {
@@ -270,8 +271,8 @@ const calculatePercentage = (value: number, total: number) => {
 
 const copyTraceId = () => {
   copyToClipboard(props.traceId);
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: "Trace ID copied to clipboard",
     timeout: 1500,
   });
@@ -280,8 +281,8 @@ const copyTraceId = () => {
 const viewTraceDetails = () => {
   // TODO: Navigate to trace detail view
   // This will be implemented once we know the trace viewer route
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Trace detail view coming soon",
     timeout: 2000,
   });
@@ -289,8 +290,8 @@ const viewTraceDetails = () => {
 
 const refreshTraceData = () => {
   fetchCorrelation();
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Refreshing trace data...",
     timeout: 1000,
   });

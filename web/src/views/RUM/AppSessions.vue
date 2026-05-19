@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="card-container tw:p-[0.325rem] tw:h-full">
-            <FieldList
+            <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
                 startTime: dateTime.startTime,
@@ -89,7 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-pb-lg flex items-center justify-center text-center tw:h-full"
                 >
                   <div>
-                    <OSpinner size="md" class="tw:mx-auto tw:block" />
+                    <OSpinner
+                      size="md"
+                      class="tw:mx-auto tw:block"
+                      data-test="app-sessions-loading-indicator"
+                    />
                     <div class="text-center full-width">
                       {{ t("rum.loadingSessions") }}
                     </div>
@@ -178,12 +182,12 @@ import {
   b64DecodeUnicode,
   b64EncodeUnicode,
 } from "@/utils/zincutils";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
@@ -197,6 +201,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Session {
   timestamp: string;
@@ -222,7 +227,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();
@@ -528,10 +532,9 @@ const getSessions = () => {
     })
     .catch((err) => {
       rows.value = [];
-      q.notify({
+      toast({
         message: err.response?.data?.message || "Error while fetching sessions",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     })
     .finally(() => {
@@ -603,12 +606,11 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message ||
           "Error while fetching session replay data",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })

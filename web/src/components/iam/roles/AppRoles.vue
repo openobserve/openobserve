@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
-    <div class="card-container tw:flex tw:flex-col tw:h-[calc(100vh-var(--navbar-height)-1.5rem)]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[56px] tw:shrink-0"
-        >
+    <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
         <div
           data-test="iam-roles-section-title"
           class="q-table__title tw:font-[600]"
@@ -26,40 +25,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.roles") }}
         </div>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <div data-test="iam-roles-search-input">
-              <OInput
-                v-model="filterQuery"
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                :placeholder="t('iam.searchRole')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </OInput>
-            </div>
-
-            <OButton
-              data-test="alert-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              @click="addRole"
+          <div data-test="iam-roles-search-input">
+            <OInput
+              v-model="filterQuery"
+              class="tw:h-[36px]"
+              :placeholder="t('iam.searchRole')"
             >
-              {{ t('iam.addRole') }}
-            </OButton>
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
+              </template>
+            </OInput>
           </div>
+          <OButton
+            data-test="alert-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            @click="addRole"
+          >
+            {{ t('iam.addRole') }}
+          </OButton>
+        </div>
       </div>
-      <div class="tw:flex-1 tw:min-h-0">
-    <RoleTable
-      data-test="iam-roles-table-section"
-      :data="rows"
-      :selected-ids="selectedRoleNames"
-      @update:selected-ids="onSelectionChange"
-      @edit="editRole"
-      @delete="showConfirmDialog"
-      @bulk-delete="openBulkDeleteDialog"
-    />
-  </div>
-  </div>
+    </div>
+    <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+      <RoleTable
+        data-test="iam-roles-table-section"
+        :data="rows"
+        :global-filter="filterQuery"
+        :selected-ids="selectedRoleNames"
+        @update:selected-ids="onSelectionChange"
+        @edit="editRole"
+        @delete="showConfirmDialog"
+        @bulk-delete="openBulkDeleteDialog"
+      />
+    </div>
   </div>
   <AddRole
     v-model:open="showAddGroup"
@@ -86,21 +85,24 @@ import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 
 const { t } = useI18n();
 
 const { track } = useReo();
+
+const filterQuery = ref("");
 
 const showAddGroup = ref(false);
 
@@ -110,7 +112,6 @@ const router = useRouter();
 
 const store = useStore();
 
-const q = useQuasar();
 
 const deleteConformDialog = ref({
   show: false,
@@ -177,19 +178,17 @@ const hideForm = () => {
 const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
-      q.notify({
+      toast({
         message: "Role deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
       setupRoles();
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message: "Error while deleting role!",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
         });
       }
     });
@@ -224,22 +223,19 @@ const bulkDeleteUserRoles = async () => {
     }
 
     if (successful.length > 0 && unsuccessful.length === 0) {
-      q.notify({
+      toast({
         message: `Successfully deleted ${successful.length} role(s)`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
-        color: "warning",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Failed to delete ${unsuccessful.length} role(s)`,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
 
@@ -248,10 +244,9 @@ const bulkDeleteUserRoles = async () => {
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
+      toast({
         message: error.response?.data?.message || error?.message || "Error while deleting roles",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
     confirmBulkDelete.value = false;

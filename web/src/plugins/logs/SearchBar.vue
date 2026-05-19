@@ -46,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
-            <OTooltip v-if="isVisualizeDisabled" :content="t('search.enableSqlModeOrSelectSingleStream')" />
+            <OTooltip
+              v-if="isVisualizeDisabled"
+              :content="t('search.enableSqlModeOrSelectSingleStream')"
+            />
           </OToggleGroupItem>
 
           <OToggleGroupItem
@@ -99,7 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #label>
               <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
-              <OTooltip :content="isSqlModeDisabled ? t('search.sqlModeDisabledForVisualization') : t('search.sqlModeLabel')" />
+              <OTooltip
+                :content="
+                  isSqlModeDisabled
+                    ? t('search.sqlModeDisabledForVisualization')
+                    : t('search.sqlModeLabel')
+                "
+              />
             </template>
           </OSwitch>
         </div>
@@ -718,11 +727,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <OIcon
-                      name="arrow-drop-down"
-                      size="sm"
-                      class="tw:ml-1"
-                    />
+                    <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
                   </OButton>
                 </template>
                 <div class="tw:p-2 tw:min-w-[240px]">
@@ -800,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -901,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1037,12 +1042,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </OButton>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <q-separator
+              <OSeparator
                 v-if="
                   config.isEnterprise == 'true' ||
                   store.state.zoConfig.auto_query_enabled
                 "
                 class="tw:h-[1.875rem]! tw:w-[1px]"
+                vertical
               />
               <ODropdown
                 v-if="
@@ -1291,11 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <OIcon
-                        name="warning"
-                        size="md"
-                        class="q-mx-sm"
-                      />
+                      <OIcon name="warning" size="md" class="q-mx-sm" />
                       <span
                         class="text-negative q-pa-sm"
                         style="font-weight: 600; font-size: 14px"
@@ -1348,7 +1350,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <ODialog data-test="search-bar-confirm-dialog"
+    <ODialog
+      data-test="search-bar-confirm-dialog"
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
@@ -1360,7 +1363,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ confirmMessage }}</p>
     </ODialog>
 
-    <ODialog data-test="search-bar-confirm-saved-view-dialog"
+    <ODialog
+      data-test="search-bar-confirm-saved-view-dialog"
       ref="confirmSavedViewDialog"
       v-model:open="confirmSavedViewDialogVisible"
       size="xs"
@@ -1371,7 +1375,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ confirmMessageSavedView }}</p>
     </ODialog>
-    <ODialog data-test="search-bar-custom-download-dialog"
+    <ODialog
+      data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
       title="Custom Download"
@@ -1380,7 +1385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
-      <p>{{ t('search.customDownloadMessage') }}</p>
+      <p>{{ t("search.customDownloadMessage") }}</p>
       <OInput
         type="number"
         data-test="custom-download-initial-number-input"
@@ -1396,7 +1401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-sm"
       />
       <div class="q-py-sm file-type">
-        <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
+        <label class="q-pr-sm">{{ t("search.fileType") }}</label
+        ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
           class="file-type-button-group q-mt-xs"
@@ -1409,11 +1415,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="downloadCustomFileType = option.value"
-          >{{ option.label }}</OButton>
+            >{{ option.label }}</OButton
+          >
         </OButtonGroup>
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-store-state-saved-view-dialog"
+    <ODialog
+      data-test="search-bar-store-state-saved-view-dialog"
       v-model:open="store.state.savedViewDialog"
       size="md"
       :title="t('search.savedViewsLabel')"
@@ -1448,7 +1456,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-store-state-saved-function-dialog"
+    <ODialog
+      data-test="search-bar-store-state-saved-function-dialog"
       v-model:open="store.state.savedFunctionDialog"
       size="md"
       :title="t('search.functionPlaceholder')"
@@ -1497,26 +1506,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-search-scheduler-job-dialog"
+    <ODialog
+      data-test="search-bar-search-scheduler-job-dialog"
       v-model:open="searchSchedulerJob"
       size="md"
       :title="t('search.scheduleSearchJob')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
+      @click:secondary="
+        searchSchedulerJob = false;
+        searchObj.meta.showSearchScheduler = false;
+      "
       @click:primary="addJobScheduler"
     >
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer">
-            <OTooltip
-              side="right"
-              align="center"
-              max-width="300px"
-            >
+            <OTooltip side="right" align="center" max-width="300px">
               <template #content>
-                <span style="font-size: 14px">{{ t("search.noOfRecordsTooltip") }}</span>
+                <span style="font-size: 14px">{{
+                  t("search.noOfRecordsTooltip")
+                }}</span>
               </template>
             </OTooltip>
           </OIcon>
@@ -1531,17 +1542,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div
-        style="opacity: 0.8"
-        class="text-left mapping-warning-msg q-mt-md"
-      >
+      <div style="opacity: 0.8" class="text-left mapping-warning-msg q-mt-md">
         <OIcon name="warning" size="sm" class="q-mr-sm" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <ODialog data-test="search-bar-search-inspect-dialog"
+    <ODialog
+      data-test="search-bar-search-inspect-dialog"
       v-model:open="searchInspectDialog"
       size="sm"
       title="Search Inspect"
@@ -1845,7 +1854,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
+import { copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -1934,6 +1943,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const defaultValue: any = () => {
   return {
@@ -1994,6 +2005,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     OButtonGroup,
     ODialog,
     ODropdown,
@@ -2061,8 +2073,8 @@ export default defineComponent({
     },
     handleUpdateSavedView(item: any) {
       if (this.searchObj.data.stream.selectedStream.length == 0) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No stream available to update save view.",
         });
         return;
@@ -2087,19 +2099,17 @@ export default defineComponent({
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
-        this.$q.notify({
+        toast({
           message: "Initial number must be positive number.",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
-        this.$q.notify({
+        toast({
           message: "Please run a query first before downloading.",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
@@ -2123,19 +2133,17 @@ export default defineComponent({
           if (res.data.hits.length > 0) {
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
-            this.$q.notify({
+            toast({
               message: "No data found to download.",
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
           }
         })
         .catch((err) => {
-          this.$q.notify({
+          toast({
             message: err.message,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
         });
@@ -2155,12 +2163,17 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const savedViewColumns = [
-      { id: "view_name", header: "", accessorKey: "view_name", sortable: false, meta: { align: "left" } },
+      {
+        id: "view_name",
+        header: "",
+        accessorKey: "view_name",
+        sortable: false,
+        meta: { align: "left" },
+      },
     ];
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -2403,10 +2416,9 @@ export default defineComponent({
             searchObj.data.tempFunctionContent != "")
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
-            $q.notify({
+            toast({
               message: "Job Context have been removed",
-              color: "warning",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             searchObj.meta.jobId = "";
@@ -2421,10 +2433,9 @@ export default defineComponent({
       () => searchObj.meta.showHistogram,
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
-          $q.notify({
+          toast({
             message: "Histogram is not available for scheduled search",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
           searchObj.meta.showHistogram = false;
@@ -2702,10 +2713,10 @@ export default defineComponent({
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // $q.notify({
+                // toast({
                 //   message: "Stream not found",
                 //   color: "info",
-                //   position: "bottom",
+                //   position: "bottom-center",
                 //   timeout: 2000,
                 // });
               }
@@ -2718,10 +2729,9 @@ export default defineComponent({
           searchObj.meta.queryEditorPlaceholderFlag == true
         ) {
           if (!checkQuery(value)) {
-            $q.notify({
+            toast({
               message: "Job Context have been removed",
-              color: "warning",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             searchObj.meta.jobId = "";
@@ -2866,10 +2876,9 @@ export default defineComponent({
       //to solve this issue we are using json2csv package
 
       if (!data || data.length === 0) {
-        $q.notify({
+        toast({
           message: "No data found to download.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
@@ -2908,8 +2917,8 @@ export default defineComponent({
         showDownloadMenu.value = false;
       } catch (error) {
         showDownloadMenu.value = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error downloading logs",
           timeout: 2000,
         });
@@ -3002,8 +3011,8 @@ export default defineComponent({
       }
 
       if (content.trim() == "") {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message:
             "The function field must contain a value and cannot be left empty.",
         });
@@ -3026,8 +3035,8 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
             });
 
@@ -3049,8 +3058,8 @@ export default defineComponent({
           })
           .catch((err) => {
             saveFunctionLoader.value = false;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response.data["message"]) ||
                 "Function creation failed",
@@ -3068,8 +3077,8 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: "Function updated successfully.",
               });
 
@@ -3092,8 +3101,8 @@ export default defineComponent({
             })
             .catch((err) => {
               saveFunctionLoader.value = false;
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   JSON.stringify(err.response.data["message"]) ||
                   "Function updation failed",
@@ -3130,8 +3139,8 @@ export default defineComponent({
       openEditor = true,
     ) => {
       if (flag) {
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `${fnValue.name} function applied successfully.`,
           timeout: 3000,
         });
@@ -3153,8 +3162,8 @@ export default defineComponent({
     const fnSavedFunctionDialog = () => {
       const content = searchObj.data.tempFunctionContent;
       if (content == "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No function definition found.",
         });
         return;
@@ -3209,8 +3218,8 @@ export default defineComponent({
 
     const fnSavedView = () => {
       if (searchObj.data.stream.selectedStream.length == 0) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No stream available to save view.",
         });
         return;
@@ -3656,10 +3665,9 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            $q.notify({
+            toast({
               message: `${item.view_name} view applied successfully.`,
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             setTimeout(async () => {
@@ -3715,10 +3723,9 @@ export default defineComponent({
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
-            $q.notify({
+            toast({
               message: err.message || `Error while applying saved view.`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 3000,
             });
           }
@@ -3726,10 +3733,9 @@ export default defineComponent({
         .catch((err) => {
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
-          $q.notify({
+          toast({
             message: `Error while applying saved view.`,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1000,
           });
           console.log("Error while applying saved view", err);
@@ -3765,10 +3771,10 @@ export default defineComponent({
       //       );
       //     });
       //   } else {
-      //     $q.notify({
+      //     toast({
       //       message: `Please select saved view to update.`,
       //       color: "negative",
-      //       position: "bottom",
+      //       position: "bottom-center",
       //       timeout: 1000,
       //     });
       //   }
@@ -3807,27 +3813,24 @@ export default defineComponent({
             );
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
-              $q.notify({
+              toast({
                 message: t("search.viewDeletedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               getSavedViews();
             } else {
-              $q.notify({
+              toast({
                 message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
           })
           .catch((err) => {
-            $q.notify({
+            toast({
               message: t("search.errorDeletingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while deleting saved view", err);
@@ -3887,10 +3890,9 @@ export default defineComponent({
     const createSavedViews = (viewName: string) => {
       try {
         if (viewName.trim() == "") {
-          $q.notify({
+          toast({
             message: `Please provide valid view name.`,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1000,
           });
           saveViewLoader.value = false;
@@ -3916,10 +3918,9 @@ export default defineComponent({
                 view_id: res.data.view_id,
                 view_name: viewName,
               });
-              $q.notify({
+              toast({
                 message: t("search.viewCreatedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               getSavedViews();
@@ -3928,20 +3929,18 @@ export default defineComponent({
               saveViewLoader.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              toast({
                 message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
           })
           .catch((err) => {
             saveViewLoader.value = false;
-            $q.notify({
+            toast({
               message: t("search.errorCreatingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while creating saved view", err);
@@ -3950,10 +3949,9 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        toast({
           message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1000,
         });
         console.log("Error while saving view", e);
@@ -3967,9 +3965,9 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        const dismiss = $q.notify({
+        const dismiss = toast({
           message: "Updating saved view...",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 0,
         });
 
@@ -3989,10 +3987,9 @@ export default defineComponent({
                 },
               );
 
-              $q.notify({
+              toast({
                 message: t("search.viewUpdatedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               isSavedViewAction.value = "create";
@@ -4001,10 +3998,9 @@ export default defineComponent({
               confirmSavedViewDialogVisible.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              toast({
                 message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
@@ -4012,10 +4008,9 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             saveViewLoader.value = false;
-            $q.notify({
+            toast({
               message: t("search.errorUpdatingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while updating saved view", err);
@@ -4024,10 +4019,9 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewSelectedName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        toast({
           message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1000,
         });
         console.log("Error while saving view", e);
@@ -4218,10 +4212,9 @@ export default defineComponent({
 
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
-          $q.notify({
+          toast({
             message: "You can only save 10 views.",
-            color: "info",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
           return;
@@ -4233,19 +4226,17 @@ export default defineComponent({
         // moveItemsToTop(localSavedView, favoriteViews.value);
 
         useLocalSavedView(localSavedView);
-        $q.notify({
+        toast({
           message: "View added to favorites.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
-        $q.notify({
+        toast({
           message: "View removed from favorites.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       }
@@ -4342,9 +4333,7 @@ export default defineComponent({
         !searchObj.meta.sqlMode &&
         searchObj.data.stream.selectedStream.length > 1
       ) {
-        showErrorNotification(
-          t("search.enableSqlOrSelectStream"),
-        );
+        showErrorNotification(t("search.enableSqlOrSelectStream"));
         return;
       }
 
@@ -4408,9 +4397,7 @@ export default defineComponent({
           searchObj.data.query === "" &&
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
-          showErrorNotification(
-            t("search.queryEmptyToVisualize"),
-          );
+          showErrorNotification(t("search.queryEmptyToVisualize"));
           return;
         }
 
@@ -4428,9 +4415,7 @@ export default defineComponent({
           Array.isArray(logsPageQuery) &&
           logsPageQuery.length > 1
         ) {
-          showErrorNotification(
-            t("search.multipleSqlNotAllowed"),
-          );
+          showErrorNotification(t("search.multipleSqlNotAllowed"));
           return;
         }
 
@@ -4444,9 +4429,7 @@ export default defineComponent({
 
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
-          showErrorNotification(
-            t("search.aggregationFieldsNeedAlias"),
-          );
+          showErrorNotification(t("search.aggregationFieldsNeedAlias"));
           return;
         }
 
@@ -4624,16 +4607,16 @@ export default defineComponent({
           !searchObj.data.stream.selectedStream ||
           searchObj.data.stream.selectedStream.length === 0
         ) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Please select a stream before scheduling a job",
             timeout: 3000,
           });
           return;
         }
         if (searchObj.meta.jobId != "") {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.jobAlreadyScheduled"),
             timeout: 3000,
           });
@@ -4644,8 +4627,8 @@ export default defineComponent({
           searchObj.meta.jobRecords == 0 ||
           searchObj.meta.jobRecords < 0
         ) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.jobSchedulerRange"),
             timeout: 3000,
           });
@@ -4657,8 +4640,8 @@ export default defineComponent({
         await getJobData();
       } catch (e) {
         if (e.response.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.errorAddingJob"),
             timeout: 3000,
           });
@@ -4726,10 +4709,9 @@ export default defineComponent({
     };
 
     const updateActionSelection = (item: any) => {
-      $q.notify({
+      toast({
         message: `${item?.name} action applied successfully`,
         timeout: 3000,
-        color: "secondary",
       });
     };
 
@@ -4807,7 +4789,6 @@ export default defineComponent({
     // [END] explain query functionality
 
     return {
-      $q,
       t,
       store,
       router,

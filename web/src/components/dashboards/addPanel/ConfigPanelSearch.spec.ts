@@ -15,11 +15,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

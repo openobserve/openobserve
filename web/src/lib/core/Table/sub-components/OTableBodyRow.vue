@@ -14,6 +14,7 @@ const props = defineProps<{
   selectionMultiple?: boolean;
   isRowSelected?: boolean;
   expansionEnabled?: boolean;
+  canExpand?: boolean;
   isExpanded?: boolean;
   highlightText?: string;
   shouldHighlightColumn?: (columnId: string) => boolean;
@@ -99,7 +100,7 @@ function onDblclick(event: MouseEvent) {
         : '',
       rowClass,
     ]"
-    :style="rowStyle"
+    :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
     @click="onClick"
     @dblclick="onDblclick"
   >
@@ -114,10 +115,11 @@ function onDblclick(event: MouseEvent) {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-0 tw:px-0 tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
+      :class="['tw:w-8 tw:min-w-8 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
+        v-if="canExpand !== false"
         :expanded="isExpanded ?? false"
         :row-id="String(row.index)"
         @toggle="emit('toggle-expansion', row.original)"

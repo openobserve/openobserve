@@ -69,14 +69,13 @@ limitations under the License. -->
         </div>
 
         <!-- Error Details Expansion -->
-        <q-expansion-item
+        <OCollapsible
           v-if="result.error || result.responseBody"
+          v-model="errorDetailsOpen"
           data-test="test-failure-details-expansion"
           class="error-expansion"
-          dense
-          expand-icon-class="text-grey-7"
         >
-          <template #header>
+          <template #trigger>
             <div class="expansion-header">
               <OIcon name="info" size="xs" class="q-mr-xs" />
               <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
@@ -99,7 +98,7 @@ limitations under the License. -->
               <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
-        </q-expansion-item>
+        </OCollapsible>
 
         <!-- Retry Button -->
         <div class="result-actions">
@@ -157,6 +156,8 @@ import { date } from 'quasar';
 import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { ref } from 'vue';
 
 // Define component props
 interface Props {
@@ -178,6 +179,8 @@ const emit = defineEmits<Emits>();
 
 // Composables
 const { t } = useI18n();
+
+const errorDetailsOpen = ref(false);
 
 // Methods
 function formatTimestamp(timestamp?: number | string): string {

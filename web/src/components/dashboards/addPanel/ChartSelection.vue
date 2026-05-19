@@ -234,7 +234,7 @@ export default defineComponent({
       isChartDisabled,
     };
   },
-  components: { OTooltip },
+  components: { OIcon , OTooltip },
 });
 </script>
 

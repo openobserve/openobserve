@@ -15,13 +15,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import QueryConfig from "./QueryConfig.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock store

@@ -56,7 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToPipelineHistory"
               >
                 <template #icon-left
-                  ><OIcon name="history" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="history"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t(`pipeline.history`) }}
               </OButton>
               <OButton
@@ -68,7 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToBackfillJobs"
               >
                 <template #icon-left
-                  ><OIcon name="refresh" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="refresh"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t("pipeline.backfill") }}
               </OButton>
               <OButton
@@ -79,7 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="routeToImportPipeline"
               >
                 <template #icon-left
-                  ><OIcon name="upload" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="upload"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t(`pipeline.import`) }}
               </OButton>
             </template>
@@ -132,33 +144,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-127px)]">
           <OTable
+            :key="activeTab"
             data-test="pipeline-list-table"
             :data="filteredPipelines"
             :columns="otableColumns"
             row-key="pipeline_id"
             :global-filter="filterQuery"
+            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
             v-model:selected-ids="selectedPipelineIds"
-            :expansion="activeTab === 'realtime' ? 'none' : 'single'"
+            :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
+            :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
+            :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
             v-model:expanded-ids="expandedId"
-            style="width: 100%; height: calc(100vh - var(--navbar-height) - 77px)"
+
+            style="
+              width: 100%;
+              height: calc(100vh - var(--navbar-height) - 77px);
+            "
             @row-click="handleRowClick"
+
           >
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
                 <OButton
                   :data-test="`pipeline-list-${row.name}-pause-start-alert`"
-                  :variant="
-                    row.enabled ? 'ghost-destructive' : 'ghost'
-                  "
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-xs-sq"
-                  :title="
-                    row.enabled
-                      ? t('alerts.pause')
-                      : t('alerts.start')
-                  "
+                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   @click.stop="togglePipeline(row)"
                 />
@@ -180,7 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="visibility" size="sm" />
                   </template>
                   <OTooltip>
-                    <template #content><PipelineView :pipeline="row" /></template>
+                    <template #content
+                      ><PipelineView :pipeline="row"
+                    /></template>
                   </OTooltip>
                 </OButton>
                 <ODropdown>
@@ -272,9 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="scheduled-pipeline-expanded-sql"
                     class="scrollable-content expanded-sql"
                   >
-                    <pre style="text-wrap: wrap"
-                      >{{ row?.sql_query }} </pre
-                    >
+                    <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                   </div>
                 </div>
               </div>
@@ -342,7 +357,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <router-view v-else />
 
-  <ODrawer data-test="pipelines-list-create-pipeline-drawer" v-model:open="showCreatePipeline" size="lg">
+  <ODrawer
+    data-test="pipelines-list-create-pipeline-drawer"
+    v-model:open="showCreatePipeline"
+    size="lg"
+  >
     <stream-selection @save="savePipeline" />
   </ODrawer>
 
@@ -372,12 +391,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 
   <!-- Pipeline Error Dialog -->
-  <ODialog data-test="pipelines-list-error-dialog"
+  <ODialog
+    data-test="pipelines-list-error-dialog"
     v-model:open="errorDialog.show"
     @update:open="(v) => !v && closeErrorDialog()"
     size="md"
     :title="errorDialog.data?.name"
-    :sub-title="errorDialog.data ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}` : undefined"
+    :sub-title="
+      errorDialog.data
+        ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`
+        : undefined
+    "
     :primary-button-label="t('pipeline_list.close')"
     @click:primary="closeErrorDialog"
   >
@@ -389,8 +413,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
         <div class="section-label tw:mb-2">
-            {{ t("pipeline_list.error_summary") }}
-          </div>
+          {{ t("pipeline_list.error_summary") }}
+        </div>
         <div class="error-summary-box">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
@@ -398,39 +422,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Node Errors -->
       <div
-          v-if="
-            errorDialog.data.last_error.node_errors &&
-            Object.keys(errorDialog.data.last_error.node_errors).length > 0
-          "
-        >
+        v-if="
+          errorDialog.data.last_error.node_errors &&
+          Object.keys(errorDialog.data.last_error.node_errors).length > 0
+        "
+      >
         <div class="section-label tw:mb-3">
-            {{ t("pipeline_list.node_errors") }}
-          </div>
+          {{ t("pipeline_list.node_errors") }}
+        </div>
         <div class="node-errors-container">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
-                .node_errors"
+              .node_errors"
             :key="nodeId"
             class="node-error-item"
           >
             <div class="node-error-header">
-              <span class="node-name">{{
-                  nodeError.node_name || nodeId
-                }}</span>
+              <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
               <span class="node-type">{{ nodeError.node_type }}</span>
             </div>
             <div
-                v-if="
-                  nodeError.error_messages &&
-                  nodeError.error_messages.length > 0
-                "
-                class="node-error-messages"
-              >
+              v-if="
+                nodeError.error_messages && nodeError.error_messages.length > 0
+              "
+              class="node-error-messages"
+            >
               <div
-                  v-for="(msg, idx) in nodeError.error_messages"
-                  :key="idx"
-                  class="error-message"
-                >
+                v-for="(msg, idx) in nodeError.error_messages"
+                :key="idx"
+                class="error-message"
+              >
                 {{ msg }}
               </div>
             </div>
@@ -438,7 +459,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-
   </ODialog>
 </template>
 <script setup lang="ts">
@@ -458,7 +478,6 @@ import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
@@ -479,13 +498,14 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 import { filter, update } from "lodash-es";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const router = useRouter();
 
-const q = useQuasar();
 
 const filterQuery = ref("");
 
@@ -504,7 +524,6 @@ onUnmounted(() => {
 });
 
 const showCreatePipeline = ref(false);
-
 
 const pipelines = ref([]);
 
@@ -561,7 +580,9 @@ const tabs = reactive([
 
 const selectedPipelineIds = ref<string[]>([]);
 const selectedPipelines = computed(() =>
-  filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id))
+  filteredPipelines.value.filter((p: any) =>
+    selectedPipelineIds.value.includes(p.pipeline_id),
+  ),
 );
 const expandedId = ref<string[]>([]);
 
@@ -581,21 +602,11 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
-const otableColumns = computed(() => {
-  if (activeTab.value === "scheduled") {
-    return columns.value.filter((c: any) => c.id !== "#");
-  }
-  return columns.value;
-});
+const otableColumns = computed(() => columns.value);
 
 const updateActiveTab = () => {
+  expandedId.value = [];
   if (activeTab.value === "all") {
-    filteredPipelines.value = pipelines.value.map(
-      (pipeline: any, index: any) => ({
-        ...pipeline,
-        "#": index + 1,
-      }),
-    );
     columns.value = getColumnsForActiveTab(activeTab.value);
     filteredPipelines.value = pipelines.value;
     return;
@@ -605,7 +616,7 @@ const updateActiveTab = () => {
     .filter((pipeline: any) => pipeline.source.source_type === activeTab.value)
     .map((pipeline: any, index) => ({
       ...pipeline,
-      "#": index + 1,
+      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
     }));
 
   columns.value = getColumnsForActiveTab(activeTab.value);
@@ -639,39 +650,26 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       const message = row.enabled
         ? `${row.name} state resumed successfully`
         : `${row.name} state paused successfully`;
-      q.notify({
+      toast({
         message: message,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       await getPipelines();
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message ||
             "Error while updating pipeline state",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
     });
 };
 
-const handleRowClick = (row: any) => {
-  if (row.source?.source_type === "realtime") {
-    expandedId.value = [];
-    return;
-  }
-  if (expandedId.value.includes(row.pipeline_id)) {
-    expandedId.value = [];
-  } else {
-    expandedId.value = [row.pipeline_id];
-  }
-};
 
 const getColumnsForActiveTab = (tab: any) => {
   const hashColumn = {
@@ -687,6 +685,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
+    size: 'auto',
     meta: { align: "left" },
   };
   const streamNameColumn = {
@@ -760,9 +759,23 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   if (tab === "realtime") {
-    return [hashColumn, nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
+    return [
+      hashColumn,
+      nameColumn,
+      streamNameColumn,
+      streamTypeColumn,
+      actionsColumn,
+    ];
   }
-  return [hashColumn, nameColumn, scheduledStreamTypeColumn, frequencyColumn, periodColumn, cronColumn, actionsColumn];
+  return [
+    hashColumn,
+    nameColumn,
+    scheduledStreamTypeColumn,
+    frequencyColumn,
+    periodColumn,
+    cronColumn,
+    actionsColumn,
+  ];
 };
 
 onMounted(async () => {
@@ -822,7 +835,7 @@ const getPipelines = async () => {
       pipeline.edges = updatedEdges;
       return {
         ...pipeline,
-        "#": index + 1,
+        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       };
     });
   } catch (error) {
@@ -856,10 +869,10 @@ const openDeleteDialog = (pipeline: any) => {
 };
 
 const savePipeline = (data: any) => {
-  const dismiss = q.notify({
+  const dismiss = toast({
     message: "saving pipeline...",
-    position: "bottom",
-    spinner: true,
+    position: "bottom-center",
+    variant: "loading",
   });
 
   pipelineService
@@ -871,21 +884,19 @@ const savePipeline = (data: any) => {
       getPipelines();
       dismiss();
       showCreatePipeline.value = false;
-      q.notify({
+      toast({
         message: "Pipeline created successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((error) => {
       dismiss();
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message || "Error while saving pipeline",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -893,10 +904,10 @@ const savePipeline = (data: any) => {
 };
 
 const deletePipeline = async () => {
-  const dismiss = q.notify({
+  const dismiss = toast({
     message: "deleting pipeline...",
-    position: "bottom",
-    spinner: true,
+    position: "bottom-center",
+    variant: "loading",
   });
   const { pipeline_id } = confirmDialogMeta.value.data;
   const org_id = store.state.selectedOrganization.identifier;
@@ -906,20 +917,18 @@ const deletePipeline = async () => {
       org_id,
     })
     .then(async () => {
-      q.notify({
+      toast({
         message: "Pipeline deleted successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message || "Error while deleting pipeline",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -1002,10 +1011,9 @@ const exportBulkPipelines = () => {
   URL.revokeObjectURL(url);
 
   selectedPipelines.value = [];
-  q.notify({
+  toast({
     message: `${pipelinesToExport.length} pipelines exported successfully`,
-    color: "positive",
-    position: "bottom",
+    position: "bottom-center",
     timeout: 3000,
   });
 };
@@ -1022,8 +1030,6 @@ const handleCancelResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
   return;
 };
-
-
 
 const showErrorDialog = (pipeline: any) => {
   errorDialog.value.show = true;
@@ -1054,8 +1060,8 @@ const goToBackfillJobs = () => {
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
     timeout: 0,
   });
@@ -1067,8 +1073,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     );
 
     if (pipelinesToToggle.length === 0) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `No pipelines to ${action}`,
         timeout: 2000,
       });
@@ -1090,8 +1096,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 
     if (response) {
       dismiss();
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Pipelines ${action}d successfully`,
         timeout: 2000,
       });
@@ -1103,8 +1109,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   } catch (error) {
     dismiss();
     console.error(`Error ${action}ing pipelines:`, error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: `Error ${action}ing pipelines. Please try again.`,
       timeout: 2000,
     });
@@ -1120,16 +1126,16 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeletePipelines = async () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Deleting pipelines...",
     timeout: 0,
   });
 
   try {
     if (selectedPipelines.value.length === 0) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "No pipelines selected for deletion",
         timeout: 2000,
       });
@@ -1157,30 +1163,30 @@ const bulkDeletePipelines = async () => {
 
       if (failCount > 0 && successCount > 0) {
         // Partial success
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
           timeout: 5000,
         });
       } else if (failCount > 0) {
         // All failed
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to delete ${failCount} pipeline(s)`,
           timeout: 3000,
         });
       } else {
         // All successful
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `${successCount} pipeline(s) deleted successfully`,
           timeout: 2000,
         });
       }
     } else {
       // Fallback success message
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
         timeout: 2000,
       });
@@ -1197,8 +1203,8 @@ const bulkDeletePipelines = async () => {
       error?.message ||
       "Error deleting pipelines. Please try again.";
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: errorMessage,
         timeout: 3000,
       });

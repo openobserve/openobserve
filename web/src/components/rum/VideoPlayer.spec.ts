@@ -27,7 +27,7 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
+  plugins: [quasar.Dialog, quasar.quasar.Loading],
 });
 
 // Mock lodash-es
@@ -161,10 +161,6 @@ describe("VideoPlayer Component", () => {
         plugins: [i18n],
         provide: { store },
         stubs: {
-          "q-spinner-hourglass": {
-            template: '<div data-test="spinner" />',
-            props: ["color", "size", "style"],
-          },
           "OIcon": {
             template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
@@ -232,13 +228,13 @@ describe("VideoPlayer Component", () => {
 
   describe("Loading State", () => {
     it("should not show spinner when not loading", () => {
-      const spinner = wrapper.find('[data-test="spinner"]');
+      const spinner = wrapper.find('[data-test="video-player-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
 
     it("should display loading spinner when isLoading is true", async () => {
       await wrapper.setProps({ isLoading: true });
-      const spinner = wrapper.find('[data-test="spinner"]');
+      const spinner = wrapper.find('[data-test="video-player-loading-indicator"]');
       expect(spinner.exists()).toBe(true);
     });
 
@@ -251,10 +247,10 @@ describe("VideoPlayer Component", () => {
 
     it("should hide loading content when not loading", async () => {
       await wrapper.setProps({ isLoading: true });
-      expect(wrapper.find('[data-test="spinner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(true);
 
       await wrapper.setProps({ isLoading: false });
-      expect(wrapper.find('[data-test="spinner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(false);
     });
   });
 

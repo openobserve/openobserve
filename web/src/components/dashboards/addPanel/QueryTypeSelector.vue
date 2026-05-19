@@ -91,7 +91,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
@@ -112,7 +111,6 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",

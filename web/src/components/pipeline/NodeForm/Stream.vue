@@ -170,9 +170,9 @@ import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
-import { useQuasar } from "quasar";
 
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["cancel:hideform"]);
@@ -187,7 +187,6 @@ function handleDrawerClose(v: boolean) {
   }
 }
 
-const $q = useQuasar();
 
 const { t } = useI18n();
 
@@ -257,10 +256,9 @@ watch(
 );
 function sanitizeStreamName(input: string): string {
   if (input.length > 100) {
-    $q.notify({
+    toast({
       message: "Stream name should be less than 100 characters",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
     //return empty string so that stream name is not saved and user will be notifid and
@@ -452,10 +450,9 @@ const saveStream = () => {
     stream_name.value.hasOwnProperty("value") &&
     stream_name.value.value === ""
   ) {
-    $q.notify({
+    toast({
       message: "Please select Stream from the list",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
     return;
@@ -562,7 +559,7 @@ defineExpose({
     justify-content: flex-start;
   }
 
-  .q-separator {
+  [role="separator"] {
     display: none !important;
   }
 }

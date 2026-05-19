@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div style="display: flex; flex-direction: row" class="q-pl-md">
           <!-- Separator between X and Breakdown/Pivot -->
-          <q-separator vertical class="q-mr-md" />
+          <OSeparator vertical class="tw:mr-4" />
           <div class="layout-name" style="min-width: 0 !important">
             {{
               dashboardPanelData.data.type == "table"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- y axis container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
 
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
@@ -662,9 +662,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </span>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="dashboardData"
       :dashboardPanelData="dashboardPanelData"
     />
-    <q-separator />
+    <OSeparator />
     <OperationsList
       v-model:operations="promqlBuilderQuery.operations"
       :dashboardData="dashboardPanelData"
@@ -753,6 +753,7 @@ export default defineComponent({
     PromQLBuilderOptions,
     OIcon,
     OTooltip,
+    OSeparator,
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],

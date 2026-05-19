@@ -206,9 +206,6 @@ describe("ErrorViewer.vue", () => {
       global: {
         plugins: [store, router, Quasar, i18n],
         stubs: {
-          QSpinnerHourglass: {
-            template: "<div data-test='spinner'>Loading...</div>",
-          },
           QSeparator: {
             template: "<hr data-test='separator' />",
           },
@@ -338,7 +335,7 @@ describe("ErrorViewer.vue", () => {
       wrapper.vm.isLoading.push(true);
       await nextTick();
 
-      expect(wrapper.find('[data-test="spinner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-viewer-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Hold on tight, we're fetching error details.");
     });
 

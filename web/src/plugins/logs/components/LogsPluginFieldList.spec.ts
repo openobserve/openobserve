@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldList from "./FieldList.vue";
+import FieldList from "./LogsPluginFieldList.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
@@ -203,10 +203,6 @@ function createWrapper(props = {}) {
           props: ["icon", "dense", "size", "flat"],
           emits: ["click"],
         },
-        QSpinnerHourglass: {
-          name: "QSpinnerHourglass",
-          template: '<span class="q-spinner-stub"></span>',
-        },
       },
     },
   });
@@ -241,13 +237,13 @@ describe("FieldList", () => {
 
     it("does not show loading spinner when loadingStream is false", () => {
       const wrapper = createWrapper({ loadingStream: false });
-      const spinner = wrapper.find(".q-spinner-stub");
+      const spinner = wrapper.find('[data-test="o2-table-loading"]');
       expect(spinner.exists()).toBe(false);
     });
 
     it("shows loading spinner when loadingStream is true", () => {
       const wrapper = createWrapper({ loadingStream: true });
-      const spinner = wrapper.find(".q-spinner-stub");
+      const spinner = wrapper.find('[data-test="o2-table-loading"]');
       expect(spinner.exists()).toBe(true);
     });
 

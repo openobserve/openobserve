@@ -87,6 +87,17 @@ export const fillMissingValues = (
     return JSON.parse(JSON.stringify(processedData));
   }
 
+  // If the time-based key is only in the breakdown field (not on the x-axis),
+  // this is not a time series chart — skip missing value filling.
+  // Filling would re-expand limited breakdown values into all time slots,
+  // defeating the series limit and causing performance issues.
+  if (
+    breakDownKeys.includes(timeBasedKey) &&
+    !xAxisKeys.includes(timeBasedKey)
+  ) {
+    return JSON.parse(JSON.stringify(processedData));
+  }
+
   const xAxisKeysWithoutTimeStamp = xAxisKeys.filter(
     (key: any) => key !== timeBasedKey,
   );

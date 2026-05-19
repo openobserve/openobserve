@@ -18,12 +18,12 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OrgStorageSettings from "./OrgStorageSettings.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 const { mockGetStorage, mockNotify } = vi.hoisted(() => ({
@@ -111,7 +111,7 @@ describe("OrgStorageSettings", () => {
   it("shows loading spinner initially", () => {
     mockGetStorage.mockReturnValue(new Promise(() => {}));
     const wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "QSpinner" }).exists()).toBe(true);
+    expect(wrapper.find('[data-test="org-storage-settings-loading-indicator"]').exists()).toBe(true);
   });
 
   it("shows empty state when not configured", async () => {

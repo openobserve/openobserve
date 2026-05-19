@@ -2674,7 +2674,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if progress bar is visible
      */
     async isProgressBarVisible() {
-        const progressLocator = this.page.locator('[data-test*="progress"], .q-linear-progress, progress').first();
+        const progressLocator = this.page.locator('[data-test*="progress"], progress').first();
         return await progressLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2911,7 +2911,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of progress bars
      */
     async getProgressBarCount() {
-        const progressBars = await this.page.locator('.q-linear-progress, progress, [data-test*="progress"]').all();
+        const progressBars = await this.page.locator('[data-test*="progress"], progress').all();
         return progressBars.length;
     }
 

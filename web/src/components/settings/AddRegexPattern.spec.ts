@@ -18,12 +18,12 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // MSW is set up globally in setupTests.ts - no need to mock services
@@ -191,10 +191,6 @@ const createWrapper = (props = {}, options = {}) => {
         QIcon: {
           template: "<span data-test-stub='OIcon'></span>",
           props: ["name", "size"],
-        },
-        QSpinnerHourglass: {
-          template: "<span data-test-stub='q-spinner-hourglass'></span>",
-          props: ["color", "size"],
         },
         FullViewContainer: {
           template: "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",

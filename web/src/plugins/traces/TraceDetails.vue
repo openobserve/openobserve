@@ -836,7 +836,7 @@ import {
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -864,6 +864,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -1053,7 +1054,6 @@ export default defineComponent({
 
     const { t } = useI18n();
 
-    const $q = useQuasar();
 
     const router = useRouter();
 
@@ -1078,8 +1078,8 @@ export default defineComponent({
       localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
       areFiltersAdded.value = true;
 
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Filter added: ${field} ${operator} '${value}'`,
         timeout: 2000,
       });
@@ -2281,7 +2281,6 @@ export default defineComponent({
         spans: [],
         index: 0,
         style: {
-          color: "",
         },
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
@@ -2393,8 +2392,8 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Trace ID copied to clipboard",
         timeout: 2000,
       });
@@ -2408,8 +2407,8 @@ export default defineComponent({
     const copySessionId = () => {
       if (!sessionId.value) return;
       copyToClipboard(sessionId.value);
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Session ID copied to clipboard",
         timeout: 2000,
       });

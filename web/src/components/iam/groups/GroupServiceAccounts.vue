@@ -62,37 +62,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
-        <template v-if="rows.length">
-          <OTable
-            :data="rows"
-            :columns="columns"
-            row-key="email"
-            :global-filter="userSearchKey"
-            pagination="client"
-            :page-size="100"
-            sorting="client"
-            filter-mode="client"
-            :default-columns="false"
-            :show-global-filter="false"
-            dense
-          >
-            <template #cell-select="{ row }">
-              <OCheckbox
-                :data-test="`iam-service-accounts-selection-table-body-row-${row.email}-checkbox`"
-                :model-value="row.isInGroup"
-                class="filter-check-box cursor-pointer"
-                @update:model-value="toggleUserSelection(row)"
-              />
-            </template>
-          </OTable>
-        </template>
-        <div
-          data-test="iam-service-accounts-selection-table-no-users-text"
-          v-if="!rows.length"
-          class="text-bold q-pl-md q-py-md"
+        <OTable
+          :data="rows"
+          :columns="columns"
+          row-key="email"
+          :global-filter="userSearchKey"
+          pagination="client"
+          :page-size="100"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          :footer-title="t('serviceAccounts.header')"
+          dense
         >
-          No Service Accounts added
-        </div>
+          <template #cell-select="{ row }">
+            <OCheckbox
+              :data-test="`iam-service-accounts-selection-table-body-row-${row.email}-checkbox`"
+              :model-value="row.isInGroup"
+              class="filter-check-box cursor-pointer"
+              @update:model-value="toggleUserSelection(row)"
+            />
+          </template>
+          <template #empty>
+            <NoData />
+          </template>
+        </OTable>
       </div>
     </div>
   </template>
@@ -100,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script setup lang="ts">
   import OTable from "@/lib/core/Table/OTable.vue";
   import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+  import NoData from "@/components/shared/grid/NoData.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import OInput from "@/lib/forms/Input/OInput.vue";
@@ -179,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: t("iam.serviceAccountsName"),
       accessorKey: "email",
       sortable: true,
-      meta: { align: "left" },
+      meta: { align: "left" , autoWidth: true },
     },
   ];
   

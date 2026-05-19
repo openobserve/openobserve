@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import User from "@/views/User.vue";
 import Users from "@/components/iam/users/User.vue";
 import i18n from "@/locales";
@@ -25,7 +25,7 @@ import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe("User.vue Component", () => {

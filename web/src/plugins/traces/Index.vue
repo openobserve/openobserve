@@ -311,7 +311,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -364,6 +364,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -388,7 +389,6 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
-const $q = useQuasar();
 const { t } = useI18n();
 const {
   searchObj,
@@ -588,8 +588,8 @@ async function getStreamList() {
       })
       .catch((e) => {
         searchObj.loadingStream = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             "Error while pulling index for selected organization" + e.message,
           timeout: 2000,
@@ -1270,8 +1270,8 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
     startTime: startTime,
     endTime: endTime,
   });
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("traces.timeRangeUpdated"),
     timeout: 5000,
   });

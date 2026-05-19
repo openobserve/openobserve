@@ -19,12 +19,13 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default {
   props: {
     nodeTypes: Array,
     hasInputType: Boolean,
   },
-  components: { OButton, OTooltip },
+  components: { OButton, OTooltip, OIcon },
   setup(props) {
     const { onDragStart, pipelineObj } = useDragAndDrop();
     return { node_types: props.nodeTypes, onDragStart, pipelineObj };
@@ -34,20 +35,16 @@ export default {
 
 <template>
   <div class="nodes">
-    <div
-      v-for="node in node_types"
-      :key="node.io_type"
-      class="o2vf_node"
-    >
+    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node">
       <OButton
         variant="ghost"
         size="md"
         :class="`o2vf_node_${node.io_type}`"
         class="q-pa-none btn-fixed-width node-draggable"
-        style="width: 170px; justify-content: flex-start;"
+        style="width: 170px; justify-content: flex-start"
         :draggable="true"
         @dragstart="onDragStart($event, node)"
-        v-if="node.isSectionHeader==false"
+        v-if="node.isSectionHeader == false"
       >
         <OTooltip side="right" :side-offset="10">
           <template #content>
@@ -59,8 +56,14 @@ export default {
         </OTooltip>
         <div class="node-content">
           <div class="node-icon-section">
-            <OIcon size="1.3em" :name="node.icon" />
-            <q-separator vertical class="node-separator" />
+            <img
+              v-if="typeof node.icon === 'string' && node.icon.startsWith('img:')"
+              :src="node.icon.slice(4)"
+              alt=""
+              class="node-icon-img"
+            />
+            <OIcon v-else size="1.3em" :name="node.icon" />
+            <OSeparator vertical class="node-separator" />
           </div>
           <div class="node-label tw:w-[70px]">{{ node.label }}</div>
           <div class="drag-dots">
@@ -74,7 +77,7 @@ export default {
       <div v-else>
         <div class="q-mb-xs text-subtitle1">
           <div>{{ node.label }}</div>
-          <q-separator />
+          <OSeparator />
         </div>
       </div>
     </div>
@@ -133,6 +136,13 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.node-icon-img {
+  width: 1.3em;
+  height: 1.3em;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .node-separator {

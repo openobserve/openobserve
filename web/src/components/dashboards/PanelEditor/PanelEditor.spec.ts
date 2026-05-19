@@ -161,9 +161,9 @@ vi.mock("@/components/dashboards/addPanel/ChartSelection.vue", () => ({
   },
 }));
 
-vi.mock("@/components/dashboards/addPanel/FieldList.vue", () => ({
+vi.mock("@/components/dashboards/addPanel/PanelFieldList.vue", () => ({
   default: {
-    name: "FieldList",
+    name: "PanelFieldList",
     template: '<div class="field-list-mock">FieldList</div>',
   },
 }));
@@ -281,7 +281,6 @@ const mountGlobal = {
     QIcon: true,
     QBtn: true,
     QTooltip: true,
-    QAvatar: true,
     ODialog: ODialogStub,
     // Explicit stub so shallowMount tracks `open` as a declared prop.
     ShowLegendsPopup: {

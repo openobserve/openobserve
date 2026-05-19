@@ -67,7 +67,7 @@ vi.mock("@/services/service_accounts", () => ({
 }));
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 describe("EditScript", () => {

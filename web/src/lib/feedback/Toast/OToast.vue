@@ -120,7 +120,7 @@ const screenReaderTitle = computed(() =>
 
     <!-- Content -->
     <div class="tw:flex-1 tw:min-w-0">
-      <!-- Title (always present for screen readers) -->
+      <!-- Title — visible when provided, sr-only otherwise (carries message text for screen readers) -->
       <ToastTitle
         :class="[
           'tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug',
@@ -130,10 +130,12 @@ const screenReaderTitle = computed(() =>
         {{ title ?? screenReaderTitle }}
       </ToastTitle>
 
-      <!-- Message (visible; hidden from SR when title is absent since title carries the text) -->
+      <!-- Message — always visible -->
       <ToastDescription
-        v-if="title"
-        class="tw:text-sm tw:text-toast-fg-secondary tw:mt-1 tw:leading-snug"
+        :class="[
+          'tw:text-sm tw:leading-snug',
+          title ? 'tw:text-toast-fg-secondary tw:mt-1' : 'tw:text-toast-fg'
+        ]"
       >
         {{ message }}
       </ToastDescription>

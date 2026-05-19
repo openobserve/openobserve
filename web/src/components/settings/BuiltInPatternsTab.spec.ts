@@ -18,10 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { Notify } from "quasar";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
-installQuasar({ plugins: { Notify } });
+installQuasar({ plugins: {  } });
 
 // --- Mock services ---
 vi.mock("@/services/regex_pattern", () => ({
@@ -175,7 +174,6 @@ function mountComponent() {
       provide: { store: mockStore },
       stubs: {
         ODialog: ODialogStub,
-        "q-spinner-hourglass": true,
         "q-list": { template: "<div><slot /></div>", props: ["bordered", "separator"] },
         "q-item": { template: "<div class='q-item'><slot /></div>", props: ["class"] },
         "q-item-section": { template: "<div class='q-item-section'><slot /></div>", props: ["side"] },

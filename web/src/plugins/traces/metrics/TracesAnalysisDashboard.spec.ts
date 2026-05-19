@@ -278,7 +278,6 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
           props: ["modelValue", "dense", "borderless", "placeholder", "clearable"],
           emits: ["update:modelValue"],
         },
-        QSpinnerHourglass: { template: "<span />" },
         // Heavy custom child — already mocked at module level
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',

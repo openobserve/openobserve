@@ -16,11 +16,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 // vi.mock calls are hoisted — must appear before imports of mocked modules

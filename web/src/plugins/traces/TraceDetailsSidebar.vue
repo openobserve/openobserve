@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OTabs>
     </div>
-    <q-separator style="width: 100%" />
+    <OSeparator class="tw:w-full" />
     <div class="span_details_tab-panels  tw:p-2">
       <OTabPanels v-model="activeTab"
 grow
@@ -386,10 +386,10 @@ class="tw:h-full tw:overflow-y-auto">
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="tw:mb-3">
-                    <q-expansion-item
+                    <OCollapsible
+                      v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
-                      header-class="tw:text-xs tw:font-medium"
                     >
                       <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
@@ -399,7 +399,7 @@ class="tw:h-full tw:overflow-y-auto">
                           view-mode="formatted"
                         />
                       </div>
-                    </q-expansion-item>
+                    </OCollapsible>
                   </div>
                   <div
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
@@ -471,15 +471,16 @@ class="tw:h-full tw:overflow-y-auto">
             </div>
 
             <!-- Model Parameters (collapsible) -->
-            <q-expansion-item
+            <OCollapsible
               v-if="span.llm_request_parameters"
+              v-model="modelParamsOpen"
               label="Model Parameters"
               class="q-mt-md"
             >
               <pre class="model-params-json q-pa-sm">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </OTabPanel>
 
@@ -870,8 +871,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
-import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
+import { date, type QTableProps, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -920,7 +922,9 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -955,6 +959,7 @@ export default defineComponent({
     },
   },
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,
@@ -963,6 +968,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OCollapsible,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1030,6 +1036,8 @@ export default defineComponent({
 
     // Track fullscreen state
     const isFullscreen = ref(false);
+    const sysInstrOpen = ref(false);
+    const modelParamsOpen = ref(false);
 
     const showPendingFilter = false;
 
@@ -1491,7 +1499,7 @@ export default defineComponent({
       copyToClipboard(props.span?.span_id || "");
 
       q?.notify?.({
-        type: "positive",
+        variant: "success",
         message: "Span ID copied to clipboard",
         timeout: 2000,
       });
@@ -1504,7 +1512,7 @@ export default defineComponent({
       copyToClipboard(attributesText);
 
       q?.notify?.({
-        type: "positive",
+        variant: "success",
         message: "Attributes copied to clipboard",
         timeout: 2000,
       });
@@ -1809,26 +1817,26 @@ export default defineComponent({
         // Copy to clipboard
         copyToClipboard(textToCopy)
           .then(() => {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-              position: "top",
+              position: "top-center",
               timeout: 2000,
             });
           })
           .catch(() => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Failed to copy to clipboard",
-              position: "top",
+              position: "top-center",
               timeout: 2000,
             });
           });
       } catch (error) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to copy content",
-          position: "top",
+          position: "top-center",
           timeout: 2000,
         });
       }
@@ -1965,8 +1973,8 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log)).then(() =>
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Content Copied Successfully!",
           timeout: 1000,
         }),
@@ -2042,6 +2050,8 @@ export default defineComponent({
         return map[color] || "default";
       },
       hasContent,
+      sysInstrOpen,
+      modelParamsOpen,
       parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,

@@ -17,25 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit;">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="full-width tw:flex tw:justify-end tw:gap-3">
-
+          <div class="q-table__title tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:h-[36px] tw:w-[200px]"
               :placeholder="t('organization.search')"
             >
-              <template #prepend>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
-          
             <OButton
               variant="primary"
               size="sm"
@@ -44,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t('organization.add') }}
             </OButton>
-            </div>
+          </div>
         </div>
         </div>
     <div>
@@ -57,6 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :global-filter="filterQuery"
         pagination="client"
         :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        :footer-title="t('organization.header')"
         sorting="client"
         filter-mode="client"
         :default-columns="false"
@@ -66,11 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </template>
 
-        <template #bottom>
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-            {{ organizations.length }} {{ t('organization.header') }}
-          </span>
-        </template>
 
         <template #cell-actions="{ row }">
           <OButton
@@ -103,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
@@ -118,6 +113,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -125,6 +121,7 @@ export default defineComponent({
     AddUpdateOrganization,
     NoData,
     OButton,
+    OInput,
     OIcon,
     OTable,
 },
@@ -132,7 +129,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
@@ -235,8 +231,8 @@ export default defineComponent({
     });
 
     const getOrganizations = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading organizations...",
       });
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
@@ -426,14 +422,14 @@ export default defineComponent({
       }
       this.getOrganizations();
 
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
       });
     },
     joinOrganization() {
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Request completed successfully.",
         timeout: 5000,
       });
@@ -442,15 +438,15 @@ export default defineComponent({
     copyAPIKey() {
       copyToClipboard(this.organizationAPIKey)
         .then(() => {
-          this.$q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "API Key Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy API Key.",
             timeout: 5000,
           });

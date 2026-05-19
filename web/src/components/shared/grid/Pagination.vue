@@ -46,7 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-sm"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          :src="getImageURL('images/common/collapse_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
       <OButton
         v-if="
@@ -58,7 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-sm"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          :src="getImageURL('images/common/expand_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
       <div class="q-ml-xs">
         {{ resultTotal }}
@@ -88,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <div v-if="position === 'bottom'" class="flex items-center">
-        <q-separator vertical inset class="q-mr-md" />
+        <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
         <span class="q-table__bottom-item">
           {{ t("search.recordsPerPage") }}
@@ -130,6 +138,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -137,8 +146,8 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
-  components: { OButtonGroup, OButton },
-   
+  components: { OSeparator, OButtonGroup, OButton },
+
   props: [
     "scope",
     "pageTitle",

@@ -57,7 +57,7 @@ export class CorrelationSettingsPage {
         this.semanticGroupRemoveBtn = '[data-test="semantic-group-remove-group-btn"]';
 
         // ==================== Common Selectors ====================
-        this.loadingSpinner = '.q-spinner-hourglass';
+        this.loadingSpinner = '[data-test="discovered-services-loading-indicator"], [data-test="discovered-services-table-loading-indicator"]';
         this.notification = '.q-notification__message';
     }
 

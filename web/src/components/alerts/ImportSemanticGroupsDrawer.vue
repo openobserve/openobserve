@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:append>
             <OIcon
               v-if="jsonFile"
-              name="close" size="sm"
+              name="close"
+              size="sm"
               @click.stop="clearFile"
               class="cursor-pointer"
             />
@@ -79,17 +80,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="xs"
               @click="selectAllAdditions"
-            >Select All New</OButton>
+              >Select All New</OButton
+            >
             <OButton
               variant="ghost-warning"
               size="xs"
               @click="selectAllModifications"
-            >Select All Modified</OButton>
-            <OButton
-              variant="ghost-muted"
-              size="xs"
-              @click="deselectAll"
-            >Clear All</OButton>
+              >Select All Modified</OButton
+            >
+            <OButton variant="ghost-muted" size="xs" @click="deselectAll"
+              >Clear All</OButton
+            >
           </OButtonGroup>
         </div>
 
@@ -186,10 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
-            <q-expansion-item
+            <OCollapsible
+              v-model="unchangedOpen"
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check_circle"
-              header-class="text-grey-7"
             >
               <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
                 <li
@@ -213,11 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state text-center q-pa-lg">
-        <OIcon
-          name="cloud-upload"
-          size="64px"
-          class="q-mb-md"
-        />
+        <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
         <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
         <div class="text-body2 text-grey-6">
           The system will analyze the file and show you what will change
@@ -227,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer Actions -->
     <div class="drawer-footer q-pa-md">
-      <q-separator class="q-mb-md" />
+      <OSeparator class="tw:mb-4" />
       <div class="row q-col-gutter-sm justify-end">
         <div class="col-auto">
           <OButton
@@ -235,7 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             @click="handleClose"
             data-test="import-drawer-cancel-btn"
-          >Cancel</OButton>
+            >Cancel</OButton
+          >
         </div>
         <div class="col-auto">
           <OButton
@@ -245,14 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!hasSelectedChanges"
             :loading="isApplying"
             data-test="import-drawer-apply-btn"
-          >Apply Changes</OButton>
+            >Apply Changes</OButton
+          >
         </div>
       </div>
     </div>
   </div>
 
   <!-- Group Details Dialog -->
-  <ODialog data-test="import-semantic-groups-drawer-group-dialog"
+  <ODialog
+    data-test="import-semantic-groups-drawer-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
@@ -276,7 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog data-test="import-semantic-groups-drawer-modification-dialog"
+  <ODialog
+    data-test="import-semantic-groups-drawer-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"
@@ -332,15 +333,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
-import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface SemanticGroup {
   id: string;
@@ -372,12 +375,12 @@ const emit = defineEmits<{
   (e: "apply", groups: SemanticGroup[]): void;
 }>();
 
-const q = useQuasar();
 
 const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
+const unchangedOpen = ref(false);
 const isLoading = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);
@@ -409,10 +412,9 @@ const loadFile = async (file: File | null) => {
 
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     clearFile();
@@ -444,10 +446,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }
@@ -524,7 +525,8 @@ const handleApply = () => {
   mergedGroups.push(...selectedModificationGroups);
 
   // Capture count before clearing state
-  const changeCount = selectedAdditions.value.length + selectedModifications.value.length;
+  const changeCount =
+    selectedAdditions.value.length + selectedModifications.value.length;
 
   // Emit the merged groups to parent
   emit("apply", mergedGroups);
@@ -534,10 +536,9 @@ const handleApply = () => {
   isApplying.value = false;
   emit("close");
 
-  q.notify({
+  toast({
     message: `Applied ${changeCount} changes`,
-    color: "positive",
-    position: "bottom",
+    position: "bottom-center",
     timeout: 2000,
   });
 };
@@ -571,7 +572,7 @@ const handleClose = () => {
 .section-header {
   font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .groups-list {

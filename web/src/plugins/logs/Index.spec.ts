@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { Mock } from 'vitest';
 
 import Index from "@/plugins/logs/Index.vue";
@@ -47,7 +47,7 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock the sqlUtils module

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Left Section (25%) — Field Browser -->
             <div class="field-browser-panel" :class="store.state.theme === 'dark' ? 'field-browser-panel--dark' : 'field-browser-panel--light'">
-              <FieldList
+              <SearchFieldList
                 :fields="fieldListItems"
                 :stream-name="streamName"
                 :stream-type="streamType"
@@ -425,7 +425,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, type PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
@@ -438,7 +437,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
@@ -449,6 +448,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -511,7 +511,6 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 const store = useStore();
-const q = useQuasar();
 const { buildQueryPayload } = useQuery();
 const { sqlParser } = useParser();
 
@@ -835,8 +834,8 @@ const triggerQuery = async (fn = false) => {
       response: err.response,
       stack: err.stack,
     });
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: err.response?.data?.message ?? t('search.errorFetchingResults'),
       timeout: 1500,
     });

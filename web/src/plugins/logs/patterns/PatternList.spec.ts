@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [quasar.Notify],
+  plugins: [quasar.],
 });
 
 describe("PatternList", () => {
@@ -145,7 +145,7 @@ describe("PatternList", () => {
     });
 
     it("should display loading spinner when loading is true", () => {
-      const spinner = wrapper.findComponent({ name: "QSpinnerHourglass" });
+      const spinner = wrapper.find('[data-test="pattern-list-loading-indicator"]');
       expect(spinner.exists()).toBe(true);
     });
 

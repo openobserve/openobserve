@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </q-card-section>
-    <q-separator />
+    <OSeparator />
     <OTabs v-model="tab" dense class="text-grey" align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>
 
-    <q-separator />
+    <OSeparator />
 
     <OTabPanels v-model="tab" animated>
       <OTabPanel name="table">
@@ -89,6 +89,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../utils/zincutils";
@@ -101,7 +102,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { OTabs, OTab, OTabPanels, OTabPanel, OButton },
+  components: { OSeparator, OTabs, OTab, OTabPanels, OTabPanel, OButton },
   props: {
     modelValue: {
       type: Object,

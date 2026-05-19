@@ -222,7 +222,7 @@ export class AlertsPage {
             serviceGraphContainer: '.incident-service-graph',
 
             // Telemetry tab state selectors
-            loadingSpinner: '.q-spinner-hourglass',
+            loadingSpinner: '[data-test="incident-telemetry-loading-indicator"]',
 
             // RCA Analysis locators (inside incident detail)
             rcaAnalysisContainer: '[data-test="rca-analysis-container"]',

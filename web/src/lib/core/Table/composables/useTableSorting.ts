@@ -24,13 +24,20 @@ export function useTableSorting<TData>(
   function handleSort(columnId: string) {
     if (isServerMode.value) {
       const field = props.sortFieldMap?.[columnId] ?? columnId;
-      let newOrder: "asc" | "desc" = "asc";
-      if (activeSortBy.value === field) {
-        newOrder = activeSortOrder.value === "asc" ? "desc" : "asc";
+      if (activeSortBy.value !== field) {
+        emit("update:sortBy", field);
+        emit("update:sortOrder", "asc");
+        emit("sort-change", { column: field, order: "asc" });
+      } else if (activeSortOrder.value === "asc") {
+        emit("update:sortBy", field);
+        emit("update:sortOrder", "desc");
+        emit("sort-change", { column: field, order: "desc" });
+      } else {
+        // was desc → clear sort
+        emit("update:sortBy", "");
+        emit("update:sortOrder", "asc");
+        emit("sort-change", { column: "", order: "asc" });
       }
-      emit("update:sortBy", field);
-      emit("update:sortOrder", newOrder);
-      emit("sort-change", { column: field, order: newOrder });
     }
     // Client-side sorting is handled by TanStack internally via toggleSorting
   }

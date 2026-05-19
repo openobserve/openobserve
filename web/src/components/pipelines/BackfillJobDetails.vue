@@ -150,54 +150,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Timeline -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Timeline</div>
-            <q-timeline color="primary">
-              <q-timeline-entry
+            <OTimeline>
+              <OTimelineItem
                 title="Job Created"
                 :subtitle="formatTimestampFull(job.created_at)"
                 icon="add_circle"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.deletion_status && job.deletion_status !== 'not_required'"
                 :title="getDeletionTimelineTitle"
                 :subtitle="getDeletionTimelineSubtitle"
                 :icon="getDeletionTimelineIcon"
-                :color="getDeletionTimelineColor"
+                :variant="getDeletionTimelineColor"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.progress_percent > 20 || (job.deletion_status === 'completed')"
                 title="Backfill Started"
                 :subtitle="getBackfillStartTime"
                 icon="play_arrow"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.status === 'running'"
                 :title="`Processing Chunk ${job.chunks_completed || 0}/${job.chunks_total || 'N/A'}`"
                 subtitle="In Progress"
                 icon="hourglass_empty"
-                color="blue"
+                variant="info"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.status === 'completed'"
                 title="Job Completed"
                 subtitle="All data processed successfully"
                 icon="check_circle"
-                color="positive"
+                variant="success"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.status === 'failed'"
                 title="Job Failed"
                 subtitle="An error occurred during processing"
                 icon="error"
-                color="negative"
+                variant="destructive"
               />
-              <q-timeline-entry
+              <OTimelineItem
                 v-if="job.status === 'canceled'"
                 title="Job Canceled"
                 subtitle="Job was canceled by user"
                 icon="cancel"
-                color="grey"
+                variant="muted"
               />
-            </q-timeline>
+            </OTimeline>
           </div>
         </div>
 
@@ -210,7 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -220,8 +219,12 @@ import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
+import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
+import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -237,7 +240,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
 
 const show = computed({
@@ -302,8 +304,8 @@ const confirmCancelJob = () => {
 
 const cancelJob = async () => {
   if (!job.value || !job.value.pipeline_id) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Job information not available. Please try again.",
       timeout: 3000,
     });
@@ -317,8 +319,8 @@ const cancelJob = async () => {
       job_id: job.value.job_id,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job canceled successfully",
       timeout: 3000,
     });
@@ -327,8 +329,8 @@ const cancelJob = async () => {
     loadJobDetails();
   } catch (error: any) {
     console.error("Error canceling backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to cancel backfill job",
       timeout: 5000,
     });
@@ -407,13 +409,13 @@ const getDeletionTimelineIcon = computed(() => {
   return "error";
 });
 
-const getDeletionTimelineColor = computed(() => {
-  if (!job.value?.deletion_status) return "grey";
+const getDeletionTimelineColor = computed<TimelineItemVariant>(() => {
+  if (!job.value?.deletion_status) return "muted";
 
-  if (job.value.deletion_status === "completed") return "positive";
-  if (job.value.deletion_status === "in_progress") return "blue";
-  if (job.value.deletion_status === "pending") return "warning";
-  return "negative";
+  if (job.value.deletion_status === "completed") return "success";
+  if (job.value.deletion_status === "in_progress") return "info";
+  if (job.value.deletion_status === "pending") return "primary";
+  return "destructive";
 });
 
 const getBackfillStartTime = computed(() => {

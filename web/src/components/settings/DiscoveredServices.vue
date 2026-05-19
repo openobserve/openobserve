@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <OSpinner size="sm" />
+      <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
     </div>
 
     <!-- Error State -->
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading state -->
             <template #loading>
               <div class="tw:flex tw:items-center tw:justify-center tw:pb-40">
-                <OSpinner size="lg" />
+                <OSpinner size="lg" data-test="discovered-services-table-loading-indicator" />
               </div>
             </template>
 
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-separator />
+      <OSeparator />
 
       <!-- Scrollable body -->
       <div class="panel-body">
@@ -515,7 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -527,13 +526,14 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
-const q = useQuasar();
 const { t } = useI18n();
 
 interface ServiceRecord {
@@ -952,8 +952,8 @@ const doResetServices = async () => {
     const response = await serviceStreamsService.resetServices(orgId);
     const { deleted_count, note } = response.data;
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.resetServicesSuccess", {
         count: deleted_count,
       }),
@@ -963,8 +963,8 @@ const doResetServices = async () => {
 
     await loadServices();
   } catch (err: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.correlation.resetServicesFailed"),
       caption: err?.message || String(err),
     });

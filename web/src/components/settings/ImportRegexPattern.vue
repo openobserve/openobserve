@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
               <div
@@ -211,15 +211,16 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ImportRegexPattern",
@@ -234,7 +235,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const baseImportRef = ref<any>(null);
 
     const regexPatternErrorsToDisplay = ref<any[]>([]);
@@ -340,10 +340,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -365,10 +364,9 @@ export default defineComponent({
       }
 
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported ${successCount} pattern(s)`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -407,10 +405,9 @@ export default defineComponent({
         }
         return false;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Regex Pattern please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;
@@ -460,18 +457,16 @@ export default defineComponent({
 
           // Check if it's a duplicate pattern error
           if (errorMessage.includes("already exists")) {
-            q.notify({
+            toast({
               message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 4000,
             });
           } else {
             // Show generic error notification for other errors
-            q.notify({
+            toast({
               message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 4000,
             });
           }
@@ -560,6 +555,7 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
     AppTabs,
     OButton,

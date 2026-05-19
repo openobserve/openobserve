@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify, Quasar } from "quasar";
+import { Quasar } from "quasar";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -90,7 +90,7 @@ vi.mock("@/utils/commons", () => ({
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
 
-installQuasar({ plugins: [Notify], config: { platform } });
+installQuasar({ plugins: [], config: { platform } });
 
 const MOCK_FOLDERS = [
   { name: "Default", folderId: "folder-1" },

@@ -77,64 +77,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div v-else class="index-table q-mt-xs">
-      <FieldList
+      <GroupedFieldList
         ref="fieldListRef"
-        :stream-fields-rows="streamFieldsRows"
-        :selected-stream="searchObj.data.stream.selectedStream[0]"
-        :filter-field="searchObj.data.stream.filterField"
-        :filter-field-fn="filterFieldFn"
-        :pagination="pagination"
-        @update:pagination="onPaginationUpdate"
-        @update:filter-field="searchObj.data.stream.filterField = $event"
-        :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        :loading-stream="searchObj.loadingStream"
-        :show-only-interesting-fields="showOnlyInterestingFields"
-        :interesting-expanded-group-rows-field-count="
-          searchObj.data.stream.interestingExpandedGroupRowsFieldCount
-        "
-        :expand-group-rows-field-count="
-          searchObj.data.stream.expandGroupRowsFieldCount
-        "
-        :expand-group-rows="searchObj.data.stream.expandGroupRows"
+        :fields="streamFieldsRows"
+        :search="searchObj.data.stream.filterField"
+        :loading="searchObj.loadingStream"
         :theme="store.state.theme"
-        :selected-fields="searchObj.data.stream.selectedFields"
-        :timestamp-column="store.state.zoConfig.timestamp_column"
-        :show-quick-mode="searchObj.meta.quickMode"
-        :field-values="fieldValues"
-        :active-include-field-values="activeIncludeFilterValues"
-        :active-exclude-field-values="activeExcludeFilterValues"
-        :expanded-fields="expandedFields"
-        :selected-streams-count="searchObj.data.stream.selectedStream.length"
-        :default-values-count="
-          store.state.zoConfig?.query_values_default_num || 10
-        "
-        :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
-        :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
-        :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
-        :selected-fields-btn-group-option="selectedFieldsBtnGroupOption"
-        :total-fields-count="
-          searchObj.data.stream.selectedStream.length > 1
-            ? searchObj.data.stream.selectedStreamFields.length -
-              (searchObj.data.stream.selectedStream.length + 1)
-            : searchObj.data.stream.selectedStreamFields.length
-        "
-        :show-fts-field-values="showFtsFieldValues"
-        @add-to-filter="addToFilter"
-        @toggle-field="clickFieldFn"
-        @toggle-interesting="addToInterestingFieldList"
-        @add-search-term="addSearchTerm"
-        @add-multiple-search-terms="addMultipleSearchTerms"
-        @remove-field-filter="removeFieldFilter"
-        @search-field-values="searchFieldValues"
-        @load-more-values="loadMoreFieldValues"
-        @before-show="openFilterCreator"
-        @before-hide="cancelFilterCreator"
-        @toggle-group="toggleFieldGroup"
-        @toggle-schema="toggleSchema"
-        @toggle-interesting-fields="toggleInterestingFields"
-        @set-page="setPage"
-        @reset-fields="resetSelectedFileds"
-      />
+        :show-pagination="true"
+        :page-size="pagination.rowsPerPage"
+        :current-page="pagination.page"
+        @update:search="searchObj.data.stream.filterField = $event"
+        @update:current-page="setPage($event)"
+      >
+        <template #field-row="{ row }">
+          <FieldRow
+            :field="row"
+            :selected-fields="searchObj.data.stream.selectedFields"
+            :timestamp-column="store.state.zoConfig.timestamp_column"
+            :theme="store.state.theme"
+            :show-quick-mode="searchObj.meta.quickMode"
+            :show-fts-field-values="showFtsFieldValues"
+            @add-to-filter="addToFilter"
+            @toggle-field="clickFieldFn"
+            @toggle-interesting="addToInterestingFieldList"
+          >
+            <template #expansion="{ field }">
+              <FieldExpansion
+                :field="field"
+                :field-values="fieldValues[field.name]"
+                :active-include-values="activeIncludeFilterValues?.[field.name] ?? []"
+                :active-exclude-values="activeExcludeFilterValues?.[field.name] ?? []"
+                :expanded="expandedFields?.[field.name] ?? false"
+                :selected-fields="searchObj.data.stream.selectedFields"
+                :selected-streams-count="searchObj.data.stream.selectedStream.length"
+                :theme="store.state.theme"
+                :show-quick-mode="searchObj.meta.quickMode"
+                :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
+                @add-to-filter="addToFilter"
+                @toggle-field="clickFieldFn"
+                @toggle-interesting="addToInterestingFieldList"
+                @add-search-term="addSearchTerm"
+                @add-multiple-search-terms="addMultipleSearchTerms"
+                @remove-field-filter="removeFieldFilter"
+                @before-show="openFilterCreator"
+                @before-hide="cancelFilterCreator"
+                @search-field-values="searchFieldValues"
+                @load-more-values="loadMoreFieldValues"
+              />
+            </template>
+          </FieldRow>
+        </template>
+
+        <template #after-list="bottomProps">
+          <GroupedFieldListPagination
+            data-test-prefix="logs-page"
+            :show-schema-toggle="showUserDefinedSchemaToggle"
+            :show-quick-mode="searchObj.meta.quickMode"
+            :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
+            :show-only-interesting-fields="showOnlyInterestingFields"
+            :schema-toggle-options="userDefinedSchemaBtnGroupOption"
+            :interesting-fields-toggle-options="selectedFieldsBtnGroupOption"
+            :current-page="bottomProps.currentPage"
+            :pages-number="bottomProps.totalPages"
+            :is-first-page="bottomProps.isFirstPage"
+            :is-last-page="bottomProps.isLastPage"
+            :total-fields-count="totalFieldsCount"
+            @toggle-schema="toggleSchema"
+            @toggle-interesting-fields="toggleInterestingFields"
+            @first-page="bottomProps.firstPage()"
+            @last-page="bottomProps.lastPage()"
+            @set-page="setPage"
+            @reset-fields="resetSelectedFileds"
+          />
+        </template>
+
+        <template #loading>
+          <div class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]">
+            <div class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center">
+              <OSpinner size="sm" />
+              {{ t("search.loadingStream") }}
+            </div>
+          </div>
+        </template>
+      </GroupedFieldList>
     </div>
   </div>
 </template>
@@ -153,7 +178,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
@@ -187,9 +211,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Filter {
   fieldName: string;
@@ -201,14 +227,24 @@ export default defineComponent({
   components: {
     EqualIcon,
     NotEqualIcon,
-    FieldList: defineAsyncComponent(
-      () => import("@/plugins/logs/components/FieldList.vue"),
+    GroupedFieldList: defineAsyncComponent(
+      () => import("@/components/common/GroupedFieldList.vue"),
+    ),
+    FieldRow: defineAsyncComponent(
+      () => import("@/components/common/FieldRow.vue"),
+    ),
+    FieldExpansion: defineAsyncComponent(
+      () => import("@/components/common/FieldExpansion.vue"),
+    ),
+    FieldListPagination: defineAsyncComponent(
+      () => import("@/components/common/FieldListPagination.vue"),
     ),
     OButton,
     OSelect,
     OIcon,
     OTooltip,
-},
+    OSpinner,
+  },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
@@ -226,7 +262,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const {
       reorderSelectedFields,
       getFilterExpressionByFieldType,
@@ -1028,8 +1063,8 @@ export default defineComponent({
           (field: string) => field !== name,
         );
         console.log(err);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }
@@ -1049,8 +1084,8 @@ export default defineComponent({
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to generate filter expression",
         });
       }
@@ -1068,8 +1103,8 @@ export default defineComponent({
         .filter(Boolean);
 
       if (!expressions.length) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to generate filter expressions",
         });
         return;
@@ -1859,10 +1894,20 @@ export default defineComponent({
 
         if (!source?.length) return source;
 
-        const expandGroupRows = searchObj.data.stream.expandGroupRows;
-
-        return applyCollapseFilter(source, expandGroupRows, searchObj.data.stream.filterField ?? "");
+        return source.map((row: any) => ({
+          ...row,
+          isGroup: !!row.label,
+          groupName: row.label ? row.name : (row.group || row.name),
+          stream: row.group || row.name,
+        }));
       }),
+
+      totalFieldsCount: computed(() =>
+        searchObj.data.stream.selectedStream.length > 1
+          ? searchObj.data.stream.selectedStreamFields.length -
+            (searchObj.data.stream.selectedStream.length + 1)
+          : searchObj.data.stream.selectedStreamFields.length,
+      ),
       formatLargeNumber,
       sortedStreamFields,
       placeHolderText,

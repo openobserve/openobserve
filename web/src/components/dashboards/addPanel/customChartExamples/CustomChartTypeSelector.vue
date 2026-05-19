@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="bar-chart" size="sm" class="q-mr-sm" />
           <span class="text-h6">Example of custom charts</span>
         </div>
-        <q-space />
+        <div class="tw:flex-1" />
         <OInput
           v-model="searchQuery"
           placeholder="Search charts..."
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
 
-    <q-separator />
+    <OSeparator />
 
     <!-- Main Content -->
     <q-card-section
@@ -186,10 +186,12 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
+    OSeparator,
     CustomChartConfirmDialog,
     OButton,
     OInput,

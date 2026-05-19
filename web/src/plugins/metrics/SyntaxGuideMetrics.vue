@@ -75,8 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
@@ -132,6 +131,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "SyntaxGuideMetrics",
   components: { OButton, OIcon, ODropdown },

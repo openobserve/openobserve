@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
-    <q-separator />
+    <OSeparator />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>View Alert History</span>
         </div>
       </div>
-      <q-separator />
+      <OSeparator />
       <div class="menu-section">
         <div
           class="menu-item"
@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const props = defineProps<{
   x: number;

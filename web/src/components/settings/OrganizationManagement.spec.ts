@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar, Notify } from "quasar";
+import { Quasar } from "quasar";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
 import store from "../../test/unit/helpers/store";
@@ -225,7 +225,7 @@ describe("OrganizationManagement.vue", () => {
           [
             Quasar,
             {
-              plugins: [Notify]
+              plugins: []
             }
           ],
           i18n,

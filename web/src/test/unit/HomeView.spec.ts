@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar, Notify } from "quasar";
+import { Quasar } from "quasar";
 import HomeView from "../../views/HomeView.vue";
 import store from "./helpers/store";
 import i18n from "@/locales";
@@ -71,7 +71,7 @@ describe("HomeView.vue", () => {
     return mount(HomeView, {
       global: {
         plugins: [
-          [Quasar, { plugins: [Notify] }],
+          [Quasar, { plugins: [] }],
           i18n,
           store,
         ],

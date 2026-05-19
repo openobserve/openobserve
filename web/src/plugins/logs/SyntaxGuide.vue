@@ -136,21 +136,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For phrase prefix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error
+                    code*')</span
                   >
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
                   For case sensitive search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('traceHits')</span
                   >
                   with exact case matching.
                 </li>
                 <li>
                   For postfix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('*failed')</span
                   >
                   to find all terms ending with 'failed'.
                 </li>
@@ -234,7 +237,7 @@ export default defineComponent({
     },
     label: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   components: { OButton, OTooltip, OIcon, ODropdown },

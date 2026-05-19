@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- longitude container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- weight container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -381,9 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -412,6 +412,7 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     ODropdown,

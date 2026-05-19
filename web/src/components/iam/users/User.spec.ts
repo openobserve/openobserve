@@ -25,7 +25,7 @@ import {
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
@@ -36,7 +36,7 @@ import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility

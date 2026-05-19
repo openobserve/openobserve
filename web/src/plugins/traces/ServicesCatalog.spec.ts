@@ -397,7 +397,6 @@ function mountServicesCatalog(
         "q-btn": false,
         "OIcon": false,
         "q-tooltip": false,
-        "q-spinner-hourglass": false,
       },
     },
   });

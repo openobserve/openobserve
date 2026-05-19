@@ -72,37 +72,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div data-test="iam-roles-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
-      <template v-if="rows.length">
-        <OTable
-          :data="rows"
-          :columns="columns"
-          row-key="role_name"
-          :global-filter="userSearchKey"
-          pagination="client"
-          :page-size="100"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :show-global-filter="false"
-          dense
-        >
-          <template #cell-select="{ row }">
-            <OCheckbox
-              :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
-              :model-value="row.isInGroup"
-              class="filter-check-box cursor-pointer"
-              @update:model-value="toggleUserSelection(row)"
-            />
-          </template>
-        </OTable>
-      </template>
-      <div
-        data-test="iam-roles-selection-table-no-users-text"
-        v-if="!rows.length"
-        class="text-bold q-pl-md q-py-md"
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="role_name"
+        :global-filter="userSearchKey"
+        pagination="client"
+        :page-size="100"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        dense
       >
-        No users added
-      </div>
+        <template #cell-select="{ row }">
+          <OCheckbox
+            :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
+            :model-value="row.isInGroup"
+            class="filter-check-box cursor-pointer"
+            @update:model-value="toggleUserSelection(row)"
+          />
+        </template>
+        <template #empty>
+          <NoData />
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
@@ -111,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { watch, onBeforeMount, computed } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";

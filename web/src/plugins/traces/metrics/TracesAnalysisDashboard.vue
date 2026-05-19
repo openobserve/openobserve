@@ -240,7 +240,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <OSpinner size="xl" class="tw:mb-4" />
+                  <OSpinner
+                    size="xl"
+                    class="tw:mb-4"
+                    data-test="traces-analysis-dashboard-loading-indicator"
+                  />
                   <div class="tw:text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>

@@ -143,7 +143,7 @@
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="getBtnLogo" />
+              <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             Send to AI Chat
           </ODropdownItem>
@@ -153,7 +153,7 @@
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="regexIcon" />
+              <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
           </ODropdownItem>
@@ -201,10 +201,11 @@
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
-          <q-img
+          <img
             :src="regexIconForContextMenu"
             class="q-mr-sm"
             style="width: 14px; height: 14px"
+            alt=""
           />
           Create regex pattern
         </div>
@@ -252,7 +253,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -267,6 +267,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
   name: "JsonPreview",
@@ -362,7 +363,6 @@ export default {
     const schemaToBeSearch = ref({});
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
-    const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
 
@@ -710,11 +710,10 @@ export default {
         searchObj.data.originalDataCache[cacheKey] = formattedData;
       } catch (err: any) {
         loading.value = false;
-        $q.notify({
+        toast({
           message:
             err.response?.data?.message || "Failed to get the Original data",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1500,
         });
       } finally {
@@ -864,18 +863,16 @@ export default {
           .writeText(selectedText.value)
           .then(() => {
             showMenu.value = false;
-            $q.notify({
+            toast({
               message: "Text copied to clipboard",
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1500,
             });
           })
           .catch(() => {
-            $q.notify({
+            toast({
               message: "Failed to copy text",
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1500,
             });
           });

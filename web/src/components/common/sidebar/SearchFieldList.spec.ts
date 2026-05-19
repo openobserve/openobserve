@@ -11,13 +11,12 @@ import {
   QList,
   QItem,
   QIcon,
-  QInnerLoading,
 } from "quasar";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import FieldList from "./FieldList.vue";
+import FieldList from "./SearchFieldList.vue";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
@@ -231,7 +230,6 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           QList,
           QItem,
           QIcon,
-          QInnerLoading,
         },
       },
     });

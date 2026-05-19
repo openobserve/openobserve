@@ -21,7 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
-          <OSpinner size="md" class="tw:mx-auto tw:block" />
+          <OSpinner
+            size="md"
+            class="tw:mx-auto tw:block"
+            data-test="rum-loading-indicator"
+          />
           <div class="text-center full-width">
             {{ t("rum.loadingMsg") }}
           </div>

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-separator vertical />
+      <OSeparator vertical />
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
@@ -55,7 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
           <OIcon
-            name="expand-all" size="sm"
+            name="expand-all"
+            size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -85,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                   <div class="col" :style="fieldListInnerStyle">
-                    <FieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
               </div>
@@ -112,7 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.layout.showFieldList
                       ? 'chevron-left'
                       : 'chevron-right'
-                  " size="sm"
+                  "
+                  size="sm"
                 />
               </template>
             </OButton>
@@ -157,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       handleCustomChartTemplateSelected
                     "
                   />
-                  <q-separator v-if="resolvedConfig.showQueryBuilder" />
+                  <OSeparator v-if="resolvedConfig.showQueryBuilder" />
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -306,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar -->
               <div
@@ -422,7 +424,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
           <OIcon
-            name="expand-all" size="sm"
+            name="expand-all"
+            size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -460,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                   <div class="col" style="width: 100%">
-                    <FieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
               </div>
@@ -482,7 +485,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.layout.showFieldList
                       ? 'chevron-left'
                       : 'chevron-right'
-                  " size="sm"
+                  "
+                  size="sm"
                 />
               </template>
             </OButton>
@@ -536,7 +540,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             /></template>
                             Example Charts
                           </OButton>
-                          <ODialog data-test="panel-editor-custom-chart-type-selector-dialog" v-model:open="showCustomChartTypeSelector" :show-close="false" :width="95">
+                          <ODialog
+                            data-test="panel-editor-custom-chart-type-selector-dialog"
+                            v-model:open="showCustomChartTypeSelector"
+                            :show-close="false"
+                            :width="95"
+                          >
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
                               @close="showCustomChartTypeSelector = false"
@@ -549,14 +558,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div class="splitter-vertical splitter-enabled"></div>
-                      <q-avatar
-                        color="primary"
-                        text-color="white"
-                        size="20px"
-                        icon="drag_indicator"
+                      <div
+                        class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
                         style="top: 10px; left: 3.5px"
                         data-test="panel-editor-custom-chart-drag-indicator"
-                      />
+                      >
+                        <OIcon name="drag-indicator" size="xs" />
+                      </div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -624,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar for custom chart -->
               <div class="col-auto">
@@ -681,7 +689,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 // ============================================================================
 
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
+import PanelFieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
@@ -690,6 +698,7 @@ import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
@@ -871,7 +880,10 @@ const chartAreaStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {};
   }
-  return { height: "calc(100vh - var(--navbar-height) - 464px)", marginTop: '0px' };
+  return {
+    height: "calc(100vh - var(--navbar-height) - 464px)",
+    marginTop: "0px",
+  };
 });
 
 // Main content area class - logs needs flat background without card styling

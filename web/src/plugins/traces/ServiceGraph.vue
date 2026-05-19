@@ -106,7 +106,7 @@
             </div>
           </div>
         </div>
-        <q-separator
+        <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           class="tw:self-stretch tw:mx-1"
@@ -270,7 +270,6 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -296,10 +295,12 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
+    OSeparator,
     ChartRenderer,
     ServiceGraphSidePanel,
     OButton,
@@ -313,7 +314,6 @@ export default defineComponent({
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();

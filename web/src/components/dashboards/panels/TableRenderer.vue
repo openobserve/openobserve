@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
           <div class="row items-center full-width tw:pr-2" data-test="dashboard-table-pagination">
-            <q-space />
+            <div class="tw:flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
               :pagination="scope.pagination"

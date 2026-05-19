@@ -87,23 +87,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-slide-transition>
-          <div v-show="showServices" class="tw:mt-3">
-            <div class="row q-col-gutter-sm">
-              <div
-                v-for="service in QUICK_SETUP_SERVICES"
-                :key="service.flag"
-                class="col-6 col-sm-4 col-md-3"
-              >
-                <OCheckbox
-                  v-model="enabledServices"
-                  :value="service.flag"
-                  :label="service.label"
-                />
+        <div
+          class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+          :class="showServices ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+        >
+          <div class="tw:overflow-hidden tw:min-h-0">
+            <div class="tw:mt-3">
+              <div class="row q-col-gutter-sm">
+                <div
+                  v-for="service in QUICK_SETUP_SERVICES"
+                  :key="service.flag"
+                  class="col-6 col-sm-4 col-md-3"
+                >
+                  <OCheckbox
+                    v-model="enabledServices"
+                    :value="service.flag"
+                    :label="service.label"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </q-slide-transition>
+        </div>
       </div>
 
       <!-- Single Region: region picker -->
@@ -177,23 +182,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <q-slide-transition>
-            <div v-show="showTargetRegions" class="tw:mt-3">
-              <div class="row q-col-gutter-sm">
-                <div
-                  v-for="region in AWS_REGIONS"
-                  :key="region.value"
-                  class="col-12 col-sm-6 col-md-4"
-                >
-                  <OCheckbox
-                    v-model="targetRegions"
-                    :value="region.value"
-                    :label="`${region.label} (${region.value})`"
-                  />
+          <div
+            class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+            :class="showTargetRegions ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+          >
+            <div class="tw:overflow-hidden tw:min-h-0">
+              <div class="tw:mt-3">
+                <div class="row q-col-gutter-sm">
+                  <div
+                    v-for="region in AWS_REGIONS"
+                    :key="region.value"
+                    class="col-12 col-sm-6 col-md-4"
+                  >
+                    <OCheckbox
+                      v-model="targetRegions"
+                      :value="region.value"
+                      :label="`${region.label} (${region.value})`"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </q-slide-transition>
+          </div>
         </div>
 
         <div class="tw:mb-6">
@@ -275,9 +285,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- StackSets Parameter Helper -->
-      <q-slide-transition>
-        <div v-if="showParamHelper && deploymentMode === 'stackset'">
-          <q-separator class="tw:mb-4" />
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="(showParamHelper && deploymentMode === 'stackset') ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
+          <OSeparator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
               <div class="tw:font-semibold step-label">
@@ -331,7 +345,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -339,7 +354,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -354,20 +368,21 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
     OIcon,
     OBadge,
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
@@ -437,8 +452,8 @@ export default defineComponent({
 
     const copyParam = (value: string) => {
       navigator.clipboard.writeText(value);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Copied to clipboard",
         timeout: 1500,
       });
@@ -446,8 +461,8 @@ export default defineComponent({
 
     const handleLaunch = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -456,8 +471,8 @@ export default defineComponent({
 
       const { organizationId, email, passcode } = getCredentials();
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -468,8 +483,8 @@ export default defineComponent({
         launchSingleRegion(organizationId, email, passcode);
       } else {
         if (targetRegions.value.length === 0) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Select at least one target region.",
             timeout: 3000,
           });
@@ -506,8 +521,8 @@ export default defineComponent({
       );
 
       if (!url) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "CloudFormation template not available yet",
           timeout: 3000,
         });
@@ -520,8 +535,8 @@ export default defineComponent({
         region: selectedRegion.value,
         services: enabledServices.value,
       });
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening AWS Console to deploy complete integration stack",
         timeout: 3000,
       });
@@ -541,8 +556,8 @@ export default defineComponent({
         services: enabledServices.value,
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message:
           "AWS StackSets console opened. Use the parameter values below to complete setup.",
         timeout: 5000,

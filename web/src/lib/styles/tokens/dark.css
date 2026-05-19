@@ -258,6 +258,15 @@
     --color-dialog-close-hover-bg: var(--color-grey-700);
     --color-dialog-close-active-bg: var(--color-grey-600);
 
+    /* Pagination */
+    --color-pagination-item-active-bg: var(--color-primary-500);
+
+    /* Timeline */
+    --color-timeline-dot-primary: var(--color-primary-500);
+    --color-timeline-dot-destructive: var(--color-error-500);
+    --color-timeline-dot-info: var(--color-primary-400);
+    --color-timeline-dot-muted: var(--color-grey-500);
+
     /* Stepper */
     --color-stepper-indicator-active: var(--color-primary-500);
     --color-stepper-indicator-done: var(--color-primary-500);

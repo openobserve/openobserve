@@ -245,9 +245,6 @@ describe('PerformanceSummary.vue', () => {
           $router: mockRouter,
           $route: { query: {} },
         },
-        stubs: {
-          'q-spinner-hourglass': true,
-        },
       },
     });
 
@@ -255,7 +252,7 @@ describe('PerformanceSummary.vue', () => {
     wrapper.vm.isLoading.push('loading');
     await nextTick();
 
-    expect(wrapper.find('q-spinner-hourglass-stub').exists()).toBe(true);
+    expect(wrapper.find('[data-test="performance-summary-loading-indicator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Loading Dashboard');
   });
 

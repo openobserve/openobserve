@@ -231,7 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="signout"
   >
     <div class="tw:flex tw:items-center tw:gap-3">
-      <q-avatar icon="info" color="primary" text-color="white" />
+      <div class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-10 tw:h-10 tw:rounded-full tw:shrink-0">
+        <OIcon name="info" size="sm" />
+      </div>
       <span>As you've chosen to change your password, you'll be automatically
         logged out.</span
       >
@@ -247,7 +249,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import userServiece from "@/services/users";
 import {
   getImageURL,
@@ -263,6 +264,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -324,7 +326,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -419,7 +420,6 @@ export default defineComponent({
 
     return {
       t,
-      q,
       store,
       router,
       formData,
@@ -465,8 +465,8 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
-      const dismiss = this.q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -499,8 +499,7 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.q.notify({
-              color: "negative",
+            toast({
               message: err.response.data.message,
               timeout: 2000,
             });
@@ -534,17 +533,16 @@ export default defineComponent({
             })
             .catch((err: any) => {
               if (err.response.data.code === 422) {
-                // this.q.notify({
+                // toast({
                 //   color: "positive",
-                //   type: 'positive',
+                //   variant: "success",
                 //   message: "User added successfully.",
                 // });
                 dismiss();
                 this.existingUser = false;
               } else {
               if (err.response?.status != 403 || err?.status != 403) {
-                this.q.notify({
-                  color: "negative",
+                toast({
                   message: err.response.data.message,
                   timeout: 2000,
                 });
@@ -566,8 +564,7 @@ export default defineComponent({
               this.$emit("update:open", false);
             })
             .catch((err: any) => {
-              this.q.notify({
-                color: "negative",
+              toast({
                 message: err.response.data.message,
                 timeout: 2000,
               });

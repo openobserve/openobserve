@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify, useQuasar } from "quasar";
+import { Dialog, useQuasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -28,7 +28,7 @@ vi.mock('quasar', async () => {
 });
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock services and composables

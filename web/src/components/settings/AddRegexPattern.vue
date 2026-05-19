@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <q-separator class="tw:my-2" />
+            <OSeparator class="tw:my-2" />
             <div>
               <div class="tw:flex tw:items-center tw:justify-between">
                 <span class="regex-pattern-test-string-label">
@@ -315,7 +315,7 @@ import { useI18n } from "vue-i18n";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { debounce, useQuasar } from "quasar";
+import { debounce } from "quasar";
 import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -332,6 +332,8 @@ import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -352,6 +354,7 @@ export default defineComponent({
   },
   emit: ["close", "update:list", "update:open"],
   components: {
+    OSeparator,
     FullViewContainer,
     O2AIChat,
     OButton,
@@ -364,7 +367,6 @@ export default defineComponent({
 
     const store = useStore();
 
-    const q = useQuasar();
 
     const isHovered = ref(false);
 
@@ -501,8 +503,7 @@ export default defineComponent({
               payload,
             );
         if (response.status == 200) {
-          q.notify({
-            color: "positive",
+          toast({
             message: props.isEdit
               ? "Regex pattern updated successfully"
               : "Regex pattern created successfully",
@@ -513,8 +514,7 @@ export default defineComponent({
         }
       } catch (error) {
         if (error.response.status != 403) {
-          q.notify({
-            color: "negative",
+          toast({
             message:
               error.response?.data?.message ||
               (props.isEdit
@@ -545,8 +545,7 @@ export default defineComponent({
         );
         outputString.value = response.data.results[0];
       } catch (error) {
-        q.notify({
-          color: "negative",
+        toast({
           message: error.response?.data?.message || "Failed to test string",
           timeout: 4000,
         });

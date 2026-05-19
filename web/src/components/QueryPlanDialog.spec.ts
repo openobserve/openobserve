@@ -145,7 +145,6 @@ function mountDialog(props: Record<string, unknown> = {}) {
         "OIcon": true,
         "q-space": true,
         "q-tooltip": true,
-        "q-spinner-dots": true,
         "q-banner": { template: "<div><slot /></div>" },
         "q-card": { template: "<div><slot /></div>" },
         "q-card-section": { template: "<div><slot /></div>" },

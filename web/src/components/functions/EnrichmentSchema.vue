@@ -31,7 +31,7 @@
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <OSpinner size="md" />
+          <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
@@ -127,7 +127,7 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import { useQuasar, date, format } from "quasar";
+    import { date, format } from "quasar";
     import streamService from "../../services/stream";
     import segment from "../../services/segment_analytics";
     import {
@@ -189,7 +189,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
     setup(props) {
         const { t } = useI18n();
         const store = useStore();
-        const q = useQuasar();
         const { getStream } = useStreams();
         const columns = [
             {

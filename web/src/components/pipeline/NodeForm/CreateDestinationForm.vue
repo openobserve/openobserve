@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="create-destination-form">
     <OForm
+      :default-values="formDefaultValues"
       @submit="createDestination"
       class="col-12 pipeline-add-remote-destination-form"
     >
@@ -89,9 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               data-test="add-destination-name-input"
               v-model="formData.name"
+              name="name"
               :label="t('alerts.name') + ' *'"
               :validators="[
-                (val: string) => !val ? t('common.nameRequired') : !isValidResourceName(val) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : undefined,
+                (val: string | number | undefined) => !val ? t('common.nameRequired') : !isValidResourceName(String(val)) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : undefined,
               ]"
               tabindex="0"
             />
@@ -99,20 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               data-test="add-destination-url-input"
               v-model="formData.url"
+              name="url"
               :label="t('alert_destinations.url') + ' *'"
               :validators="[
-                (val: string) => !val?.trim() ? 'Field is required!' : undefined,
-                (val: string) => val?.trim().endsWith('/') ? 'URL should not end with a trailing slash' : undefined,
+                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined,
+                (val: string | number | undefined) => String(val ?? '').trim().endsWith('/') ? 'URL should not end with a trailing slash' : undefined,
               ]"
+              help-text="Base URL without trailing slash (e.g., https://your-domain.com)"
               tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption"
-                  >Base URL without trailing slash (e.g.,
-                  https://your-domain.com)</span
-                >
-              </template>
-            </OFormInput>
+            />
 
             <!-- OpenObserve Organization and Stream fields -->
             <div
@@ -123,41 +120,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   v-model="openobserveOrg"
+                  name="org"
                   :label="'Organization *'"
                   :placeholder="'e.g., default'"
                   :validators="[
-                    (val: string) => !val?.trim() ? 'Organization is required for OpenObserve' : undefined,
+                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Organization is required for OpenObserve' : undefined,
                   ]"
+                  help-text="OpenObserve organization identifier"
                   tabindex="0"
-                >
-                  <template #hint>
-                    <span class="text-caption">
-                      OpenObserve organization identifier
-                    </span>
-                  </template>
-                </OFormInput>
+                />
               </div>
               <div class="col-6">
                 <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   v-model="openobserveStream"
+                  name="stream"
                   :label="'Stream Name *'"
                   :placeholder="'e.g., default'"
                   :validators="[
-                    (val: string) => !val?.trim() ? 'Stream name is required for OpenObserve' : undefined,
+                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Stream name is required for OpenObserve' : undefined,
                   ]"
+                  help-text="OpenObserve stream name"
                   tabindex="0"
-                >
-                  <template #hint>
-                    <span class="text-caption"> OpenObserve stream name </span>
-                  </template>
-                </OFormInput>
+                />
               </div>
             </div>
 
             <OFormInput
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
+              name="url_endpoint"
               :label="
                 formData.destination_type === 'custom'
                   ? 'Endpoint Path'
@@ -166,26 +158,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="formData.destination_type !== 'custom'"
               :validators="[
                 ...(formData.destination_type !== 'custom'
-                  ? [(val: string) => !val?.trim() ? 'Field is required!' : undefined]
+                  ? [(val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined]
                   : []),
-                (val: string) =>
-                  val?.trim() && !val.trim().startsWith('/')
+                (val: string | number | undefined) =>
+                  String(val ?? '').trim() && !String(val ?? '').trim().startsWith('/')
                     ? 'Endpoint path must start with /'
                     : undefined,
               ]"
+              help-text="Path will be appended to base URL (must start with /)"
               tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption">
-                  Path will be appended to base URL (must start with /)
-                </span>
-              </template>
-            </OFormInput>
+            />
             <!-- Method field - only shown for Custom destination type -->
             <OFormSelect
               v-if="formData.destination_type === 'custom'"
               data-test="add-destination-method-select"
               v-model="formData.method"
+              name="method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
               :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
@@ -196,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormSelect
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
+              name="output_format"
               :label="t('alert_destinations.output_format') + ' *'"
               :options="outputFormats"
               labelKey="label"
@@ -210,37 +199,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="formData.output_format === 'esbulk'"
               data-test="add-destination-esbulk-index-input"
               v-model="formData.esbulk_index"
+              name="esbulk_index"
               :label="'ESBulk Index Name *'"
               :placeholder="'Enter index name (e.g., logs, events)'"
               :validators="[
-                (val: string) => !val?.trim() ? 'Index name is required for ESBulk format' : undefined,
+                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Index name is required for ESBulk format' : undefined,
               ]"
+              help-text="Index name where data will be written in Elasticsearch"
               tabindex="0"
-            >
-              <template v-slot:hint>
-                Index name where data will be written in Elasticsearch
-              </template>
-            </OFormInput>
+            />
 
             <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
             <OFormInput
               v-if="formData.output_format === 'stringseparated'"
               data-test="add-destination-separator-input"
               v-model="formData.separator"
+              name="separator"
               :label="t('alert_destinations.separator') + ' *'"
               :placeholder="t('alert_destinations.separator_placeholder')"
               :validators="[
-                (val: string) =>
+                (val: string | number | undefined) =>
                   (val === null || val === undefined || val === '')
                     ? 'Separator is required for StringSeparated format'
                     : undefined,
               ]"
+              :help-text="t('alert_destinations.separator_hint')"
               tabindex="0"
-            >
-              <template v-slot:hint>
-                {{ t('alert_destinations.separator_hint') }}
-              </template>
-            </OFormInput>
+            />
           </div>
 
           <!-- Destination-specific Metadata Section -->
@@ -256,36 +241,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.metadata!.source"
                 :label="'Source'"
                 :placeholder="'Enter source (e.g., http:my_source)'"
+                help-text="Splunk source field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk source field for event metadata
-                </template>
-              </OInput>
+              />
 
               <OInput
                 data-test="add-destination-metadata-sourcetype-input"
                 v-model="formData.metadata!.sourcetype"
                 :label="'Source Type'"
                 :placeholder="'Enter source type (e.g., _json)'"
+                help-text="Splunk sourcetype field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk sourcetype field for event metadata
-                </template>
-              </OInput>
+              />
 
               <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
+                help-text="Splunk host field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk host field for event metadata
-                </template>
-              </OInput>
+              />
             </template>
 
             <!-- Datadog Metadata Fields -->
@@ -293,52 +269,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
                 v-model="formData.metadata!.ddsource"
+                name="ddsource"
                 :label="'DD Source *'"
                 :placeholder="'Enter source (e.g., nginx, java)'"
                 :validators="[
-                  (val: string) => !val?.trim() ? 'DD Source is required for Datadog' : undefined,
+                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Source is required for Datadog' : undefined,
                 ]"
+                help-text="Source attribute for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Source attribute for Datadog logs
-                </template>
-              </OFormInput>
+              />
 
               <OFormInput
                 data-test="add-destination-metadata-ddtags-input"
                 v-model="formData.metadata!.ddtags"
+                name="ddtags"
                 :label="'DD Tags *'"
                 :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
                 :validators="[
-                  (val: string) => !val?.trim() ? 'DD Tags are required for Datadog' : undefined,
+                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Tags are required for Datadog' : undefined,
                 ]"
+                help-text="Comma-separated tags for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Comma-separated tags for Datadog logs
-                </template>
-              </OFormInput>
+              />
 
               <OInput
                 data-test="add-destination-metadata-service-input"
                 v-model="formData.metadata!.service"
                 :label="'Service'"
                 :placeholder="'Enter service name (e.g., api-gateway)'"
+                help-text="Service name for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint> Service name for Datadog logs </template>
-              </OInput>
+              />
 
               <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
+                help-text="Hostname for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint> Hostname for Datadog logs </template>
-              </OInput>
+              />
             </template>
 
           </div>
@@ -500,7 +470,6 @@ import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -512,6 +481,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<{
@@ -519,13 +489,16 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 
 const isEditMode = computed(() => !!props.destination);
 
-const apiMethods = ["get", "post", "put"];
+const apiMethods = [
+  { label: "GET", value: "get" },
+  { label: "POST", value: "post" },
+  { label: "PUT", value: "put" },
+];
 const outputFormats = [
   { label: "JSON", value: "json" },
   { label: "NDJSON", value: "ndjson" },
@@ -863,6 +836,23 @@ watch(
   { immediate: true },
 );
 
+// Snapshot of all field values for OForm defaultValues.
+// Defined AFTER the immediate watch above so that edit-mode values
+// (set synchronously by populateFormForEdit) are captured correctly.
+const formDefaultValues = {
+  name: formData.value.name,
+  url: formData.value.url,
+  url_endpoint: formData.value.url_endpoint,
+  method: formData.value.method,
+  output_format: formData.value.output_format ?? "json",
+  esbulk_index: formData.value.esbulk_index ?? "",
+  separator: formData.value.separator ?? "",
+  org: openobserveOrg.value,
+  stream: openobserveStream.value,
+  ddsource: formData.value.metadata?.ddsource ?? "",
+  ddtags: formData.value.metadata?.ddtags ?? "",
+};
+
 // Watch destination_type changes to ensure method is set to "post" for non-custom types
 watch(
   () => formData.value.destination_type,
@@ -1101,15 +1091,15 @@ const connectionNotes = computed(() => {
 
 const createDestination = () => {
   if (!isValidDestination.value) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
     return;
   }
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -1181,8 +1171,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1204,8 +1194,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });

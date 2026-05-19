@@ -28,7 +28,7 @@ node.style.height = "1024px";
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock flag-icons CSS

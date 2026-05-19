@@ -153,7 +153,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
@@ -171,6 +170,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ConformDelete {
   visible: boolean;
@@ -199,7 +199,6 @@ export default defineComponent({
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
-    const q = useQuasar();
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
@@ -301,8 +300,8 @@ export default defineComponent({
     });
 
     const getDestinations = () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading destinations...",
       });
       destinationService
@@ -324,8 +323,8 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response.status != 403) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling destinations.",
               timeout: 2000,
             });
@@ -394,8 +393,8 @@ export default defineComponent({
             destination_name: confirmDelete.value.data.name,
           })
           .then(() => {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
               timeout: 2000,
             });
@@ -407,8 +406,8 @@ export default defineComponent({
                 err.response.data?.message ||
                 err.response.data?.error ||
                 "Error while deleting destination";
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message,
                 timeout: 2000,
               });
@@ -439,8 +438,8 @@ export default defineComponent({
       toggleDestinationEditor();
       getDestinations();
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Destination "${destinationName}" created successfully.`,
       });
     };
@@ -449,8 +448,8 @@ export default defineComponent({
       toggleDestinationEditor();
       getDestinations();
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Destination "${destinationName}" updated successfully.`,
       });
     };
@@ -512,16 +511,16 @@ export default defineComponent({
     };
 
     const bulkDeleteDestinations = async () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting destinations...",
         timeout: 0,
       });
 
       try {
         if (selectedDestinations.value.length === 0) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No destinations selected for deletion",
             timeout: 2000,
           });
@@ -546,27 +545,27 @@ export default defineComponent({
           const failCount = unsuccessful.length;
 
           if (failCount > 0 && successCount > 0) {
-            q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} destination(s)`,
               timeout: 3000,
             });
           } else {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} destination(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
             timeout: 2000,
           });
@@ -583,8 +582,8 @@ export default defineComponent({
           error?.message ||
           "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });

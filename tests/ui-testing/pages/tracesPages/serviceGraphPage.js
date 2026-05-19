@@ -330,7 +330,7 @@ export class ServiceGraphPage {
 
   async getOperationsTableRowCount() {
     const table = this.page.locator(this.operationsTable);
-    await table.locator('.q-spinner, .loading').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    await table.locator('[data-test="service-graph-operations-loading-indicator"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     return await table.locator('tbody tr').count();
   }
 
@@ -352,8 +352,8 @@ export class ServiceGraphPage {
 
     // Wait for loading spinner to appear and disappear
     const metricsPanel = this.page.locator('[data-test="service-graph-side-panel-metrics"]');
-    await metricsPanel.locator('.q-spinner').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await metricsPanel.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
     // Check if the metrics dashboard rendered
     const dashboardVisible = await this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')

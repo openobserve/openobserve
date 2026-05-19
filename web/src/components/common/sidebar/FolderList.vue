@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
+        <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
 
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
@@ -145,7 +145,7 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
     watch,
   } from "vue";
   import { useStore } from "vuex";
-  import { useQuasar, date, debounce } from "quasar";
+  import { date, debounce } from "quasar";
   import { useI18n } from "vue-i18n";
 
   import dashboardService from "@/services/dashboards";
@@ -166,6 +166,7 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
     getFoldersListByType
   } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
   import { filter, forIn } from "lodash-es";
@@ -184,6 +185,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({  
     name: "FolderList",
     components: {
+      OSeparator,
       OIcon,
       AddDashboard,
       QTablePagination,

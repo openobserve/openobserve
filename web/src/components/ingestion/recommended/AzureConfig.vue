@@ -234,7 +234,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -244,6 +243,7 @@ import {
 } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SCRIPT_URL =
   "https://raw.githubusercontent.com/openobserve/o2-datasource/main/azure/azure_activity_logs/configure-diagnostic-settings.sh";
@@ -270,7 +270,6 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     let endpoint: any = null;
     try {
@@ -302,8 +301,8 @@ export default defineComponent({
 
     const handleDeploy = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -315,8 +314,8 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -337,8 +336,8 @@ export default defineComponent({
         integration_id: "activity-logs",
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening Azure portal to deploy Activity Logs infrastructure",
         timeout: 3000,
       });

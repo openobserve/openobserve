@@ -91,7 +91,7 @@
         </OButton>
       </div>
     </div>
-    <q-separator></q-separator>
+    <OSeparator />
     <div class="row" style="height: calc(100vh - 130px); overflow: hidden">
       <div class="col" style="width: 100%; height: 100%">
         <div class="row" style="height: 100%">
@@ -227,6 +227,7 @@ import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -238,6 +239,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
     VariablesValueSelector,

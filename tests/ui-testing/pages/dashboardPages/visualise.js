@@ -129,8 +129,7 @@ export default class LogsVisualise {
         const hasRunQueryText = btn.textContent?.includes('Run query');
 
         // Also check that no loading indicator is present
-        const hasLoadingClass = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true' ||
-                                btn.querySelector('.q-spinner') !== null;
+        const hasLoadingClass = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true';
 
         return isEnabled && hasRunQueryText && !hasLoadingClass;
       },

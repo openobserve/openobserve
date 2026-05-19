@@ -63,13 +63,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MemberInvitationPage",
@@ -84,7 +84,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const userEmail: any = ref("");
     const options = ref();
@@ -111,8 +110,8 @@ export default defineComponent({
       );
 
       if (!validationArray.includes(false)) {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000,
         });
@@ -128,14 +127,14 @@ export default defineComponent({
             if (data.data.invalid_members != null) {
               const message = `Error while member invitation: ${data.data.invalid_members.toString()}`;
 
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: message,
                 timeout: 15000,
               });
             } else {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: data.message,
                 timeout: 5000,
               });
@@ -147,8 +146,8 @@ export default defineComponent({
           })
           .catch((error) => {
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
@@ -163,8 +162,8 @@ export default defineComponent({
           page: "Users",
         });
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Please enter correct email id.`,
         });
       }
@@ -188,7 +187,6 @@ export default defineComponent({
       options,
       inviteUser,
       currentUserRole,
-      $q
     };
   },
 });

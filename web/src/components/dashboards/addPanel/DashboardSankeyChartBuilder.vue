@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- target container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- value container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -393,9 +393,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -434,6 +434,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     ODropdown,

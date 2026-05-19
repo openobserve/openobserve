@@ -84,57 +84,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     </div>
     <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
-      <template v-if="rows.length">
-        <OTable
-          :data="rows"
-          :columns="columns"
-          row-key="email"
-          :global-filter="userSearchKey"
-          pagination="client"
-          :page-size="100"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :show-global-filter="false"
-          dense
-        >
-          <template #cell-select="{ row }">
-            <OCheckbox
-              :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
-              size="sm"
-              :model-value="row.isInGroup"
-              class="filter-check-box cursor-pointer"
-              @update:model-value="toggleUserSelection(row)"
-            />
-          </template>
-          <template #cell-email="{ row }">
-            <div class="flex items-center">
-              <span>{{ row.email }}</span>
-              <OIcon
-                v-if="shouldShowWarning(row)"
-                name="info"
-                size="sm"
-                class="q-ml-xs cursor-pointer"
-                :data-test="`iam-external-user-warning-icon-${row.email}`"
-              >
-                <OTooltip side="right">
-                  <div style="font-size: 12px; line-height: 1.5;">
-                    <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
-                  </div>
-                </OTooltip>
-              </OIcon>
-            </div>
-          </template>
-        </OTable>
-      </template>
-      <div
-        data-test="iam-users-selection-table-no-users-text"
-        v-if="!rows.length"
-        class="text-bold q-pl-md q-py-md"
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="email"
+        :global-filter="userSearchKey"
+        pagination="client"
+        :page-size="100"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        :footer-title="t('iam.basicUsers')"
+        dense
       >
-        No users added
-      </div>
+        <template #cell-select="{ row }">
+          <OCheckbox
+            :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
+            size="sm"
+            :model-value="row.isInGroup"
+            class="filter-check-box cursor-pointer"
+            @update:model-value="toggleUserSelection(row)"
+          />
+        </template>
+        <template #cell-email="{ row }">
+          <div class="flex items-center">
+            <span>{{ row.email }}</span>
+            <OIcon
+              v-if="shouldShowWarning(row)"
+              name="info"
+              size="sm"
+              class="q-ml-xs cursor-pointer"
+              :data-test="`iam-external-user-warning-icon-${row.email}`"
+            >
+              <OTooltip side="right">
+                <div style="font-size: 12px; line-height: 1.5;">
+                  <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
+                  <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                </div>
+              </OTooltip>
+            </OIcon>
+          </div>
+        </template>
+        <template #empty>
+          <NoData />
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
@@ -142,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -239,7 +235,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
-      meta: { align: "left" },
+      meta: { align: "left" , autoWidth: true},
     },
   ];
 

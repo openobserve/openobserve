@@ -131,18 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="services-catalog-records-per-page"
           @update:model-value="changeRowsPerPage"
         />
-        <q-pagination
+        <OPagination
           v-model="currentPage"
           :max="totalPages"
-          :input="false"
-          direction-links
-          :boundary-numbers="false"
-          :max-pages="5"
-          :ellipses="false"
-          icon-first="skip_previous"
-          icon-last="skip_next"
-          icon-prev="fast_rewind"
-          icon-next="fast_forward"
           class="float-right paginator-section tw:mt-0!"
           data-test="services-catalog-pagination"
           @update:model-value="changePage"
@@ -426,6 +417,7 @@ import { cloneDeep } from "lodash-es";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 

@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-
 export interface FieldItem {
   name: string;
   type?: string;
@@ -15,15 +13,16 @@ export interface OFieldListProps {
   search?: string;
   searchPlaceholder?: string;
   loading?: boolean;
+  currentPage?: number;
   pageSize?: number;
   pageSizeOptions?: number[];
-  virtualScroll?: boolean;
   rowKey?: string;
-  dense?: boolean;
   showSearch?: boolean;
   showPagination?: boolean;
-  expansion?: "none" | "single";
   expandedIds?: string[];
+  draggable?: boolean;
+  dragEnabledFn?: (row: FieldItem, index: number) => boolean;
+  sortFn?: (a: FieldItem, b: FieldItem) => number;
 }
 
 export interface OFieldListEmits {
@@ -33,6 +32,8 @@ export interface OFieldListEmits {
   "row-click": [row: FieldItem, event: MouseEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
+  "drag-start": [row: FieldItem, event: DragEvent];
+  "drag-end": [row: FieldItem, event: DragEvent];
 }
 
 export interface OFieldListSlots {
@@ -50,17 +51,15 @@ export interface OFieldListSlots {
     nextPage: () => void;
     lastPage: () => void;
   }) => any;
-  "field-row"?: (props: { row: FieldItem; index: number }) => any;
+  "field-row"?: (props: {
+    row: FieldItem;
+    index: number;
+    draggable: boolean;
+    isDragEnabled: boolean;
+  }) => any;
   "field-actions"?: (props: { row: FieldItem; index: number }) => any;
   "group-header"?: (props: { row: FieldItem; groupName: string }) => any;
   expansion?: (props: { row: FieldItem }) => any;
   empty?: (props: Record<string, never>) => any;
+  loading?: (props: Record<string, never>) => any;
 }
-
-export const OFieldListDefaultColumn: OTableColumnDef<FieldItem> = {
-  id: "name",
-  header: "",
-  accessorKey: "name",
-  cell: " ",
-  meta: { align: "left" },
-};

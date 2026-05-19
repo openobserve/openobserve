@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #before>
         <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
-          <FieldList
+          <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
               startTime: dateTime.startTime,
@@ -86,7 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
               >
                 <div>
-                  <OSpinner size="md" class="tw:mx-auto tw:block" />
+                  <OSpinner
+                    size="md"
+                    class="tw:mx-auto tw:block"
+                    data-test="app-errors-loading-indicator"
+                  />
                   <div class="text-center full-width">
                     {{ t("rum.loadingApplicationErrors") }}
                   </div>
@@ -136,16 +140,16 @@ import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
 import {
   applyFilterTerm,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -250,7 +254,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -398,11 +401,10 @@ const getErrorLogs = () => {
       );
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })

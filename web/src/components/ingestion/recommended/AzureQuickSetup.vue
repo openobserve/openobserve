@@ -73,9 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-slide-transition>
-        <div v-show="showDetails">
-          <q-separator />
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="showDetails ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
+          <OSeparator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
               <h6
@@ -172,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-card-section>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -181,15 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AzureQuickSetup",
-  components: { OButton,
+  components: { OSeparator, OButton,
     OIcon,
 },
   setup() {
@@ -343,8 +350,8 @@ export default defineComponent({
           replaced: shouldReplace,
         });
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: shouldReplace
             ? "Microsoft O365 dashboard replaced successfully"
             : "Microsoft O365 dashboard added successfully to Microsoft folder",
@@ -352,8 +359,8 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error adding dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to add dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });

@@ -44,14 +44,13 @@
       </div>
     </div>
 
-    <q-separator class="tw:mb-6" />
+    <OSeparator class="tw:mb-6" />
 
     <!-- Advanced/Manual Install Section -->
-    <q-expansion-item
+    <OCollapsible
       v-model="showAdvancedInstall"
       label="Advanced Installation (Manual Steps)"
       caption="For custom configurations or step-by-step installation"
-      header-class="text-primary"
       data-test="kubernetes-advanced-install-toggle"
     >
       <div class="tw:mt-4">
@@ -109,7 +108,7 @@
               <OTooltip :content="t('ingestion.internalLabel')" side="top" />
             </OTab>
           </OTabs>
-          <q-separator />
+          <OSeparator />
           <OTabPanels
             v-model="tab"
             animated
@@ -132,7 +131,7 @@ Make changes accordingly to the above URL.
           </OTabPanels>
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <br />
     <hr />
@@ -212,6 +211,8 @@ import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 const store = useStore();
 

@@ -181,7 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
@@ -190,6 +189,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SetupState =
   | "select_org"
@@ -208,7 +208,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
@@ -296,8 +295,8 @@ export default defineComponent({
 
     const linkToExistingOrg = async () => {
       if (!selectedOrg.value) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Please select an organization",
         });
         return;

@@ -16,13 +16,13 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import SearchJobInspector from "@/plugins/logs/SearchJobInspector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 // ── Stubs for migrated ODialog / ODrawer ────────────────────────────────────
 // Mirror the real contract: v-model:open, title, size and the named slots

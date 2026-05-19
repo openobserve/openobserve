@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
-          <q-pagination
+          <OPagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs' &&
@@ -133,20 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
             class="float-right paginator-section"
             @update:model-value="getPageData('pageChange')"
-            rowsPerPageLabel="Rows per page"
-            :rows-per-page-options="rowsPerPageOptions"
-            :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
             data-test="logs-search-result-pagination"
           />
           <OSelect
@@ -533,7 +521,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -570,6 +558,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "SearchResult",
@@ -580,6 +570,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OSelect,
+    OPagination,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -739,8 +730,8 @@ export default defineComponent({
           this.pageNumberInput > Math.ceil(maxPages) &&
           this.searchObj.meta.jobId == ""
         ) {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "Page number is out of range. Please provide valid page number.",
             timeout: 1000,
@@ -824,7 +815,6 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");
@@ -1242,8 +1232,8 @@ export default defineComponent({
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
           correlationError.value = "No matching service found for correlation";
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "No matching service found for correlation",
             timeout: 3000,
           });
@@ -1253,8 +1243,8 @@ export default defineComponent({
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
           correlationError.value = "Unable to retrieve correlation data";
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Unable to retrieve correlation data",
             timeout: 3000,
           });
@@ -1318,8 +1308,8 @@ export default defineComponent({
           console.warn(
             "[SearchResult] No metric streams found for correlation",
           );
-          $q.notify({
-            type: "info",
+          toast({
+            variant: "info",
             message: `No metric streams found for service "${result.correlationData.service_name}"`,
             timeout: 3000,
           });
@@ -1333,8 +1323,8 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         correlationError.value = `Correlation error: ${err.message || err}`;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Correlation error: ${err.message || err}`,
           timeout: 3000,
         });
@@ -1413,8 +1403,8 @@ export default defineComponent({
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
       copyToClipboard(copyData).then(() =>
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Content Copied Successfully!",
           timeout: 1000,
         }),
@@ -1521,8 +1511,8 @@ export default defineComponent({
       const traceId = searchObj.data.lastSearchTraceId;
 
       if (!traceId) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "No trace ID available for inspection",
           timeout: 2000,
         });

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="general-settings-max-series-per-query"
               style="width: 180px"
             >
-              <template v-slot:append>
+              <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </OIcon>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_img"
               :src="
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_dark_img"
               :src="
                 `data:image; base64, ` +
@@ -381,6 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="loadingState"
     size="md"
     class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+    data-test="general-settings-loading-indicator"
   />
   <ODialog data-test="general-delete-image-dialog"
     v-model:open="confirmDeleteImage"
@@ -412,7 +413,6 @@ import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
@@ -431,6 +431,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -647,14 +649,14 @@ export default defineComponent({
         // Clear temporary theme colors from store since we're saving permanently
         store.commit("clearTempThemeColors");
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("settings.organizationSettingsUpdated"),
           timeout: 2000,
         });
       } catch (err: any) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err?.message || t("settings.somethingWentWrong"),
           timeout: 2000,
         });
@@ -692,8 +694,8 @@ export default defineComponent({
           )
           .then(async (res) => {
             if (res.status == 200) {
-              q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: t("settings.logoUpdatedSuccessfully", {
                   mode:
                     theme === "dark"
@@ -715,16 +717,16 @@ export default defineComponent({
               }
               files.value = null;
             } else {
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t("settings.somethingWentWrong"),
                 timeout: 2000,
               });
             }
           })
           .catch((e) => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e?.message || t("settings.errorUploadingImage"),
               timeout: 2000,
             });
@@ -733,14 +735,14 @@ export default defineComponent({
             loadingState.value = false;
           });
       } else if (config.isEnterprise != "true") {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.notAllowedAction"),
           timeout: 2000,
         });
       } else {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.selectFileToUpload"),
           timeout: 2000,
         });
@@ -762,8 +764,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoDeletedSuccessfully", {
                 mode:
                   theme === "dark"
@@ -777,16 +779,16 @@ export default defineComponent({
               store.dispatch("setConfig", res.data);
             });
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorDeletingImage"),
               timeout: 2000,
             });
           }
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -894,8 +896,8 @@ export default defineComponent({
       applyThemeColors(color, currentMode, true);
 
       // Show notification
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("settings.themeColorsResetSuccess"),
         timeout: 2000,
       });
@@ -940,8 +942,8 @@ export default defineComponent({
 
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.textMaxCharacters"),
           timeout: 2000,
         });
@@ -957,8 +959,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoTextUpdatedSuccessfully"),
               timeout: 2000,
             });
@@ -968,16 +970,16 @@ export default defineComponent({
             store.dispatch("setConfig", stateConfig);
             editingText.value = false;
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorUpdatingImage"),
               timeout: 2000,
             });
           }
         })
         .catch((err) => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.message || t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -1015,10 +1017,10 @@ export default defineComponent({
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
       onRejected(rejectedEntries: string | any[]) {
-        // Notify plugin needs to be installed
+        //  plugin needs to be installed
         // https://quasar.dev/quasar-plugins/notify#Installation
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.filesValidationFailed", {
             count: rejectedEntries.length,
           }),

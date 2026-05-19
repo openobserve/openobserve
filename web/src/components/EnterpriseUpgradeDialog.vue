@@ -49,10 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton
                   class="usage-indicator tw:rounded-full"
                   style="width: 40px; height: 40px;"
+                  data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
                   class="offer-badge-skeleton tw:rounded-3xl"
                   style="width: 200px; height: 44px;"
+                  data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton
                   class="chart-skeleton tw:rounded-lg"
                   style="height: 150px;"
+                  data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
               <!-- Loaded chart -->
@@ -219,7 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
@@ -228,6 +230,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -294,7 +297,6 @@ export default defineComponent({
     const showDialog = ref(props.modelValue);
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { t } = useI18n();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
@@ -708,9 +710,8 @@ export default defineComponent({
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-        $q.notify({
+        toast({
           message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
-          color: 'negative',
           timeout: 5000,
         });
       }

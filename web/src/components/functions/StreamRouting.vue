@@ -10,7 +10,7 @@
         @click="emits('cancel:hideform')"
       />
     </div>
-    <q-separator />
+    <OSeparator />
     <div class="stream-routing-container q-px-md q-pt-md">
       <div
         data-test="stream-routing-name-input"
@@ -123,6 +123,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface RouteCondition {
   column: string;

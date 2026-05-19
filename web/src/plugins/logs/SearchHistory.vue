@@ -246,7 +246,7 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
@@ -258,6 +258,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -290,7 +291,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const $q = useQuasar();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();
@@ -376,8 +376,8 @@ export default defineComponent({
         //check if datetime is present or not
         //else show the error message
         if (!startTime) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "The selected start time is  invalid. Please choose a valid time",
             timeout: 5000,
@@ -386,8 +386,8 @@ export default defineComponent({
           return;
         }
         if (!endTime) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "The selected end time is  invalid. Please choose a valid time",
             timeout: 5000,
@@ -452,8 +452,8 @@ export default defineComponent({
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
       } catch (error) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to fetch search history. Please try again later.",
           timeout: 5000,
         });
@@ -467,15 +467,15 @@ export default defineComponent({
       navigator.clipboard
         .writeText(text)
         .then(() => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${type} Copied Successfully!`,
             timeout: 5000,
           });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });

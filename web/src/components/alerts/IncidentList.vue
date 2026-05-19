@@ -175,7 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, { Incident } from "@/services/incidents";
@@ -187,6 +186,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IncidentList",
@@ -202,7 +202,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
 
     const qTableRef: any = ref(null);
@@ -319,8 +318,8 @@ export default defineComponent({
         allIncidents.value = response.data.incidents;
         store.dispatch('incidents/setCachedData', response.data.incidents);
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.errorLoading"),
         });
         console.error("Failed to load incidents:", error);
@@ -347,15 +346,15 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         await incidentsService.updateStatus(org, incident.id, newStatus);
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
         loadIncidents();
         store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.statusUpdateFailed"),
         });
         console.error("Failed to update incident status:", error);
@@ -521,8 +520,8 @@ export default defineComponent({
 
     const refreshIncidents = async () => {
       await loadIncidents();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Incidents refreshed",
         timeout: 1500,
       });

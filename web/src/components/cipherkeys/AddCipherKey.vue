@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <div
       class="create-cipher-form"
     >
@@ -179,7 +179,6 @@ import { ref, onBeforeMount, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import {
   isValidResourceName,
   maxLengthCharValidation,
@@ -195,11 +194,12 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
-const $q = useQuasar();
 const store = useStore();
 const addCipherKeyFormRef: any = ref();
 const nameError = ref('');
@@ -289,8 +289,8 @@ const setupTemplateData = () => {
     if (router.currentRoute.value.query.name) {
       const name = String(router.currentRoute.value.query.name) || "";
       if (name === "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid cipher key name",
         });
         emit("cancel:hideform");
@@ -306,8 +306,8 @@ const setupTemplateData = () => {
         })
         .catch((error) => {
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response.data.message || "Error fetching cipher key.",
             });
@@ -351,7 +351,7 @@ const onSubmit = () => {
   const nameValid = validateName();
   const typeValid = validateStoreType();
   if (!nameValid || !typeValid) {
-    $q.notify({ type: 'negative', message: 'Please fill all the required fields' });
+    toast({ variant: "error", message: 'Please fill all the required fields' });
     return;
   }
   isSubmitting.value = true;
@@ -365,8 +365,8 @@ const onSubmit = () => {
 };
 
 const createCipherKey = () => {
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while processing your request...",
   });
   CipherKeysService.create(
@@ -375,8 +375,8 @@ const createCipherKey = () => {
   )
     .then((response) => {
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Cipher key created successfully",
       });
       emit("cancel:hideform");
@@ -384,8 +384,8 @@ const createCipherKey = () => {
     .catch((error) => {
       dismiss();
       if (error.status != 403) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error.response.data.message,
         });
       }
@@ -423,15 +423,15 @@ function filterEditedAttributes(formdata: any, originalData: any) {
 
 const updateCipherKey = () => {
   isSubmitting.value = true;
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while processing your request...",
   });
 
   if (JSON.stringify(formData.value) == originalData.value) {
     dismiss();
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "No changes detected",
     });
     emit("cancel:hideform");
@@ -451,8 +451,8 @@ const updateCipherKey = () => {
     .then((response) => {
       isSubmitting.value = false;
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Cipher key updated successfully",
       });
       emit("cancel:hideform");
@@ -461,8 +461,8 @@ const updateCipherKey = () => {
       isSubmitting.value = false;
       dismiss();
       if (error.status != 403) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error.response.data.message,
         });
       }

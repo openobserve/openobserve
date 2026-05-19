@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="loading"
         size="md"
         class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        data-test="associate-function-loading-indicator"
       />
     </div>
     <div
@@ -93,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("function.function_definition") }}
               </div>
             </q-card-section>
-            <q-separator />
+            <OSeparator />
             <q-card-section class="function-definition-content q-pa-none">
               <div class="function-code-container">
                 <pre class="function-code">{{
@@ -204,9 +205,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface RouteCondition {
   column: string;
@@ -287,7 +289,6 @@ const afterFlattening = ref(
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
-const q = useQuasar();
 
 const store = useStore();
 
@@ -362,10 +363,9 @@ const saveFunction = () => {
 
   if (createNewFunction.value) {
     if (addFunctionRef.value.formData.name == "") {
-      q.notify({
+      toast({
         message: "Function Name is required",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 2000,
       });
       return;

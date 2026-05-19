@@ -50,7 +50,7 @@ vi.mock("@/composables/useNotifications", () => ({
 // Mock search service
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock clipboard API
@@ -284,19 +284,6 @@ describe("TraceDetails", () => {
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.find(".trace-details").exists()).toBe(true);
   });
-
-  // describe("Loading state", () => {
-  //   it("should show loading spinner when isLoadingTraceDetails is true", async () => {
-  //     const spinner = wrapper.find(".q-spinner");
-  //     const loadingText = wrapper.find(
-  //       '[data-test="trace-details-loading-text"]',
-  //     );
-
-  //     expect(spinner.exists()).toBe(true);
-  //     expect(loadingText.exists()).toBe(true);
-  //     expect(loadingText.text()).toContain("Fetching your trace");
-  //   });
-  // });
 
   describe("Toolbar functionality", () => {
     beforeEach(() => {

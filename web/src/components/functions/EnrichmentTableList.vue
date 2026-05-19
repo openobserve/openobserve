@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${row.name}-explore-btn`"
                     :title="t('logStream.explore')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
                   />
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
                     :title="t('logStream.schemaHeader')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
                   />
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
                     :title="t('function.enrichmentTables')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
                   />
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :title="t('function.delete')"
                     variant="ghost-destructive"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
                   />
@@ -306,7 +306,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch, reactive } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -359,7 +358,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -378,7 +376,7 @@ export default defineComponent({
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },
@@ -422,8 +420,8 @@ export default defineComponent({
 
     const getLookupTables = async (force: boolean = false) => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading enrichment tables...",
       });
 
@@ -534,8 +532,8 @@ export default defineComponent({
         console.info("Error while fetching enrichment tables", err);
         dismiss();
         if (err.response?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               err.response?.data?.message ||
               "Error while fetching functions.",
@@ -658,8 +656,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `${selectedDelete.value.name} deleted successfully.`,
             });
             resetStreamType("enrichment_tables");
@@ -668,8 +665,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message:
                 err.response?.data?.message || "Error while deleting stream.",
             });
@@ -728,18 +724,15 @@ export default defineComponent({
           });
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
-            $q.notify({
-              color: "warning",
+            toast({
               message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
             });
           } else if (failedDeletions > 0) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: `Failed to delete ${failedDeletions} enrichment table(s).`,
             });
           }
@@ -763,10 +756,9 @@ export default defineComponent({
     const getTimeRange = async (stream: any) => {
       const dateTime: { period?: string; from?: number; to?: number } = {};
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Redirecting to explorer...",
-        color: "secondary",
       });
 
       try {

@@ -18,12 +18,12 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricList from "./MetricList.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock useQuasar
@@ -254,10 +254,6 @@ const createWrapper = (props = {}, options = {}) => {
           </button>`,
           props: ["icon", "size", "round", "title"],
           emits: ["click"],
-        },
-        QInnerLoading: {
-          template: "<div data-test-stub='q-inner-loading' v-if='showing'></div>",
-          props: ["showing", "size", "label", "labelStyle"],
         },
         EqualIcon: {
           template: "<div data-test-stub='equal-icon'></div>",

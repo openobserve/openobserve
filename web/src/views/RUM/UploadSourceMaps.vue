@@ -150,16 +150,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const $q = useQuasar();
 
 // Form data
 const formData = ref({
@@ -224,8 +223,8 @@ const handleDrop = (event: DragEvent) => {
 // Validate and set file
 const validateAndSetFile = (file: File) => {
   if (!file.name.endsWith('.zip')) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Only ZIP files are allowed",
     });
     return;
@@ -253,8 +252,8 @@ const formatFileSize = (bytes: number): string => {
 // Upload source maps
 const uploadSourceMaps = async () => {
   if (!formData.value.file) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please select a ZIP file to upload",
     });
     return;
@@ -280,8 +279,8 @@ const uploadSourceMaps = async () => {
       uploadData
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Source maps uploaded successfully",
     });
 
@@ -289,8 +288,8 @@ const uploadSourceMaps = async () => {
     navigateBack();
   } catch (error: any) {
     console.error("Error uploading source maps:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.message || error?.message || "Failed to upload source maps",
     });
   } finally {

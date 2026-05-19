@@ -15,18 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-expansion-item
-    dense
-    hide-expand-icon
-    v-model="isExpanded"
-    :label="field.name"
-    class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
-    @before-show="(event: any) => handleBeforeShow(event)"
-    @before-hide="() => handleBeforeHide()"
+  <OCollapsible
+    :model-value="isExpanded"
+    @update:model-value="handleToggle"
+    class="field-expansion-item tw:w-full tw:rounded-[0.375rem] tw:overflow-hidden"
   >
-    <template v-slot:header>
+    <template #trigger>
       <div
-        class="flex content-center ellipsis full-width field-expansion-header"
+        class="flex content-center ellipsis full-width field-expansion-header tw:relative"
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
@@ -34,11 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="field_label full-width"
           :data-test="`logs-field-list-item-${field.name}`"
         >
-          <div
-            class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
-            style="display: inline-block"
-          >
-            <span v-if="field.dataType" class="field-type-container">
+          <div class="ellipsis tw:flex tw:flex-1 tw:min-w-0">
+            <span class="field-type-container">
               <OIcon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand-more' : 'chevron-right'"
@@ -63,8 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
         </div>
-        <div class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden">
-          <span v-if="field.isSchemaField" style="margin-right: 0.375rem">
+        <div class="field_overlay">
+          <span
+            v-if="field.isSchemaField && showFilterIcon"
+            style="margin-right: 0.375rem"
+          >
             <OButton
               :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
               variant="ghost"
@@ -76,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OIcon
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
-            v-if="!isFieldSelected"
+            v-if="showVisibilityToggle && !isFieldSelected"
             name="visibility"
             style="margin-right: 0.375rem"
             size="1.1rem"
@@ -85,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OIcon
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
-            v-if="isFieldSelected"
+            v-if="showVisibilityToggle && isFieldSelected"
             name="visibility-off"
             style="margin-right: 0.375rem"
             title="Remove field from table"
@@ -110,28 +106,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <q-card>
-      <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-        <FieldValuesPanel
-          ref="fieldValuesPanelRef"
-          :field-name="field.name"
-          :field-values="fieldValues"
-          :show-multi-select="selectedStreamsCount == field.streams.length"
-          :default-values-count="defaultValuesCount"
-          :theme="theme"
-          :active-include-values="activeIncludeValues"
-          :active-exclude-values="activeExcludeValues"
-          @add-search-term="(fn, v, a) => emit('add-search-term', fn, v, a)"
-          @add-multiple-search-terms="
-            (fn, vs, a) => emit('add-multiple-search-terms', fn, vs, a)
-          "
-          @remove-field-filter="(fn) => emit('remove-field-filter', fn)"
-          @load-more-values="(fn) => emit('load-more-values', fn)"
-          @search-field-values="(fn, t) => emit('search-field-values', fn, t)"
-        />
-      </q-card-section>
-    </q-card>
-  </q-expansion-item>
+    <div class="tw:pl-4 tw:pr-0 tw:py-0">
+        <slot name="body">
+          <FieldValuesPanel
+            ref="fieldValuesPanelRef"
+            :field-name="field.name"
+            :field-values="mappedFieldValues"
+            :show-multi-select="effectiveShowMultiSelect"
+            :default-values-count="defaultValuesCount"
+            :theme="theme"
+            :active-include-values="activeIncludeValues"
+            :active-exclude-values="activeExcludeValues"
+            @add-search-term="(fn: string, v: string, a: string) => emit('add-search-term', fn, v, a)"
+            @add-multiple-search-terms="(fn: string, vs: string[], a: string) => emit('add-multiple-search-terms', fn, vs, a)"
+            @remove-field-filter="(fn: string) => emit('remove-field-filter', fn)"
+            @load-more-values="(fn: string) => emit('load-more-values', fn)"
+            @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
+          />
+        </slot>
+    </div>
+  </OCollapsible>
 </template>
 
 <script setup lang="ts">
@@ -139,6 +133,7 @@ import { computed, ref, watch } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 interface Props {
   field: any;
@@ -148,17 +143,38 @@ interface Props {
     errMsg?: string;
     hasMore?: boolean;
   };
-  selectedFields: string[];
-  selectedStreamsCount: number;
-  theme: string;
-  showQuickMode: boolean;
-  defaultValuesCount: number;
+  selectedFields?: string[];
+  selectedStreamsCount?: number;
+  showMultiSelect?: boolean;
+  theme?: string;
+  defaultValuesCount?: number;
   activeIncludeValues?: string[];
   activeExcludeValues?: string[];
   expanded?: boolean;
+  showVisibilityToggle?: boolean;
+  showFilterIcon?: boolean;
+  showQuickMode?: boolean;
+  valueMapper?: (values: { key: string; count: number }[]) => {
+    key: string;
+    count: number;
+  }[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  selectedFields: () => [],
+  selectedStreamsCount: 1,
+  showMultiSelect: true,
+  theme: "light",
+  defaultValuesCount: 10,
+  activeIncludeValues: () => [],
+  activeExcludeValues: () => [],
+  expanded: false,
+  showVisibilityToggle: true,
+  showFilterIcon: true,
+  showQuickMode: false,
+  fieldValues: undefined,
+  valueMapper: undefined,
+});
 
 const emit = defineEmits<{
   "add-to-filter": [value: string];
@@ -188,8 +204,31 @@ watch(
 );
 
 const isFieldSelected = computed(() =>
-  props.selectedFields.includes(props.field.name),
+  (props.selectedFields ?? []).includes(props.field.name),
 );
+
+const effectiveShowMultiSelect = computed(() => {
+  if (
+    props.selectedStreamsCount !== undefined &&
+    props.field.streams !== undefined
+  ) {
+    return props.selectedStreamsCount === props.field.streams.length;
+  }
+  return props.showMultiSelect;
+});
+
+const mappedFieldValues = computed(() => {
+  const raw = props.fieldValues ?? {
+    isLoading: false,
+    values: [],
+    hasMore: false,
+    errMsg: "",
+  };
+  if (props.valueMapper && raw.values.length) {
+    return { ...raw, values: props.valueMapper(raw.values) };
+  }
+  return raw;
+});
 
 const handleBeforeShow = (event: any) => {
   emit("before-show", event, props.field);
@@ -199,12 +238,52 @@ const handleBeforeHide = () => {
   fieldValuesPanelRef.value?.reset();
   emit("before-hide", props.field);
 };
+
+const handleToggle = (val: boolean) => {
+  isExpanded.value = val;
+  if (val) handleBeforeShow(null);
+  else handleBeforeHide();
+};
+
+defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
 <style scoped lang="scss">
-:deep(.q-expansion-item__container .q-item) {
+.field-type-container {
+  width: 1.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.field-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  color: var(--o2-text-muted);
+}
+
+:deep(.field-expansion-item button[data-state]) {
   padding-left: 0 !important;
   padding-right: 0 !important;
+  min-height: 24px !important;
+}
+
+:deep(.field-expansion-item button[data-state="open"]) {
+  background-color: var(--o2-hover-accent);
+}
+
+:deep(.field-expansion-item .o-collapsible-content) {
+  background-color: var(--o2-hover-accent);
+  width: 100%;
+}
+
+:deep(.field-expansion-item[data-state="open"]) {
+  border: 1px solid var(--o2-border-color);
+  margin-bottom: 0.375rem;
 }
 
 .field_overlay {
@@ -212,12 +291,13 @@ const handleBeforeHide = () => {
   right: 0;
   top: 0;
   bottom: 0;
+  display: none;
   align-items: center;
   padding: 0 0.25rem;
-  background: var(--q-dark);
+  background-color: var(--o2-hover-accent);
 }
 
-:deep(.q-expansion-item):hover .field_overlay {
+.field-expansion-header:hover .field_overlay {
   display: flex;
 }
 </style>

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
           <div
@@ -376,13 +376,14 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
 import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -393,6 +394,7 @@ import {
 export default defineComponent({
   name: "ImportPipeline",
   components: {
+    OSeparator,
     BaseImport,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -432,7 +434,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const q = useQuasar();
     const { getStreams } = useStreams();
     const { getPipelineDestinations } = usePipelines();
 
@@ -675,10 +676,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -700,10 +700,9 @@ export default defineComponent({
       }
 
       if (allPipelinesCreated) {
-        q.notify({
+        toast({
           message: "Pipeline(s) imported successfully",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -738,10 +737,9 @@ export default defineComponent({
           return await createPipeline(jsonObj, index);
         }
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Pipeline(s) please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;

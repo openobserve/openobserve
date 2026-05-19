@@ -300,7 +300,7 @@ import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
-import { event, useQuasar } from "quasar";
+import { event } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
@@ -310,6 +310,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   vrlFunction: {
@@ -407,7 +408,6 @@ const filteredStreams = ref<any[]>([]);
 
 const sqlQueryErrorMsg = ref<string>("");
 
-const q = useQuasar();
 
 const streams = ref([]);
 
@@ -442,8 +442,8 @@ const outputMessage = computed(() => {
 
 const areInputValid = () => {
   if (!inputQuery.value) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please enter a query",
       timeout: 3000,
     });
@@ -545,8 +545,8 @@ const getResults = async () => {
 
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Invalid SQL Query : " + err.response?.data?.message,
         timeout: 3000,
       });
@@ -561,8 +561,8 @@ const isInputValid = () => {
     return true;
   } catch (e: any) {
     eventsErrorMsg.value = `Invalid events: ${e?.message}`;
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: eventsErrorMsg.value,
       timeout: 3000,
     });
@@ -601,8 +601,8 @@ const handleTestError = (err: any) => {
     ? "JavaScript error - see details below"
     : "Error while transforming results";
 
-  q.notify({
-    type: "negative",
+  toast({
+    variant: "error",
     message: rawErrMsg,
     timeout: 5000,
   });
