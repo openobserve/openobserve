@@ -566,7 +566,6 @@ export default defineComponent({
     return {
       t,
       store,
-      q,
       config,
       getBtnLogo,
       isHovered,
