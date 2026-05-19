@@ -43,6 +43,7 @@ import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
+import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { ManagementPage } from "./generalPages/managementPage.js";
@@ -128,6 +129,7 @@ class PageManager {
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
+    this.reportFoldersPage = new ReportFoldersPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
     this.managementPage = new ManagementPage(page);
