@@ -109,17 +109,29 @@ jobs:
 
           ### OUTPUT FORMAT — FAILURE TO FOLLOW MEANS YOU FAILED
 
-          You MUST output ONLY the comment exactly as shown. NO preamble, NO "Here is the review", NO markdown outside the table.
+          You MUST output ONLY the comment exactly as shown. NO preamble, NO "Here is the review".
 
+          Issues found:
           ```
           <!-- deepseek-pr-review -->
           ## Code Review
 
-          | # | File | Severity | Issue |
-          |---|------|----------|-------|
-          | 1 | `path/file:line` | 🔴 High | Description. **Fix:** suggestion |
+          <details>
+          <summary>🔴 High: `path/file:line`</summary>
+
+          Description of the issue. **Fix:** suggestion.
+
+          </details>
+
+          <details>
+          <summary>🟡 Medium: `path/file:line`</summary>
+
+          Description of the issue. **Fix:** suggestion.
+
+          </details>
           ```
 
+          Each issue MUST be wrapped in `<details>` like above.
           If NO issues found:
           ```
           <!-- deepseek-pr-review -->
@@ -129,13 +141,13 @@ jobs:
           ```
 
           STRICT RULES:
-          - Output the markdown table ONLY — no extra text, no summaries, no praise
-          - Each issue: file path with line, severity (🔴 High / 🟡 Medium / 🟢 Low), one-line description with fix suggestion
-          - 2 sentences max per issue
+          - Output ONLY the `<!-- deepseek-pr-review -->` marker followed by the review content — no extra text, no summaries, no praise
+          - Each finding MUST be a `<details>` block with severity emoji in the `<summary>`: `🔴 High`, `🟡 Medium`, `🟢 Low`
+          - The summary line format: `🔴 High: \`path/file:line\`` (severity + file path with line)
+          - Inside each `<details>` block: one or two sentences describing the issue and fix
           - Max 10 issues, sorted by severity (high first)
           - If existing review body shows resolved issues, append a "### Resolved" section with ~~strikethrough~~
-          - DO NOT number items outside the table column
-          - DO NOT use "1.", "2." at the start of each issue — use the table's `#` column instead
+          - Maintain a blank line between `</details>` and the next `<details>`
           ENDINSTRUCTIONS
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
