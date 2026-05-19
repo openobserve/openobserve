@@ -19,10 +19,7 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
-use config::meta::{
-    inverted_index::UNKNOWN_NAME,
-    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
-};
+use config::meta::search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use infra::runtime::DATAFUSION_RUNTIME;
 use sqlparser::ast::{BinaryOperator, Expr};
@@ -181,15 +178,6 @@ pub fn is_value(e: &Expr) -> bool {
 
 pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
-}
-
-// Note: the expr should be Identifier or CompoundIdentifier
-pub fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => UNKNOWN_NAME.to_string(),
-    }
 }
 
 pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
@@ -375,24 +363,6 @@ mod tests {
         // Test non-field expression
         let value_expr = Expr::Value(Value::Number("123".to_string(), false).into());
         assert!(!is_field(&value_expr));
-    }
-
-    #[test]
-    fn test_get_field_name() {
-        // Test simple identifier
-        let ident_expr = Expr::Identifier(Ident::new("\"field_name\"".to_string()));
-        assert_eq!(get_field_name(&ident_expr), "field_name");
-
-        // Test compound identifier
-        let compound_expr = Expr::CompoundIdentifier(vec![
-            Ident::new("table".to_string()),
-            Ident::new("'field_name'".to_string()),
-        ]);
-        assert_eq!(get_field_name(&compound_expr), "field_name");
-
-        // Test identifier without quotes
-        let unquoted_expr = Expr::Identifier(Ident::new("field_name".to_string()));
-        assert_eq!(get_field_name(&unquoted_expr), "field_name");
     }
 
     #[tokio::test]
