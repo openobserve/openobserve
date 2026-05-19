@@ -260,7 +260,16 @@ export function resolveMessageArray(parsed: any): any[] {
  */
 export function messagesFromInput(raw: unknown): Message[] {
   const parsed = safeParseJSON(raw);
-  if (!parsed) return [];
+  if (!parsed) {
+    // Some SDKs emit `gen_ai.input.messages` as the raw prompt string
+    // rather than a structured JSON payload. Treat that as a single
+    // user turn so the UI still shows the question.
+    if (typeof raw === "string" && raw.trim()) {
+      const content = raw.trim();
+      return [{ role: "user", content, sig: `user::${content}` }];
+    }
+    return [];
+  }
 
   const arr = resolveMessageArray(parsed);
   const messages: Message[] = [];
@@ -291,7 +300,15 @@ export function messagesFromInput(raw: unknown): Message[] {
  */
 export function messagesFromOutput(raw: unknown): Message[] {
   const parsed = safeParseJSON(raw);
-  if (!parsed) return [];
+  if (!parsed) {
+    // Plain-string output payload (non-JSON) — surface it as a single
+    // assistant reply rather than dropping the turn entirely.
+    if (typeof raw === "string" && raw.trim()) {
+      const content = raw.trim();
+      return [{ role: "assistant", content, sig: `assistant::${content}` }];
+    }
+    return [];
+  }
 
   if (
     !Array.isArray(parsed) &&
