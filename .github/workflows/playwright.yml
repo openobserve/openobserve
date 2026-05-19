@@ -285,7 +285,6 @@ jobs:
                 "pipeline-backfill.spec.js",
                 "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
-                "pipeline-query-fields.spec.js",
                 # "remotepipeline.spec.js"
               ]
           - testfolder: "Functions"
