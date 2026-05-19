@@ -76,6 +76,7 @@
             :page-size-options="pageSizeOptions"
             sorting="client"
             expansion="single"
+            :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
             :show-global-filter="false"
             :default-columns="false"
@@ -87,7 +88,7 @@
                 ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;'
                 : 'height: 0px'
             "
-            @row-click="onExpandRow"
+            @update:expanded-ids="onExpandedIdsChange"
           >
             <template #cell-sql="{ row }">
               <span>{{ row.sql }}</span>
@@ -305,10 +306,7 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
-    const expandedUuid = ref("");
-    const expandedIds = computed(() =>
-      expandedUuid.value ? [expandedUuid.value] : [],
-    );
+    const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
@@ -361,7 +359,8 @@ export default defineComponent({
     const fetchSearchHistory = async () => {
       columnsToBeRendered.value = [];
       dataToBeLoaded.value = [];
-      expandedUuid.value = "";
+      expandedIds.value = [];
+      moreDetailsToDisplay.value = "";
       try {
         const { org_identifier } = router.currentRoute.value.query;
         isLoading.value = true;
@@ -551,16 +550,16 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
-    const onExpandRow = (row: any) => {
-      moreDetailsToDisplay.value = JSON.stringify(
-        filterRow(row),
-        null,
-        2,
-      );
-      if (expandedUuid.value === row.uuid) {
-        expandedUuid.value = "";
-      } else {
-        expandedUuid.value = row.uuid;
+    const onExpandedIdsChange = (ids: string[]) => {
+      expandedIds.value = ids;
+      const expandedId = ids[0];
+      if (!expandedId) {
+        moreDetailsToDisplay.value = "";
+        return;
+      }
+      const row = dataToBeLoaded.value.find((r: any) => r.uuid === expandedId);
+      if (row) {
+        moreDetailsToDisplay.value = JSON.stringify(filterRow(row), null, 2);
       }
     };
     const goToLogs = (row) => {
@@ -656,11 +655,10 @@ export default defineComponent({
       isLoading,
       updateDateTime,
       searchDateTimeRef,
-      expandedUuid,
       expandedIds,
       goToLogs,
       goToInspector,
-      onExpandRow,
+      onExpandedIdsChange,
       copyToClipboard,
       formatTime,
       delayMessage,
