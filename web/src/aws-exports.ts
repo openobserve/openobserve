@@ -22,14 +22,14 @@
 const LLM_UI_LS_KEY = "openobserve.llm_ui_visible";
 
 function readLLMUIFlag(): "true" | "false" {
-  if (typeof window === "undefined") return "false";
+  if (typeof window === "undefined") return "true";
   try {
-    return window.localStorage.getItem(LLM_UI_LS_KEY) === "true"
-      ? "true"
-      : "false";
+    return window.localStorage.getItem(LLM_UI_LS_KEY) === "false"
+      ? "false"
+      : "true";
   } catch {
-    // Private mode / disabled storage — fall back to hidden.
-    return "false";
+    // Private mode / disabled storage — fall back to visible.
+    return "true";
   }
 }
 
