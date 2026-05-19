@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleExtendTrialDialog(row)"
             >
               <OIcon name="event" size="xs" />
-              <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
+              <OTooltip :content="t('settings.extendTrial')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === '-'"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(row, 'create')"
             >
               <OIcon name="note-add" size="xs" />
-              <q-tooltip>Add Contract</q-tooltip>
+              <OTooltip content="Add Contract" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(row, 'extend')"
             >
               <OIcon name="event" size="xs" />
-              <q-tooltip>Extend Contract</q-tooltip>
+              <OTooltip content="Extend Contract" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="confirmRevokeContract(row)"
             >
               <OIcon name="tw:block" size="xs" />
-              <q-tooltip>Revoke</q-tooltip>
+              <OTooltip content="Revoke" />
             </OButton>
             <OButton
               v-if="!row.org_storage_enabled"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleOrgStorage(row)"
             >
               <OIcon name="cloud-upload" size="xs" />
-              <q-tooltip>Enable Storage</q-tooltip>
+              <OTooltip content="Enable Storage" />
             </OButton>
             <OButton
               v-else
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-storage-enabled-btn"
             >
               <OIcon name="cloud-done" size="xs" />
-              <q-tooltip>Storage Enabled</q-tooltip>
+              <OTooltip content="Storage Enabled" />
             </OButton>
           </div>
         </template>

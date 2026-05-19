@@ -65,9 +65,7 @@ describe("AutoRefreshInterval", () => {
           ODropdownSeparator: {
             template: '<hr />',
           },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
-          },
+
           'q-tooltip': {
             template: '<div class="q-tooltip"><slot /></div>'
           },

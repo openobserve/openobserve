@@ -231,88 +231,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-details-history-table"
                 @pagination-change="onPaginationChange"
               >
-                <template v-slot:body="props">
-                  <q-tr :props="props" :class="getRowClass(props.row.status)">
-                    <q-td
-                      v-for="col in historyTableColumns"
-                      :key="col.name"
-                      :props="props"
-                    >
-                      <template v-if="col.name === '#'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-500'
-                              : 'tw:text-gray-400'
-                          "
-                        >
-                          {{
-                            (currentPage - 1) * selectedPerPage +
-                            props.rowIndex +
-                            1
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'status'">
-                        <OBadge
-                          size="sm"
-                          :icon="getStatusChipIcon(props.row.status)"
-                          :variant="getStatusChipVariant(props.row.status)"
-                          class="tw:cursor-default"
-                          data-test="alert-history-status-chip"
-                        >
-                          {{ formatStatus(props.row.status) }}
-                          <OTooltip
-                            v-if="props.row.error"
-                            :max-width="'300px'"
-                            :content="props.row.error"
-                          />
-                        </OBadge>
-                      </template>
-                      <template v-else-if="col.name === 'timestamp'">
-                        <span class="tw:text-[13px]">{{
-                          formatTimestamp(props.row.timestamp)
-                        }}</span>
-                        <OTooltip :content="formatTimestampFull(props.row.timestamp)" />
-                      </template>
-                      <template v-else-if="col.name === 'evaluation_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.evaluation_took_in_secs
-                              ? props.row.evaluation_took_in_secs.toFixed(3) +
-                                "s"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'query_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.query_took
-                              ? props.row.query_took + "ms"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'anomaly_count'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            props.row.anomaly_count > 0
-                              ? 'tw:text-red-500 tw:font-medium'
-                              : ''
-                          "
-                        >
-                          {{
-                            props.row.anomaly_count != null
-                              ? props.row.anomaly_count
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                    </q-td>
-                  </q-tr>
+                <template #[`cell-#`]="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-500'
+                        : 'tw:text-gray-400'
+                    "
+                  >
+                    {{
+                      (currentPage - 1) * selectedPerPage +
+                      alertHistory.findIndex((r: any) => r.timestamp === row.timestamp) +
+                      1
+                    }}
+                  </span>
+                </template>
+                <template #cell-status="{ row }">
+                  <OBadge
+                    size="sm"
+                    :icon="getStatusChipIcon(row.status)"
+                    :variant="getStatusChipVariant(row.status)"
+                    class="tw:cursor-default"
+                    data-test="alert-history-status-chip"
+                  >
+                    {{ formatStatus(row.status) }}
+                    <OTooltip
+                      v-if="row.error"
+                      :max-width="'300px'"
+                      :content="row.error"
+                    />
+                  </OBadge>
+                </template>
+                <template #cell-timestamp="{ row }">
+                  <span class="tw:text-[13px]">{{
+                    formatTimestamp(row.timestamp)
+                  }}</span>
+                  <OTooltip :content="formatTimestampFull(row.timestamp)" />
+                </template>
+                <template #cell-evaluation_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{
+                      row.evaluation_took_in_secs
+                        ? row.evaluation_took_in_secs.toFixed(3) + "s"
+                        : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-query_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{
+                      row.query_took ? row.query_took + "ms" : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-anomaly_count="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      row.anomaly_count > 0
+                        ? 'tw:text-red-500 tw:font-medium'
+                        : ''
+                    "
+                  >
+                    {{
+                      row.anomaly_count != null ? row.anomaly_count : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-error="{ row }">
+                  <span class="tw:text-[13px]">{{ row.error || "—" }}</span>
                 </template>
 
                 <template #bottom="scope">

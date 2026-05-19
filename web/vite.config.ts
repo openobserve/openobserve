@@ -18,7 +18,6 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
-import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
@@ -109,14 +108,7 @@ export default defineConfig({
   },
   base: "./",
   plugins: [
-    vue({
-      template: { transformAssetUrls },
-    }),
-    quasar({
-      sassVariables: fileURLToPath(
-        new URL("src/styles/quasar-variables.sass", import.meta.url),
-      ),
-    }),
+    vue(),
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
@@ -136,6 +128,13 @@ export default defineConfig({
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@import '@/styles/quasar-variables';\n`,
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

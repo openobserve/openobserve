@@ -13,17 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// TODO: REMOVE THIS FILE when unit tests are rewritten.
+// Quasar has been removed as a dependency. This helper no longer installs
+// Quasar — it only provides layout injections. All references to
+// tempQuasarPlugin() in spec files should be replaced with direct
+// qLayoutInjections() calls during the test rewrite.
+
 import { config } from "@vue/test-utils";
 import { cloneDeep } from "lodash-es";
-import { Quasar } from "quasar";
 import { qLayoutInjections } from "./layout-injections";
 import { beforeAll, afterAll } from "vitest";
 
-export function installQuasar(options?: any) {
+export function tempQuasarPlugin() {
   const globalConfigBackup = cloneDeep(config.global);
 
   beforeAll(() => {
-    config.global.plugins.unshift([Quasar, options]);
     config.global.provide = {
       ...config.global.provide,
       ...qLayoutInjections(),
