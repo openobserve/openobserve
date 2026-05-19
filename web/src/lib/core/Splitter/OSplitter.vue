@@ -28,14 +28,13 @@
       :class="[
         'o-splitter__separator',
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
-        'tw:cursor-pointer',
         'tw:select-none',
         'tw:transition-colors',
         'hover:tw:bg-[var(--o2-border-input)]',
         'tw:absolute',
         'tw:z-10',
         disable ? 'tw:cursor-not-allowed tw:opacity-50' : '',
-        horizontal ? 'tw:w-[4px] tw:h-full tw:cursor-col-resize' : 'tw:h-[4px] tw:w-full tw:cursor-row-resize',
+        horizontal ? 'tw:w-[4px] tw:h-full tw:cursor-col-resize!' : 'tw:h-[4px] tw:w-full tw:cursor-row-resize!',
         separatorClass
       ]"
       :style="[separatorStyle, separatorPosition]"
