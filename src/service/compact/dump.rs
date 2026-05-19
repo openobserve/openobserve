@@ -374,9 +374,9 @@ pub async fn delete_all(
 // check this delete is all or other cases
 //   1. we need to get all the files in the range
 //   2. pickup the items that need to be deleted
-//   3. if not all the files need to be deleted, we need to generate a new dump file
+//   3. if not all the files need to be deleted, we need to generate new dump files
 //   4. insert the deleted items into file_list_deleted table
-//   5. make the old files deleted and add the new file to file_list table
+//   5. make the old files deleted and add the new files to file_list table
 pub async fn delete_by_time_range(
     org_id: &str,
     stream_type: StreamType,
@@ -415,7 +415,7 @@ pub async fn delete_by_time_range(
         return Ok(()); // nothing need to do
     }
 
-    // Check if there are some files need to be kept, then we need to generate a new dump file
+    // Check if there are some files need to be kept, then we need to generate new dump files
     let mut new_dump_files = Vec::new();
     let groupd_files_to_keep = files_to_keep
         .into_iter()
