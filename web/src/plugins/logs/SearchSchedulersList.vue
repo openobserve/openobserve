@@ -49,7 +49,7 @@
             expansion="single"
             :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
-            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh  - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
+            style="height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;"
             @update:expanded-ids="onExpandedIdsChange"
             :show-global-filter="false"
           >
@@ -59,7 +59,7 @@
                   :name="getStatusIcon(row.status)"
                   size="xs"
                   class="q-mr-xs"
-                  :color="getStatusColor(row.status)"
+                  :class="getStatusColorClass(row.status)"
                 />
                 {{ getStatusText(row.status) }}
               </div>
@@ -722,15 +722,31 @@ export default defineComponent({
     const getStatusIcon = (status) => {
       switch (status) {
         case 0:
-          return "hourglass_empty"; // Icon for pending
+          return "hourglass-empty"; // Icon for pending
         case 1:
-          return "pause_circle"; // Icon for running
+          return "pause"; // Icon for running (pause-circle isn't in OIcon registry)
         case 2:
-          return "check_circle"; // Icon for finished
+          return "check-circle"; // Icon for finished
         case 3:
           return "cancel"; // Icon for cancelled
         default:
           return "help"; // Icon for unknown
+      }
+    };
+    // OIcon doesn't accept a `color` prop; map status → Tailwind text-color class
+    // applied via :class on the OIcon instead.
+    const getStatusColorClass = (status) => {
+      switch (status) {
+        case 0:
+          return "tw:text-orange-500"; // Pending
+        case 1:
+          return "tw:text-blue-500"; // Running
+        case 2:
+          return "tw:text-green-500"; // Finished
+        case 3:
+          return "tw:text-red-500"; // Cancelled
+        default:
+          return "tw:text-gray-500"; // Unknown
       }
     };
     const getStatusColor = (status) => {
@@ -784,6 +800,7 @@ export default defineComponent({
       getStatusText,
       getStatusIcon,
       getStatusColor,
+      getStatusColorClass,
       showSearchResults,
       fetchSearchResults,
       cancelSearchJob,
