@@ -61,13 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex" :class="contentWrapperClass">
       <div class="flex" :style="contentStyle">
-        <q-splitter
+        <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter"
-          no-scroll
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
+          :horizontal="false"
         >
           <template #before>
             <div class="tw:w-full tw:h-full">
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </slot>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
 
         <!-- Slot for tw:w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
@@ -228,11 +228,13 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
 
 export default defineComponent({
   name: "BaseImport",
   components: {
     OSeparator,
+    OSplitter,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

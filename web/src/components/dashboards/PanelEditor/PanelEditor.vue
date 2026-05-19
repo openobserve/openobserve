@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Main splitter for field list -->
-        <q-splitter
+        <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
@@ -105,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'splitter-icon-collapse'
                   : 'splitter-icon-expand'
               "
+              class="tw:absolute!"
               @click.stop="collapseFieldList"
             >
               <template #icon-left>
@@ -332,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
 
       <!-- HTML Editor Section -->
@@ -435,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Custom chart splitter -->
-        <q-splitter
+        <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="[0, 20]"
           :style="{
@@ -504,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Editor/Preview splitter -->
                 <div style="height: 500px; flex-shrink: 0; overflow: hidden">
-                  <q-splitter
+                  <OSplitter
                     class="query-editor-splitter"
                     v-model="splitterModel"
                     style="height: 100%"
@@ -608,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </template>
-                  </q-splitter>
+                  </OSplitter>
                 </div>
 
                 <!-- Errors Component -->
@@ -649,7 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
     </div>
 
@@ -697,6 +698,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
@@ -1268,7 +1270,7 @@ defineExpose({
   background-color: orange;
 }
 
-:deep(.query-editor-splitter .q-splitter__separator) {
+:deep(.query-editor-splitter .o-splitter__separator) {
   background-color: transparent !important;
 }
 

@@ -15,9 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
+    :horizontal="false"
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
@@ -69,13 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -90,7 +92,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "DevOpsPage",
   components: { OTabs, ORouteTab, OInput,
-    OIcon,
+    OIcon, OSplitter,
 },
   props: {
     currOrgIdentifier: {

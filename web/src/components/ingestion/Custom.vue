@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
     class="tw:h-[calc(100vh-140px)]"
@@ -74,12 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </router-view>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -92,7 +93,7 @@ import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab, OSplitter },
   props: {
     currOrgIdentifier: {
       type: String,

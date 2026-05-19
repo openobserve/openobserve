@@ -946,7 +946,7 @@ export default defineComponent({
       owner: folderInfo ? board.dashboard.owner : board.owner,
       created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
-        "YYYY-MM-DDTHH:mm:ssZ",
+        "YYYY-MM-DDTHH:mm:ss",
       ),
       actions: "true",
     });

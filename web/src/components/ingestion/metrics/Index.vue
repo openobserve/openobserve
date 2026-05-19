@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
+    :horizontal="false"
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
@@ -90,13 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -112,7 +114,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 export default defineComponent({
   name: "IngestMetrics",
   components: {
-    OTabs, OTab, ORouteTab,},
+    OTabs, OTab, ORouteTab, OSplitter,},
   data() {
     return {};
   },

@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="secondLevel"
       class="full-height"
     >
-      <q-splitter
-        class="logs-horizontal-splitter full-height"
+      <OSplitter
+        class="full-height"
         v-model="splitterModel"
-        horizontal
+        :horizontal="true"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <q-splitter
+            <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               class="full-height tw:w-full logs-splitter-smooth"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <template #after>
-                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                <div class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -316,12 +316,12 @@ size="md" />
                   </div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
             class="visualize-container"
-            :style="{ '--splitter-height': `${splitterModel}vh` }"
+            :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
@@ -337,7 +337,7 @@ size="md" />
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
             class="build-container"
-            :style="{ '--splitter-height': `${splitterModel}vh` }"
+            :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <BuildQueryPage
               ref="buildQueryPageRef"
@@ -356,7 +356,7 @@ size="md" />
             />
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
     <div v-show="showSearchHistory">
       <search-history
@@ -491,6 +491,7 @@ import { createLogsContextProvider } from "@/composables/contextProviders/logsCo
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -521,6 +522,7 @@ export default defineComponent({
       () => import("@/plugins/logs/SearchHistory.vue"),
     ),
     OIcon,
+    OSplitter,
 },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -3480,10 +3482,6 @@ export default defineComponent({
     font-size: 12px !important;
   }
 
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
   .q-table__top {
     padding: 0px !important;
   }
@@ -3503,11 +3501,6 @@ export default defineComponent({
     height: 100% !important;
     overflow: visible !important;
     /* Changed from tw:hidden to visible for button */
-  }
-
-  .logs-horizontal-splitter .q-splitter__before {
-    z-index: auto;
-    overflow: visible;
   }
 
   // .search-result-container {

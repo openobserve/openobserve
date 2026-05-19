@@ -43,9 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="%"
+      :horizontal="false"
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
@@ -187,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 <script lang="ts" setup>
@@ -218,6 +219,7 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);

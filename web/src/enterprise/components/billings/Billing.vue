@@ -44,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     </div>
       </div>
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="px"
-      class="logs-splitter-smooth"
+      :horizontal="false"
     >
       <template v-slot:before>
         <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
@@ -137,12 +137,13 @@ import AppTabs from "@/components/common/AppTabs.vue";
 
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
     OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
-    OIcon,
+    OIcon, OSplitter,
 },
   setup() {
     const { t } = useI18n();

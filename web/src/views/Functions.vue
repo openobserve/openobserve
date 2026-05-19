@@ -17,11 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md">
     <div class=" tw:pb-[0.625rem]">
-      <q-splitter
+      <OSplitter
         v-model="splitterModel"
         unit="px"
         :limits="[0, 400]"
-        class="tw:overflow-hidden logs-splitter-smooth"
+        :horizontal="false"
+        class="tw:overflow-hidden"
       >
         <template v-slot:before>
           <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
@@ -148,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </RouterView>
             </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </div>
 </template>
@@ -160,6 +161,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -169,7 +171,7 @@ import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
-  components: { OTabs, OTab, ORouteTab, OButton, OIcon, OTooltip },
+  components: { OTabs, OTab, ORouteTab, OButton, OIcon, OTooltip, OSplitter },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();

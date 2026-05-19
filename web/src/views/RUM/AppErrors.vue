@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-splitter
+    <OSplitter
       class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
       v-model="splitterModel"
       unit="px"
-      vertical
+      :horizontal="true"
     >
       <template #before>
         <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
@@ -130,6 +130,7 @@ import {
   defineAsyncComponent,
 } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";

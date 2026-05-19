@@ -133,19 +133,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="column" style="width: 100%; height: 100%">
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
         <div class="tw:flex" style="height: 100%">
-          <q-splitter
+          <OSplitter            
             no-scroll
             style="width: 100%; height: 100%"
             v-model="splitterModel"
+            :disable="
+              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
+            "
             :limits="[
               30,
               promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
                 ? 100
                 : 70,
             ]"
-            :disable="
-              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
-            "
           >
             <template #before>
               <UnifiedQueryEditor
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </template>
-          </q-splitter>
+          </OSplitter>
         </div>
       </div>
       <div style="color: red; z-index: 100000" class="tw:mx-2 col-auto">
@@ -280,6 +280,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -294,6 +295,7 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
+    OSplitter,
   },
   emits: ["searchdata", "run-query"],
   methods: {

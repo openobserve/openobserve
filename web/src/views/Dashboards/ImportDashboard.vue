@@ -55,11 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="flex">
       <div class="flex">
-        <q-splitter
-          no-scroll
+        <OSplitter
           v-model="splitterModel"
-          :limits="[40, 80]"
           style="width: calc(100vw - 100px)"
+          horizontal
         >
           <template #before>
             <div class="tw:w-full tw:h-full">
@@ -265,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
     </div>
 
@@ -293,6 +292,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -855,7 +855,7 @@ export default defineComponent({
     };
   },
   components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
-    OIcon,
+    OIcon, OSplitter,
 },
 });
 </script>

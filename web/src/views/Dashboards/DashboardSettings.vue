@@ -27,11 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: inherit"
   >
 
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="px"
       style="height: calc(100vh - 65px)"
-      disable
+      disabled
+      horizontal
     >
       <template v-slot:before>
         <div class="functions-tabs" style="width: 100%">
@@ -80,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanels>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
   </ODrawer>
 </template>
@@ -91,6 +92,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -103,7 +105,7 @@ import { getImageURL } from "../../utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    ODrawer, OTabs, OTab, OTabPanels, OTabPanel,
+    ODrawer, OTabs, OTab, OTabPanels, OTabPanel, OSplitter,
     VariableSettings,
     GeneralSettings,
     TabsSettings,
@@ -182,17 +184,17 @@ export default defineComponent({
   }
 }
 
-:deep(.q-splitter__before) {
+:deep(.o-splitter__before) {
   border-right: 1px solid $border-color;
 }
 
 .dark-mode {
-  :deep(.q-splitter__before) {
+  :deep(.o-splitter__before) {
     border-right-color: rgba(255, 255, 255, 0.12);
   }
 }
 
-:deep(.q-splitter__separator) {
+:deep(.o-splitter__separator) {
   display: none !important;
 }
 </style>
