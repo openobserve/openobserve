@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import Smooth from '@/components/icons/dashboards/Smooth.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('Smooth.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('Smooth.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(Smooth, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(Smooth, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

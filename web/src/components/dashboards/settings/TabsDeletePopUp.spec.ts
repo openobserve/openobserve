@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -76,6 +76,8 @@ const ODialogStub = {
   `,
 };
 
+installQuasar();
+
 describe("TabsDeletePopUp", () => {
   let wrapper: VueWrapper<any>;
 
@@ -98,7 +100,7 @@ describe("TabsDeletePopUp", () => {
     return mount(TabsDeletePopUp, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           ODialog: ODialogStub,
         },

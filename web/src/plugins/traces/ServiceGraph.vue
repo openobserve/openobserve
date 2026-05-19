@@ -298,7 +298,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -320,7 +319,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
@@ -396,13 +394,13 @@ export default defineComponent({
           ? convertServiceGraphToTree(
               filteredGraphData.value,
               layoutType,
-              $q.dark.isActive,
+              store.state.theme === 'dark',
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType,
               new Map(),
-              $q.dark.isActive,
+              store.state.theme === 'dark',
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
@@ -574,7 +572,7 @@ export default defineComponent({
 
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
-      const isDarkInit = $q.dark.isActive;
+      const isDarkInit = store.state.theme === 'dark';
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -791,7 +789,7 @@ export default defineComponent({
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
-        tooltipEl.style.color = $q.dark.isActive
+        tooltipEl.style.color = store.state.theme === 'dark'
           ? "rgba(255,255,255,0.88)"
           : "rgba(0,0,0,0.82)";
       };

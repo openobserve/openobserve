@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FilterGroup from './FilterGroup.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -31,6 +31,8 @@ const mockI18n = createI18n({
     },
   },
 });
+
+installQuasar();
 
 describe('FilterGroup.vue Comprehensive Coverage', () => {
   const defaultProps = {
@@ -65,7 +67,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -82,7 +84,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -111,7 +113,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: emptyProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -130,7 +132,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -153,7 +155,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -177,7 +179,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -195,7 +197,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -217,7 +219,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -241,7 +243,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -268,7 +270,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -288,7 +290,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -311,7 +313,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -346,7 +348,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -366,7 +368,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -392,7 +394,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           group: { ...defaultProps.group, logicalOperator: 'AND' }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -414,7 +416,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           group: { ...defaultProps.group, logicalOperator: 'OR' }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -433,7 +435,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -453,7 +455,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -473,7 +475,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -512,7 +514,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: multiItemProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -550,7 +552,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: multiItemProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -586,7 +588,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: singleItemProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -606,7 +608,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -628,7 +630,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -651,7 +653,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -675,7 +677,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -695,7 +697,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -715,7 +717,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -735,7 +737,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -755,7 +757,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -775,7 +777,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -795,7 +797,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -820,7 +822,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -838,7 +840,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -856,7 +858,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -874,7 +876,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -901,7 +903,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 1 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: darkStore,
           },
@@ -927,7 +929,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 1 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: lightStore,
           },
@@ -953,7 +955,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const depth0Wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 0 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: darkStore,
           },
@@ -966,7 +968,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const depth2Wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 2 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: darkStore,
           },
@@ -993,7 +995,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const depth0Wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 0 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: lightStore,
           },
@@ -1006,7 +1008,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const depth2Wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 2 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: lightStore,
           },
@@ -1033,7 +1035,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 100 }, // Very high depth
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: darkStore,
           },
@@ -1058,7 +1060,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 100 }, // Very high depth
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: lightStore,
           },
@@ -1078,7 +1080,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 0 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1095,7 +1097,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 5 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1112,7 +1114,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: -2 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1131,7 +1133,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1151,7 +1153,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 1 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1170,7 +1172,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 2 },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1190,7 +1192,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1239,7 +1241,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: propsWithSubGroup,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1290,7 +1292,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: propsWithMultipleSubGroups,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1329,7 +1331,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: propsWithoutSubGroups,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1371,7 +1373,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: propsWithSubGroup,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1414,7 +1416,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1450,7 +1452,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1491,7 +1493,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1512,7 +1514,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1552,7 +1554,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           group: { ...defaultProps.group, logicalOperator: 'AND' }
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1609,7 +1611,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: mixedOrderProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1661,7 +1663,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: mixedOrderProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1700,7 +1702,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: onlyConditionsProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1747,7 +1749,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: onlyGroupsProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1783,7 +1785,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: emptyItemsProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1808,7 +1810,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           conditionInputWidth: 'tw:w-[100px]'
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1825,7 +1827,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1849,7 +1851,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: emptyFieldsProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1872,7 +1874,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: maxDepthProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -1922,7 +1924,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: complexGroupProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },

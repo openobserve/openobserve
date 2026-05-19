@@ -249,7 +249,9 @@ export const isInvalidDate = (date: any) => {
 function normalizeFormat(format: string): string {
   return format
     .replace(/YYYY/g, "yyyy")
-    .replace(/DD/g, "dd");
+    .replace(/DD/g, "dd")
+    .replace(/(?<!')T(?!')/g, "'T'")
+    .replace(/(?<!')Z(?!')/g, "X");
 }
 
 /**

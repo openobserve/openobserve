@@ -215,7 +215,6 @@ export default defineComponent({
     OTable,
   },
   setup() {
-    const $q = useQuasar();
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();

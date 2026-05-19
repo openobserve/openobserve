@@ -16,7 +16,7 @@
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import Databricks from './Databricks.vue';
 import useIngestion from '@/composables/useIngestion';
@@ -87,6 +87,8 @@ const mockIngestionData = {
   }
 };
 
+installQuasar({});
+
 describe('Databricks.vue', () => {
   let wrapper: any;
   let store: any;
@@ -102,7 +104,7 @@ describe('Databricks.vue', () => {
   const getGlobalConfig = (props = {}) => ({
     props,
     global: {
-      plugins: [store, i18n, [Quasar, {}]],
+      plugins: [store, i18n, ],
       stubs: {
         CopyContent: {
           template: '<div class="copy-content-stub copy-content-container-cls"><slot /></div>',

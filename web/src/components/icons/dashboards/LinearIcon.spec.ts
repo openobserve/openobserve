@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import LinearIcon from '@/components/icons/dashboards/LinearIcon.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('LinearIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('LinearIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(LinearIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(LinearIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import NoData from '@/components/shared/grid/NoData.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('vue-i18n', () => ({
@@ -13,6 +13,8 @@ vi.mock('vue-i18n', () => ({
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn((path: string) => `mocked-url-for-${path}`)
 }));
+
+installQuasar();
 
 describe('NoData.vue', () => {
   let wrapper: VueWrapper;
@@ -27,7 +29,7 @@ describe('NoData.vue', () => {
   const createWrapper = () => {
     return mount(NoData, {
       global: {
-        plugins: [Quasar],
+        plugins: [],
       }
     });
   };

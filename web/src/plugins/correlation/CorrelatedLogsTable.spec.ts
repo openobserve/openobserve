@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -89,6 +89,8 @@ const i18n = createI18n({
   },
 });
 
+installQuasar({ plugins: {} });
+
 describe("CorrelatedLogsTable.vue", () => {
   let wrapper: any;
 
@@ -112,13 +114,6 @@ describe("CorrelatedLogsTable.vue", () => {
       },
       global: {
         plugins: [
-          [
-            Quasar,
-            {
-              plugins: {
-                },
-            },
-          ],
           i18n,
           store,
         ],

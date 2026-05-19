@@ -1089,7 +1089,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
@@ -1184,7 +1183,6 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;

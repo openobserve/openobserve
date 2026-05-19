@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddTab from "./AddTab.vue";
 
 // Mock vue-router
@@ -152,6 +152,8 @@ const ODrawerStub = {
   inheritAttrs: false,
 };
 
+installQuasar();
+
 describe("AddTab", () => {
   let wrapper: VueWrapper<any>;
   let mockAddTab: any;
@@ -166,7 +168,7 @@ describe("AddTab", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           ODrawer: ODrawerStub,
           "q-form": {

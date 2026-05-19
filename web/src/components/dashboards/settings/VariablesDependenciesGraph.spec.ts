@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 
@@ -29,6 +29,8 @@ const MockChartRenderer = {
 vi.mock("../panels/ChartRenderer.vue", () => ({
   default: MockChartRenderer
 }));
+
+installQuasar();
 
 describe("VariablesDependenciesGraph", () => {
   let wrapper: VueWrapper<any>;
@@ -64,7 +66,7 @@ describe("VariablesDependenciesGraph", () => {
   beforeEach(() => {
     wrapper = mount(VariablesDependenciesGraph, {
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           ChartRenderer: MockChartRenderer
         }
@@ -96,7 +98,7 @@ describe("VariablesDependenciesGraph", () => {
     it("should have default empty array for variablesList", async () => {
       const wrapperWithoutProps = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -183,7 +185,7 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle empty variables list", async () => {
       const emptyWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -203,7 +205,7 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle single variable", async () => {
       const singleVarWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -275,7 +277,7 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle ChartRenderer with fallback options", () => {
       const nullOptionsWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -317,7 +319,7 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle variables with no dependencies", async () => {
       const noDepsWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -349,7 +351,7 @@ describe("VariablesDependenciesGraph", () => {
       // Test that the component handles async loading of ChartRenderer
       const asyncWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }
@@ -375,7 +377,7 @@ describe("VariablesDependenciesGraph", () => {
 
       const errorWrapper = mount(VariablesDependenciesGraph, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             ChartRenderer: MockChartRenderer
           }

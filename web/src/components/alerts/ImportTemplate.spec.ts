@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { shallowMount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import ImportTemplate from './ImportTemplate.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -84,6 +84,8 @@ const mockRouter = createRouter({
   routes: [],
 });
 
+installQuasar();
+
 describe('ImportTemplate Component - Comprehensive Function Tests', () => {
   let wrapper: any;
   let mockNotify: any;
@@ -118,7 +120,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
     wrapper = shallowMount(ImportTemplate, {
       props: JSON.parse(JSON.stringify(defaultProps)),
       global: {
-        plugins: [Quasar, mockI18n],
+        plugins: [mockI18n],
         provide: {
           store: mockStore,
         },
@@ -168,7 +170,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
     it('should initialize with empty arrays when no props provided', () => {
       const emptyWrapper = shallowMount(ImportTemplate, {
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -209,7 +211,7 @@ describe('ImportTemplate Component - Comprehensive Function Tests', () => {
       const emptyWrapper = shallowMount(ImportTemplate, {
         props: { destinations: [], templates: [], alerts: [] },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },

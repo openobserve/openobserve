@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createI18n } from 'vue-i18n';
 import Functions from './Functions.vue';
 
@@ -18,6 +18,8 @@ const MockRouterView = {
     return { MockComponent };
   },
 };
+
+installQuasar({});
 
 describe('Functions.vue', () => {
   let wrapper: any;
@@ -85,9 +87,7 @@ describe('Functions.vue', () => {
         plugins: [
           store,
           router,
-          i18n,
-          [Quasar, {}],
-        ],
+          i18n, ],
         stubs: {
                     'q-btn': {
             template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',

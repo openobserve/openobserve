@@ -19,7 +19,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LoginPage from "./Login.vue";
 
 // Mock dependencies first with factory functions to avoid hoisting issues
@@ -105,6 +105,8 @@ Object.defineProperty(window, "location", {
   },
   writable: true,
 });
+
+installQuasar();
 
 describe("Login.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -238,7 +240,7 @@ describe("Login.vue", () => {
     it("should mount LoginPage component", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -252,7 +254,7 @@ describe("Login.vue", () => {
     it("should have correct component name", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -265,7 +267,7 @@ describe("Login.vue", () => {
     it("should register Login component", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -279,7 +281,7 @@ describe("Login.vue", () => {
       expect(() => {
         wrapper = mount(LoginPage, {
           global: {
-            plugins: [store, router, i18n, Quasar],
+            plugins: [store, router, i18n],
             mocks: {
               $q: mockQuasar,
             },
@@ -294,7 +296,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -338,7 +340,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -358,7 +360,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -379,7 +381,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -399,7 +401,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -445,7 +447,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -523,7 +525,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -726,7 +728,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -753,7 +755,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -780,7 +782,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -809,7 +811,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -844,7 +846,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -871,7 +873,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -896,7 +898,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -920,7 +922,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -941,7 +943,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -1033,7 +1035,7 @@ describe("Login.vue", () => {
     it("should render login component when user email is empty", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -1049,7 +1051,7 @@ describe("Login.vue", () => {
     it("should render login component based on user email state", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -1076,7 +1078,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
           },
@@ -1091,7 +1093,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -1112,7 +1114,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -1190,7 +1192,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -1227,7 +1229,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {
@@ -1256,7 +1258,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: {
             $q: mockQuasar,
             $route: {

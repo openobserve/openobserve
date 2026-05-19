@@ -3,7 +3,9 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import PendingSubscriptionWarning from '@/components/PendingSubscriptionWarning.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('PendingSubscriptionWarning.vue', () => {
   let wrapper: VueWrapper;
@@ -56,7 +58,7 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     return mount(PendingSubscriptionWarning, {
       global: {
-        plugins: [currentStore, router, Quasar],
+        plugins: [currentStore, router],
         stubs: {
           'OIcon': true,
           'q-btn': true,

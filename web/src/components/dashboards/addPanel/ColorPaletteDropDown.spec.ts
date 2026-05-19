@@ -14,7 +14,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import { reactive, nextTick } from "vue";
 
@@ -93,6 +93,8 @@ vi.mock("vue-i18n", () => ({
   }),
 }));
 
+installQuasar();
+
 describe("ColorPaletteDropDown", () => {
   let wrapper: VueWrapper;
 
@@ -100,7 +102,7 @@ describe("ColorPaletteDropDown", () => {
     return mount(ColorPaletteDropDown, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
         },
@@ -223,7 +225,7 @@ describe("ColorPaletteDropDown", () => {
     it("should use injected dashboardPanelDataPageKey", () => {
       const customWrapper = mount(ColorPaletteDropDown, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           provide: {
             dashboardPanelDataPageKey: "customKey",
           },

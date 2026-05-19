@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariableAdHocValueSelector from "./VariableAdHocValueSelector.vue";
 
@@ -48,6 +48,8 @@ vi.mock("../../icons/DynamicFilterIcon.vue", () => ({
   }
 }));
 
+installQuasar();
+
 describe("VariableAdHocValueSelector", () => {
   let wrapper: VueWrapper<any>;
 
@@ -72,7 +74,7 @@ describe("VariableAdHocValueSelector", () => {
   beforeEach(() => {
     wrapper = mount(VariableAdHocValueSelector, {
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
       props: defaultProps
     });

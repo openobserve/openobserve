@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MoveDashboardToAnotherFolder from "./MoveDashboardToAnotherFolder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -140,6 +140,8 @@ const getMockUtils = async () => {
   };
 };
 
+installQuasar();
+
 describe("MoveDashboardToAnotherFolder", () => {
   let wrapper: any;
   const defaultProps = {
@@ -155,7 +157,7 @@ describe("MoveDashboardToAnotherFolder", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar, i18n],
+        plugins: [i18n],
         stubs: {
           ODrawer: ODrawerStub,
           SelectFolderDropdown: {
@@ -220,7 +222,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     it("should initialize with correct default props when not provided", () => {
       wrapper = mount(MoveDashboardToAnotherFolder, {
         global: {
-          plugins: [Quasar, i18n],
+          plugins: [i18n],
           stubs: {
             ODrawer: ODrawerStub,
             SelectFolderDropdown: true,

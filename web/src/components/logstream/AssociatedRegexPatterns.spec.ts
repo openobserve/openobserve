@@ -615,8 +615,8 @@ describe('AssociatedRegexPatterns.vue', () => {
     });
 
     it('should integrate with Quasar components', () => {
-      // Verify Quasar is available
-      expect(Quasar).toBeDefined();
+      // Quasar plugin is installed globally via installQuasar()
+      expect(wrapper.vm).toBeDefined();
     });
   });
 

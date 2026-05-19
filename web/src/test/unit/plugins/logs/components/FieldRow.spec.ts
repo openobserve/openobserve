@@ -16,7 +16,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldRow from "@/components/common/FieldRow.vue";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -27,6 +27,8 @@ vi.mock("vuex", () => ({
     },
   }),
 }));
+
+installQuasar();
 
 describe("FieldRow.vue", () => {
   const defaultProps = {
@@ -47,7 +49,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -58,7 +60,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -75,7 +77,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -92,7 +94,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -110,7 +112,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
         slots: {
           expansion: '<div class="expansion-content">Expansion</div>',
@@ -127,7 +129,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -145,7 +147,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -157,7 +159,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -177,7 +179,7 @@ describe("FieldRow.vue", () => {
           selectedFields: [],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -195,7 +197,7 @@ describe("FieldRow.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -210,7 +212,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -228,7 +230,7 @@ describe("FieldRow.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -247,7 +249,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: false,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -262,7 +264,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -281,7 +283,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -300,7 +302,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -315,7 +317,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -337,7 +339,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -355,7 +357,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -371,7 +373,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -385,7 +387,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -402,7 +404,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -422,7 +424,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
         slots: {
           expansion: '<div class="expansion-slot">{{ field.name }}</div>',

@@ -18,7 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MessageQueues from "./MessageQueues.vue";
 import store from "../../test/unit/helpers/store";
 
@@ -88,6 +88,8 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+installQuasar();
+
 describe("MessageQueues.vue", () => {
   let wrapper: any;
   let router: any;
@@ -101,7 +103,7 @@ describe("MessageQueues.vue", () => {
         ...props,
       },
       global: {
-        plugins: [i18n, store, Quasar, router],
+        plugins: [i18n, store, router],
         mocks: {
           $q: mockQuasar,
           $t: (key: string) => key,
