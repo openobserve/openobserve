@@ -19,30 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="custom-chart-type-selector-popup"
     style="
       padding: 0;
-      width: 95vw;
+      width: 100%;
       height: calc(100vh - 57px);
-      max-width: 1800px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     "
   >
     <!-- Header -->
     <OCardSection role="header">
-      <div class="flex justify-between items-center q-pa-none">
-        <div class="flex items-center q-table__title">
-          <OIcon name="bar-chart" size="sm" class="q-mr-sm" />
-          <span class="text-h6">Example of custom charts</span>
-        </div>
-        <div class="tw:flex-1" />
+      <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
+        <OIcon name="bar-chart" size="sm" />
+        <span class="text-h6 tw:whitespace-nowrap">Example of custom charts</span>
         <OInput
           v-model="searchQuery"
           placeholder="Search charts..."
           clearable
+          style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
           @clear="searchQuery = ''"
         >
           <template #icon-left>
             <OIcon name="search" size="sm" />
           </template>
         </OInput>
+        <div class="tw:flex-1" />
         <OButton
           variant="ghost"
           size="icon"
@@ -50,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
           icon-left="close"
-        >
-        </OButton>
+        />
       </div>
     </OCardSection>
 
