@@ -79,18 +79,16 @@ jobs:
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
 
-          EXISTING_BODY=""
           if [ -n "$EXISTING_COMMENT_ID" ]; then
-            EXISTING_BODY=$(gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
+            gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
+              --jq '.body' > /tmp/existing_body.txt
+          else
+            printf '' > /tmp/existing_body.txt
           fi
 
-          PR_DIFF=$(cat /tmp/pr_diff.txt)
-          PR_COMMITS=$(cat /tmp/pr_commits.json)
-          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 6000)
+          head -n 6000 /tmp/pr_diff.txt > /tmp/pr_diff_truncated.txt
 
-          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
-
-          INSTRUCTIONS=$(cat <<'ENDINSTRUCTIONS'
+          cat > /tmp/instructions.txt <<'ENDINSTRUCTIONS'
           ## Code Review Request
 
           **Repository:** ${{ github.repository }}
@@ -139,16 +137,17 @@ jobs:
           - DO NOT number items outside the table column
           - DO NOT use "1.", "2." at the start of each issue — use the table's `#` column instead
           ENDINSTRUCTIONS
-          )
 
-          JSON_BODY=$(jq -n \
+          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
+
+          RESPONSE=$(jq -n \
             --arg model "deepseek-chat" \
             --arg sys "$SYSTEM_PROMPT" \
-            --arg instructions "$INSTRUCTIONS" \
             --arg pr_number "$PR_NUMBER" \
-            --arg pr_commits "$PR_COMMITS" \
-            --arg diff_truncated "$DIFF_TRUNCATED" \
-            --arg existing_body "$EXISTING_BODY" \
+            --rawfile instructions /tmp/instructions.txt \
+            --rawfile pr_commits /tmp/pr_commits.json \
+            --rawfile diff_truncated /tmp/pr_diff_truncated.txt \
+            --rawfile existing_body /tmp/existing_body.txt \
             '{
               model: $model,
               messages: [
@@ -162,18 +161,16 @@ jobs:
               ],
               temperature: 0.0,
               max_tokens: 8192
-            }')
+            }' | curl -s https://api.deepseek.com/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+              -d @-)
 
-          RESPONSE=$(curl -s https://api.deepseek.com/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-            -d "$JSON_BODY")
-
-          REVIEW_BODY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+          REVIEW_BODY=$(printf '%s' "$RESPONSE" | jq -r '.choices[0].message.content // empty')
 
           if [ -z "$REVIEW_BODY" ]; then
             echo "DeepSeek API returned empty response"
-            echo "Error: $(echo "$RESPONSE" | jq -r '.error.message // "unknown error"')"
+            echo "Error: $(printf '%s' "$RESPONSE" | jq -r '.error.message // "unknown error"')"
             exit 1
           fi
 
