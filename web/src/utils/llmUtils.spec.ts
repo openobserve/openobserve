@@ -500,24 +500,24 @@ describe("getQualityScoreColor", () => {
 // getObservationTypeColor
 // ---------------------------------------------------------------------------
 describe("getObservationTypeColor", () => {
-  it("returns 'green' for GENERATION", () => {
-    expect(getObservationTypeColor("GENERATION")).toBe("green");
+  it("returns 'green' for chat", () => {
+    expect(getObservationTypeColor("chat")).toBe("green");
   });
 
-  it("returns 'blue' for EMBEDDING", () => {
-    expect(getObservationTypeColor("EMBEDDING")).toBe("blue");
+  it("returns 'blue' for embeddings", () => {
+    expect(getObservationTypeColor("embeddings")).toBe("blue");
   });
 
-  it("returns 'purple' for AGENT", () => {
-    expect(getObservationTypeColor("AGENT")).toBe("purple");
+  it("returns 'purple' for invoke_agent", () => {
+    expect(getObservationTypeColor("invoke_agent")).toBe("purple");
   });
 
-  it("returns 'orange' for TOOL", () => {
-    expect(getObservationTypeColor("TOOL")).toBe("orange");
+  it("returns 'orange' for execute_tool", () => {
+    expect(getObservationTypeColor("execute_tool")).toBe("orange");
   });
 
-  it("returns 'red' for GUARDRAIL", () => {
-    expect(getObservationTypeColor("GUARDRAIL")).toBe("red");
+  it("returns 'red' for guardrail", () => {
+    expect(getObservationTypeColor("guardrail")).toBe("red");
   });
 
   it("returns 'grey' for unknown types", () => {
@@ -572,10 +572,10 @@ describe("extractLLMData", () => {
     expect(result.modelName).toBe("unknown");
   });
 
-  it("defaults observationType to 'SPAN'", () => {
+  it("defaults observationType to 'span'", () => {
     const span = { gen_ai_input_messages: "hello" };
     const result = extractLLMData(span)!;
-    expect(result.observationType).toBe("SPAN");
+    expect(result.observationType).toBe("span");
   });
 
   it("captures userId and sessionId", () => {

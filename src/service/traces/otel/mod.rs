@@ -102,7 +102,9 @@ pub mod extractors;
 pub mod pricing;
 pub mod processor;
 
-pub use extractors::{ObservationType, ScopeInfo, is_llm_trace, map_to_observation_type};
+pub use extractors::{
+    ScopeInfo, is_generation_or_embedding, is_llm_trace, map_to_gen_ai_operation_name,
+};
 pub use pricing::calculate_cost;
 pub use processor::OtelIngestionProcessor;
 
@@ -174,12 +176,12 @@ mod tests {
         );
 
         // Verify enrichment
-        // 1. Observation type should be GENERATION
+        // 1. Observation type should be chat
         assert_eq!(
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
 
         // 2. Model name should be extracted
@@ -228,12 +230,9 @@ mod tests {
             Some("conv-123")
         );
 
-        // 8. Model parameters should be extracted
-        assert!(span_attributes.contains_key(O2Attributes::MODEL_PARAMETERS));
-        let params = span_attributes.get(O2Attributes::MODEL_PARAMETERS).unwrap();
-        assert!(params.is_object());
-        assert!(params.get("temperature").is_some());
-        assert!(params.get("max_tokens").is_some());
+        // 8. Model parameters should be present as individual gen_ai.request.* scalars
+        assert!(span_attributes.contains_key("gen_ai.request.temperature"));
+        assert!(span_attributes.contains_key("gen_ai.request.max_tokens"));
 
         // 9. LLM input/output should be present
         assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
@@ -277,7 +276,7 @@ mod tests {
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attributes
@@ -333,7 +332,7 @@ mod tests {
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("TOOL")
+            Some("execute_tool")
         );
         assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
         assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
@@ -364,7 +363,7 @@ mod tests {
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("EMBEDDING")
+            Some("embeddings")
         );
         assert_eq!(
             span_attributes
@@ -496,7 +495,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attrs
@@ -504,7 +503,8 @@ mod tests {
                 .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
-        assert!(span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS));
+        assert!(span_attrs.contains_key("gen_ai.request.temperature"));
+        assert!(span_attrs.contains_key("gen_ai.request.max_tokens"));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_OUTPUT_TOKENS));
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_COST));
@@ -549,7 +549,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("TOOL")
+            Some("execute_tool")
         );
         assert!(span_attrs.contains_key(GenAiAttributes::INPUT_MESSAGES));
         assert!(span_attrs.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
@@ -578,7 +578,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("EMBEDDING")
+            Some("embeddings")
         );
     }
 
@@ -612,7 +612,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attrs
@@ -651,7 +651,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
     }
@@ -739,8 +739,8 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION"),
-            "Should detect GENERATION from gen_ai.operation.name=chat"
+            Some("chat"),
+            "Should detect chat from gen_ai.operation.name=chat"
         );
 
         // 2. Model name (response model takes precedence)
@@ -808,23 +808,14 @@ mod tests {
             "Total cost should be > 0"
         );
 
-        // 6. Model parameters (stored as HashMap<String, String> → JSON object with string values)
+        // 6. Model parameters as individual gen_ai.request.* scalars
         assert!(
-            span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS),
-            "Should have model parameters"
+            span_attrs.contains_key("gen_ai.request.temperature"),
+            "Should have gen_ai.request.temperature"
         );
-        let params = span_attrs.get(O2Attributes::MODEL_PARAMETERS).unwrap();
         assert!(
-            params.is_object(),
-            "Model parameters should be a JSON object"
-        );
-        assert_eq!(
-            params.get("temperature").and_then(|v| v.as_str()),
-            Some("0.7")
-        );
-        assert_eq!(
-            params.get("max_tokens").and_then(|v| v.as_str()),
-            Some("4096")
+            span_attrs.contains_key("gen_ai.request.max_tokens"),
+            "Should have gen_ai.request.max_tokens"
         );
 
         // 7. User/session metadata

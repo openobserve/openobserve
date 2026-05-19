@@ -154,7 +154,6 @@ export default defineComponent({
       "bar",
       "h-bar",
       "line",
-      "stacked",
       "scatter",
       "table",
     ];

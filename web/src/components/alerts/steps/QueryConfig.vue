@@ -945,6 +945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     no-error-icon
                     class="alert-v3-select"
+                    data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
                     :rules="[(val: any) => !!val || 'Field is required!']"
                     @update:model-value="emitPromqlConditionUpdate"
@@ -955,6 +956,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     no-error-icon
                     class="alert-v3-input"
+                    data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
                     debounce="300"
                     :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"

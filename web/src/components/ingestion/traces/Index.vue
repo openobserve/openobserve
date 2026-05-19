@@ -91,9 +91,7 @@ export default defineComponent({
   components: {
     OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      ingestiontabs: "openTelemetry",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -108,6 +106,11 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const routeToTracesTab: Record<string, string> = {
+      tracesOTLP: "openTelemetry",
+      ingestTracesFromOtel: "ingestTracesFromOtel",
+    };
+    const ingestiontabs = ref(routeToTracesTab[router.currentRoute.value.name as string] ?? "openTelemetry");
 
     onMounted(() => {
       const ingestRoutes = ["tracesOTLP"];
@@ -184,6 +187,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };

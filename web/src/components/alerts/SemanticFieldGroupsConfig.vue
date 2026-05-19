@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           @click="addGroup"
         >{{ t('correlation.addCustomGroup') }}</OButton>
+        <slot name="header-actions" />
       </div>
     </div>
 

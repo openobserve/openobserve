@@ -449,25 +449,26 @@ export function getQualityScoreColor(score: number | null): string {
  */
 export function getObservationTypeColor(type: string | null | undefined): string {
   if (!type) return "grey";
-  const upperType = type.toUpperCase();
 
   const colorMap: Record<string, string> = {
-    GENERATION: "green",
-    CHAT: "green",
-    EMBEDDING: "blue",
-    AGENT: "purple",
-    TOOL: "orange",
-    CHAIN: "indigo",
-    RETRIEVER: "cyan",
-    TASK: "teal",
-    EVALUATOR: "pink",
-    WORKFLOW: "deep-purple",
-    RERANK: "light-blue",
-    GUARDRAIL: "red",
-    SPAN: "grey",
-    EVENT: "amber",
+    chat: "green",
+    text_completion: "green",
+    generate_content: "green",
+    embeddings: "blue",
+    invoke_agent: "purple",
+    create_agent: "purple",
+    execute_tool: "orange",
+    chain: "indigo",
+    retrieval: "cyan",
+    task: "teal",
+    evaluator: "pink",
+    invoke_workflow: "deep-purple",
+    rerank: "light-blue",
+    guardrail: "red",
+    span: "grey",
+    event: "amber",
   };
-  return colorMap[upperType] || "grey";
+  return colorMap[type] || "grey";
 }
 
 /**
@@ -489,7 +490,7 @@ export function extractLLMData(span: any): LLMData | null {
       span.gen_ai_system ||
       span.gen_ai_provider_name ||
       "unknown",
-    observationType: span.gen_ai_operation_name || "SPAN",
+    observationType: span.gen_ai_operation_name || "span",
     modelName:
       span.gen_ai_response_model ||
       span.gen_ai_request_model ||

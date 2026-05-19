@@ -281,6 +281,8 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
+        this.wildcardChip = '.wildcard-chip';
         // Pattern details dialog
         this.closePatternDialog = '[data-test="close-pattern-dialog"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -2037,7 +2039,7 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
     }
 
     async clearQueryEditor() {
@@ -3854,8 +3856,8 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
     }
 
-    async expectFieldInTableHeader(fieldName) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    async expectFieldInTableHeader(fieldName, timeout = 10000) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
@@ -6250,7 +6252,8 @@ export class LogsPage {
      */
     async setQueryEditorContent(query) {
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        // Use .first() to avoid strict mode violations when multiple monaco instances exist
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea').first();
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
@@ -6506,14 +6509,73 @@ export class LogsPage {
     }
 
     /**
+     * Get the count of wildcard chips in a specific pattern card template
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<number>} Number of wildcard chip elements
+     */
+    async getPatternCardWildcardChipCount(index = 0) {
+        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get the total count of all wildcard chips across all visible pattern cards
+     * @returns {Promise<number>} Total number of .wildcard-chip elements on page
+     */
+    async getWildcardChipCount() {
+        const count = await this.page.locator(this.wildcardChip).count();
+        testLogger.info(`Total wildcard chips on page: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get the text content of a wildcard chip at the given index
+     * @param {number} index - The chip index (0-based, page-global)
+     * @returns {Promise<string>} The chip's text label
+     */
+    async getWildcardChipText(index = 0) {
+        const text = await this.page.locator(this.wildcardChip).nth(index).textContent().catch(() => '');
+        return text.trim();
+    }
+
+    /**
+     * Hover over a wildcard chip at the given index to trigger its tooltip
+     * @param {number} index - The chip index (0-based, page-global)
+     */
+    async hoverWildcardChip(index = 0) {
+        await this.page.locator(this.wildcardChip).nth(index).hover();
+        testLogger.info(`Hovered over wildcard chip ${index}`);
+    }
+
+    /**
+     * Check if a specific wildcard chip is visible
+     * @param {number} index - The chip index (0-based, page-global)
+     * @returns {Promise<boolean>} True if the chip is visible
+     */
+    async isWildcardChipVisible(index = 0) {
+        return this.page.locator(this.wildcardChip).nth(index).isVisible().catch(() => false);
+    }
+
+    /**
      * Check if a pattern card has an anomaly badge
      * @param {number} index - The pattern card index (0-based)
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible().catch(() => false);
+        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
+    }
+
+    /**
+     * Get the text content of a pattern card's anomaly badge
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} Badge text, or empty string if not visible
+     */
+    async getPatternAnomalyBadgeText(index = 0) {
+        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        return text.trim();
     }
 
     /**
@@ -6767,9 +6829,11 @@ export class LogsPage {
     /**
      * Expect Builder mode (Auto mode) to be active
      */
-    async expectBuilderModeActive() {
+    async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
-        await expect(builderTypeBtn).toBeVisible();
+        await expect(builderTypeBtn).toBeVisible({ timeout });
+        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
+        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -6787,7 +6851,13 @@ export class LogsPage {
      */
     async clickBuilderQueryType() {
         await this.page.locator(this.builderQueryType).click();
-        await this.page.waitForTimeout(500);
+        // Confirmation dialog only appears when switching Custom → Builder
+        // AND there's an existing query that would be wiped
+        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        if (await confirmBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+            await confirmBtn.click();
+            testLogger.info('Confirmed Builder mode switch (dialog dismissed)');
+        }
         testLogger.info('Clicked Builder query type');
     }
 
@@ -6803,24 +6873,24 @@ export class LogsPage {
     /**
      * Expect X-axis layout section to be visible
      */
-    async expectXAxisLayoutVisible() {
-        await expect(this.page.locator(this.xAxisLayout)).toBeVisible();
+    async expectXAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.xAxisLayout)).toBeVisible({ timeout });
         testLogger.info('X-axis layout is visible');
     }
 
     /**
      * Expect Y-axis layout section to be visible
      */
-    async expectYAxisLayoutVisible() {
-        await expect(this.page.locator(this.yAxisLayout)).toBeVisible();
+    async expectYAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.yAxisLayout)).toBeVisible({ timeout });
         testLogger.info('Y-axis layout is visible');
     }
 
     /**
      * Expect Breakdown layout section to be visible
      */
-    async expectBreakdownLayoutVisible() {
-        await expect(this.page.locator(this.breakdownLayout)).toBeVisible();
+    async expectBreakdownLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.breakdownLayout)).toBeVisible({ timeout });
         testLogger.info('Breakdown layout is visible');
     }
 
@@ -6915,8 +6985,7 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses page.waitForFunction to poll the DOM directly, which is more reliable than
-     * locator-based polling during Vue reactive re-renders.
+     * Uses waitForFunction for reliable DOM detection that survives reactive re-renders.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
@@ -7020,9 +7089,32 @@ export class LogsPage {
      * @param {string} fieldName - The field name to search
      */
     async searchFieldInBuilder(fieldName) {
-        await this.page.locator(this.fieldListSearchInput).fill(fieldName);
+        const input = this.page.locator(this.fieldListSearchInput).first();
+        // Quasar's q-field__native input resolves in the DOM but is considered hidden
+        // by Playwright's visibility algorithm — use force to interact directly.
+        await input.waitFor({ state: 'attached', timeout: 10000 });
+        await input.fill(fieldName, { force: true });
         await this.page.waitForTimeout(500);
         testLogger.info(`Searched for field: ${fieldName}`);
+    }
+
+    async getAddXButtonCount() {
+        return await this.page.locator(this.addToXAxis).count();
+    }
+
+    async expectFilterLayoutVisible(timeout = 10000) {
+        await expect(this.page.locator('[data-test="dashboard-filter-layout"]').last()).toBeVisible({ timeout });
+        testLogger.info('Filter layout visible');
+    }
+
+    async expectChartOrNoDataAttached(timeout = 30000) {
+        await expect(this.page.locator(`${this.chartRenderer}, ${this.noDataMessage}`).first()).toBeAttached({ timeout });
+        testLogger.info('Chart or no-data element attached');
+    }
+
+    async expectMonacoEditorAreaVisible(timeout = 10000) {
+        await expect(this.page.locator(`${this.logsSearchBarQueryEditor} .monaco-editor`).first()).toBeVisible({ timeout });
+        testLogger.info('Monaco editor area visible');
     }
 
     /**
@@ -7156,6 +7248,87 @@ export class LogsPage {
             testLogger.info(`Chart type detected via fallback: ${fallback}`);
         }
         return fallback;
+    }
+
+    // ============================================================================
+    // BUILD TAB IMPROVEMENT METHODS - PR #11586
+    // New behavior: SQL mode preserved, default histogram/count for empty/SELECT*
+    // ============================================================================
+
+    /**
+     * Verify SQL mode state is preserved (not forced ON) when switching to Build tab.
+     * NEW behavior in PR #11586 — replaces verifySqlModeAutoEnablesOnBuild().
+     * @param {boolean} expectedState - Expected SQL mode state after Build toggle
+     * @returns {Promise<boolean>} True if SQL mode matches expected state
+     */
+    async verifySqlModePreservedOnBuild(expectedState) {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        const actualState = isChecked === 'true';
+        if (actualState === expectedState) {
+            testLogger.info(`SQL mode preserved on Build tab: expected=${expectedState}, actual=${actualState}`);
+            return true;
+        } else {
+            testLogger.warn(`SQL mode NOT preserved: expected=${expectedState}, actual=${actualState}`);
+            return false;
+        }
+    }
+
+    /**
+     * Expect the builder has X-axis items populated (any items on X axis).
+     * Checks that at least one item exists inside the X-axis layout.
+     */
+    async expectXAxisHasItems() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        await expect(xItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await xItems.count();
+        testLogger.info(`X-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the builder has Y-axis items populated (any items on Y axis).
+     * Checks that at least one item exists inside the Y-axis layout.
+     */
+    async expectYAxisHasItems() {
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(yItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await yItems.count();
+        testLogger.info(`Y-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect X-axis and Y-axis are empty (no items)
+     */
+    async expectAxesEmpty() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(xItems).toHaveCount(0, { timeout: 5000 });
+        await expect(yItems).toHaveCount(0, { timeout: 5000 });
+        testLogger.info('X and Y axes are empty');
+    }
+
+    /**
+     * Check if the filter section has any conditions populated.
+     * Looks for filter condition items inside the filter layout.
+     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * @returns {Promise<number>} Number of filter conditions found
+     */
+    async getFilterConditionCount() {
+        // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
+        const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
+        const count = await filterItems.count();
+        testLogger.info(`Filter has ${count} condition(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the logs table to be visible (when on Logs tab)
+     */
+    async expectLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Logs table is visible');
     }
 
     // ============================================================================

@@ -341,6 +341,9 @@ describe("useLLMInsights — fetchAll error path", () => {
 
 describe("useLLMInsights — sparklines accumulation", () => {
   // Single-row response → 1-element series across all 5 metrics.
+  // Window 100→200µs falls into the "10 seconds" bucket; the pre-built
+  // grid produces a single key "1970-01-01T00:00:00", so the row's ts
+  // must match it for the data to land in the series.
   it("populates 5 series from a single bucket row", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
@@ -356,7 +359,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         results: {
           hits: [
             {
-              ts: "2026-05-08T12:00:00Z",
+              ts: "1970-01-01T00:00:00",
               request_count: 10,
               trace_count: 5,
               error_count: 1,
@@ -375,14 +378,17 @@ describe("useLLMInsights — sparklines accumulation", () => {
     expect(sparklines.value.tokens).toEqual([1234]);
     expect(sparklines.value.traces).toEqual([5]);
     expect(sparklines.value.p95Micros).toEqual([800]);
-    // error rate = 1/10 = 10%
-    expect(sparklines.value.errorRate).toEqual([10]);
+    // error rate = error_count / trace_count = 1/5 = 20%
+    expect(sparklines.value.errorRate).toEqual([20]);
   });
 
-  // Multiple rows → series in row order, same length across all metrics.
+  // Multiple rows → series in grid order, same length across all metrics.
+  // Window 1µs→20s (in µs) at "10 seconds" interval = grid of 2 keys:
+  //   "1970-01-01T00:00:00" and "1970-01-01T00:00:10".
+  // Start must be non-zero — `fetchAll` bails on `!startTime`.
   it("preserves bucket ordering across multiple rows", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
-    const promise = fetchAll("default", 100, 200);
+    const promise = fetchAll("default", 1, 20_000_000);
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, c]: any) => c,
@@ -393,8 +399,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
       content: {
         results: {
           hits: [
-            { ts: "T1", request_count: 10, error_count: 2, total_tokens: 100, total_cost: 1, p95_duration: 1, trace_count: 1 },
-            { ts: "T2", request_count: 20, error_count: 0, total_tokens: 200, total_cost: 2, p95_duration: 2, trace_count: 2 },
+            { ts: "1970-01-01T00:00:00", request_count: 10, error_count: 2, total_tokens: 100, total_cost: 1, p95_duration: 1, trace_count: 10 },
+            { ts: "1970-01-01T00:00:10", request_count: 20, error_count: 0, total_tokens: 200, total_cost: 2, p95_duration: 2, trace_count: 20 },
           ],
         },
       },
@@ -404,7 +410,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
     await promise;
     expect(sparklines.value.tokens).toEqual([100, 200]);
     expect(sparklines.value.cost).toEqual([1, 2]);
-    expect(sparklines.value.errorRate).toEqual([20, 0]); // 2/10*100, 0/20*100
+    // error rate = error_count / trace_count: 2/10*100=20, 0/20*100=0
+    expect(sparklines.value.errorRate).toEqual([20, 0]);
   });
 
   // Defensive: a bucket with zero requests must not divide-by-zero
@@ -422,7 +429,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
       content: {
         results: {
           hits: [
-            { ts: "T1", request_count: 0, error_count: 5, total_tokens: 0, total_cost: 0, p95_duration: 0, trace_count: 0 },
+            // trace_count=0 → no traces in window → errorRate must be 0 (not NaN/Infinity)
+            { ts: "1970-01-01T00:00:00", request_count: 0, error_count: 0, total_tokens: 0, total_cost: 0, p95_duration: 0, trace_count: 0 },
           ],
         },
       },
@@ -431,6 +439,93 @@ describe("useLLMInsights — sparklines accumulation", () => {
 
     await promise;
     expect(sparklines.value.errorRate).toEqual([0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error rate — regression tests for the > 100% bug
+// ---------------------------------------------------------------------------
+
+describe("useLLMInsights — error rate is always [0%, 100%]", () => {
+  // Regression: previously error_count = COUNT(*) FILTER (WHERE span_status='ERROR')
+  // counted ALL spans (including non-LLM tool/infra spans), while request_count
+  // only counted LLM spans. On real workloads this produced values like 104350%.
+  // Fix: error_count = approx_distinct(trace_id) FILTER (WHERE span_status='ERROR'),
+  // denominator = approx_distinct(trace_id).
+  // Since error_count ≤ trace_count by definition, rate is always ≤ 100%.
+
+  it("sparkline errorRate never exceeds 100 even when error_count equals trace_count", async () => {
+    const { fetchAll, sparklines } = useLLMInsights();
+    const promise = fetchAll("default", 100, 200);
+
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
+    cbs[0].complete();
+    cbs[1].complete();
+    cbs[2].data(null, {
+      content: {
+        results: {
+          hits: [
+            // All traces errored → 100%
+            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 10, error_count: 10, total_tokens: 0, total_cost: 0, p95_duration: 0 },
+          ],
+        },
+      },
+    });
+    cbs[2].complete();
+
+    await promise;
+    expect(sparklines.value.errorRate[0]).toBe(100);
+  });
+
+  it("sparkline errorRate is 0 when there are no error traces", async () => {
+    const { fetchAll, sparklines } = useLLMInsights();
+    const promise = fetchAll("default", 100, 200);
+
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
+    cbs[0].complete();
+    cbs[1].complete();
+    cbs[2].data(null, {
+      content: {
+        results: {
+          hits: [
+            { ts: "1970-01-01T00:00:00", request_count: 50, trace_count: 50, error_count: 0, total_tokens: 0, total_cost: 0, p95_duration: 0 },
+          ],
+        },
+      },
+    });
+    cbs[2].complete();
+
+    await promise;
+    expect(sparklines.value.errorRate[0]).toBe(0);
+  });
+
+  it("KPI SQL uses approx_distinct(trace_id) FILTER for error_count (not COUNT(*))", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+
+    const kpiCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
+      p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)"),
+    );
+    const sql: string = (kpiCall as any)[0].queryReq.query.sql;
+
+    // Must NOT use COUNT(*) FILTER for errors — that counted all spans and
+    // produced error rates of thousands of percent on real environments.
+    expect(sql).not.toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    // Must use trace-level distinct count instead.
+    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+  });
+
+  it("sparkline SQL uses approx_distinct(trace_id) FILTER for error_count", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+
+    const sparkCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
+      p.queryReq.query.sql.includes("GROUP BY ts"),
+    );
+    const sql: string = (sparkCall as any)[0].queryReq.query.sql;
+
+    expect(sql).not.toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
   });
 });
 
@@ -523,8 +618,10 @@ describe("useLLMInsights — SQL surface", () => {
     expect(sql).toContain("gen_ai_usage_total_tokens");
     expect(sql).toContain("gen_ai_usage_cost");
     expect(sql).toContain("approx_distinct(trace_id)");
-    // Errors deliberately drop the gen_ai filter — see fetchKPIInto comment.
-    expect(sql).toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    // Error count is trace-level: approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR').
+    // Using COUNT(*) FILTER on all spans while dividing by LLM-only request_count
+    // produced values >> 100% (e.g. 104350%) on real workloads.
+    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
   });
 
   // Sparkline query bins by `histogram(_timestamp, ...)` and groups+orders

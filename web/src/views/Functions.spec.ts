@@ -163,7 +163,8 @@ describe('Functions.vue', () => {
       
       expect((wrapper.vm as any).splitterModel).toBe(220);
       expect((wrapper.vm as any).showSidebar).toBe(true);
-      expect((wrapper.vm as any).activeTab).toBe('streamPipelines');
+      // The test router navigates to 'functionList', which maps to 'functions' via routeToFunctionsTab
+      expect((wrapper.vm as any).activeTab).toBe('functions');
     });
 
     it('should render the collapse/expand button', async () => {

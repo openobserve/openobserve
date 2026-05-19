@@ -34,7 +34,7 @@ export class MetricsBuilderPage {
         this.runQueryButton = '[data-test="metrics-apply"]';
 
         // Add to Dashboard dialog selectors
-        this.addToDashboardButton = 'button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
+        this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"], button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
         this.dashboardDialogTitle = '[data-test="schema-title-text"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
         this.dashboardCancelButton = '[data-test="metrics-schema-cancel-button"]';
@@ -568,12 +568,17 @@ export class MetricsBuilderPage {
      */
     async clickAddToDashboard() {
         const addBtn = this.page.locator(this.addToDashboardButton).first();
-        if (await addBtn.isVisible({ timeout: 5000 })) {
+        if (await addBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
             await addBtn.click();
             // Wait for the "Add to Dashboard" side panel to fully load (matches visualise.js pattern)
             const sidePanelTitle = this.page.locator(this.dashboardDialogTitle);
-            await sidePanelTitle.waitFor({ state: 'visible', timeout: 10000 });
-            await sidePanelTitle.waitFor({ state: 'attached', timeout: 5000 });
+            const panelOpened = await sidePanelTitle.waitFor({ state: 'visible', timeout: 10000 })
+                .then(() => true)
+                .catch(() => false);
+            if (!panelOpened) {
+                return false;
+            }
+            await sidePanelTitle.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;

@@ -62,6 +62,8 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
 pub struct GetOrgUsageResponseBody {
     pub data: Vec<OrgUserData>,
     pub range: String,
+    pub start_time: i64,
+    pub end_time: i64,
 }
 
 impl GetOrgUsageResponseBody {
@@ -173,6 +175,8 @@ mod tests {
                 unit: "GB".to_string(),
             }],
             range: "30d".to_string(),
+            start_time: 0,
+            end_time: 0,
         };
 
         body.convert_to_unit("MB");
@@ -190,6 +194,8 @@ mod tests {
                 unit: "MB".to_string(),
             }],
             range: "30d".to_string(),
+            start_time: 0,
+            end_time: 0,
         };
 
         body.convert_to_unit("GB");
@@ -207,6 +213,8 @@ mod tests {
                 unit: "gb".to_string(),
             }],
             range: "30d".to_string(),
+            start_time: 0,
+            end_time: 0,
         };
 
         body.convert_to_unit("mb");
@@ -224,6 +232,8 @@ mod tests {
                 unit: "GB".to_string(),
             }],
             range: "7d".to_string(),
+            start_time: 0,
+            end_time: 0,
         };
 
         body.convert_to_unit("GB");
@@ -241,6 +251,8 @@ mod tests {
                 unit: "Bytes".to_string(),
             }],
             range: "1d".to_string(),
+            start_time: 0,
+            end_time: 0,
         };
 
         body.convert_to_unit("MB");
@@ -258,6 +270,8 @@ mod tests {
             "event": "Ingestion",
             "unit": "GB",
             "size": 12.5,
+            "start_time":0,
+            "end_time":0
         });
         let q: OrgUsageQueryResult = serde_json::from_value(json).unwrap();
 

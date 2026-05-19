@@ -256,6 +256,11 @@ pub struct FoundGroup {
     pub unique_values: Option<usize>,
     /// Cardinality class derived from unique_values (None if no data yet)
     pub cardinality_class: Option<CardinalityClass>,
+    /// Category this group belongs to (e.g., "AWS", "Kubernetes", "Azure", "GCP", "Common").
+    /// Sourced from the underlying `FieldAlias.group`. When `None`, the frontend falls
+    /// back to inferring the category from `group_id` prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 /// Dimension analytics tracking

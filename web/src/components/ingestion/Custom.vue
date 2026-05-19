@@ -104,7 +104,6 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const tabs = ref("");
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
@@ -114,24 +113,31 @@ export default defineComponent({
       "telegraf",
       "cloudwatchMetrics",
     ];
-    const traceRoutes = ["tracesOTLP"];
+    const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
     const rumRoutes = ["frontendMonitoring"];
+    const logRoutes = [
+      "curl", "fluentbit", "fluentd", "kinesisfirehose", "vector",
+      "filebeat", "gcpLogs", "logstash", "syslogNg", "ingestLogsFromOtel",
+    ];
+    const tabs = ref(
+      logRoutes.includes(router.currentRoute.value.name as string)
+        ? "ingestLogs"
+        : metricRoutes.includes(router.currentRoute.value.name as string)
+          ? "ingestMetrics"
+          : traceRoutes.includes(router.currentRoute.value.name as string)
+            ? "ingestTraces"
+            : "ingestLogs"
+    );
 
     onBeforeMount(() => {
+      // Parent container routes: navigating to these redirects to their first child.
+      // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
+      // are intentionally excluded here — they just set the active tab below.
       const ingestRoutes = [
         "ingestLogs",
         "ingestTraces",
         "ingestMetrics",
         "rumMonitoring",
-      ];
-      const logRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "filebeat",
-        "gcpLogs",
       ];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {

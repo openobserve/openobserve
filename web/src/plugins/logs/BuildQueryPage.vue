@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   onMounted,
-  watch,
   defineAsyncComponent,
   provide,
   defineExpose,
@@ -63,6 +62,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
+import { parseWhereClauseToFilter } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 
 // ============================================================================
@@ -78,11 +78,46 @@ const AddToDashboard = defineAsyncComponent(
 );
 
 // ============================================================================
+// Default Builder Fields
+// ============================================================================
+
+/** Default x-axis field: histogram(_timestamp) */
+const DEFAULT_X_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "x_axis_1",
+  column: "_timestamp",
+  color: null,
+  type: "build",
+  functionName: "histogram",
+  args: [
+    { type: "field", value: { field: "_timestamp" } },
+    { type: "histogramInterval", value: null },
+  ],
+  sortBy: "ASC",
+  isDerived: false,
+  havingConditions: [],
+});
+
+/** Default y-axis field: count(_timestamp) */
+const DEFAULT_Y_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "y_axis_1",
+  column: "_timestamp",
+  color: "#5960b2",
+  type: "build",
+  functionName: "count",
+  args: [{ type: "field", value: { field: "_timestamp" } }],
+  sortBy: null,
+  isDerived: false,
+  havingConditions: [],
+});
+
+// ============================================================================
 // Props and Emits
 // ============================================================================
 
 interface Props {
-  /** Current SQL query from logs search */
+  /** Current SQL query from logs search (only used when isSqlMode is true) */
   searchQuery?: string;
   /** Selected stream name */
   selectedStream?: string;
@@ -95,6 +130,10 @@ interface Props {
   };
   /** Whether this is the first toggle to build tab (for shared link support) */
   isFirstToggle?: boolean;
+  /** Whether SQL mode is ON in the logs page */
+  isSqlMode?: boolean;
+  /** Raw WHERE clause text from non-SQL mode */
+  whereClause?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -102,6 +141,8 @@ const props = withDefaults(defineProps<Props>(), {
   selectedStream: "",
   selectedDateTime: undefined,
   isFirstToggle: true,
+  isSqlMode: true,
+  whereClause: "",
 });
 
 // Emits
@@ -114,8 +155,6 @@ const emit = defineEmits<{
   (e: "initialized"): void;
   /** Emitted when search request trace IDs change (for cancel query functionality) */
   (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
-  /** Emitted when fields or customQuery mode change (for URL sync) */
-  (e: "fieldsUpdated"): void;
 }>();
 
 // ============================================================================
@@ -267,17 +306,65 @@ const initializeFromQuery = async () => {
     return;
   }
 
-  // If no query, use builder mode with selected stream
-  // Don't run query automatically - let user select fields and click Run Query
-  if (!props.searchQuery || !props.searchQuery.trim()) {
+  // ---- Case 1: Non-SQL mode → builder mode with defaults ----
+  // When SQL mode is OFF, always use builder mode with histogram/count fields
+  // and carry over the WHERE clause as a filter
+  if (!props.isSqlMode) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
       dashboardPanelData.data.queries[0].fields.stream_type = "logs";
-      // Load stream fields for the query builder
+      await updateGroupedFields();
+    }
+
+    dashboardPanelData.data.queries[0].customQuery = false;
+
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
+
+    // Parse WHERE clause into builder filter
+    if (props.whereClause?.trim()) {
+      const filter = await parseWhereClauseToFilter(props.whereClause);
+      dashboardPanelData.data.queries[0].fields.filter = filter;
+    }
+
+    emit("initialized");
+
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
+    await runQuery();
+    return;
+  }
+
+  // ---- Case 3: SQL mode ON (existing behavior) ----
+
+  // If no query or bare SELECT * FROM "stream" (without WHERE/GROUP BY/etc.),
+  // use builder mode with default histogram/count fields.
+  // Queries with WHERE clause should be parsed so the filter is preserved.
+  const trimmedQuery = props.searchQuery?.trim() || "";
+  const isEmptyOrSelectAll =
+    !trimmedQuery ||
+    /^\s*select\s+\*\s+from\s+["'`]?[\w.:-]+["'`]?\s*$/i.test(trimmedQuery);
+  if (isEmptyOrSelectAll) {
+    if (props.selectedStream) {
+      dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
       await updateGroupedFields();
     }
     dashboardPanelData.data.queries[0].customQuery = false;
+
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
+
     emit("initialized");
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
+    await runQuery();
     return;
   } else if (shouldUseCustomMode(props.searchQuery)) {
     // Complex query - use custom mode
@@ -409,14 +496,10 @@ const addPanelToDashboard = () => {
 // Watchers
 // ============================================================================
 
-// Watch for field, filter, join, and customQuery changes to sync URL params via parent
-watch(
-  () => dashboardPanelData.data.queries[0],
-  () => {
-    emit("fieldsUpdated");
-  },
-  { deep: true },
-);
+// NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
+// rather than a deep watcher. A deep watcher here would call router.push on every
+// field/filter mutation, which causes Quasar q-menu popups to auto-close
+// (QMenu watches $route.fullPath and dismisses on any route change).
 
 // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
 // PanelEditor emits 'queryGenerated' and 'customQueryModeChanged' which we forward to parent

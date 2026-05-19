@@ -255,7 +255,11 @@
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                     <q-icon name="info" size="18px" class="tw:flex-shrink-0" />
+                    <span v-if="isIngestionUnlimited">
+                      {{ t("about.license_allows_unlimited_ingestion") }}
+                    </span>
                     <span
+                      v-else
                       v-html="
                         DOMPurify.sanitize(
                           t('about.license_allows_ingestion', {
@@ -271,7 +275,10 @@
                   </div>
 
                   <!-- Line 2: Exceeded Status -->
-                  <div class="tw:flex tw:items-center tw:gap-2">
+                  <div
+                    v-if="!isIngestionUnlimited"
+                    class="tw:flex tw:items-center tw:gap-2"
+                  >
                     <q-icon
                       v-if="
                         licenseData?.ingestion_exceeded &&
@@ -749,7 +756,7 @@ export default defineComponent({
         thresholds.push({
           type: "yAxis",
           name: "Limit Exceeded",
-          value: ingestionLimitGB,
+          value: ingestionLimit,
           color: "#FF0000", // Red
           lineStyle: "solid",
           width: 2,

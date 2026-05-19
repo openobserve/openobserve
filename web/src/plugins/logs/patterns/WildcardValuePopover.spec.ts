@@ -91,14 +91,16 @@ describe("WildcardValuePopover", () => {
   });
 
   describe("header", () => {
-    it("should display the token in the header", () => {
+    it("should display the inferred label in the header", () => {
       const text = wrapper.text();
-      expect(text).toContain("<*>");
+      // displayValues are ["alice", "bob", "charlie"] — all strings → "str"
+      expect(text).toContain("str");
     });
 
-    it("should display <:IP> token in the header", () => {
+    it("should display descriptive label for <:IP> token", () => {
       wrapper = mountComponent({ token: "<:IP>", displayValues: [{ value: "10.0.0.1", count: 5 }] });
-      expect(wrapper.text()).toContain("<:IP>");
+      // <:IP> maps to "ip" in wildcardLabel
+      expect(wrapper.text()).toContain("ip");
     });
   });
 

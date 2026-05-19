@@ -55,6 +55,11 @@ export class ServicesCatalogPage {
     await this.page.waitForLoadState('load', { timeout: 15000 });
   }
 
+  async clickServiceCatalogTab() {
+    await this.page.locator('[data-test="traces-search-mode-services-catalog-btn"]').click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
   async waitForLoad() {
     // Wait for loading spinner to disappear
     await this.page.locator(this.loading)
@@ -109,6 +114,19 @@ export class ServicesCatalogPage {
     await input.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await input.fill('');
     await this.page.waitForTimeout(500);
+  }
+
+  async clickFilterClearButton() {
+    const btn = this.page.locator(this.filterClearBtn);
+    const visible = await btn.isVisible().catch(() => false);
+    if (!visible) {
+      // Fallback: clear via fill('')
+      await this.clearFilter();
+      return false;
+    }
+    await btn.click();
+    await this.page.waitForTimeout(300);
+    return true;
   }
 
   async getFilterInputValue() {
@@ -174,6 +192,9 @@ export class ServicesCatalogPage {
   async getRowCount() {
     // Count service-name links (one per row, scoped to TenstackTable body)
     // Uses service-link prefix to avoid matching status-pill / status-legend in the toolbar
+    // Wait briefly for at least one row to render — virtual scrolling may delay row DOM
+    await this.page.locator('[data-test^="services-catalog-service-link-"]').first()
+      .waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
     return await this.page.locator('[data-test^="services-catalog-service-link-"]').count();
   }
 

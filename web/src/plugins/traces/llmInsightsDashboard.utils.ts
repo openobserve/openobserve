@@ -112,15 +112,19 @@ export function splitNumberWithUnit(n: number): {
  * Split a duration in microseconds into `{ value, unit }`.
  *   < 1s   → ms (rounded)
  *   < 1m   → s  (1 decimal)
- *   else   → min (1 decimal)
+ *   < 1h   → min (1 decimal)
+ *   < 1d   → h  (1 decimal)
+ *   else   → d  (1 decimal)
  *
  * Falsy / zero input → `{ "0", "ms" }` so the card renders as "0 ms"
  * instead of "0 (no unit)".
  *
- * @example splitDuration(0)            // { value: "0",   unit: "ms" }
- * @example splitDuration(123_000)      // { value: "123", unit: "ms" }
- * @example splitDuration(2_500_000)    // { value: "2.5", unit: "s" }
- * @example splitDuration(120_000_000)  // { value: "2.0", unit: "min" }
+ * @example splitDuration(0)                  // { value: "0",   unit: "ms" }
+ * @example splitDuration(123_000)            // { value: "123", unit: "ms" }
+ * @example splitDuration(2_500_000)          // { value: "2.5", unit: "s" }
+ * @example splitDuration(120_000_000)        // { value: "2.0", unit: "min" }
+ * @example splitDuration(7_200_000_000)      // { value: "2.0", unit: "h" }
+ * @example splitDuration(172_800_000_000)    // { value: "2.0", unit: "d" }
  */
 export function splitDuration(micros: number): {
   value: string;
@@ -130,7 +134,36 @@ export function splitDuration(micros: number): {
   const ms = micros / 1000;
   if (ms < 1000) return { value: Math.round(ms).toString(), unit: "ms" };
   if (ms < 60_000) return { value: (ms / 1000).toFixed(1), unit: "s" };
-  return { value: (ms / 60_000).toFixed(1), unit: "min" };
+  if (ms < 3_600_000) return { value: (ms / 60_000).toFixed(1), unit: "min" };
+  if (ms < 86_400_000) return { value: (ms / 3_600_000).toFixed(1), unit: "h" };
+  return { value: (ms / 86_400_000).toFixed(1), unit: "d" };
+}
+
+/**
+ * Format a window duration (microseconds) as a short relative label
+ * for the KPI trend chip — `"15m"`, `"12h"`, `"3d"`, etc. Used to
+ * tell the user *what* "prev" refers to (so the chip reads
+ * "▲ 100% vs prev 12h" instead of an ambiguous "▲ 100% vs prev").
+ *
+ * Boundaries are inclusive on the right so a 60-second window reads
+ * as "1m", not "60s".
+ *
+ * @example formatWindowLabel(30 * 1_000_000)            // "30s"
+ * @example formatWindowLabel(15 * 60 * 1_000_000)       // "15m"
+ * @example formatWindowLabel(12 * 60 * 60 * 1_000_000)  // "12h"
+ * @example formatWindowLabel(7 * 86400 * 1_000_000)     // "7d"
+ * @example formatWindowLabel(0)                          // ""  (defensive)
+ */
+export function formatWindowLabel(durationMicros: number): string {
+  if (!durationMicros || durationMicros <= 0) return "";
+  const seconds = durationMicros / 1_000_000;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = seconds / 60;
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = minutes / 60;
+  if (hours < 24) return `${Math.round(hours)}h`;
+  const days = hours / 24;
+  return `${Math.round(days)}d`;
 }
 
 /**

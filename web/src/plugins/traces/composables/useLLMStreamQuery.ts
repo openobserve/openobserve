@@ -71,6 +71,13 @@ export function useLLMStreamQuery() {
       activeTraceIds.add(traceId);
       const accumulated: any[] = [];
 
+      // Honour the SQL's own LIMIT as the request `size` so the
+      // backend doesn't scan more rows than the panel actually wants.
+      // Recent-errors panel uses LIMIT 10; latency raw uses LIMIT
+      // 50000. Falls back to 1000 for queries without LIMIT.
+      const limitMatch = sql.match(/\bLIMIT\s+(\d+)\b/i);
+      const size = limitMatch ? parseInt(limitMatch[1], 10) : 1000;
+
       // Match the rest of the codebase: only base64-encode when the
       // org/instance has sql_base64_enabled. Plain SQL is fine otherwise.
       const useBase64 = store.state.zoConfig?.sql_base64_enabled;
@@ -82,7 +89,7 @@ export function useLLMStreamQuery() {
               start_time: startTime,
               end_time: endTime,
               from: 0,
-              size: 1000,
+              size,
             },
             ...(useBase64 ? { encoding: "base64" } : {}),
           },
@@ -99,16 +106,20 @@ export function useLLMStreamQuery() {
           },
           error: (response: any, _traceId: any) => {
             activeTraceIds.delete(traceId);
-            // Streaming endpoint passes the parsed error body as the first
-            // argument (e.g. { status, code, message, error_detail }).
+            // useStreamingSearch wraps the server error body as
+            // `{ content: { ...errorBody, trace_id }, type: "error" }`.
+            // Unwrap so the real fields (message / error_detail / status)
+            // are visible without forcing every caller to know the shape.
+            const body = response?.content ?? response ?? {};
             const message =
+              body.message ||
+              body.error ||
+              body.error_detail ||
               response?.message ||
-              response?.error ||
-              response?.error_detail ||
               "Failed to fetch query data";
             const err: any = new Error(message);
-            err.status = response?.status;
-            err.code = response?.code;
+            err.status = body.status ?? response?.status;
+            err.code = body.code ?? response?.code;
             err.raw = response;
             reject(err);
           },

@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleErrorDetails"
                             variant="outline"
                             size="sm-action"
+                            style="font-size: 0.875rem"
                             data-test="logs-page-result-error-details-btn"
                             >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
@@ -344,22 +345,18 @@ size="md" />
           >
             <BuildQueryPage
               ref="buildQueryPageRef"
-              :searchQuery="searchObj.data.query"
+              :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
+              :isSqlMode="searchObj.meta.sqlMode"
+              :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
               class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
               @initialized="onBuildInitialized"
-              @fieldsUpdated="
-                updateUrlQueryParams(
-                  null,
-                  buildQueryPageRef?.dashboardPanelData,
-                )
-              "
             />
           </div>
         </template>
@@ -469,6 +466,7 @@ import {
   getFieldsFromQuery,
   isSimpleSelectAllQuery,
   getStreamFromQuery,
+  extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import {
   buildColumnIdentifierAst,
@@ -833,6 +831,12 @@ export default defineComponent({
       clearAllTimeouts();
       try {
         if (searchObj) {
+          // Save visualization config so it can be restored when navigating back
+          if (searchObj.meta.logsVisualizeToggle === "visualize") {
+            searchObj.meta.savedVisualizationConfig =
+              getVisualizationConfig(dashboardPanelData);
+          }
+
           // Serialize breakdownSeries Map as entries array before JSON cloning
           const breakdownSeries = searchObj.data?.histogram?.breakdownSeries;
           const serializableSearchObj = {
@@ -1870,53 +1874,63 @@ export default defineComponent({
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
             let shouldAutoSelectChartType = true;
-            // Always try to restore config from URL if present
+            // Try to restore config from URL first, then fall back to saved state
             const visualizationDataParam = queryParams.visualization_data;
+            let restoredData = null;
+
             if (
               visualizationDataParam &&
               typeof visualizationDataParam === "string"
             ) {
               try {
-                const restoredData = decodeVisualizationConfig(
+                restoredData = decodeVisualizationConfig(
                   visualizationDataParam,
                 );
-
-                if (restoredData && typeof restoredData === "object") {
-                  // Always restore config from URL on every toggle
-                  if (
-                    restoredData.config &&
-                    typeof restoredData.config === "object"
-                  ) {
-                    preservedConfig = { ...restoredData.config };
-                  }
-
-                  // Only check for chart type from URL on first visualization toggle
-                  if (
-                    isFirstVisualizationToggle.value &&
-                    restoredData.type &&
-                    typeof restoredData.type === "string"
-                  ) {
-                    const validLogsChartTypes = [
-                      "area",
-                      "bar",
-                      "h-bar",
-                      "line",
-                      "stacked",
-                      "scatter",
-                      "table",
-                    ];
-                    if (validLogsChartTypes.includes(restoredData.type)) {
-                      // Valid chart type found in URL - set it and disable auto-selection
-                      dashboardPanelData.data.type = restoredData.type;
-                      shouldAutoSelectChartType = false;
-                    }
-                  }
-                }
               } catch (error) {
                 console.warn(
                   "Failed to restore visualization config from URL:",
                   error,
                 );
+              }
+            }
+
+            // Fallback: use saved visualization config from store (preserved across navigation)
+            if (
+              !restoredData &&
+              searchObj.meta.savedVisualizationConfig
+            ) {
+              restoredData = searchObj.meta.savedVisualizationConfig;
+              searchObj.meta.savedVisualizationConfig = null;
+            }
+
+            if (restoredData && typeof restoredData === "object") {
+              // Always restore config on every toggle
+              if (
+                restoredData.config &&
+                typeof restoredData.config === "object"
+              ) {
+                preservedConfig = { ...restoredData.config };
+              }
+
+              // Only check for chart type on first visualization toggle
+              if (
+                isFirstVisualizationToggle.value &&
+                restoredData.type &&
+                typeof restoredData.type === "string"
+              ) {
+                const validLogsChartTypes = [
+                  "area",
+                  "bar",
+                  "h-bar",
+                  "line",
+                  "scatter",
+                  "table",
+                ];
+                if (validLogsChartTypes.includes(restoredData.type)) {
+                  // Valid chart type found - set it and disable auto-selection
+                  dashboardPanelData.data.type = restoredData.type;
+                  shouldAutoSelectChartType = false;
+                }
               }
             }
 
@@ -1994,74 +2008,108 @@ export default defineComponent({
               shouldUseHistogramQuery.value = false;
             }
 
-            // set logs page data to searchResponseForVisualization
-            if (shouldUseHistogramQuery.value === true) {
-              // only do it if is_histogram_eligible is true on logs page
-              // and showHistogram is true on logs page
-              if (
-                searchObj?.data?.queryResults?.is_histogram_eligible === true &&
-                searchObj?.meta?.showHistogram === true
+            // Only reuse cached search results if the current query matches
+            // the query that produced those results. When the user modifies
+            // the query in Build/Patterns mode and switches to Visualize,
+            // stale results would cause a blank or incorrect chart.
+            const lastRunSql = searchObj.data.customDownloadQueryObj?.query?.sql;
+            const currentSql = logsPageQuery;
+            const normalizeSQL = (sql: any) => {
+              if (!sql) return "";
+              const s = Array.isArray(sql) ? sql.join(";") : String(sql);
+              return s.replace(/\s+/g, " ").trim().toLowerCase();
+            };
+            const queryMatchesResults =
+              !!lastRunSql && normalizeSQL(currentSql) === normalizeSQL(lastRunSql);
+
+            // Only reuse cached search results when the current query
+            // matches the query that produced them. When they differ (e.g.
+            // query was edited in Build mode), leave searchResponseForVisualization
+            // empty so the chart component makes a fresh API call.
+            if (queryMatchesResults) {
+              // set logs page data to searchResponseForVisualization
+              if (shouldUseHistogramQuery.value === true) {
+                // only do it if is_histogram_eligible is true on logs page
+                // and showHistogram is true on logs page
+                if (
+                  searchObj?.data?.queryResults?.is_histogram_eligible ===
+                    true &&
+                  searchObj?.meta?.showHistogram === true
+                ) {
+                  // replace hits with histogram query data
+                  // Override time_offset with the full query time range so that
+                  // fillMissingValues uses the correct start time. The main search
+                  // time_offset only covers the current page (last N rows), which
+                  // would cause the chart to display partial data.
+                  searchResponseForVisualization.value = {
+                    ...searchObj.data.queryResults,
+                    hits: searchObj.data.queryResults.aggs,
+                    histogram_interval:
+                      searchObj?.data?.queryResults
+                        ?.visualization_histogram_interval,
+                    time_offset: {
+                      start_time:
+                        searchObj?.data?.customDownloadQueryObj?.query
+                          ?.start_time,
+                      end_time:
+                        searchObj?.data?.customDownloadQueryObj?.query
+                          ?.end_time,
+                    },
+                  };
+
+                  // assign converted_histogram_query to dashboardPanelData
+                  if (searchObj.data.queryResults.converted_histogram_query) {
+                    // Store the histogram query so it persists for "Add to Dashboard"
+                    storedHistogramQuery.value =
+                      searchObj.data.queryResults.converted_histogram_query;
+
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].query =
+                      searchObj.data.queryResults.converted_histogram_query;
+
+                    // assign to visualizeChartData as well
+                    visualizeChartData.value.queries[0].query =
+                      dashboardPanelData.data.queries[0].query;
+                    visualizeChartData.value.queries[0].vrlFunctionQuery =
+                      dashboardPanelData.data.queries[0].vrlFunctionQuery;
+                  }
+                }
+              } else if (
+                searchObj.data.queryResults?.hits?.length > 0 ||
+                searchObj.data.queryResults?.filteredHit?.length > 0
               ) {
-                // replace hits with histogram query data
-                // Override time_offset with the full query time range so that
-                // fillMissingValues uses the correct start time. The main search
-                // time_offset only covers the current page (last N rows), which
-                // would cause the chart to display partial data.
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
-                  hits: searchObj.data.queryResults.aggs,
                   histogram_interval:
                     searchObj?.data?.queryResults
                       ?.visualization_histogram_interval,
-                  time_offset: {
-                    start_time:
-                      searchObj?.data?.customDownloadQueryObj?.query
-                        ?.start_time,
-                    end_time:
-                      searchObj?.data?.customDownloadQueryObj?.query?.end_time,
-                  },
                 };
 
-                // assign converted_histogram_query to dashboardPanelData
-                if (searchObj.data.queryResults.converted_histogram_query) {
-                  // Store the histogram query so it persists for "Add to Dashboard"
-                  storedHistogramQuery.value =
-                    searchObj.data.queryResults.converted_histogram_query;
-
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].query =
-                    searchObj.data.queryResults.converted_histogram_query;
-
-                  // assign to visualizeChartData as well
-                  visualizeChartData.value.queries[0].query =
-                    dashboardPanelData.data.queries[0].query;
-                  visualizeChartData.value.queries[0].vrlFunctionQuery =
-                    dashboardPanelData.data.queries[0].vrlFunctionQuery;
+                // if hits is empty and filteredHit is present, then set hits to filteredHit
+                if (
+                  searchResponseForVisualization?.value?.hits?.length === 0 &&
+                  searchResponseForVisualization?.value?.filteredHit
+                ) {
+                  searchResponseForVisualization.value.hits =
+                    searchResponseForVisualization?.value?.filteredHit ?? [];
                 }
-              }
-            } else {
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // if hits is empty and filteredHit is present, then set hits to filteredHit
-              if (
-                searchResponseForVisualization?.value?.hits?.length === 0 &&
-                searchResponseForVisualization?.value?.filteredHit
-              ) {
-                searchResponseForVisualization.value.hits =
-                  searchResponseForVisualization?.value?.filteredHit ?? [];
               }
             }
 
             // reset old rendered chart
             visualizeChartData.value = {};
 
+            // Use customDownloadQueryObj time only when reusing cached results
+            // (the time must match the data). Otherwise use the user's current
+            // datetime selection — e.g. when navigating back to the page the
+            // user may have selected a different time range on the visualize tab
+            // than the last logs query used.
+            const hasReusableData =
+              searchResponseForVisualization.value?.hits?.length > 0;
+
             if (
+              hasReusableData &&
               searchObj?.data?.customDownloadQueryObj?.query?.start_time &&
               searchObj?.data?.customDownloadQueryObj?.query?.end_time
             ) {
@@ -2253,6 +2301,32 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for SQL mode changes while in build mode.
+    // When SQL mode is toggled, re-sync the search bar query:
+    //   ON  → show the builder's full generated SQL
+    //   OFF → show only the WHERE clause (filter text)
+    watch(
+      () => searchObj.meta.sqlMode,
+      async () => {
+        if (searchObj.meta.logsVisualizeToggle !== "build") return;
+
+        const generatedQuery =
+          buildDashboardPanelData.data.queries?.[0]?.query || "";
+        await onBuildQueryGenerated(generatedQuery);
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -2279,17 +2353,6 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
-
-    // Watch for build page config changes to sync URL params
-    watch(
-      () => buildDashboardPanelData.data.config,
-      () => {
-        if (searchObj.meta.logsVisualizeToggle === "build") {
-          updateUrlQueryParams(null, buildDashboardPanelData);
-        }
-      },
-      { deep: true },
-    );
 
     // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
     // This ensures edited queries are reflected in the panel schema immediately
@@ -2467,8 +2530,8 @@ export default defineComponent({
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
         if (
           isCustomQueryMode &&
-          searchObj.meta.sqlMode &&
-          !searchObj.data.query?.trim()
+          !searchObj.data.query?.trim() &&
+          !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(
             "Query is empty, please select fields to build query",
@@ -2519,11 +2582,18 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
-    const onBuildQueryGenerated = (query: string) => {
-      // Sync generated query to logs composables so user can see it in the editor
-      // Always update, including empty string when all fields are removed
-      searchObj.data.query = query;
-      searchObj.data.editorValue = query;
+    const onBuildQueryGenerated = async (query: string) => {
+      if (searchObj.meta.sqlMode) {
+        // SQL mode ON: sync the full generated SQL to the search bar
+        searchObj.data.query = query;
+        searchObj.data.editorValue = query;
+      } else {
+        // SQL mode OFF: extract only the WHERE clause and sync that
+        // so the search bar stays in filter mode
+        const whereClause = await extractWhereClause(query);
+        searchObj.data.query = whereClause;
+        searchObj.data.editorValue = whereClause;
+      }
     };
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {
@@ -2538,18 +2608,31 @@ export default defineComponent({
       if (buildDashboardPanelData.data.queries[0]) {
         buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
 
-        // Reuse the same logic as QueryTypeSelector's changeToggle:
-        // clear fields and query when switching modes
+        // Builder → Custom: show the generated SQL in the editor for editing
+        if (isCustomMode) {
+          const generatedQuery =
+            buildDashboardPanelData.data.queries[0]?.query || "";
+          if (searchObj.meta.sqlMode) {
+            searchObj.data.query = generatedQuery;
+            searchObj.data.editorValue = generatedQuery;
+          } else {
+            // SQL mode OFF: sync only the WHERE clause
+            const whereClause = await extractWhereClause(generatedQuery);
+            searchObj.data.query = whereClause;
+            searchObj.data.editorValue = whereClause;
+          }
+          return;
+        }
+
+        // Custom → Builder: clear fields and query
         await nextTick();
         buildRemoveXYFilters();
         buildUpdateXYFieldsForCustomQueryMode();
 
-        // Clear query when switching from Custom to Builder mode
-        if (!isCustomMode) {
-          buildDashboardPanelData.data.queries[
-            buildDashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          // Also clear the search bar editor
+        buildDashboardPanelData.data.queries[
+          buildDashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        if (searchObj.meta.sqlMode) {
           searchObj.data.query = "";
           searchObj.data.editorValue = "";
         }
@@ -2860,11 +2943,6 @@ export default defineComponent({
               : ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
             timeseries_field: "zo_sql_key", // zo_sql_key is the time field in histogram
           };
-
-          if (histogramBreakdownField && autoSelectChartType) {
-            dashboardPanelData.data.type = "stacked";
-            shouldAutoSelectChartTypeForFields = false;
-          }
         }
 
         // Use the refactored functions
@@ -3147,6 +3225,7 @@ export default defineComponent({
       extractPatternsForCurrentQuery,
       patternsState,
       buildQueryPageRef,
+      buildDashboardPanelData,
       onBuildApply,
       onBuildCancel,
       onBuildQueryGenerated,
@@ -3331,6 +3410,11 @@ export default defineComponent({
       }
     },
     async fullSQLMode(newVal) {
+      // Build mode handles SQL mode changes via its own watcher in setup()
+      if (this.searchObj.meta.logsVisualizeToggle === "build") {
+        return;
+      }
+
       if (newVal) {
         await nextTick();
         if (this.searchObj.meta.sqlModeManualTrigger) {

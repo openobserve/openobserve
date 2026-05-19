@@ -13,103 +13,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/// OpenObserve LLM Attributes
-/// Maps to OTEL semantic conventions where available, uses llm.* namespace for custom fields
+/// Evaluation attributes kept as legacy O2 keys for backward compatibility
+/// with evaluation frameworks (o2-sre-agent, etc.) that emit per-metric
+/// `llm.evaluation.*` / `llm.evaluator.*` span attributes.
 pub struct O2Attributes;
 
 impl O2Attributes {
-    // ===== Standard OTEL Gen-AI Attributes =====
+    // ===== Evaluation Attributes =====
 
-    /// Name of the LLM model used (OTEL: gen_ai.response.model)
-    pub const MODEL_NAME: &'static str = "gen_ai.response.model";
-
-    /// Name of the LLM provider (OTEL: gen_ai.system)
-    pub const PROVIDER_NAME: &'static str = "gen_ai.system";
-
-    /// Name of the prompt template used (OTEL: gen_ai.prompt.name)
-    pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
-
-    /// Name of the tool being called (OTEL: gen_ai.tool.name)
-    pub const TOOL_NAME: &'static str = "gen_ai.tool.name";
-
-    /// Identifier for the tool call (OTEL: gen_ai.tool.call.id)
-    pub const TOOL_CALL_ID: &'static str = "gen_ai.tool.call.id";
-
-    /// Arguments passed to the tool call (OTEL: gen_ai.tool.call.arguments)
-    pub const TOOL_CALL_ARGUMENTS: &'static str = "gen_ai.tool.call.arguments";
-
-    /// Result returned from the tool call (OTEL: gen_ai.tool.call.result)
-    pub const TOOL_CALL_RESULT: &'static str = "gen_ai.tool.call.result";
-
-    /// User identifier (OTEL: user.id)
-    pub const USER_ID: &'static str = "user.id";
-
-    /// Session identifier (OTEL: session.id)
-    pub const SESSION_ID: &'static str = "session.id";
-
-    // ===== Custom LLM Namespace Attributes =====
-
-    /// Type of LLM observation (Custom: llm.observation.type)
-    /// Values: "generation", "chat", "embedding", "tool", "chain", "agent", etc.
-    pub const OBSERVATION_TYPE: &'static str = "llm.observation.type";
-
-    /// Simplified input text (Custom: llm.input)
-    /// Condensed from gen_ai.input.messages for easier UI display
-    pub const INPUT: &'static str = "llm.input";
-
-    /// Simplified output text (Custom: llm.output)
-    /// Condensed from gen_ai.output.messages for easier UI display
-    pub const OUTPUT: &'static str = "llm.output";
-
-    /// Model parameters as JSON (Custom: llm.request.parameters)
-    /// Aggregates individual gen_ai.request.* parameters for convenience
-    pub const MODEL_PARAMETERS: &'static str = "llm.request.parameters";
-
-    /// Token usage as JSON (Custom: llm.usage.tokens)
-    /// Contains: {input, output, total}
-    pub const USAGE_DETAILS: &'static str = "llm.usage.tokens";
-
-    /// Cost breakdown as JSON (Custom: llm.usage.cost)
-    /// Contains: {input, output, total}
-    pub const COST_DETAILS: &'static str = "llm.usage.cost";
-
-    /// Completion start time in microseconds (Custom: llm.completion.start_time)
-    /// Used to calculate TTFT (Time To First Token)
-    pub const COMPLETION_START_TIME: &'static str = "llm.completion.start_time";
-
-    // ===== Evaluation Attributes (Already OTEL-Compliant) =====
-
-    /// Aggregate quality score from evaluation (OTEL: llm.evaluation.quality_score)
+    /// Aggregate quality score from evaluation
     pub const EVALUATION_QUALITY: &'static str = "llm.evaluation.quality_score";
 
-    /// Relevance evaluation score (OTEL: llm.evaluation.relevance)
+    /// Relevance evaluation score
     pub const EVALUATION_RELEVANCE: &'static str = "llm.evaluation.relevance";
 
-    /// Completeness evaluation score (OTEL: llm.evaluation.completeness)
+    /// Completeness evaluation score
     pub const EVALUATION_COMPLETENESS: &'static str = "llm.evaluation.completeness";
 
-    /// Tool effectiveness evaluation score (OTEL: llm.evaluation.tool_effectiveness)
+    /// Tool effectiveness evaluation score
     pub const EVALUATION_TOOL_EFFECTIVENESS: &'static str = "llm.evaluation.tool_effectiveness";
 
-    /// Groundedness/faithfulness evaluation score (OTEL: llm.evaluation.groundedness)
+    /// Groundedness/faithfulness evaluation score
     pub const EVALUATION_GROUNDEDNESS: &'static str = "llm.evaluation.groundedness";
 
-    /// Safety evaluation score (OTEL: llm.evaluation.safety)
+    /// Safety evaluation score
     pub const EVALUATION_SAFETY: &'static str = "llm.evaluation.safety";
 
-    /// Evaluation duration in milliseconds (OTEL: llm.evaluation.duration_ms)
+    /// Evaluation duration in milliseconds
     pub const EVALUATION_DURATION_MS: &'static str = "llm.evaluation.duration_ms";
 
-    /// Per-evaluator reasoning/commentary (OTEL: llm.evaluation.commentary)
+    /// Per-evaluator reasoning/commentary
     pub const EVALUATION_COMMENTARY: &'static str = "llm.evaluation.commentary";
 
-    /// Evaluator name (OTEL: llm.evaluator.name)
+    /// Evaluator name
     pub const EVALUATOR_NAME: &'static str = "llm.evaluator.name";
 
-    /// Evaluator version (OTEL: llm.evaluator.version)
+    /// Evaluator version
     pub const EVALUATOR_VERSION: &'static str = "llm.evaluator.version";
 
-    /// Evaluator type: "human", "model", or "deterministic" (OTEL: llm.evaluator.type)
+    /// Evaluator type: "human", "model", or "deterministic"
     pub const EVALUATOR_TYPE: &'static str = "llm.evaluator.type";
 }
 
@@ -366,33 +308,7 @@ mod tests {
 
     #[test]
     fn test_llm_otel_compliant_attributes() {
-        // Standard OTEL Gen-AI attributes
-        assert_eq!(O2Attributes::MODEL_NAME, "gen_ai.response.model");
-        assert_eq!(O2Attributes::PROVIDER_NAME, "gen_ai.system");
-        assert_eq!(O2Attributes::PROMPT_NAME, "gen_ai.prompt.name");
-        assert_eq!(O2Attributes::TOOL_NAME, "gen_ai.tool.name");
-        assert_eq!(O2Attributes::TOOL_CALL_ID, "gen_ai.tool.call.id");
-        assert_eq!(
-            O2Attributes::TOOL_CALL_ARGUMENTS,
-            "gen_ai.tool.call.arguments"
-        );
-        assert_eq!(O2Attributes::TOOL_CALL_RESULT, "gen_ai.tool.call.result");
-        assert_eq!(O2Attributes::USER_ID, "user.id");
-        assert_eq!(O2Attributes::SESSION_ID, "session.id");
-
-        // Custom llm.* namespace attributes
-        assert_eq!(O2Attributes::OBSERVATION_TYPE, "llm.observation.type");
-        assert_eq!(O2Attributes::INPUT, "llm.input");
-        assert_eq!(O2Attributes::OUTPUT, "llm.output");
-        assert_eq!(O2Attributes::MODEL_PARAMETERS, "llm.request.parameters");
-        assert_eq!(O2Attributes::USAGE_DETAILS, "llm.usage.tokens");
-        assert_eq!(O2Attributes::COST_DETAILS, "llm.usage.cost");
-        assert_eq!(
-            O2Attributes::COMPLETION_START_TIME,
-            "llm.completion.start_time"
-        );
-
-        // Evaluation attributes (OTEL-compliant llm.evaluation.* namespace)
+        // Evaluation attributes
         assert_eq!(
             O2Attributes::EVALUATION_QUALITY,
             "llm.evaluation.quality_score"

@@ -125,7 +125,9 @@
     "resources": "Ressourcen",
     "updated_at": "Aktualisiert am",
     "error": "Fehler",
-    "db": "Datenbank"
+    "db": "Datenbank",
+    "discardChanges": "Änderungen verwerfen",
+    "unsavedChanges": "Ungespeicherte Änderungen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -393,7 +395,8 @@
     "selectStreamFirst": "Wähle zuerst einen Stream",
     "traces": "Spuren",
     "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
-    "patternNoValuesAvailable": "Keine Werte verfügbar"
+    "patternNoValuesAvailable": "Keine Werte verfügbar",
+    "selectLogStream": "Logs-Stream auswählen"
   },
   "menu": {
     "home": "Startseite",
@@ -787,7 +790,8 @@
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
     "feature_log_patterns": "Muster protokollieren",
-    "environment_type": "Art der Umgebung"
+    "environment_type": "Art der Umgebung",
+    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -2932,7 +2936,75 @@
     "copyStacktrace": "Stacktrace kopieren",
     "noStacktraceAvailable": "Kein Stacktrace verfügbar",
     "stacktraceCopied": "Stacktrace wurde in die Zwischenablage kopiert",
-    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden"
+    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden",
+    "sessionsList": {
+      "noStreamsTooltip": "Keine LLM-Streams verfügbar.",
+      "session": "Sitzung",
+      "sessions": "Sitzungen",
+      "countPill": "{Anzahl} von {total} {unit}",
+      "noStreamsFound": "Keine LLM-Streams gefunden",
+      "noStreamsDescription1": "Die Sitzungsgruppe umfasst",
+      "noStreamsDescription2": "across verfolgt Streams, die als LLM-Streams gekennzeichnet sind. Entweder existiert kein solcher Stream, oder es wurden noch keine Spans aufgenommen.",
+      "failedToLoad": "Sitzungen konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "noSessionsFound": "Keine Sessions gefunden",
+      "noSessionsDescription": "In diesem Zeitraum wurden keine LLM-Sitzungen auf {stream} aufgezeichnet. Versuchen Sie, den Zeitbereich zu erweitern oder zu einem anderen Stream zu wechseln.",
+      "loading": "Sitzungen werden geladen...",
+      "tokenTooltip": "Eingabe: {input} · Ausgabe: {output} · Summe: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zeitstempel",
+        "sessionId": "Sitzungs-ID",
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "tokens": "Tokens",
+        "cost": "Kosten",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Zurück zu Sessions",
+      "pageTitle": "Einzelheiten der Sitzung",
+      "failedToLoad": "Sitzung konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "sessionNotFound": "Sitzung nicht gefunden",
+      "noSpansFound": "Im aktuellen Zeitraum wurden keine Zeitspannen für {id} gefunden.",
+      "searchPlaceholder": "Suchen Sie in dieser Sitzung nach Spuren...",
+      "turn": "Wende",
+      "turns": "wendet sich",
+      "turnsShown": "{gefiltert} von {total} {unit} angezeigt",
+      "userBadge": "Nutzer",
+      "sessionPrefix": "Sitzung",
+      "copySessionId": "Sitzungs-ID kopieren",
+      "openInTraceExplorer": "Im Trace Explorer öffnen",
+      "unknownUser": "Unbekannter Benutzer",
+      "kpi": {
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "inputTokens": "Eingabe-Token",
+        "outputTokens": "Ausgabetokens",
+        "cost": "Kosten"
+      },
+      "conversation": "Konversation",
+      "turnLabel": "Wende",
+      "openTrace": "Trace öffnen",
+      "noUserMessage": "Für diesen Spielzug wurde keine Benutzernachricht erfasst.",
+      "noAssistantMessage": "Für diesen Zug wurde keine Reaktion des Assistenten erfasst.",
+      "roles": {
+        "user": "Nutzer",
+        "assistant": "Assistentin"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Modell",
+        "tokens": "Tokens",
+        "input": "Eingabe",
+        "output": "Ausgang",
+        "total": "Insgesamt",
+        "cost": "Kosten",
+        "spans": "Spannweiten"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3699,5 +3771,52 @@
     "clearAll": "Alles löschen",
     "clearAllTitle": "Alle Chats löschen",
     "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "storage_settings": {
+    "tabLabel": "Org-Speicher",
+    "title": "Org-Speicher",
+    "notEnabled": "Der Organisationsspeicher ist für diese Organisation nicht aktiviert",
+    "notConfigured": "einen benutzerdefinierten Speicheranbieter für die Daten dieser Organisation konfigurieren",
+    "configured": "konfiguriert",
+    "heroHeadline": "Bringen Sie Ihren eigenen Speicher mit",
+    "heroSub": "Verbinden Sie Ihren eigenen Cloud-Bucket, die Daten bleiben in Ihrer Infrastruktur — volle Kontrolle, kein Lock-In.",
+    "configureStorage": "Speicher konfigurieren",
+    "supportedProviders": "Unterstützte Anbieter",
+    "noStorageConfigured": "Kein Speicher konfiguriert",
+    "routeDataDesc": "Leiten Sie die Daten dieser Organisation an einen dedizierten Bucket weiter — unabhängig von anderen Organisationen und globalen Standardeinstellungen.",
+    "perOrgIsolation": "Isolierung pro Organisation",
+    "appliesImmediately": "Gilt sofort für neue Daten",
+    "usesOrgCredentials": "Verwendet organisationsbezogene Anmeldeinformationen",
+    "updateStorage": "Speicher aktualisieren",
+    "active": "aktiv",
+    "bucketName": "Bucket-Name",
+    "region": "Region",
+    "serverUrl": "Server-URL",
+    "accessKey": "Zugangsschlüssel",
+    "secretKey": "geheimer Schlüssel",
+    "roleArn": "Rolle, Garn",
+    "createdAt": "erstellt am",
+    "updatedAt": "aktualisiert am",
+    "featureOwnDataTitle": "Besitzen Sie Ihre Daten von Anfang bis Ende",
+    "featureOwnDataDesc": "Speichern Sie aufgenommene Daten direkt in Ihrem eigenen Bucket und behalten Sie die vollständige Kontrolle darüber, wer darauf zugreifen kann.",
+    "featureSecureTitle": "Sicher und konform",
+    "featureSecureDesc": "Feinkörnige Zugangsschlüssel, Ihre sensiblen Daten bleiben in Ihrer Infrastruktur.",
+    "goBack": "Geh zurück",
+    "newStorageConfiguration": "Neue Speicherkonfiguration",
+    "selectProviderDesc": "Wählen Sie einen Cloud-Speicheranbieter aus, um die Daten dieser Organisation zu speichern.",
+    "bucketNameRequired": "Bucket-Name ist erforderlich",
+    "accessKeyRequired": "Zugangsschlüssel ist erforderlich",
+    "secretKeyRequired": "Geheimer Schlüssel ist erforderlich",
+    "serverURLRequired": "Server-URL ist erforderlich",
+    "regionRequired": "Region ist erforderlich",
+    "roleARNRequired": "Rollen-ARN ist erforderlich",
+    "back": "Zurück",
+    "continue": "Weiter",
+    "save": "Speichern",
+    "update": "Aktualisieren",
+    "awsStsCloudInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Sie müssen das Openobservate-AWS-Konto als vertrauenswürdigen Entitätstyp für diese Rolle in der AWS-Konsole hinzufügen. Bitte wenden Sie sich an das Openobserve-Team, um die Kontoinformationen zu erhalten oder weitere Hilfe bei der Einrichtung zu erhalten.",
+    "awsStsSelfHostedInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Stellen Sie sicher, dass Sie in der Installationsumgebung AWS-Anmeldeinformationen konfiguriert haben, die Zugriff auf diese Rolle haben.",
+    "externalIdRequired": "Externe ID ist erforderlich",
+    "storageAccountRequired": "Name des Speicherkontos ist erforderlich"
   }
 }

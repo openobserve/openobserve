@@ -64,7 +64,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
+          <!--
+            Two-gate visibility:
+              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
+                 NOT be `"false"`. Unset (default), `"true"`, or any
+                 other value keeps the UI visible — only the literal
+                 string `"false"` hides it. Prevents accidental hide
+                 on typo / missing .env file.
+              2. The org must have at least one traces stream flagged
+                 `is_llm_stream === true` (resolved by `Index.vue` and
+                 passed as `hasLLMStreams`).
+            We also keep the toggle visible when the user is already
+            on the LLM Insights tab (e.g., navigated via URL) so the
+            active selection isn't orphaned mid-session.
+          -->
           <OToggleGroupItem
+            v-if="
+              config.showLLMUI !== 'false' &&
+              (hasLLMStreams || searchObj.meta.searchMode === 'sessions')
+            "
+            data-test="traces-search-mode-sessions-btn"
+            value="sessions"
+            size="sm"
+          >
+            <template #icon-left
+              ><MessagesSquare class="tw:size-3.5 tw:shrink-0"
+            /></template>
+            Sessions
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            v-if="
+              config.showLLMUI !== 'false' &&
+              (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
+            "
             data-test="traces-search-mode-llm-insights-btn"
             value="llm-insights"
             size="sm"
@@ -76,12 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog' &&
-            searchObj.meta.searchMode !== 'llm-insights'
+            searchObj.meta.searchMode !== 'llm-insights' &&
+            searchObj.meta.searchMode !== 'sessions'
           "
         >
           <div
@@ -400,6 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
         searchObj.meta.searchMode !== 'llm-insights' &&
+        searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -454,7 +488,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles, MessagesSquare } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -488,6 +522,7 @@ export default defineComponent({
     Share2,
     BookOpen,
     Sparkles,
+    MessagesSquare,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -518,6 +553,16 @@ export default defineComponent({
     isLLMSpanPresent: {
       type: Boolean,
       default: false,
+    },
+    // True when the parent (`Index.vue`) has confirmed at least one
+    // traces stream is flagged `is_llm_stream === true`. Drives the
+    // LLM Insights tab visibility — we hide the toggle entirely when
+    // no org has opted in (avoids a dead button that opens an empty
+    // dashboard). Defaults to `true` so the tab doesn't flicker
+    // during the brief window before streams resolve on first mount.
+    hasLLMStreams: {
+      type: Boolean,
+      default: true,
     },
   },
   methods: {
@@ -805,7 +850,7 @@ export default defineComponent({
 
     // Apply multiple filter terms independently (replace-or-append per field).
     // Used by parent (Index.vue) for metrics brush selections and error toggle.
-    const applyFilters = (terms: string[]) => {
+    const applyFilters = (terms: string[], skipSearch = false) => {
       let current = searchObj.data.editorValue;
       for (const term of terms) {
         current = applyFilterTerm(term, current);
@@ -813,7 +858,8 @@ export default defineComponent({
       searchObj.data.editorValue = current;
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(current);
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+      // Only trigger search if not explicitly skipped
+      if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
     };

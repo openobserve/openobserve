@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           @click.stop="addTab"
-          data-test="`dashboard-panel-query-tab-add`"
+          data-test="dashboard-panel-query-tab-add"
         >
           <template #icon-left><q-icon name="add" /></template>
         </OButton>

@@ -279,8 +279,16 @@ size="sm">
                 /></template>
                 DAG
               </OToggleGroupItem>
+              <!--
+                Thread tab gated on:
+                  1. `VITE_SHOW_LLM_UI` env flag is NOT explicitly set
+                     to `"false"`. Unset / any other value keeps the
+                     feature visible.
+                  2. The trace actually has LLM spans worth rendering
+                     as a chat (`hasLLMSpans`).
+              -->
               <OToggleGroupItem
-                v-if="hasLLMSpans"
+                v-if="config.showLLMUI !== 'false' && hasLLMSpans"
                 value="thread"
                 size="sm"
                 data-test="trace-details-thread-tab"
@@ -306,7 +314,11 @@ size="sm">
           <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
-              v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
+              v-if="
+                activeTab !== 'flame-graph' &&
+                activeTab !== 'map' &&
+                activeTab !== 'thread'
+              "
               class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
@@ -366,7 +378,7 @@ size="sm">
             </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
-              v-if="showLogStreamSelector"
+              v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
@@ -375,7 +387,7 @@ size="sm">
                 :label="
                   searchObj.data.traceDetails.selectedLogStreams.length
                     ? ''
-                    : t('search.selectIndex')
+                    : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
                 data-cy="stream-selection"
@@ -514,6 +526,7 @@ size="14px"
                   >
                     <div class="position-relative">
                       <div
+                        data-test="trace-details-resizer"
                         :style="{
                           width: '1px',
                           left: `${leftWidth}px`,
@@ -556,6 +569,7 @@ size="14px"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
                         @search-result="handleSearchResult"
+                        @view-correlated-logs="handleTreeViewCorrelatedLogs"
                       />
                     </div>
                   </div>
@@ -662,13 +676,30 @@ size="14px"
                 :spans="flatSpans"
                 :selected-span-id="selectedSpanId"
                 :trace-duration="traceMetadata?.duration_ms || 0"
-                @span-selected="updateSelectedSpan"
+                :span-map="spanMap"
+                :stream-name="currentTraceStreamName"
+                :search-query="searchQuery"
+                :parent-mode="mode"
+                :service-streams-enabled="serviceStreamsEnabled"
+                :base-trace-position="baseTracePosition"
+                @view-logs="redirectToLogs"
+                @close="closeSidebar"
+                @select-span="updateSelectedSpan"
+                @add-filter="addFilterFromSidebar"
+                @apply-filter-immediately="applyFilterImmediately"
+                @open-trace="openTraceLink"
               />
             </div>
 
-            <!-- Thread View — chat-style projection of LLM turns -->
+            <!--
+              Thread View — chat-style projection of LLM turns.
+              Same `config.showLLMUI !== 'false'` gate as the tab
+              toggle above so a stale `activeTab="thread"` (e.g. from
+              a saved URL) can't render the body when the env flag
+              has explicitly disabled the feature.
+            -->
             <div
-              v-if="activeTab === 'thread'"
+              v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
               style="display: flex; flex: 1; min-height: 0"
               class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
             >
@@ -703,11 +734,13 @@ size="14px"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :activeTab="sidebarActiveTab"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
+                  @update:activeTab="sidebarActiveTab = $event as string"
                 />
               </div>
             </div>
@@ -872,23 +905,25 @@ v-close-popup>
 import {
   defineComponent,
   ref,
-  type Ref,
   type PropType,
   onMounted,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   onBeforeMount,
   nextTick,
+  computed,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
-import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
+import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
+import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
@@ -909,7 +944,7 @@ import {
   SPAN_KIND_UNSPECIFIED,
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
-import { throttle } from "lodash-es";
+import useResizer from "@/composables/useResizer";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import {
@@ -920,6 +955,8 @@ import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -1062,7 +1099,14 @@ export default defineComponent({
     const activeTab = ref("waterfall");
     const sidebarActiveTab = ref("attributes");
 
-    const { searchObj, getUrlQueryParams } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      buildQueryDetails,
+      navigateToLogs,
+      navigateToCorrelatedLogs,
+    } = useTraces();
+
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1070,8 +1114,21 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const traceServiceMap: any = ref({});
     const { getStreams, getStream } = useStreams();
+
+    // AI copilot context provider for trace details page
+    const setupContextProvider = () => {
+      const provider = createTracesContextProvider(searchObj, store);
+      contextRegistry.register("traces", provider);
+      contextRegistry.setActive("traces");
+    };
+
+    const cleanupContextProvider = () => {
+      contextRegistry.unregister("traces");
+      contextRegistry.setActive("");
+    };
+
+    const traceServiceMap: any = ref({});
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1181,17 +1238,29 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(460);
-    const initialX: Ref<number> = ref(0);
-    const initialWidth: Ref<number> = ref(0);
-
-    const throttledResizing = ref<any>(null);
+    const {
+      value: leftWidth,
+      onMouseDown: startResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 460,
+      unit: "px",
+      throttleMs: 50,
+    });
 
     // DAG panel resize state
-    const dagLeftWidth: Ref<number> = ref(50); // percentage
-    const dagInitialX: Ref<number> = ref(0);
-    const dagInitialWidth: Ref<number> = ref(0);
-    const throttledDagResizing = ref<any>(null);
+    const {
+      value: dagLeftWidth,
+      onMouseDown: startDagResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 50,
+      minValue: 20,
+      maxValue: 80,
+      unit: "%",
+      containerRef: parentContainer,
+      throttleMs: 16,
+    });
 
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
@@ -1555,7 +1624,7 @@ export default defineComponent({
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreamFromQuery,
               );
-            } else if (logStreams.value.length > 0) {
+            } else if (logStreams.value.length === 1) {
               // Default: select the first available log stream
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreams.value[0],
@@ -1610,6 +1679,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      setupContextProvider();
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
@@ -1620,9 +1690,9 @@ export default defineComponent({
       // window.addEventListener("resize", updateHeight);
     });
 
-    // onBeforeUnmount(() => {
-    //   window.removeEventListener("resize", updateHeight);
-    // });
+    onUnmounted(() => {
+      cleanupContextProvider();
+    });
 
     // watch(
     //   () => spanList.value.length,
@@ -2431,56 +2501,7 @@ export default defineComponent({
       updateHeight();
     };
 
-    onMounted(() => {
-      throttledResizing.value = throttle(resizing, 50);
-    });
-
-    const startResize = (event: any) => {
-      initialX.value = event.clientX;
-      initialWidth.value = leftWidth.value;
-
-      window.addEventListener("mousemove", throttledResizing.value);
-      window.addEventListener("mouseup", stopResize);
-      document.body.classList.add("no-select");
-    };
-
-    const resizing = (event: any) => {
-      const deltaX = event.clientX - initialX.value;
-      leftWidth.value = initialWidth.value + deltaX;
-    };
-
-    const stopResize = () => {
-      window.removeEventListener("mousemove", throttledResizing.value);
-      window.removeEventListener("mouseup", stopResize);
-      document.body.classList.remove("no-select");
-    };
-
-    // DAG panel resize handlers
-    const startDagResize = (event: MouseEvent) => {
-      dagInitialX.value = event.clientX;
-      dagInitialWidth.value = dagLeftWidth.value;
-
-      throttledDagResizing.value = throttle(dagResizing, 16);
-      window.addEventListener("mousemove", throttledDagResizing.value);
-      window.addEventListener("mouseup", stopDagResize);
-      document.body.classList.add("no-select");
-    };
-
-    const dagResizing = (event: MouseEvent) => {
-      if (!parentContainer.value) return;
-      const containerWidth = parentContainer.value.clientWidth;
-      const deltaX = event.clientX - dagInitialX.value;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = dagInitialWidth.value + deltaPercent;
-      // Constrain between 20% and 80%
-      dagLeftWidth.value = Math.max(20, Math.min(80, newWidth));
-    };
-
-    const stopDagResize = () => {
-      window.removeEventListener("mousemove", throttledDagResizing.value);
-      window.removeEventListener("mouseup", stopDagResize);
-      document.body.classList.remove("no-select");
-    };
+    // Resizers are now handled by useResizer composable
 
     const toggleTimeline = () => {
       isTimelineExpanded.value = !isTimelineExpanded.value;
@@ -2523,6 +2544,10 @@ export default defineComponent({
       if (customFrom) queryParams.from = customFrom;
       if (customTo) queryParams.to = customTo;
 
+      if(effectiveStreamName.value){
+        queryParams.stream = effectiveStreamName.value as string;
+      }
+
       const searchParams = new URLSearchParams();
       for (const [key, value] of Object.entries(queryParams)) {
         searchParams.append(key, String(value));
@@ -2546,7 +2571,9 @@ export default defineComponent({
       store.dispatch("logs/setIsInitialized", false);
 
       const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
+        config.isEnterprise === "true"
+          ? logStreams.value.join(",")
+          : searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
@@ -2554,7 +2581,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -2573,6 +2600,16 @@ export default defineComponent({
           quick_mode: "false",
         },
       });
+    };
+
+    const handleTreeViewCorrelatedLogs = (span: any) => {
+      const spanId = span.spanId || span.span_id;
+      updateSelectedSpan(spanId);
+
+      const correlationData = searchObj.data.traceDetails.correlationProps;
+      if (correlationData) {
+        navigateToCorrelatedLogs(correlationData);
+      }
     };
 
     const redirectToSessionReplay = () => {
@@ -2851,6 +2888,10 @@ export default defineComponent({
     return {
       router,
       t,
+      // Exposed for the template `v-if` gating the LLM Observability
+      // surfaces (Thread tab toggle + ThreadView body) behind
+      // `config.showLLMUI`.
+      config,
       activeTab,
       sidebarActiveTab,
       traceTree,
@@ -2892,6 +2933,7 @@ export default defineComponent({
       outlinedInfo,
       outlinedPlayCircle,
       redirectToLogs,
+      handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasRumSessionId,
       firstRumSessionData,

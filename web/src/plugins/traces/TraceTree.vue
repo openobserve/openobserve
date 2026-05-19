@@ -424,6 +424,7 @@ import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "TraceTree",
@@ -493,6 +494,7 @@ export default defineComponent({
     "unhoverSpan",
     "update-current-index",
     "search-result",
+    "view-correlated-logs",
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
@@ -500,6 +502,9 @@ export default defineComponent({
 
     const { t } = useI18n();
     const router = useRouter();
+
+    // As there are some UX issues, disabling it for now
+    const enableHoverSelection = false;
 
     // ── Virtualizer ──────────────────────────────────────────────────────────
     const rowVirtualizer = useVirtualizer(
@@ -585,13 +590,17 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
     const onHoverSpan = (spanId: string) => {
-      emit("hoverSpan", spanId);
+      if(enableHoverSelection) emit("hoverSpan", spanId);
     };
     const onUnhoverSpan = () => {
-      emit("unhoverSpan");
+     if(enableHoverSelection) emit("unhoverSpan");
     };
 
     const viewSpanLogs = (span: any) => {
+      if (config.isEnterprise === "true") {
+        emit("view-correlated-logs", span);
+        return;
+      }
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };

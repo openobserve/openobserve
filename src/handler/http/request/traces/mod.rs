@@ -19,7 +19,10 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
-        search::{SearchPartitionRequest, StreamResponses, TimeOffset, default_use_cache},
+        search::{
+            PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset,
+            default_use_cache,
+        },
         stream::StreamType,
     },
     metrics,
@@ -53,8 +56,22 @@ use crate::{
 };
 
 pub mod dag;
+mod schema_compat;
 pub mod session;
 pub mod user;
+
+#[derive(Default, Clone, Debug)]
+pub(crate) struct TraceDetail {
+    pub(crate) start_time: i64,
+    pub(crate) end_time: i64,
+    pub(crate) gen_ai_usage_input_tokens: i64,
+    pub(crate) gen_ai_usage_output_tokens: i64,
+    pub(crate) gen_ai_usage_total_tokens: i64,
+    pub(crate) gen_ai_usage_cost: f64,
+    pub(crate) error_count: i64,
+    pub(crate) user_id: Option<String>,
+    pub(crate) first_user_message: Option<String>,
+}
 
 /// TracesIngest
 #[utoipa::path(
@@ -311,6 +328,13 @@ pub async fn get_latest_traces(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
+    let has_gen_ai_fields = is_llm_stream
+        && schema_compat::stream_has_gen_ai_fields(
+            org_id.as_str(),
+            stream_name.as_str(),
+            StreamType::Traces,
+        )
+        .await;
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -335,7 +359,7 @@ pub async fn get_latest_traces(
     let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
-    let query_sql = if is_llm_stream {
+    let query_sql = if is_llm_stream && has_gen_ai_fields {
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -344,7 +368,24 @@ pub async fn get_latest_traces(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
+            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    } else if is_llm_stream {
+        // Legacy `_o2_llm` schema (pre-PR #11626): columns live under `llm_*`
+        // names and the messages column is `llm_input`. Per-direction cost is
+        // not stored separately, so we emit only the total.
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
+            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
+            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -489,6 +530,15 @@ pub async fn get_latest_traces(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
                 gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+                models: item
+                    .get("gen_ai_response_models")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             },
         );
     }
@@ -707,6 +757,27 @@ pub async fn get_latest_traces(
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .inc();
                 log::error!("get traces latest service-breakdown error: {err:?}");
                 return map_error_to_http_response(&err, Some(trace_id));
             }
@@ -774,17 +845,18 @@ pub async fn get_latest_traces(
         ])
         .inc();
 
-    let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from((time * 1000.0) as usize));
-    resp.insert("total", json::Value::from(traces_data.len()));
-    resp.insert("from", json::Value::from(from));
-    resp.insert("size", json::Value::from(size));
-    resp.insert("hits", json::to_value(traces_data).unwrap());
-    resp.insert("trace_id", json::Value::from(trace_id));
-    if !range_error.is_empty() {
-        resp.insert("function_error", json::Value::String(range_error));
-    }
-    MetaHttpResponse::json(resp)
+    MetaHttpResponse::json(PaginatedResponse {
+        took: (time * 1000.0) as usize,
+        total: traces_data.len(),
+        from,
+        size,
+        hits: traces_data
+            .into_iter()
+            .map(|v| json::to_value(v).unwrap())
+            .collect(),
+        trace_id,
+        function_error: range_error,
+    })
 }
 
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces
@@ -952,6 +1024,13 @@ pub async fn get_latest_traces_stream(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
+    let has_gen_ai_fields = is_llm_stream
+        && schema_compat::stream_has_gen_ai_fields(
+            org_id.as_str(),
+            stream_name.as_str(),
+            StreamType::Traces,
+        )
+        .await;
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -1004,6 +1083,7 @@ pub async fn get_latest_traces_stream(
             sort_order.to_string(),
             sql_order_expr,
             is_llm_stream,
+            has_gen_ai_fields,
             use_cache,
             range_error,
             tx,
@@ -1067,6 +1147,7 @@ async fn process_latest_traces_stream(
     sort_order: String,
     sql_order_expr: String,
     is_llm_stream: bool,
+    has_gen_ai_fields: bool,
     use_cache: bool,
     range_error: String,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
@@ -1091,7 +1172,7 @@ async fn process_latest_traces_stream(
     };
 
     // Build the aggregation SQL (Query 1) — identical to get_latest_traces
-    let query_sql_base = if is_llm_stream {
+    let query_sql_base = if is_llm_stream && has_gen_ai_fields {
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1100,7 +1181,23 @@ async fn process_latest_traces_stream(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
+            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    } else if is_llm_stream {
+        // Legacy `_o2_llm` schema (pre-PR #11626): see comment in
+        // `get_latest_traces` for column mapping rationale.
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
+            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
+            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -1193,11 +1290,25 @@ async fn process_latest_traces_stream(
     // Partitions from search_partition are already in DESC order (newest-first) by default,
     // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
     let partitions_desc = if sql_order_expr == "zo_sql_timestamp DESC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=DESC",
+            partitions.len()
+        );
         partitions
     } else if sql_order_expr == "zo_sql_timestamp ASC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
+            partitions.len()
+        );
         partitions.into_iter().rev().collect::<Vec<_>>()
     } else {
         // order by other fields can't be multiple partitions
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] sort_by non-timestamp ({sql_order_expr}), \
+            forcing single partition [{}, {}]",
+            partition_req.start_time,
+            partition_req.end_time,
+        );
         vec![[partition_req.start_time, partition_req.end_time]]
     };
 
@@ -1387,6 +1498,15 @@ async fn process_latest_traces_stream(
                         item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                     ),
                     gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+                    models: item
+                        .get("gen_ai_response_models")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 },
             );
         }
@@ -1707,6 +1827,7 @@ struct TraceResponseItem {
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
     gen_ai_input_messages: Option<serde_json::Value>,
+    models: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize)]

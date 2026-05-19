@@ -371,15 +371,15 @@ class="tw:h-full tw:overflow-y-auto">
           name="preview"
           class="llm-preview-panel q-pa-md"
         >
-          <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
+          <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="flex io-container tw:w-full!"
+              class="flex io-container tw:w-full! tw:h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -446,7 +446,7 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -919,6 +919,7 @@ import {
   formatTimeWithSuffix,
   convertTimeFromNsToUs,
   getImageURL,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -928,6 +929,7 @@ import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import {
@@ -953,6 +955,7 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1071,7 +1074,7 @@ export default defineComponent({
       rowsPerPage: 0,
     });
     const q = useQuasar();
-    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+    const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
     // JSON syntax highlighting colors - using CSS variables for theme-aware colors
@@ -1501,9 +1504,14 @@ export default defineComponent({
     );
 
     const viewSpanLogs = () => {
-      const queryDetails = buildQueryDetails(props.span);
-      navigateToLogs(queryDetails);
+      if(config.isEnterprise === 'true'){
+        navigateToCorrelatedLogs(correlationProps.value)
+      } else {
+        const queryDetails = buildQueryDetails(props.span);
+        navigateToLogs(queryDetails);
+      }
     };
+
 
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
@@ -1588,7 +1596,12 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
-    const { findRelatedTelemetry } = useServiceCorrelation();
+    const { findRelatedTelemetry, loadSemanticGroups } = useServiceCorrelation();
+
+    // Write correlation data to shared searchObj for TraceDetails to use
+    watch(correlationProps, (newVal) => {
+      searchObj.data.traceDetails.correlationProps = newVal;
+    });
 
     /**
      * Extract dimensions from span attributes for correlation
@@ -1691,12 +1704,6 @@ export default defineComponent({
         const spanDimensions = extractSpanDimensions(props.span);
         // Merge span dimensions into context fields for semantic extraction
         Object.assign(context.fields, spanDimensions);
-
-        console.log("[TraceDetailsSidebar] Correlation context:", {
-          streamName: props.streamName,
-          serviceName: props.span.service_name,
-          dimensions: spanDimensions,
-        });
 
         // Find related telemetry
         const result = await findRelatedTelemetry(
@@ -2067,6 +2074,10 @@ export default defineComponent({
   :deep(.q-btn) {
     padding: 0.25rem 0.5rem;
   }
+}
+
+:deep(.span_details_tab-panels .o-tab-panel) {
+  height: 100%;
 }
 
 :deep(.traces-correlated-metrics-container) {
@@ -2643,25 +2654,13 @@ body.body--dark {
   }
 }
 
-.llm-preview-panel {
+.llm-preview-container {
   overflow: hidden; // Prevent scroll at panel level
 
   .section-label {
     color: var(--o2-text-primary);
     font-size: 14px;
     margin-bottom: 0.5rem;
-  }
-
-  .io-container {
-    display: flex;
-    gap: 0.5rem;
-    width: calc(100vw - 350px);
-    height: calc(
-      100vh - 17.2rem
-    ); // Fixed height for the container (with 2-row toolbar for LLM spans)
-    max-height: calc(100vh - 17.2rem);
-    align-items: stretch; // Ensure equal heights
-    overflow: hidden; // Prevent scroll at outer level
   }
 
   .io-section {

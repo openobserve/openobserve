@@ -125,7 +125,9 @@
     "resources": "Kaynaklar",
     "updated_at": "Güncellendi:",
     "error": "Hata",
-    "db": "Veritabanı"
+    "db": "Veritabanı",
+    "discardChanges": "Değişiklikleri iptal et",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -393,7 +395,8 @@
     "selectStreamFirst": "Önce bir yayın seçin",
     "traces": "İzleri",
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
-    "patternNoValuesAvailable": "Mevcut değer yok"
+    "patternNoValuesAvailable": "Mevcut değer yok",
+    "selectLogStream": "Günlükler akışını seçin"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -787,7 +790,8 @@
     "no_keep_current": "Hayır, güncel tut",
     "feature_correlation_management": "Korelasyon yönetimi",
     "feature_log_patterns": "Günlük kalıpları",
-    "environment_type": "Ortam Türü"
+    "environment_type": "Ortam Türü",
+    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir."
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -2943,7 +2947,75 @@
     "copyStacktrace": "Stacktrace'i kopyala",
     "noStacktraceAvailable": "Yığın izleme mevcut değil",
     "stacktraceCopied": "Stacktrace panoya kopyalandı",
-    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM akışı mevcut değil.",
+      "session": "oturum, toplantı, celse",
+      "sessions": "oturumları",
+      "countPill": "{total} {unit} {count}",
+      "noStreamsFound": "LLM akışı bulunamadı",
+      "noStreamsDescription1": "Oturum grubu şunları kapsar:",
+      "noStreamsDescription2": "LLM akışları olarak işaretlenmiş izleme akışları arasında. Ya böyle bir akış yoktur ya da henüz hiçbir açıklık alınmamıştır.",
+      "failedToLoad": "Oturumlar yüklenemedi",
+      "retry": "Tekrar dene",
+      "noSessionsFound": "Oturum bulunamadı",
+      "noSessionsDescription": "{stream} üzerinde bu zaman aralığında hiçbir LLM oturumu kaydedilmedi. Zaman aralığını genişletmeyi veya farklı bir akışa geçmeyi deneyin.",
+      "loading": "Oturumlar yükleniyor...",
+      "tokenTooltip": "Giriş: {input} · Çıktı: {output} · Toplam: {toplam}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zaman damgası",
+        "sessionId": "Oturum Kimliği",
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "tokens": "Jetonlar",
+        "cost": "Maliyet",
+        "status": "Durum"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Oturumlara Dön",
+      "pageTitle": "Oturum Detayı",
+      "failedToLoad": "Oturum yüklenemedi",
+      "retry": "Tekrar dene",
+      "sessionNotFound": "Oturum bulunamadı",
+      "noSpansFound": "Geçerli zaman aralığında {id} için hiçbir açıklık bulunamadı.",
+      "searchPlaceholder": "Bu oturumdaki izleri ara...",
+      "turn": "dönüş",
+      "turns": "sıralar",
+      "turnsShown": "{total} {unit} 'den {filtrelenmiş} gösterildi",
+      "userBadge": "Kullanıcı",
+      "sessionPrefix": "oturum, toplantı, celse",
+      "copySessionId": "Oturum kimliğini kopyala",
+      "openInTraceExplorer": "Trace explorer'da aç",
+      "unknownUser": "Bilinmeyen kullanıcı",
+      "kpi": {
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "inputTokens": "Giriş Belirteçleri",
+        "outputTokens": "Çıktı Belirteçleri",
+        "cost": "Maliyet"
+      },
+      "conversation": "Konuşma",
+      "turnLabel": "Döndür",
+      "openTrace": "İzini aç",
+      "noUserMessage": "Bu tur için kullanıcı mesajı alınmadı.",
+      "noAssistantMessage": "Bu tur için asistan yanıtı alınmadı.",
+      "roles": {
+        "user": "Kullanıcı",
+        "assistant": "asistan"
+      },
+      "stats": {
+        "status": "Durum",
+        "model": "Modeli",
+        "tokens": "Jetonlar",
+        "input": "Giriş",
+        "output": "Çıktı",
+        "total": "Toplam",
+        "cost": "Maliyet",
+        "spans": "Açıklıklar"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3710,5 +3782,52 @@
     "clearAll": "Tümünü temizle",
     "clearAllTitle": "Tüm sohbetleri temizle",
     "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
+  },
+  "storage_settings": {
+    "tabLabel": "Kuruluş Depolama",
+    "title": "Kuruluş Depolama",
+    "notEnabled": "kuruluş depolama alanı bu kuruluş için etkin değil",
+    "notConfigured": "bu kuruluşun verileri için özel bir depolama sağlayıcısı yapılandırma",
+    "configured": "yapılandırılmış",
+    "heroHeadline": "Kendi depolarınızı getirin",
+    "heroSub": "Kendi bulut paketinizi bağlayın, veriler altyapınızda kalır - tam kontrol, sıfır kilit.",
+    "configureStorage": "Depolamayı yapılandırın",
+    "supportedProviders": "Desteklenen sağlayıcılar",
+    "noStorageConfigured": "Depolama yapılandırılmamış",
+    "routeDataDesc": "Bu kuruluşun verilerini, diğer organizasyonlardan ve global varsayılanlardan bağımsız olarak özel bir depoya yönlendirin.",
+    "perOrgIsolation": "Kuruluş başına izolasyon",
+    "appliesImmediately": "Yeni verilere hemen uygulanır",
+    "usesOrgCredentials": "Organ kapsamındaki kimlik bilgilerini kullanır",
+    "updateStorage": "Depolama Alanını Güncelle",
+    "active": "aktif",
+    "bucketName": "kepçe adı",
+    "region": "bölge",
+    "serverUrl": "sunucu URL'si",
+    "accessKey": "erişim anahtarı",
+    "secretKey": "gizli anahtar",
+    "roleArn": "rol arn",
+    "createdAt": "şurada oluşturuldu",
+    "updatedAt": "güncellendi",
+    "featureOwnDataTitle": "Verilerinize uçtan uca sahip olun",
+    "featureOwnDataDesc": "Alınan verileri doğrudan kendi klasörünüzde saklayın ve bunlara kimlerin erişebileceğini tam olarak kontrol edin.",
+    "featureSecureTitle": "Güvenli ve uyumlu",
+    "featureSecureDesc": "İnce taneli erişim anahtarları, hassas verileriniz altyapınızda kalır.",
+    "goBack": "Geri Dön",
+    "newStorageConfiguration": "Yeni Depolama Yapılandırması",
+    "selectProviderDesc": "Bu kuruluşun verilerini depolamak için bir bulut depolama sağlayıcısı seçin.",
+    "bucketNameRequired": "Kepçe adı zorunludur",
+    "accessKeyRequired": "Erişim anahtarı gereklidir",
+    "secretKeyRequired": "Gizli anahtar gereklidir",
+    "serverURLRequired": "Sunucu URL'si gereklidir",
+    "regionRequired": "Bölge gereklidir",
+    "roleARNRequired": "ARN rolü gereklidir",
+    "back": "Geri",
+    "continue": "Devamı",
+    "save": "Kaydet",
+    "update": "Güncelleme",
+    "awsStsCloudInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. AWS konsolunda bu rol için Openobserver AWS hesabını güvenilir varlık türü olarak eklemeniz gerekir. Hesap bilgilerini almak veya bunu ayarlamak için daha fazla yardım almak için lütfen Openobserver ekibiyle iletişime geçin.",
+    "awsStsSelfHostedInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. Kurulum ortamında bu role erişimi olan aws kimlik bilgilerini yapılandırdığınızdan emin olun.",
+    "externalIdRequired": "Harici kimlik gereklidir",
+    "storageAccountRequired": "Depolama Hesabı adı gereklidir"
   }
 }

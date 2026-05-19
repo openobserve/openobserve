@@ -77,6 +77,7 @@ macro_rules! process_numeric_array {
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
+    org_id: &str,
     parquet_file_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
@@ -117,7 +118,7 @@ pub(crate) async fn create_tantivy_index(
     }
 
     // the index file is stored in the same account as the parquet file
-    let account = storage::get_account(parquet_file_name).unwrap_or_default();
+    let account = storage::get_account(org_id, parquet_file_name).unwrap_or_default();
     match storage::put(&account, &idx_file_name, buf).await {
         Ok(_) => {
             log::info!(
@@ -727,6 +728,7 @@ mod tests {
         // Test that create_tantivy_index returns 0 for empty data
         let result = create_tantivy_index(
             "test_caller",
+            "default",
             "test_file.parquet",
             &["content".to_string()],
             &["status".to_string()],
@@ -747,6 +749,7 @@ mod tests {
         // Test that create_tantivy_index returns 0 when no fields to index
         let result = create_tantivy_index(
             "test_caller",
+            "default",
             "test_file.parquet",
             &[], // No FTS fields
             &[], // No index fields
@@ -767,6 +770,7 @@ mod tests {
         // Test with an invalid parquet filename that won't convert to tantivy filename
         let result = create_tantivy_index(
             "test_caller",
+            "default",
             "invalid_filename", // This won't convert to a valid tantivy filename
             &["content".to_string()],
             &["status".to_string()],

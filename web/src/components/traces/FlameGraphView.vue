@@ -7,124 +7,173 @@
     class="flame-graph-view tw:flex tw:flex-col tw:h-full tw:bg-white tw:w-full tw:bg-[var(--o2-card-bg)]!"
     style="min-height: 400px; height: 100%"
   >
-    <!-- Controls Bar -->
-    <div
-      class="tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-[var(--o2-card-bg)]!"
-    >
-      <div class="tw:flex tw:items-center tw:space-x-4">
-        <div class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-secondary)]">
-          <span class="tw:text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
-          spans
-          <span class="tw:mx-2">•</span>
-          <span class="tw:text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
-          depth
-        </div>
-      </div>
-    </div>
-
-    <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
-    <div
-      class="tw:flex tw:flex-col tw:flex-1"
-      style="min-height: 0"
-      @mousemove="handleChartMouseMove"
-      @mouseleave="cursorVisible = false"
-    >
-      <!-- Timeline Ruler — stays fixed above the scrollable chart -->
+    <!-- Upper area: controls + ruler + chart -->
+    <div class="tw:flex tw:flex-col tw:flex-1" style="min-height: 0">
+      <!-- Controls Bar -->
       <div
-        class="tw:relative tw:bg-[var(--o2-card-bg)] tw:select-none tw:flex-shrink-0"
-        style="height: 1.5rem"
+        class="tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-[var(--o2-card-bg)]!"
       >
-        <!-- Static tick labels -->
-        <span
-          v-for="(tick, index) in timelineTicks"
-          :key="'lbl-' + index"
-          class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
-          style="top: 50%; padding-left: 3px"
-          :style="{ left: tick.left, transform: tick.transform }"
-          >{{ tick.label }}</span
-        >
-
-        <!-- Static tick marks — skip first and last -->
-        <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
+        <div class="tw:flex tw:items-center tw:space-x-4">
           <div
-            v-if="index > 0 && index < timelineTicks.length - 1"
-            class="tw:absolute tw:w-px"
-            style="bottom: 0; height: 100%; background: #aaa"
-            :style="{ left: tick.left, transform: 'translateX(-50%)' }"
-          ></div>
-        </template>
-
-        <!-- Cursor time badge with downward arrow -->
-        <div
-          v-if="cursorVisible"
-          class="tw:absolute tw:pointer-events-none tw:flex tw:flex-col tw:items-center"
-          style="top: 2px; z-index: 20; transform: translateX(-50%)"
-          :style="{ left: cursorX + 'px' }"
-        >
-          <div
-            class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
-            style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
+            class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-secondary)]"
           >
-            {{ cursorTimeLabel }}
+            <span class="tw:text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
+            spans
+            <span class="tw:mx-2">•</span>
+            <span class="tw:text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
+            depth
           </div>
-          <div
-            style="
-              width: 0;
-              height: 0;
-              border-left: 4px solid transparent;
-              border-right: 4px solid transparent;
-              border-top: 5px solid rgba(30, 30, 30, 0.9);
-              margin-top: 0;
-            "
-          ></div>
         </div>
       </div>
 
-      <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
+      <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
-        class="tw:flex-1 tw:overflow-y-auto tw:relative"
+        data-test="flame-graph-view-chart-wrapper"
+        class="tw:flex tw:flex-col tw:flex-1"
         style="min-height: 0"
+        @mousemove="handleChartMouseMove"
+        @mouseleave="cursorVisible = false"
       >
+        <!-- Timeline Ruler — stays fixed above the scrollable chart -->
         <div
-          :style="{
-            height: chartContentHeight + 'px',
-            minHeight: '100%',
-            position: 'relative',
-          }"
+          class="tw:relative tw:bg-[var(--o2-card-bg)] tw:select-none tw:flex-shrink-0"
+          style="height: 1.5rem"
         >
-          <ChartRenderer
-            v-if="hasData"
-            :data="chartData"
-            style="height: 100%; width: 100%"
-            @click="handleChartClick"
-          />
+          <!-- Static tick labels -->
+          <span
+            v-for="(tick, index) in timelineTicks"
+            :key="'lbl-' + index"
+            class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
+            style="top: 50%; padding-left: 3px"
+            :style="{ left: tick.left, transform: tick.transform }"
+            >{{ tick.label }}</span
+          >
 
-          <!-- Vertical cursor line -->
+          <!-- Static tick marks — skip first and last -->
+          <template
+            v-for="(tick, index) in timelineTicks"
+            :key="'tic-' + index"
+          >
+            <div
+              v-if="index > 0 && index < timelineTicks.length - 1"
+              class="tw:absolute tw:w-px"
+              style="bottom: 0; height: 100%; background: #aaa"
+              :style="{ left: tick.left, transform: 'translateX(-50%)' }"
+            ></div>
+          </template>
+
+          <!-- Cursor time badge with downward arrow -->
           <div
             v-if="cursorVisible"
-            class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
-            style="width: 1px; background: rgba(80, 80, 80, 0.6); z-index: 10"
+            class="tw:absolute tw:pointer-events-none tw:flex tw:flex-col tw:items-center"
+            style="top: 2px; z-index: 20; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
-          ></div>
+          >
+            <div
+              class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
+              style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
+            >
+              {{ cursorTimeLabel }}
+            </div>
+            <div
+              style="
+                width: 0;
+                height: 0;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid rgba(30, 30, 30, 0.9);
+                margin-top: 0;
+              "
+            ></div>
+          </div>
+        </div>
+
+        <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
+        <div
+          ref="chartScrollRef"
+          class="tw:flex-1 tw:overflow-y-auto tw:relative"
+          style="min-height: 0"
+        >
+          <div
+            :style="{
+              height: chartContentHeight + 'px',
+              minHeight: '100%',
+              position: 'relative',
+            }"
+          >
+            <ChartRenderer
+              v-if="hasData"
+              :data="chartData"
+              style="height: 100%; width: 100%"
+              @click="handleChartClick"
+            />
+
+            <!-- Vertical cursor line -->
+            <div
+              v-if="cursorVisible"
+              class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
+              style="
+                width: 1px;
+                background: rgba(80, 80, 80, 0.6);
+                z-index: 10;
+              "
+              :style="{ left: cursorX + 'px' }"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        v-if="!hasData"
+        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:bg-white"
+        style="top: 60px"
+      >
+        <div class="tw:text-center tw:text-[var(--o2-text-secondary)]">
+          <div class="tw:text-sm">No spans to display</div>
         </div>
       </div>
     </div>
 
-    <!-- Empty State -->
+    <!-- Resize handle -->
     <div
-      v-if="!hasData"
-      class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:bg-white"
-      style="top: 60px"
+      v-if="sidebarVisible"
+      class="tw:h-1 tw:cursor-row-resize tw:bg-[var(--o2-border)] hover:tw:bg-[var(--o2-primary-color)] tw:flex-shrink-0 tw:transition-colors"
+      style="min-height: 4px"
+      data-test="flame-graph-resizer"
+      @mousedown="startResize"
+    ></div>
+
+    <!-- Bottom panel: Trace Details Sidebar -->
+    <div
+      v-if="sidebarVisible"
+      data-test="trace-details-flame-graph-sidebar"
+      class="tw:border-t tw:border-t-solid tw:border-t-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]! tw:flex-shrink-0 tw:overflow-hidden"
+      :style="{ height: bottomPanelHeight + 'px' }"
     >
-      <div class="tw:text-center tw:text-[var(--o2-text-secondary)]">
-        <div class="tw:text-sm">No spans to display</div>
-      </div>
+      <TraceDetailsSidebar
+        :span="selectedSpan"
+        :base-trace-position="baseTracePosition"
+        :search-query="searchQuery"
+        :stream-name="streamName"
+        :service-streams-enabled="serviceStreamsEnabled"
+        :parent-mode="parentMode"
+        :active-tab="sidebarActiveTab"
+        @view-logs="$emit('view-logs')"
+        @close="closeSidebar"
+        @select-span="handleSelectSpan"
+        @open-trace="$emit('open-trace')"
+        @add-filter="(payload: any) => $emit('add-filter', payload)"
+        @apply-filter-immediately="(payload: any) => $emit('apply-filter-immediately', payload)"
+        @update:active-tab="sidebarActiveTab = $event as string"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from "vue";
+import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
@@ -134,20 +183,43 @@ const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
+const TraceDetailsSidebar = defineAsyncComponent(
+  () => import("@/plugins/traces/TraceDetailsSidebar.vue")
+);
+
 // Props
 interface Props {
   spans: EnrichedSpan[];
   selectedSpanId?: string | null;
   traceDuration: number;
+  spanMap: Record<string, any>;
+  streamName: string;
+  searchQuery: string;
+  parentMode: string;
+  serviceStreamsEnabled: boolean;
+  baseTracePosition: any;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectedSpanId: null,
+  streamName: "",
+  searchQuery: "",
+  parentMode: "standalone",
+  serviceStreamsEnabled: false,
+  spanMap: () => ({}),
+  baseTracePosition: () => ({}),
 });
 
 // Emits
 const emit = defineEmits<{
-  "span-selected": [spanId: string, boolean];
+  "view-logs": [];
+  close: [];
+  "select-span": [spanId: string];
+  "add-filter": [payload: { field: string; value: string; operator: "=" | "!=" }];
+  "apply-filter-immediately": [
+    payload: { field: string; value: string; operator: "=" | "!=" },
+  ];
+  "open-trace": [];
 }>();
 
 // Composables
@@ -157,6 +229,21 @@ const { searchObj } = useTraces();
 const cursorVisible = ref(false);
 const cursorX = ref(0);
 const cursorTimeLabel = ref("");
+const sidebarVisible = ref(false);
+const sidebarActiveTab = ref("attributes");
+const {
+  value: bottomPanelHeight,
+  onMouseDown: startResize,
+} = useResizer({
+  direction: "vertical",
+  initialValue: 360,
+  minValue: 200,
+  maxValue: window.innerHeight * 0.7,
+  unit: "px",
+  throttleMs: 50,
+  invert: true,
+});
+const chartScrollRef = ref<HTMLElement | null>(null);
 
 // Constants
 const BLOCK_PADDING = 2;
@@ -188,6 +275,12 @@ const timelineTicks = computed(() => {
         ? "translateX(-100%) translateY(-50%)"
         : "translateY(-50%)",
   }));
+});
+
+// Selected span lookup from spanMap
+const selectedSpan = computed(() => {
+  if (!props.selectedSpanId) return null;
+  return props.spanMap[props.selectedSpanId] ?? null;
 });
 
 // Assigns a collision-free visual row to each span using a tree-aware DFS.
@@ -462,28 +555,58 @@ const handleChartMouseMove = (event: any) => {
   const rect = event.currentTarget.getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
-  const fraction = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
+  const fraction = Math.max(
+    0,
+    Math.min(1, (offsetX - GRID_LEFT) / gridWidth),
+  );
 
   cursorX.value = offsetX;
   cursorTimeLabel.value = formatDuration(fraction * props.traceDuration);
   cursorVisible.value = true;
 };
 
+// Scroll the chart to make a span visible
+const scrollToSpan = (spanId: string) => {
+  const row = visualLayout.value.rowMap.get(spanId);
+  if (row === undefined || !chartScrollRef.value) return;
+  const yPos = row * (BLOCK_HEIGHT + BLOCK_PADDING);
+  chartScrollRef.value.scrollTop = yPos;
+};
+
 // Handle click events from ChartRenderer
 const handleChartClick = (params: any) => {
-  if (params.data && params.data.spanData) {
-    emit("span-selected", params.data.spanData.span_id, true);
+  if (params.data?.spanData) {
+    emit("select-span", params.data.spanData.span_id);
+    sidebarVisible.value = true;
+    nextTick(() => scrollToSpan(params.data.spanData.span_id));
   }
 };
+
+// Close the bottom sidebar
+const closeSidebar = () => {
+  sidebarVisible.value = false;
+  emit("close");
+};
+
+// Handle span selection from within the sidebar (e.g., clicking a link)
+const handleSelectSpan = (spanId: string) => {
+  nextTick(() => scrollToSpan(spanId));
+  emit("select-span", spanId);
+};
+
+// Watch for external selectedSpanId clear (e.g., closeSidebar in parent)
+watch(
+  () => props.selectedSpanId,
+  (newVal) => {
+    if (!newVal) {
+      sidebarVisible.value = false;
+    }
+  },
+);
+
+// Resizer is now handled by useResizer composable
+
 </script>
 
 <style scoped lang="scss">
-.flame-graph-view {
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-}
 </style>

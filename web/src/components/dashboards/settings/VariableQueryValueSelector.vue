@@ -110,14 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
           <q-item-section>
             <q-item-label>
-              <span
-                v-html="
-                  typeof opt.value === 'string' &&
-                  opt.value.endsWith(`${CUSTOM_VALUE}`)
-                    ? `${opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), '')} (Custom)`
-                    : opt.label
-                "
-              ></span>
+              <span>{{
+                typeof opt.value === 'string' &&
+                opt.value.endsWith(`${CUSTOM_VALUE}`)
+                  ? `${opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), '')} (Custom)`
+                  : opt.label
+              }}</span>
             </q-item-label>
           </q-item-section>
         </q-item>

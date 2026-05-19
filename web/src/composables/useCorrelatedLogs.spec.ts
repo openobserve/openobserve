@@ -73,8 +73,8 @@ describe("useCorrelatedLogs", () => {
         region: "us-west",
       },
       logStreams: [
-        { name: "app-logs", stream_type: "logs" },
-        { name: "system-logs", stream_type: "logs" },
+        { stream_name: "app-logs", stream_type: "logs", filters: { service: "api", environment: "prod" } },
+        { stream_name: "system-logs", stream_type: "logs", filters: { service: "api", environment: "prod" } },
       ],
       sourceStream: "app-logs",
       sourceType: "logs",
@@ -116,10 +116,16 @@ describe("useCorrelatedLogs", () => {
       expect(composable.currentTimeRange.value).toEqual(props.timeRange);
     });
 
-    it("should set primaryStream correctly", () => {
+    it("should expose logStreamsCount correctly", () => {
       const composable = useCorrelatedLogs(props);
 
-      expect(composable.primaryStream.value).toBe("app-logs");
+      expect(composable.logStreamsCount.value).toBe(2);
+    });
+
+    it("should expose logStreamsCount as 0 when empty", () => {
+      const propsWithEmpty = { ...props, logStreams: [] };
+      const composable = useCorrelatedLogs(propsWithEmpty);
+      expect(composable.logStreamsCount.value).toBe(0);
     });
   });
 
@@ -158,13 +164,14 @@ describe("useCorrelatedLogs", () => {
     it("should compute isLoading correctly", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
-          // Simulate metadata and complete
-          callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 0, took: 5 } }
+          // Schedule callbacks asynchronously so loading state can be observed
+          return Promise.resolve().then(() => {
+            callbacks.data(null, {
+              type: 'search_response_metadata',
+              content: { results: { total: 0, took: 5 } }
+            });
+            callbacks.complete(null);
           });
-          callbacks.complete(null);
-          return Promise.resolve();
         }
       );
 
@@ -333,11 +340,11 @@ describe("useCorrelatedLogs", () => {
   });
 
   describe("Query Building", () => {
-    it("should build basic query from props", () => {
+    it("should build queries for all log streams", () => {
       const composable = useCorrelatedLogs(props);
 
-      // Access internal query builder if exposed or test via side effects
-      expect(composable.primaryStream.value).toBe("app-logs");
+      // logStreamsCount reflects the number of correlated streams
+      expect(composable.logStreamsCount.value).toBe(2);
     });
   });
 
@@ -448,21 +455,7 @@ describe("useCorrelatedLogs", () => {
       };
 
       const composable = useCorrelatedLogs(propsWithEmptyStreams);
-      // When logStreams is empty but sourceStream is provided and sourceType is 'logs',
-      // primaryStream returns sourceStream
-      expect(composable.primaryStream.value).toBe("app-logs");
-    });
-
-    it("should return empty string when logStreams is empty and no sourceStream", () => {
-      const propsWithNoStreams = {
-        ...props,
-        logStreams: [],
-        sourceStream: "",
-        sourceType: "traces",
-      };
-
-      const composable = useCorrelatedLogs(propsWithNoStreams);
-      expect(composable.primaryStream.value).toBe("");
+      expect(composable.logStreamsCount.value).toBe(0);
     });
 
     it("should handle missing ftsFields", () => {

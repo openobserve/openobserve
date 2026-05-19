@@ -144,6 +144,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "storage_settings",
+          name: "storageSettings",
+          component: () =>
+            import("@/components/settings/OrgStorageSettings.vue"),
+          meta: {
+            title: "Storage Settings",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "nodes",
           name: "nodes",
           component: () => import("@/components/settings/Nodes.vue"),

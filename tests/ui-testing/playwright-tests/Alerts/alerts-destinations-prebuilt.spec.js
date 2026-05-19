@@ -270,8 +270,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     testLogger.info('===== P1 CUSTOM DESTINATION TEST =====');
 
     const destinationName = `auto_dest_custom_${sharedRandomValue}`;
-    const originalUrl = 'https://webhook.example.com/original';
-    const updatedUrl = 'https://webhook.example.com/updated';
+    const originalUrl = 'https://example.com/webhook/original';
+    const updatedUrl = 'https://example.com/webhook/updated';
 
     // ----- PART 1: Verify Custom option still works -----
     testLogger.info('Part 1: Verifying Custom destination option');

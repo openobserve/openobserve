@@ -415,23 +415,40 @@ export default defineComponent({
       emit("node-click", spanId);
     };
 
-    // Known LLM observation types (from ObservationType enum)
-    const knownObservationTypes = new Set([
-      'generation', 'span', 'tool', 'agent', 'chain', 'retriever',
-      'task', 'evaluator', 'workflow', 'embedding', 'rerank', 'guardrail', 'event',
-    ]);
+    // Map OTEL gen_ai.operation.name spec values to DAG CSS class suffixes.
+    // Well-known spec values: chat, text_completion, generate_content, embeddings,
+    //   invoke_agent, create_agent, execute_tool, invoke_workflow, retrieval
+    // Custom values (no OTEL eq.): chain, task, evaluator, rerank, guardrail, span, event
+    const specToCssSuffix: Record<string, string> = {
+      chat: "generation",
+      text_completion: "generation",
+      generate_content: "generation",
+      embeddings: "embedding",
+      invoke_agent: "agent",
+      create_agent: "agent",
+      execute_tool: "tool",
+      invoke_workflow: "workflow",
+      retrieval: "retriever",
+      chain: "chain",
+      task: "task",
+      evaluator: "evaluator",
+      rerank: "rerank",
+      guardrail: "guardrail",
+      span: "span",
+      event: "event",
+    };
 
     const getObservationTypeClass = (type: string | null): string => {
       if (!type) return '';
-      const key = type.toLowerCase();
-      if (knownObservationTypes.has(key)) return `node-llm-${key}`;
+      const cssSuffix = specToCssSuffix[type.toLowerCase()];
+      if (cssSuffix) return `node-llm-${cssSuffix}`;
       return 'node-llm-default';
     };
 
     const getObservationTypeTextClass = (type: string | null): string => {
       if (!type) return '';
-      const key = type.toLowerCase();
-      if (knownObservationTypes.has(key)) return `node-llm-text-${key}`;
+      const cssSuffix = specToCssSuffix[type.toLowerCase()];
+      if (cssSuffix) return `node-llm-text-${cssSuffix}`;
       return 'node-llm-text-default';
     };
 

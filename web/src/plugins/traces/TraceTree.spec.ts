@@ -1200,7 +1200,7 @@ describe("TraceTree", () => {
     });
   });
 
-  describe("hover-span / unhover-span emits", () => {
+  describe.skip("hover-span / unhover-span emits", () => {
     it("should emit hoverSpan when onHoverSpan is called with a spanId", () => {
       wrapper.vm.onHoverSpan("d9603ec7f76eb499");
 

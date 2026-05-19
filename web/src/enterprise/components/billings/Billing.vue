@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               '/billings/usage?org_identifier=' +
               store.state.selectedOrganization.identifier +
               '&usage_date=' +
-              usageDate + 
+              usageDate +
               '&data_type=' +
               usageDataType
             "
@@ -135,6 +135,7 @@ import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
@@ -148,12 +149,13 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const billingtab = ref("usage");
+    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
     const billingProvider = ref(""); // empty until loaded
+    const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
 
     // Fetch billing info to determine provider
@@ -163,6 +165,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         );
         billingProvider.value = res.data?.provider || "";
+        isPaidUser.value = res.data?.customer_id.length > 0;
       } catch (e) {
         console.error("Failed to fetch billing info:", e);
         billingProvider.value = "";
@@ -175,6 +178,23 @@ export default defineComponent({
     const showInvoiceTab = computed(() => {
       return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
+    const options = computed(()=>{
+      return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value ?
+        [
+          {label: "Current Cycle", value: "1cycle"},
+          {label: "30 Days", value: "30days"},
+          {label: "60 Days", value: "60days"},
+          {label: "3 Months", value: "3months"},
+          {label: "6 Months", value: "6months"},
+        ]
+        :
+        [
+          {label: "30 Days", value: "30days"},
+          {label: "60 Days", value: "60days"},
+          {label: "3 Months", value: "3months"},
+          {label: "6 Months", value: "6months"},
+        ]
+    })
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
       if (showSidebar.value) {
@@ -188,14 +208,21 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
+
+      // Default to current cycle for paid Stripe users
+      if (
+        !router.currentRoute.value.query.usage_date &&
+        billingProvider.value === "stripe" &&
+        isPaidUser.value
+      ) {
+        usageDate.value = "1cycle";
+          selectUsageDate();
+      }
+
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
         billingtab.value = "plans";
         router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
       }
-      // else {
-      //   billingtab.value = router.currentRoute.value.name;
-      //   router.push({ path: "/billings/" + router.currentRoute.value.name });
-      // }
     });
 
     const headerBasedOnRoute = () => {
@@ -222,7 +249,7 @@ export default defineComponent({
           data_type: usageDataType.value
         }
       })
-      
+
     }
     const updateActiveTab = (value: any) => {
       usageDataType.value = value;
@@ -250,11 +277,7 @@ export default defineComponent({
       getImageURL,
       splitterModel,
       headerBasedOnRoute,
-      options: [
-        {label: "30 Days", value: "30days"},
-        {label: "60 Days", value: "60days"},
-        {label: "3 Months", value: "3months"},
-        {label: "6 Months", value: "6months"}],
+      options,
       usageDate,
       selectUsageDate,
       isUsageRoute,
@@ -266,6 +289,7 @@ export default defineComponent({
       lastSplitterPosition,
       showInvoiceTab,
       billingProvider,
+      isPaidUser,
     };
   },
 });

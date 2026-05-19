@@ -125,7 +125,9 @@
     "resources": "Risorse",
     "updated_at": "Aggiornato a",
     "error": "Errore",
-    "db": "Banca dati"
+    "db": "Banca dati",
+    "discardChanges": "Ignora le modifiche",
+    "unsavedChanges": "Modifiche non salvate"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -393,7 +395,8 @@
     "selectStreamFirst": "Seleziona prima uno stream",
     "traces": "Tracce",
     "switchToLogs": "clicca per tornare a Logs",
-    "patternNoValuesAvailable": "Nessun valore disponibile"
+    "patternNoValuesAvailable": "Nessun valore disponibile",
+    "selectLogStream": "Seleziona lo stream dei log"
   },
   "menu": {
     "home": "Home",
@@ -787,7 +790,8 @@
     "no_keep_current": "No, tieniti aggiornato",
     "feature_correlation_management": "Gestione delle correlazioni",
     "feature_log_patterns": "Schemi di registro",
-    "environment_type": "Tipo di ambiente"
+    "environment_type": "Tipo di ambiente",
+    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati."
   },
   "login": {
     "userid": "ID utente",
@@ -2941,7 +2945,75 @@
     "copyStacktrace": "Copia stacktrace",
     "noStacktraceAvailable": "Nessuno stacktrace disponibile",
     "stacktraceCopied": "Stacktrace copiato negli appunti",
-    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita",
+    "sessionsList": {
+      "noStreamsTooltip": "Non sono disponibili stream LLM.",
+      "session": "sessione",
+      "sessions": "sessioni",
+      "countPill": "{count} di {total} {unità}",
+      "noStreamsFound": "Nessun stream LLM trovato",
+      "noStreamsDescription1": "Il gruppo di sessioni si estende per",
+      "noStreamsDescription2": "attraverso tracce di flussi contrassegnati come flussi LLM. O non esiste un flusso di questo tipo o non è stato ancora inserito alcun intervallo.",
+      "failedToLoad": "Caricamento delle sessioni non riuscito",
+      "retry": "Riprova",
+      "noSessionsFound": "Nessuna sessione trovata",
+      "noSessionsDescription": "Nessuna sessione LLM è stata registrata in questo intervallo di tempo su {stream}. Prova ad ampliare l'intervallo di tempo o a passare a un altro stream.",
+      "loading": "Caricamento delle sessioni...",
+      "tokenTooltip": "Ingresso: {input} · Uscita: {output} · Totale: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Timestamp",
+        "sessionId": "ID sessione",
+        "turns": "Turni",
+        "duration": "Durata",
+        "tokens": "Gettoni",
+        "cost": "Costo",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Torna alle sessioni",
+      "pageTitle": "Dettagli della sessione",
+      "failedToLoad": "Caricamento della sessione non riuscito",
+      "retry": "Riprova",
+      "sessionNotFound": "Sessione non trovata",
+      "noSpansFound": "Nessun intervallo trovato per {id} nell'intervallo di tempo corrente.",
+      "searchPlaceholder": "Cerca tracce in questa sessione...",
+      "turn": "girare",
+      "turns": "turni",
+      "turnsShown": "{filtrato} di {total} {unit} mostrato",
+      "userBadge": "Utente",
+      "sessionPrefix": "sessione",
+      "copySessionId": "Copia l'id della sessione",
+      "openInTraceExplorer": "Apri in Trace Explorer",
+      "unknownUser": "Utente sconosciuto",
+      "kpi": {
+        "turns": "Turni",
+        "duration": "Durata",
+        "inputTokens": "Token di input",
+        "outputTokens": "Token di uscita",
+        "cost": "Costo"
+      },
+      "conversation": "Conversazione",
+      "turnLabel": "Turno",
+      "openTrace": "Traccia aperta",
+      "noUserMessage": "Nessun messaggio utente ricevuto per questo turno.",
+      "noAssistantMessage": "Nessuna risposta dell'assistente acquisita per questo turno.",
+      "roles": {
+        "user": "Utente",
+        "assistant": "Assistente"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Modello",
+        "tokens": "Gettoni",
+        "input": "Ingresso",
+        "output": "Uscita",
+        "total": "Totale",
+        "cost": "Costo",
+        "spans": "Spaziate"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3708,5 +3780,52 @@
     "clearAll": "Cancella tutto",
     "clearAllTitle": "Cancella tutte le chat",
     "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
+  },
+  "storage_settings": {
+    "tabLabel": "Storage dell'organizzazione",
+    "title": "Storage dell'organizzazione",
+    "notEnabled": "l'archiviazione dell'organizzazione non è abilitata per questa organizzazione",
+    "notConfigured": "configurare un provider di archiviazione personalizzato per i dati di questa organizzazione",
+    "configured": "disposto",
+    "heroHeadline": "Porta il tuo spazio di archiviazione a",
+    "heroSub": "Connetti il tuo bucket cloud e i dati rimangono nella tua infrastruttura: pieno controllo, zero vincoli.",
+    "configureStorage": "Configurazione dello storage",
+    "supportedProviders": "Provider supportati",
+    "noStorageConfigured": "Nessuno spazio di archiviazione configurato",
+    "routeDataDesc": "Indirizza i dati di questa organizzazione a un bucket dedicato, indipendentemente dalle altre organizzazioni e dalle impostazioni predefinite globali.",
+    "perOrgIsolation": "Isolamento per organizzazione",
+    "appliesImmediately": "Si applica immediatamente ai nuovi dati",
+    "usesOrgCredentials": "Utilizza credenziali con ambito di organizzazione",
+    "updateStorage": "Aggiorna spazio di archiviazione",
+    "active": "attivo",
+    "bucketName": "nome del secchio",
+    "region": "regione",
+    "serverUrl": "url del server",
+    "accessKey": "chiave di accesso",
+    "secretKey": "chiave segreta",
+    "roleArn": "filato di ruolo",
+    "createdAt": "creato in",
+    "updatedAt": "aggiornato su",
+    "featureOwnDataTitle": "Gestisci i tuoi dati dall'inizio alla fine",
+    "featureOwnDataDesc": "Archivia i dati acquisiti direttamente nel tuo bucket e mantieni il controllo completo di chi può accedervi.",
+    "featureSecureTitle": "Sicuro e conforme",
+    "featureSecureDesc": "Chiavi di accesso granulari, i tuoi dati sensibili rimangono nella tua infrastruttura.",
+    "goBack": "Torna indietro",
+    "newStorageConfiguration": "Nuova configurazione di storage",
+    "selectProviderDesc": "seleziona un provider di cloud storage per archiviare i dati di questa organizzazione.",
+    "bucketNameRequired": "Il nome del bucket è obbligatorio",
+    "accessKeyRequired": "La chiave di accesso è obbligatoria",
+    "secretKeyRequired": "È richiesta la chiave segreta",
+    "serverURLRequired": "L'URL del server è obbligatorio",
+    "regionRequired": "La regione è obbligatoria",
+    "roleARNRequired": "Il ruolo ARN è obbligatorio",
+    "back": "Indietro",
+    "continue": "Continua",
+    "save": "Salva",
+    "update": "Aggiornamento",
+    "awsStsCloudInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. È necessario aggiungere l'account Openobserve AWS come tipo di entità attendibile per questo ruolo nella console AWS. Contatta il team di Openobserve per ottenere le informazioni sull'account o per ulteriore assistenza nella configurazione.",
+    "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo.",
+    "externalIdRequired": "È richiesto un ID esterno",
+    "storageAccountRequired": "Il nome dell'account di archiviazione è obbligatorio"
   }
 }

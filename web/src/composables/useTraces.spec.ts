@@ -34,21 +34,25 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
-vi.mock("vuex", () => ({
-  useStore: vi.fn(() => ({
-    state: {
-      selectedOrganization: { identifier: "test-org" },
-      zoConfig: { timestamp_column: "_timestamp" },
-      organizationData: {
-        organizationSettings: {
-          span_id_field_name: "span_id",
-          trace_id_field_name: "trace_id",
+vi.mock("vuex", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    useStore: vi.fn(() => ({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        zoConfig: { timestamp_column: "_timestamp", sql_reserved_keywords: [] },
+        organizationData: {
+          organizationSettings: {
+            span_id_field_name: "span_id",
+            trace_id_field_name: "trace_id",
+          },
         },
       },
-    },
-    dispatch: vi.fn(),
-  })),
-}));
+      dispatch: vi.fn(),
+    })),
+  };
+});
 
 const { mockCopyToClipboard, mockNotify } = vi.hoisted(() => ({
   mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
@@ -77,11 +81,15 @@ const { localTraceFilterStore, mockUseLocalTraceFilterField } = vi.hoisted(
   },
 );
 
-vi.mock("@/utils/zincutils", () => ({
-  b64EncodeStandard: vi.fn((s: string) => `b64std:${s}`),
-  b64EncodeUnicode: vi.fn((s: string) => `b64uni:${s}`),
-  useLocalTraceFilterField: mockUseLocalTraceFilterField,
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    b64EncodeStandard: vi.fn((s: string) => `b64std:${s}`),
+    b64EncodeUnicode: vi.fn((s: string) => `b64uni:${s}`),
+    useLocalTraceFilterField: mockUseLocalTraceFilterField,
+  };
+});
 
 vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),

@@ -56,7 +56,7 @@ vi.stubGlobal("crypto", {
 
 type RecordMap = Map<number, Record<string, unknown>>;
 
-/* eslint-disable no-unused-vars */
+ 
 interface MockIndex {
   name: string;
   keyPath: string;
@@ -100,7 +100,7 @@ interface MockDB {
   transaction(storeName: string, mode: string): MockTransaction;
   _stores: Map<string, MockObjectStore>;
 }
-/* eslint-enable no-unused-vars */
+ 
 
 // In-memory database registry — persists across transactions within a test
 // Also tracks the version at which each DB was last upgraded so we don't

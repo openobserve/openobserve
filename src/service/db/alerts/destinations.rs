@@ -38,6 +38,8 @@ pub enum DestinationError {
     InvalidName,
     #[error("HTTP destination must have a url")]
     EmptyUrl,
+    #[error("Destination URL blocked by SSRF guard: {0}")]
+    SsrfBlocked(String),
     #[error("SNS destination must have Topic ARN and Region")]
     InvalidSns,
     #[error("Email destination must have at least one email recipient")]

@@ -125,7 +125,9 @@
     "resources": "리소스",
     "updated_at": "업데이트 날짜",
     "error": "오류",
-    "db": "데이터베이스"
+    "db": "데이터베이스",
+    "discardChanges": "변경 내용 취소",
+    "unsavedChanges": "저장되지 않은 변경 사항"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -393,7 +395,8 @@
     "selectStreamFirst": "먼저 스트림을 선택하세요",
     "traces": "트레이스",
     "switchToLogs": "로그로 다시 전환하려면 클릭",
-    "patternNoValuesAvailable": "사용할 수 있는 값 없음"
+    "patternNoValuesAvailable": "사용할 수 있는 값 없음",
+    "selectLogStream": "로그 스트림 선택"
   },
   "menu": {
     "home": "홈",
@@ -787,7 +790,8 @@
     "no_keep_current": "아니요, 최신 상태로 유지",
     "feature_correlation_management": "상관관계 관리",
     "feature_log_patterns": "로그 패턴",
-    "environment_type": "환경 유형"
+    "environment_type": "환경 유형",
+    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다."
   },
   "login": {
     "userid": "사용자 ID",
@@ -2943,7 +2947,75 @@
     "copyStacktrace": "스택 트레이스 복사",
     "noStacktraceAvailable": "스택트레이스를 사용할 수 없음",
     "stacktraceCopied": "스택트레이스를 클립보드에 복사했습니다.",
-    "stacktraceCopyFailed": "스택 트레이스를 복사하지 못했습니다."
+    "stacktraceCopyFailed": "스택 트레이스를 복사하지 못했습니다.",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM 스트림을 사용할 수 없습니다.",
+      "session": "세션",
+      "sessions": "세션",
+      "countPill": "{총} {단위} 의 {개수}",
+      "noStreamsFound": "LLM 스트림을 찾을 수 없음",
+      "noStreamsDescription1": "세션 그룹 범위 기준",
+      "noStreamsDescription2": "LLM 스트림으로 표시된 트레이스 스트림에서해당 스트림이 존재하지 않거나 스팬이 아직 인제스트되지 않았습니다.",
+      "failedToLoad": "세션을 로드하지 못했습니다.",
+      "retry": "재시도",
+      "noSessionsFound": "세션을 찾을 수 없음",
+      "noSessionsDescription": "이 기간 동안 {stream} 에는 LLM 세션이 기록되지 않았습니다.시간 범위를 넓히거나 다른 스트림으로 전환해 보십시오.",
+      "loading": "세션 로드 중...",
+      "tokenTooltip": "입력: {입력} · 출력: {출력} · 합계: {합계}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "타임스탬프",
+        "sessionId": "세션 ID",
+        "turns": "회전합니다",
+        "duration": "지속",
+        "tokens": "토큰",
+        "cost": "비용",
+        "status": "상태"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "세션으로 돌아가기",
+      "pageTitle": "세션 세부 정보",
+      "failedToLoad": "세션을 로드하지 못했습니다.",
+      "retry": "재시도",
+      "sessionNotFound": "세션을 찾을 수 없음",
+      "noSpansFound": "현재 시간 범위에서 {id} 에 대한 범위를 찾을 수 없습니다.",
+      "searchPlaceholder": "이 세션에서 추적 검색...",
+      "turn": "회전",
+      "turns": "회전합니다",
+      "turnsShown": "{총} {단위} 의 {필터링된} 가 표시됨",
+      "userBadge": "사용자",
+      "sessionPrefix": "세션",
+      "copySessionId": "세션 ID 복사",
+      "openInTraceExplorer": "트레이스 탐색기에서 열기",
+      "unknownUser": "알 수 없는 사용자",
+      "kpi": {
+        "turns": "회전합니다",
+        "duration": "지속",
+        "inputTokens": "입력 토큰",
+        "outputTokens": "출력 토큰",
+        "cost": "비용"
+      },
+      "conversation": "대화",
+      "turnLabel": "회전",
+      "openTrace": "트레이스 열기",
+      "noUserMessage": "이번 턴에 대한 사용자 메시지는 캡처되지 않았습니다.",
+      "noAssistantMessage": "이번 턴에는 어시스턴트 응답이 캡처되지 않았습니다.",
+      "roles": {
+        "user": "사용자",
+        "assistant": "조수"
+      },
+      "stats": {
+        "status": "상태",
+        "model": "모델",
+        "tokens": "토큰",
+        "input": "입력",
+        "output": "출력",
+        "total": "합계",
+        "cost": "비용",
+        "spans": "스팬"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -3710,5 +3782,52 @@
     "clearAll": "모두 지우기",
     "clearAllTitle": "모든 채팅 지우기",
     "clearAllMessage": "이렇게 하면 모든 채팅 기록이 영구적으로 삭제됩니다.이 작업은 취소할 수 없습니다."
+  },
+  "storage_settings": {
+    "tabLabel": "조직 스토리지",
+    "title": "조직 스토리지",
+    "notEnabled": "조직 저장소가 이 조직에 대해 활성화되지 않았습니다.",
+    "notConfigured": "이 조직의 데이터에 대한 사용자 지정 저장소 제공자 구성",
+    "configured": "구성된",
+    "heroHeadline": "나만의 스토리지를 가지고 오세요",
+    "heroSub": "자체 클라우드 버킷을 연결하면 데이터가 인프라에 그대로 유지됩니다. 완전한 제어가 가능하고 종속되지 않습니다.",
+    "configureStorage": "스토리지 구성",
+    "supportedProviders": "지원되는 제공업체",
+    "noStorageConfigured": "스토리지가 구성되지 않음",
+    "routeDataDesc": "이 조직의 데이터를 다른 조직 및 글로벌 기본값과 독립적으로 전용 버킷으로 라우팅합니다.",
+    "perOrgIsolation": "조직별 격리",
+    "appliesImmediately": "새 데이터에 즉시 적용",
+    "usesOrgCredentials": "조직 범위의 자격 증명 사용",
+    "updateStorage": "스토리지 업데이트",
+    "active": "유효한",
+    "bucketName": "버킷 이름",
+    "region": "부위",
+    "serverUrl": "서버 URL",
+    "accessKey": "액세스 키",
+    "secretKey": "시크릿 키",
+    "roleArn": "역할 실행",
+    "createdAt": "에서 생성됨",
+    "updatedAt": "에 업데이트됨",
+    "featureOwnDataTitle": "데이터를 처음부터 끝까지 소유하세요",
+    "featureOwnDataDesc": "수집된 데이터를 자체 버킷에 직접 저장하고 누가 데이터에 액세스할 수 있는지 완벽하게 제어할 수 있습니다.",
+    "featureSecureTitle": "보안 및 규정 준수",
+    "featureSecureDesc": "세밀한 액세스 키를 사용하면 중요한 데이터가 인프라에 그대로 유지됩니다.",
+    "goBack": "뒤로 이동",
+    "newStorageConfiguration": "새 스토리지 구성",
+    "selectProviderDesc": "이 조직의 데이터를 저장할 클라우드 저장소 공급자를 선택합니다.",
+    "bucketNameRequired": "버킷 이름이 필요합니다",
+    "accessKeyRequired": "액세스 키가 필요합니다",
+    "secretKeyRequired": "비밀 키가 필요합니다",
+    "serverURLRequired": "서버 URL이 필요합니다.",
+    "regionRequired": "지역은 필수입니다.",
+    "roleARNRequired": "역할 ARN이 필요합니다.",
+    "back": "뒤로",
+    "continue": "계속",
+    "save": "저장",
+    "update": "업데이트",
+    "awsStsCloudInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.OpenObserve AWS 계정을 AWS 콘솔에서 이 역할의 신뢰할 수 있는 개체 유형으로 추가해야 합니다.계정 정보를 얻거나 이 정보를 설정하는 데 도움이 더 필요하면 OpenObserve 팀에 문의하십시오.",
+    "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오.",
+    "externalIdRequired": "외부 ID가 필요합니다.",
+    "storageAccountRequired": "스토리지 계정 이름이 필요합니다"
   }
 }

@@ -33,9 +33,9 @@ const server = setupServer(...restHandlers);
 // For this we need instance of server while testing
 // So have added server instance on global so that it can be accessed while testing
 declare global {
-  // eslint-disable-next-line no-var
+   
   var server: any;
-  // eslint-disable-next-line no-var
+   
   var IntersectionObserver: {
     new (callback: IntersectionObserverCallback, options?: IntersectionObserverInit): IntersectionObserver;
     prototype: IntersectionObserver;

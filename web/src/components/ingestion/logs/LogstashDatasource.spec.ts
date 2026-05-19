@@ -758,7 +758,7 @@ describe('LogstashDatasource.vue Component Logic', () => {
   // Test 61: Content URL structure validation
   it('should have valid URL structure in content', () => {
     const setup = createComponentSetup();
-    const urlMatch = setup.content.match(/url => "([^"]+)"/); // eslint-disable-line
+    const urlMatch = setup.content.match(/url => "([^"]+)"/);  
     
     expect(urlMatch).toBeTruthy();
     expect(urlMatch?.[1]).toContain('http');

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:pt-[0.375rem] tw:justify-between tw:w-full"
+    class="tw:pt-[0.125rem] tw:justify-between tw:w-full"
     :class="showUserDefinedSchemaToggle || showQuickMode ? 'tw:flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="opt in userDefinedSchemaBtnGroupOption"
           :key="opt.value"
           :value="opt.value"
+          size="sm"
           data-test="logs-user-defined-fields-btn"
         >
           <template v-if="opt.slot === 'user_defined_slot'">
@@ -97,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="opt in selectedFieldsBtnGroupOption"
           :key="opt.value"
           :value="opt.value"
+          size="sm"
           :data-test="opt.slot === 'all_fields_slot' ? 'logs-all-fields-btn' : 'logs-interesting-fields-btn'"
         >
           <template v-if="opt.slot === 'all_fields_slot'">

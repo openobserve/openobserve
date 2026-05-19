@@ -34,7 +34,11 @@ describe('createDashboardsContextProvider', () => {
 
     const currentDashboardData = {
       data: {
-        title: 'Test Dashboard'
+        title: 'Test Dashboard',
+        tabs: [
+          { tabId: 'tab-1', name: 'Overview' },
+          { tabId: 'tab-2', name: 'Errors' }
+        ]
       }
     };
 
@@ -47,6 +51,7 @@ describe('createDashboardsContextProvider', () => {
     expect(context.user_intent).toBe('view dashboard');
     expect(context.dashboardName).toBe('Test Dashboard');
     expect(context.tabId).toBe('tab-1');
+    expect(context.tabName).toBe('Overview');
   });
 
   it('should create context for editing panel', () => {

@@ -25,6 +25,7 @@ installQuasar();
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 vi.mock("@/services/service_streams", () => ({

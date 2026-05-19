@@ -12,7 +12,7 @@ from typing import Generator
 @pytest.fixture(scope="session")
 def openobserve_base_url() -> str:
     """Base URL for OpenObserve API."""
-    return os.getenv("ZO_BASE_URL", "http://localhost:5080")
+    return os.getenv("ZO_BASE_URL", "http://localhost:5080").rstrip("/")
 
 
 @pytest.fixture(scope="session")

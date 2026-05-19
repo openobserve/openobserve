@@ -74,6 +74,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "RecommendedPage",
@@ -94,7 +95,7 @@ export default defineComponent({
       store.state.selectedOrganization.identifier,
     );
 
-    const ingestTabType = ref("ingestFromKubernetes");
+    const ingestTabType = ref(resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"));
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {

@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Render non-selectable group headers -->
           <q-item v-else>
             <q-item-section>
-              <q-item-label v-html="props.opt.label" />
+              <q-item-label>{{ props.opt.label }}</q-item-label>
             </q-item-section>
           </q-item>
         </template>

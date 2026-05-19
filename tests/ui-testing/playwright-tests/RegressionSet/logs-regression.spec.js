@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
+const { ingestTestData, getHeaders, getIngestionUrl, sendRequest, waitForStreamData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bugs", () => {
@@ -93,11 +93,11 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
     await page.waitForLoadState('domcontentloaded');
-    // Wait for data indexing by polling streams API until both streams are available
-    await page.waitForResponse(
-        response => response.url().includes('/streams') && response.status() === 200,
-        { timeout: 15000 }
-    ).catch(() => {}); // Streams may already be indexed
+    // Wait for data to be indexed (polls search API until records are available)
+    const dataReadyA = await waitForStreamData(page, streamA, 1, 30000);
+    const dataReadyB = await waitForStreamData(page, streamB, 1, 30000);
+    if (!dataReadyA) testLogger.warn(`Data may not be fully indexed for stream A`);
+    if (!dataReadyB) testLogger.warn(`Data may not be fully indexed for stream B`);
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
@@ -108,15 +108,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Select stream A
     await pm.logsPage.selectStream(streamA);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Click refresh to load data - wait for search API response
-    const searchResponseA = page.waitForResponse(
-      resp => resp.url().includes('/_search') && resp.status() === 200,
-      { timeout: 30000 }
-    );
+    // Click refresh to load data (data already verified indexed via waitForStreamData)
     await pm.logsPage.clickRefreshButton();
-    await searchResponseA;
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamA);
@@ -125,7 +121,8 @@ test.describe("Logs Regression Bugs", () => {
     // Add field to table for stream A
     await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamA);
     await pm.logsPage.clickAddFieldToTableButton(fieldForStreamA);
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(500);
 
     // Clear field search
     await pm.logsPage.fillIndexFieldSearchInput('');
@@ -148,15 +145,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Switch to stream B
     await pm.logsPage.selectStream(streamB);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Click refresh to load data - wait for search API response
-    const searchResponseB = page.waitForResponse(
-      resp => resp.url().includes('/_search') && resp.status() === 200,
-      { timeout: 30000 }
-    );
+    // Click refresh to load data (data already verified indexed via waitForStreamData)
     await pm.logsPage.clickRefreshButton();
-    await searchResponseB;
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamB);
@@ -165,7 +158,8 @@ test.describe("Logs Regression Bugs", () => {
     // Add different field to table for stream B
     await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamB);
     await pm.logsPage.clickAddFieldToTableButton(fieldForStreamB);
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(500);
 
     // Clear field search
     await pm.logsPage.fillIndexFieldSearchInput('');

@@ -1437,13 +1437,15 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       updateQueryValue: vi.fn((value) => {
         componentInstance.searchObj.data.editorValue = value;
-        
+
         if (componentInstance.searchObj.meta.quickMode === true) {
           // Quick mode logic
         }
-        
-        if (value !== "" && 
-            value.toLowerCase().includes("select") && 
+
+        // Matches real guard logic in SearchBar.vue ~line 3151
+        if (componentInstance.searchObj.meta.sqlMode === false &&
+            componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
+            value.toLowerCase().includes("select") &&
             value.toLowerCase().includes("from")) {
           componentInstance.searchObj.meta.sqlMode = true;
           componentInstance.searchObj.meta.sqlModeManualTrigger = true;
@@ -3841,6 +3843,106 @@ describe("SearchBar.vue Build Query Toggle Support", () => {
 
       expect(buildInstance.searchObj.data.stream.selectedStream).toEqual(originalStream);
     });
+  });
+
+  describe("SQL mode should not change on build toggle", () => {
+    it("should NOT force sqlMode to true when toggling to build with sqlMode OFF", () => {
+      buildInstance.searchObj.meta.sqlMode = false;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      // SQL mode must remain OFF — build page handles queries independently
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("should keep sqlMode true when toggling to build with sqlMode already ON", () => {
+      buildInstance.searchObj.meta.sqlMode = true;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(true);
+    });
+
+    it("should NOT change sqlMode when toggling back from build to logs", () => {
+      buildInstance.searchObj.meta.sqlMode = false;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+
+      buildInstance.onLogsVisualizeToggleUpdate("logs");
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+    });
+  });
+});
+
+/**
+ * SQL mode auto-detection guard for build mode
+ *
+ * Tests that updateQueryValue does NOT auto-enable SQL mode
+ * when logsVisualizeToggle is set to "build". Uses the componentInstance
+ * mock which mirrors the real guard logic from SearchBar.vue ~line 3151.
+ */
+describe("SearchBar.vue SQL mode auto-detection guard", () => {
+  let componentInstance: any;
+
+  beforeEach(() => {
+    componentInstance = {
+      searchObj: {
+        meta: {
+          sqlMode: false,
+          sqlModeManualTrigger: false,
+          logsVisualizeToggle: "logs",
+          quickMode: false,
+        },
+        data: {
+          editorValue: "",
+        },
+      },
+      // Mirrors the real guard logic in SearchBar.vue ~line 3151
+      updateQueryValue(value: string) {
+        componentInstance.searchObj.data.editorValue = value;
+        if (componentInstance.searchObj.meta.sqlMode === false &&
+            componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
+            value.toLowerCase().includes("select") &&
+            value.toLowerCase().includes("from")) {
+          componentInstance.searchObj.meta.sqlMode = true;
+          componentInstance.searchObj.meta.sqlModeManualTrigger = true;
+        }
+      },
+    };
+  });
+
+  it("should auto-enable SQL mode for SQL queries in logs mode", () => {
+    componentInstance.updateQueryValue('SELECT * FROM "test"');
+    expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
+  });
+
+  it("should NOT auto-enable SQL mode for SQL queries in build mode", () => {
+    componentInstance.searchObj.meta.logsVisualizeToggle = "build";
+    componentInstance.updateQueryValue(
+      'SELECT histogram(_timestamp) AS x_axis_1, count(_timestamp) AS y_axis_1 FROM "default"',
+    );
+    expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
+  });
+
+  it("should NOT auto-enable SQL mode when sqlMode is already true", () => {
+    componentInstance.searchObj.meta.sqlMode = true;
+    componentInstance.searchObj.meta.sqlModeManualTrigger = false;
+    componentInstance.updateQueryValue('SELECT * FROM "test"');
+    // sqlModeManualTrigger should NOT be set since sqlMode was already true
+    expect(componentInstance.searchObj.meta.sqlModeManualTrigger).toBe(false);
+  });
+
+  it("should NOT auto-enable SQL mode for non-SQL queries", () => {
+    componentInstance.updateQueryValue("k8s_namespace_name = 'kube-system'");
+    expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
+  });
+
+  it("should auto-enable SQL mode in visualize mode (not build)", () => {
+    componentInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+    componentInstance.updateQueryValue('SELECT * FROM "test"');
+    // visualize mode is not "build", so auto-detection applies
+    expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
   });
 });
 

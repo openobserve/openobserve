@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Thread view — chat-style projection of an LLM trace.
 
   Phase A scope (this commit):
-    - Classify spans by `llm_observation_type`
+    - Classify spans by `gen_ai_operation_name`
     - Render the trace summary chip-bar (turn count, total duration, cost,
       model, tool calls, errors)
     - Empty + skeleton states
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:text-[var(--o2-text-3)] tw:text-[0.85rem]"
     >
       No LLM turns detected. The trace doesn't contain spans with
-      <code>llm_observation_type = GENERATION</code>.
+      <code>gen_ai.operation.name = chat</code>.
     </div>
     <div v-else class="tw:flex-1 tw:overflow-auto tw:px-[1rem] tw:py-[0.75rem]">
       <!-- System prompt (global — identical across traces in a session). -->
@@ -585,14 +585,14 @@ function formatTime(ns: number): string {
   border-radius: 0.25rem !important;
   font-size: 12px !important;
   font-feature-settings: "tnum";
-  color: var(--o2-text-1) !important;
+  color: var(--o2-text-primary) !important;
 
   :deep(.q-icon) {
-    color: var(--o2-text-2);
+    color: var(--o2-text-secondary);
   }
 
   &__label {
-    color: var(--o2-text-2);
+    color: var(--o2-text-muted);
     font-weight: 500;
     margin-right: 5px;
     letter-spacing: 0;
@@ -600,7 +600,7 @@ function formatTime(ns: number): string {
   }
 
   &__value {
-    color: var(--o2-text-1);
+    color: var(--o2-text-primary);
     font-weight: 600;
     font-size: 12px;
   }
@@ -612,9 +612,12 @@ function formatTime(ns: number): string {
   &--cost { border-left: 3px solid #16a34a; }
   &--model { border-left: 3px solid #8b5cf6; }
   &--error {
-    border-left: 3px solid #dc2626;
+    // Error tint uses the theme-aware error token so the number "1"
+    // (or whatever count) is readable in dark mode. Previously we
+    // hardcoded #dc2626 which is too dark against the dark card bg.
+    border-left: 3px solid var(--o2-status-error-text);
     .thread-chip__value {
-      color: #dc2626;
+      color: var(--o2-status-error-text);
     }
   }
 }

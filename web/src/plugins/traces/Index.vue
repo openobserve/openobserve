@@ -25,17 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         :class="[
           'traces-horizontal-splitter full-height',
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'hide-splitter-separator'
             : '',
         ]"
         v-model="splitterModel"
         :disable="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
         horizontal
         :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.54rem]!'
             : ''
         "
@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
               :isLLMSpanPresent="isLLMSpanPresent"
+              :hasLLMStreams="hasLLMStreams"
               class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
@@ -102,6 +103,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <LLMInsightsDashboard
               ref="llmInsightsRef"
+              :streamName="selectedStreamName"
+              :startTime="insightsTimeRange.startTime"
+              :endTime="insightsTimeRange.endTime"
+              class="tw:h-full"
+            />
+          </div>
+
+          <!-- Sessions Tab Content -->
+          <div
+            v-if="activeTab === 'sessions'"
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <SessionsList
+              ref="sessionsListRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
               :endTime="insightsTimeRange.endTime"
@@ -378,6 +393,9 @@ const ServicesCatalog = defineAsyncComponent(
 const LLMInsightsDashboard = defineAsyncComponent(
   () => import("./LLMInsightsDashboard.vue"),
 );
+const SessionsList = defineAsyncComponent(
+  () => import("./SessionsList.vue"),
+);
 
 const store = useStore();
 const activeTab = computed(() => {
@@ -385,6 +403,7 @@ const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "services-catalog")
     return "services-catalog";
   if (searchObj.meta.searchMode === "llm-insights") return "llm-insights";
+  if (searchObj.meta.searchMode === "sessions") return "sessions";
   return "search";
 });
 const router = useRouter();
@@ -421,6 +440,7 @@ const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const llmInsightsRef = ref<any>(null);
+const sessionsListRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -484,6 +504,21 @@ function recomputeInsightsTimeRange() {
 
 const isLLMSpanPresent = ref(false);
 
+// True when the org has at least one traces stream marked as an LLM
+// stream (strict opt-in: `settings.is_llm_stream === true`). Drives
+// the LLM Insights tab visibility in `SearchBar` — we hide the tab
+// entirely when nothing is opted in.
+//
+// Implemented as a `computed` (not a `ref`) so resolving `streamResults`
+// doesn't fire an extra reactive write inside `getStreamList`'s async
+// chain — that would force an unrelated re-render and surface latent
+// reactivity assumptions elsewhere on the page.
+const hasLLMStreams = computed(() =>
+  (searchObj.data.streamResults?.list || []).some(
+    (s: any) => s?.settings?.is_llm_stream === true,
+  ),
+);
+
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
   const { sqlParser }: any = useSqlParser.default();
@@ -531,6 +566,9 @@ async function getStreamList() {
     return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
+        // `hasLLMStreams` is a computed that reads from
+        // `searchObj.data.streamResults` — no explicit write needed
+        // here. See the computed's declaration above for why.
 
         if (res.list.length > 0) {
           if (config.isCloud == "true") {
@@ -1637,8 +1675,8 @@ function restoreUrlQueryParams() {
   if (
     tab !== undefined &&
     (
-      ["service-graph", "traces", "spans", "llm-insights", "services-catalog"] as const
-    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog")
+      ["service-graph", "traces", "spans", "llm-insights", "services-catalog", "sessions"] as const
+    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog" | "sessions")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1721,7 +1759,15 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
     allFilters.push("span_status = 'ERROR'");
   }
   // Apply each filter term independently so replace-or-append works per field
-  searchBarRef.value?.applyFilters(allFilters);
+  // Skip search only when live mode is ON (datetime trigger will handle it)
+  // Don't skip when live mode is OFF (datetime trigger won't fire)
+  const skipSearch = !!(searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled);
+
+  if (searchBarRef.value?.applyFilters) {
+    searchBarRef.value.applyFilters(allFilters, skipSearch);
+  } else {
+    console.warn("SearchBar not ready for filter application");
+  }
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1734,14 +1780,14 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog / Sessions / LLM Insights)
 const onSearchModeChange = (
-  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog",
+  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog" | "sessions",
 ) => {
   searchObj.meta.searchMode = mode;
   // Refresh the datetime snapshot on every tab-enter so the dashboard's
   // first onMounted has the up-to-date window for relative ranges.
-  if (mode === "llm-insights") {
+  if (mode === "llm-insights" || mode === "sessions") {
     recomputeInsightsTimeRange();
     return;
   }
@@ -1927,6 +1973,15 @@ const searchData = () => {
     return;
   }
 
+  if (activeTab.value === "sessions") {
+    recomputeInsightsTimeRange();
+    sessionsListRef.value?.refresh?.(
+      insightsTimeRange.value.startTime,
+      insightsTimeRange.value.endTime,
+    );
+    return;
+  }
+
   if (
     !(
       searchObj.data.stream.streamLists.length &&
@@ -2100,6 +2155,7 @@ const debouncedAutoRunOnDatetime = debounce(() => {
   // `on:date-change` emit (re-writes `searchObj.data.datetime`, which
   // would otherwise trigger a second `searchData` 500ms after mount).
   if (activeTab.value === "llm-insights") return;
+  if (activeTab.value === "sessions") return;
 
   // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
   // Only auto-run here for relative time to avoid double-triggering.

@@ -18,6 +18,7 @@ import {
   STATUS_COLORS,
   STATUS_COLORS_DARK,
   extractStatusFromLog,
+  extractStatusFromTemplate,
   type StatusInfo,
 } from "./statusParser";
 
@@ -331,6 +332,54 @@ describe("statusParser.ts", () => {
       const light = extractStatusFromLog({ level: "error" }, false);
       const dark  = extractStatusFromLog({ level: "error" }, true);
       expect(light.priority).toBe(dark.priority);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // extractStatusFromTemplate — template/example text parsing
+  // ---------------------------------------------------------------------------
+  describe("extractStatusFromTemplate", () => {
+    it("returns info for null/empty input (light mode)", () => {
+      const result = extractStatusFromTemplate("");
+      expect(result.level).toBe("info");
+    });
+
+    it("detects ERROR in a template string", () => {
+      const result = extractStatusFromTemplate("ERROR something went wrong <*>");
+      expect(result.level).toBe("error");
+      expect(result.color).toBe(STATUS_COLORS.error);
+    });
+
+    it("detects WARN in a template string", () => {
+      const result = extractStatusFromTemplate("WARN: low memory <:NUM>");
+      expect(result.level).toBe("warning");
+    });
+
+    it("detects INFO in a template string", () => {
+      const result = extractStatusFromTemplate("[INFO] User <*> logged in");
+      expect(result.level).toBe("info");
+      expect(result.color).toBe(STATUS_COLORS.info);
+    });
+
+    it("detects DEBUG in a template string", () => {
+      const result = extractStatusFromTemplate("DEBUG <:METHOD> <:URL>");
+      expect(result.level).toBe("debug");
+    });
+
+    it("returns info when no level keyword is found in template", () => {
+      const result = extractStatusFromTemplate("User <*> accessed <:URL>");
+      expect(result.level).toBe("info");
+    });
+
+    it("uses dark color when isDark=true", () => {
+      const result = extractStatusFromTemplate("ERROR disk full", true);
+      expect(result.level).toBe("error");
+      expect(result.color).toBe(STATUS_COLORS_DARK.error);
+    });
+
+    it("handles non-string input gracefully", () => {
+      const result = extractStatusFromTemplate(null as any);
+      expect(result.level).toBe("info");
     });
   });
 });

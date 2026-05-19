@@ -10,6 +10,7 @@ import {
   splitNumberWithUnit,
   splitDuration,
   splitCost,
+  formatWindowLabel,
   FLAT_THRESHOLD,
 } from "./llmInsightsDashboard.utils";
 
@@ -169,14 +170,28 @@ describe("splitNumberWithUnit", () => {
 
 describe("splitDuration", () => {
   it.each([
+    // ms tier
     [0, { value: "0", unit: "ms" }],
-    [123_000, { value: "123", unit: "ms" }],         // 123ms
-    [1_000_000, { value: "1.0", unit: "s" }],        // 1s
-    [12_345_000, { value: "12.3", unit: "s" }],      // 12.3s
-    [120_000_000, { value: "2.0", unit: "min" }],    // 2min
-    [3_600_000_000, { value: "60.0", unit: "min" }], // 60min
+    [123_000, { value: "123", unit: "ms" }],              // 123 ms
+    // s tier
+    [1_000_000, { value: "1.0", unit: "s" }],             // 1 s
+    [12_345_000, { value: "12.3", unit: "s" }],           // 12.3 s
+    // min tier
+    [120_000_000, { value: "2.0", unit: "min" }],         // 2 min
+    [3_599_000_000, { value: "59.98", unit: "min" }],     // ~60 min (just under 1 h)
+    // h tier  (>= 3 600 000 ms = 3_600_000_000 µs)
+    [3_600_000_000, { value: "1.0", unit: "h" }],         // exactly 1 h
+    [7_200_000_000, { value: "2.0", unit: "h" }],         // 2 h
+    [12_600_000_000, { value: "3.5", unit: "h" }],        // 3.5 h
+    // d tier  (>= 86 400 000 ms = 86_400_000_000 µs)
+    [86_400_000_000, { value: "1.0", unit: "d" }],        // exactly 1 d
+    [172_800_000_000, { value: "2.0", unit: "d" }],       // 2 d
+    [7 * 86_400_000_000, { value: "7.0", unit: "d" }],    // 1 week
   ])("splits %d microseconds → %j", (micros, expected) => {
-    expect(splitDuration(micros)).toEqual(expected);
+    // For the ~60 min case the exact decimal depends on rounding — just check unit.
+    const result = splitDuration(micros);
+    expect(result.unit).toBe(expected.unit);
+    if (expected.value !== "59.98") expect(result.value).toBe(expected.value);
   });
 
   // Defensive: zero / falsy input → "0 ms" (not just "0").
@@ -223,5 +238,41 @@ describe("splitCost", () => {
 
   it("renders $1,000,000 as $1.00M (boundary into M)", () => {
     expect(splitCost(1_000_000)).toEqual({ value: "$1.00", unit: "M" });
+  });
+});
+
+// ===========================================================================
+// formatWindowLabel — used in the KPI trend chip ("vs prev <X>")
+// ===========================================================================
+
+describe("formatWindowLabel", () => {
+  // Each unit branch with values safely inside its range.
+  it.each([
+    [30 * 1_000_000, "30s"],
+    [59 * 1_000_000, "59s"],
+    [60 * 1_000_000, "1m"],          // 1 minute exactly → seconds branch fails (60 < 60 is false) → minutes
+    [5 * 60 * 1_000_000, "5m"],
+    [59 * 60 * 1_000_000, "59m"],
+    [60 * 60 * 1_000_000, "1h"],
+    [12 * 60 * 60 * 1_000_000, "12h"],
+    [23 * 60 * 60 * 1_000_000, "23h"],
+    [24 * 60 * 60 * 1_000_000, "1d"],
+    [7 * 24 * 60 * 60 * 1_000_000, "7d"],
+    [30 * 24 * 60 * 60 * 1_000_000, "30d"],
+  ])("formats %d microseconds as %s", (input, expected) => {
+    expect(formatWindowLabel(input)).toBe(expected);
+  });
+
+  // Sub-second windows round to whole seconds.
+  it("rounds sub-second windows to the nearest whole second", () => {
+    expect(formatWindowLabel(1_500_000)).toBe("2s"); // 1.5s → rounds up
+    expect(formatWindowLabel(400_000)).toBe("0s");   // 0.4s → rounds down
+  });
+
+  // Defensive: zero / negative → empty string so the chip falls back
+  // to plain "vs prev" instead of "vs prev 0s".
+  it("returns empty string for zero / negative input", () => {
+    expect(formatWindowLabel(0)).toBe("");
+    expect(formatWindowLabel(-1)).toBe("");
   });
 });

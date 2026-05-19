@@ -591,13 +591,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="step > 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step3-back-btn"
-            variant="ghost"
-            size="icon-xs-sq"
+            variant="outline"
+            size="sm-action"
             @click="prevStep"
           >
-            <template #icon-left>
-              <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
-            </template>
+            Back
           </OButton>
           <OButton
             data-test="add-destination-cancel-btn"
@@ -631,7 +629,7 @@ import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Trash2, Plus, ChevronLeft } from "lucide-vue-next";
+import { Trash2, Plus } from "lucide-vue-next";
 
 // Props
 const props = defineProps<{

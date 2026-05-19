@@ -17,8 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div class="q-pa-md " style="height: calc(100vh - 130px); width: 100%;" >
       <div class="row items-baseline justify-between">
-        <div class="row q-table__title tw:font-[600] q-pb-md">
-          {{ t("billing.totalUsage") }}
+        <div class="row q-table__title tw:font-[600] q-pb-md usage-title">
+          <span>{{ t("billing.totalUsage") }}</span>
+          <span> {{ new Date(startTime/1000).toDateString() }} </span>
+          <span>-</span>
+          <span> {{ new Date(endTime/1000).toDateString() }} </span>
         </div>
       </div>
       <div>
@@ -272,6 +275,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const lastUsageUpdated = ref(0);
       const pipelinesPanelDataKey = ref(0);
       const elapsedText = ref('Just now');
+      const startTime = ref(new Date().getTime()*1000);
+      const endTime = ref(new Date().getTime()*1000);
       const usageData = ref<any>({
         ingestion: "0.00",
         search: "0.00",
@@ -325,6 +330,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
                 usageData.value[key] = numericValue.toFixed(2);
               }
             });
+            startTime.value = res.data.start_time;
+            endTime.value = res.data.end_time;
 
             dismiss();
           })
@@ -926,6 +933,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         dataLoading,
         options: ["30days", "60days", "3months", "6months"],
         selectUsageDate,
+        startTime,
+        endTime,
         usageDate,
         usageDataType,
         lastUsageUpdated,
@@ -995,6 +1004,10 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 .text-sub-title{
   font-size: 20px;
   font-weight: bolder;
+}
+
+.usage-title > span{
+    margin: auto 10px;
 }
   </style>
   

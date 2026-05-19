@@ -200,7 +200,7 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
-        // eslint-disable-next-line vue/require-default-prop
+         
         selectedEnrichmentTable: {
         type: String,
         default: '',

@@ -164,34 +164,50 @@ jobs:
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
               ]
+          - testfolder: "Logs-Builder-Basic"
+            browser: "chrome"
+            run_files:
+              [
+                "logsQueryBuilder-chart.spec.js",
+                "logsQueryBuilder-filters-basic.spec.js",
+                "pagination.spec.js",
+                "unflattened.spec.js",
+              ]
+          - testfolder: "Logs-Builder-Advanced"
+            browser: "chrome"
+            run_files:
+              [
+                "logsQueryBuilder-editor.spec.js",
+                "logsQueryBuilder-filters-advanced.spec.js",
+                "logsquickmode.spec.js",
+                "logshistogram.spec.js",
+              ]
           - testfolder: "Logs-Core"
             browser: "chrome"
             run_files:
               [
-                "join.spec.js",
-                "logshistogram.spec.js",
                 "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "logsQueryBuilder.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
                 "logstable.spec.js",
+                "logsqueries.spec.js",
+                "join.spec.js",
                 "shareLink.spec.js",
-                "monaco-query-prefill.spec.js",
                 "logsAnalyzeDimensions.spec.js",
+                "monaco-query-prefill.spec.js",
+                "logsqueries.matchall.spec.js",
               ]
-          - testfolder: "Logs-Queries"
+          - testfolder: "Logs-Features"
             browser: "chrome"
             run_files:
               [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
                 "logs-autocomplete-suggestions.spec.js",
+                # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
                 "logs-sql-autocomplete.spec.js",
+                "logsqueries.cte.spec.js",
+                "logsDownloads.spec.js",
+                "secondsPrecisionAdded.spec.js",
+                "searchpartition.spec.js",
+                "indexquery.spec.js",
+                "region.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -548,7 +564,7 @@ jobs:
           if [ -n "$FILE_LIST" ]; then
             # Map logical folder names to actual directories
             case "${{ matrix.testfolder }}" in
-              "Logs-Core"|"Logs-Queries")
+              "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
                 ACTUAL_FOLDER="Logs"
                 ;;
               "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
