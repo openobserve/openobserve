@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OIcon
                 class="q-mr-xs q-ml-sm flex-shrink-0"
-                size="15px"
+                size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
                 data-test="dashboard-config-cancel-panel-time"
@@ -1621,7 +1621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OIcon
               class="q-mr-xs q-ml-sm"
-              size="15px"
+              size="sm"
               name="close"
               style="cursor: pointer"
               @click="removeTimeShift(index)"

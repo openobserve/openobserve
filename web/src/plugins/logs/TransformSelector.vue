@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alt="Transform"
               class="tw:size-4"
             />
-            <OIcon v-else :name="transformIcon" size="16px" />
+            <OIcon v-else :name="transformIcon" size="sm" />
             <OIcon name="arrow-drop-down" size="sm" class="tw:ms-0.5" />
             <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>

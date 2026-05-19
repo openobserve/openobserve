@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <OIcon size="20px">
+      <OIcon size="md">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </OIcon>
       <OTooltip side="top" align="center">

@@ -26,7 +26,7 @@
         v-if="queryData.length === 0"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-[var(--o2-text-muted)]"
       >
-        <OIcon name="info" size="48px" />
+        <OIcon name="info" style="width: 48px; height: 48px;" />
         <p class="tw:mt-2">No queries executed for this panel.</p>
       </div>
 

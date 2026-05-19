@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               :name="row.is_silenced ? 'volume-off' : 'volume-up'"
               :color="row.is_silenced ? 'grey' : 'positive'"
-              size="20px"
+              size="md"
             >
               <q-tooltip>
                 {{ row.is_silenced ? "Silenced" : "Not Silenced" }}

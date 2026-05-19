@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="chunkPeriodError = ''"
                     data-test="chunk-period-input"
                   >
-                    <template #append>
+                    <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
                     </template>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="delayBetweenError = ''"
                     data-test="delay-between-chunks-input"
                   >
-                    <template #append>
+                    <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: 5 seconds" />
                     </template>

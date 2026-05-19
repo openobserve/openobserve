@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon
                 :name="serviceNameDetected ? 'check-circle' : 'warning'"
-                size="18px"
+                size="sm"
                 :color="serviceNameDetected ? 'positive' : undefined"
                 :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
               />
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'keyboard-arrow-up'
                     : 'keyboard-arrow-down'
                 "
-                size="18px"
+                size="sm"
                 class="tw:opacity-40 tw:shrink-0"
               />
             </div>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:border-grey-4 tw:bg-grey-1'
               "
             >
-              <OIcon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <OIcon name="tune" size="lg" class="tw:text-grey-5 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'keyboard-arrow-up'
                   : 'keyboard-arrow-down'
               "
-              size="18px"
+              size="sm"
               class="tw:opacity-40 tw:shrink-0"
             />
           </div>
@@ -814,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                   <OIcon
                     :name="card.theme.icon"
-                    size="14px"
+                    size="sm"
                     :class="card.theme.iconClass"
                   />
                   <span

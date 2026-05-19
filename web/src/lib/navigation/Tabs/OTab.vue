@@ -4,6 +4,8 @@ import { computed, inject, type ComputedRef } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
+import OIcon from '@/lib/core/Icon/OIcon.vue'
+import { iconRegistry } from '@/lib/core/Icon/OIcon.icons'
 
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
@@ -21,6 +23,8 @@ const isVertical = computed<boolean>(() => context?.value.isVertical ?? false)
 const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')))
 /** The resolved src URL (stripped of `img:` prefix) */
 const imgSrc = computed<string>(() => (props.icon?.startsWith('img:') ? props.icon.slice(4) : ''))
+/** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
+const isOIcon = computed<boolean>(() => Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry))
 
 // ── Classes ────────────────────────────────────────────────────────────────
 const baseClasses = computed<string>(() => [
@@ -96,7 +100,14 @@ const heightClasses = computed<string>(() => {
           aria-hidden="true"
           alt=""
         />
-        <!-- Regular Material icon name → render as outlined icon font glyph -->
+        <!-- OIcon registry name (kebab-case SVG icon) -->
+        <OIcon
+          v-else-if="icon && isOIcon"
+          :name="(icon as any)"
+          size="sm"
+          class="o-tab__icon tw:shrink-0"
+        />
+        <!-- Fallback: Material icon font glyph (Quasar-compat underscore names) -->
         <span
           v-else-if="icon"
           class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons-outlined"

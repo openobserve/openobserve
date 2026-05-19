@@ -5,6 +5,9 @@ import { useI18n } from "vue-i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useQuasar } from "quasar";
+
+const $q = useQuasar();
 
 const emit = defineEmits<{
   (e: "load-chat", id: number): void;

@@ -169,19 +169,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
-                      size="15px"
+                      size="sm"
                       class="tw:text-blue-600 tw:shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
-                      size="15px"
+                      size="sm"
                       class="tw:text-orange-500 tw:shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
-                      size="15px"
+                      size="sm"
                       class="tw:text-grey-7 tw:shrink-0"
                     />
                     <span>{{ computedName(row.name) }}</span>
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @select="triggerAlert(row)"
                         >
                           <template #icon-left>
-                            <OIcon size="16px" :name="symOutlinedSoundSampler" />
+                            <OIcon size="sm" :name="symOutlinedSoundSampler" />
                           </template>
                           Trigger Detection
                         </ODropdownItem>
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
-                          <OIcon size="16px" :name="symOutlinedSoundSampler" />
+                          <OIcon size="sm" :name="symOutlinedSoundSampler" />
                         </template>
                         {{ t("alerts.triggerAlert") }}
                       </ODropdownItem>

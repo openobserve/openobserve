@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <OIcon name="notifications" size="15px" />
+        <OIcon name="notifications" size="sm" />
         <OTooltip :content="t('search.createAlertFromPattern')" />
       </OButton>
     </div>

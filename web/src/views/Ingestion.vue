@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
             data-test="recommended-list-search-input"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </OInput>

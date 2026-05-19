@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
             :placeholder="t('common.search')"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </OInput>

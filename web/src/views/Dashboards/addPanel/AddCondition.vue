@@ -86,8 +86,6 @@
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
                         multiple
-                        emit-value
-                        map-options
                         :rules="[
                           (val: any) =>
                             val.length > 0 || 'At least 1 item required',

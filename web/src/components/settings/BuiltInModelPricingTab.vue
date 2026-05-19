@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
           >
-            <template v-slot:prepend>
+            <template v-slot:icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <OIcon name="error" size="50px" />
+      <OIcon name="error" style="width: 50px; height: 50px;" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div class="full-width column flex-center q-pa-xl">
-            <OIcon name="search-off" size="50px" />
+            <OIcon name="search-off" style="width: 50px; height: 50px;" />
             <div class="q-mt-md" style="color: var(--o2-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
             </div>

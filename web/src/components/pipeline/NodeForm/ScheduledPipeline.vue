@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("pipeline.trigger") }}
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.crontitle") + " *" }}
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.frequency") + " *" }}
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
@@ -734,7 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.period") + " *" }}
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
@@ -829,7 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("pipeline.delay") + " *" }}
                         <OIcon
                           name="info"
-                          size="17px"
+                          size="sm"
                           class="q-ml-xs cursor-pointer"
                           :class="
                             store.state.theme === 'dark'

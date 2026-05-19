@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="error"
-            size="1rem"
+            size="sm"
             class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
           />
         </span>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="chip-value">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
-              size="10px"
+              size="xs"
               class="q-ml-xs copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <template #icon><OIcon name="arrow-upward" size="10px" /></template>
+              <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </OBadge>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <template #icon><OIcon name="arrow-downward" size="10px" /></template>
+              <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </OBadge>
@@ -369,7 +369,7 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="14px"
+                        size="sm"
                       />
                     </OButton>
                     <OButton
@@ -436,7 +436,7 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="14px"
+                        size="sm"
                       />
                     </OButton>
                     <OButton

@@ -28,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="tw:text-center tw:py-8">
       <OIcon
         name="error-outline"
-        size="3rem"
-        class="tw:mb-4"
-      />
+        class="tw:mb-4" style="width: 3rem; height: 3rem;" />
       <div class="text-body1 text-negative">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
@@ -45,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
-      <OIcon name="search-off" size="3rem" class="tw:mb-4" />
+      <OIcon name="search-off" class="tw:mb-4" style="width: 3rem; height: 3rem;" />
       <div class="text-body1">
         {{ t("settings.correlation.noServicesYet") }}
       </div>
@@ -73,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon
           name="info"
-          size="1.25rem"
+          size="md"
           class="tw:shrink-0 info-banner-icon"
         />
         <div class="tw:text-sm tw:leading-relaxed info-banner-text">
@@ -135,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               class="o2-search-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
@@ -192,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'expand-more'
                       : 'chevron-right'
                   "
-                  size="1.25rem"
+                  size="md"
                   class="tw:text-gray-400 tw:cursor-pointer"
                   @click.stop="toggleGroup(row.service_name)"
                 />
@@ -356,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="selectedService?.set_id === 'default'"
         class="panel-warning-banner"
       >
-        <OIcon name="info-outline" size="1rem" class="tw:shrink-0 tw:mt-0.5" />
+        <OIcon name="info-outline" size="sm" class="tw:shrink-0 tw:mt-0.5" />
         <div class="tw:text-xs tw:leading-relaxed">
           <span class="tw:font-semibold">{{
             t("settings.correlation.defaultSetWarningTitle")
@@ -491,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="mapping-key">{{ raw }}</span>
               <OIcon
                 name="arrow-forward"
-                size="0.75rem"
+                size="xs"
                 class="tw:text-gray-400 tw:justify-self-center"
               />
               <span class="mapping-val">{{ mapped }}</span>

@@ -29,7 +29,7 @@
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
-            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="12px" />
+            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="xs" />
           </OButton>
       </template>
       <template v-slot:after>
@@ -89,6 +89,7 @@ const allTabs = [
     },
     label: t("iam.basicUsers"),
     class: "tab_content",
+    icon: "person",
   },
   {
     dataTest: "iam-service-accounts-tab",
@@ -101,6 +102,7 @@ const allTabs = [
     },
     label: t("iam.serviceAccounts"),
     class: "tab_content",
+    icon: "manage-accounts",
   },
   {
     dataTest: "iam-groups-tab",
@@ -113,6 +115,7 @@ const allTabs = [
     },
     label: t("iam.groups"),
     class: "tab_content",
+    icon: "group",
   },
   {
     dataTest: "iam-roles-tab",
@@ -125,6 +128,7 @@ const allTabs = [
     },
     label: t("iam.roles"),
     class: "tab_content",
+    icon: "shield",
   },
   {
     dataTest: "iam-quota-tab",
@@ -137,6 +141,7 @@ const allTabs = [
     },
     label: t("iam.quota"),
     class: "tab_content",
+    icon: "speed",
   },
   {
     dataTest: "iam-organizations-tab",
@@ -149,6 +154,7 @@ const allTabs = [
     },
     label: t("iam.organizations"),
     class: "tab_content",
+    icon: "corporate-fare",
   },
   {
     dataTest: "iam-invitations-tab",
@@ -161,6 +167,7 @@ const allTabs = [
     },
     label: t("iam.invitations"),
     class: "tab_content",
+    icon: "mail",
   },
 ];
 

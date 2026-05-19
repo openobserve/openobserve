@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'bolt'
                       : 'schedule'
                 "
-                size="14px"
+                size="sm"
                 class="tw:opacity-70"
               />
               <span
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon
                   name="history-toggle-off"
-                  size="28px"
+                  size="lg"
                   :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
                 />
               </div>
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-gray-500'
                 "
               >
-                <OIcon name="info-outline" size="13px" />
+                <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div

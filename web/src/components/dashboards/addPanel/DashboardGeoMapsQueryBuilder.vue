@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-latitude-item-${latitudeLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
           <ODropdown>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-longitude-item-${longitudeLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
           <ODropdown>
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-weight-item-${weightLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
           <ODropdown>

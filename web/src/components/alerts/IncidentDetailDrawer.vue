@@ -1012,9 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated logs found' }}
             </div>
@@ -1063,9 +1061,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
@@ -1121,9 +1117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated traces found' }}
             </div>
@@ -1175,7 +1169,7 @@ import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, o
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { date, useQuasar } from "quasar";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1226,6 +1220,7 @@ export default defineComponent({
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
+    const $q = useQuasar();
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();

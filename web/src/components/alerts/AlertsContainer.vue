@@ -11,7 +11,7 @@
             v-if="!image"
             data-test="container-icon"
             :name="icon"
-            size="16px"
+            size="sm"
             class="tw:mr-2   tw:rounded-full tw:px-1 tw:py-1  "
             :class="[
               store.state.theme === 'dark'
@@ -56,7 +56,7 @@
                 ? 'tw:text-gray-100  tw:bg-gray-600'
                 : 'tw:text-gray-900 tw:bg-gray-300',
             ]"
-            size="18px"
+            size="sm"
           />
         </div>
       </div>

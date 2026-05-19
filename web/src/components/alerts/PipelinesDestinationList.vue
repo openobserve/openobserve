@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-auto no-border o2-search-input"
             :placeholder="t('pipeline_destinations.search')"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>

@@ -450,6 +450,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { useQuasar } from "quasar";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -470,6 +471,7 @@ export default defineComponent({
     OCardSection,
 },
   setup() {
+    const $q = useQuasar();
     const { t } = useI18n();
     const loading = ref(false);
     const updating = ref(false);

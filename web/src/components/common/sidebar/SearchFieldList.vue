@@ -23,7 +23,7 @@
               v-if="isExpandable(row)"
               class="field-expand-icon"
               :name="expandedRows[row.name] ? 'expand-less' : 'expand-more'"
-              size="1rem"
+              size="sm"
             />
           </span>
           <span class="field_label ellipsis tw:flex tw:items-center" :title="row.name">

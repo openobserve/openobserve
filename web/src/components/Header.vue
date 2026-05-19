@@ -397,7 +397,7 @@ size="xs" class="warning" />{{
           >
             <OIcon
               :name="user.picture ? user.picture : 'person'"
-              size="20px"
+              size="md"
               class="header-icon tw:opacity-70"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />

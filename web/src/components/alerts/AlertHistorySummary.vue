@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             :name="getStateIcon(row.current_state)"
             :color="getStateColor(row.current_state)"
-            size="18px"
+            size="sm"
           />
           <span>{{ row.current_state }}</span>
         </div>

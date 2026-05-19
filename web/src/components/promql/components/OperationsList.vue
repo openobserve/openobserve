@@ -23,7 +23,7 @@
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
                   <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
@@ -136,7 +136,7 @@
         v-model="searchQuery"
         clearable
       >
-        <template v-slot:prepend>
+        <template v-slot:icon-left>
           <OIcon name="search" size="sm" />
         </template>
       </OInput>

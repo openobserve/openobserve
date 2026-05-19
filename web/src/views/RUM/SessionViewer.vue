@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="sentiment-very-dissatisfied"
-            size="0.875rem"
+            size="sm"
             class="q-pr-xs"
             style="color: #fb923c"
             data-test="frustration-summary-icon"

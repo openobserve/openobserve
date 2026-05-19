@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search Roles"
         >
-          <template #prepend>
+          <template #icon-left>
             <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
           </template>
         </OInput>

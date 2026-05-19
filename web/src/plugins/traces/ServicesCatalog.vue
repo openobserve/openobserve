@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :debounce="300"
           class="tw:w-[14rem]!"
         >
-          <template #prepend>
-            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
+          <template #icon-left>
+            <OIcon class="o2-search-input-icon" size="sm" name="search" />
           </template>
         </OInput>
       </div>
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <OIcon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="layers" class="tw:mb-3 tw:opacity-40" style="width: 3rem; height: 3rem;" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>

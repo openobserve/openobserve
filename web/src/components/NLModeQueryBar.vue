@@ -117,7 +117,7 @@
             :data-test="`${dataTestPrefix}-ai-input-field`"
             @keydown.enter="handleAIInputEnter"
           >
-            <template v-slot:prepend>
+            <template v-slot:icon-left>
               <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
             </template>
           </OInput>

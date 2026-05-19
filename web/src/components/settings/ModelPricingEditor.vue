@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'check'
                             : 'content-copy'
                         "
-                        size="12px"
+                        size="xs"
                         :class="
                           copiedPattern === ex.match_pattern
                             ? 'text-positive'
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                         "
                       >
-                        <template #prepend
+                        <template #icon-left
                           ><span class="price-dollar">$</span></template
                         >
                       </OInput>
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
                       >
-                        <template #prepend
+                        <template #icon-left
                           ><span class="price-dollar">$</span></template
                         >
                       </OInput>

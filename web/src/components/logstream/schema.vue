@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-ml-auto no-border o2-search-input"
                         :placeholder="t('search.searchField')"
                       >
-                        <template #prepend>
+                        <template #icon-left>
                           <OIcon
                             class="o2-search-input-icon"
                             :class="

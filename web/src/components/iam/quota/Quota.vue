@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }[activeTab]
                 "
               >
-                <template #prepend>
+                <template #icon-left>
                   <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
               </OInput>
@@ -452,10 +452,12 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
+        icon: "speed",
       },
       {
         label: "Role Limits",
         value: "role-limits",
+        icon: "shield",
       },
     ]);
 
@@ -463,14 +465,17 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
+        icon: "timer",
       },
       {
         label: "Per Minute",
         value: "minute",
+        icon: "schedule",
       },
       {
         label: "Per Hour",
         value: "hour",
+        icon: "hourglass-empty",
       },
     ]);
 
@@ -478,10 +483,12 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
+        icon: "table-chart",
       },
       {
         label: "JSON",
         value: "json",
+        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);

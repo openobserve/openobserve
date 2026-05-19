@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
-                  <OIcon name="help" size="17px" />
+                  <OIcon name="help" size="sm" />
                   <span class="q-ml-xs"> Help </span>
                 </div>
               </div>

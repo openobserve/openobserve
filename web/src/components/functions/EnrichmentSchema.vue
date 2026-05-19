@@ -84,7 +84,7 @@
                   debounce="1"
                   :placeholder="t('search.searchField')"
                 >
-                  <template #prepend>
+                  <template #icon-left>
                     <OIcon name="search" size="sm" />
                   </template>
                 </OInput>

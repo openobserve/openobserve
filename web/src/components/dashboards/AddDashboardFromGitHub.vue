@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="error-outline"
-            size="3em"
-            class="tw:mb-2"
-          />
+            class="tw:mb-2" style="width: 3em; height: 3em;" />
           <div class="text-negative">{{ error }}</div>
           <OButton
             variant="primary"

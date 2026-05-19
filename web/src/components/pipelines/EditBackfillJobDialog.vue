@@ -146,6 +146,9 @@ import DateTime from "@/components/DateTime.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { useQuasar } from "quasar";
+
+const $q = useQuasar();
 
 interface Props {
   modelValue: boolean;

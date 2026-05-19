@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:mx-2 tw:my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
-                          <template #prepend>
+                          <template #icon-left>
                             <OIcon name="search" size="sm" />
                           </template>
                         </OInput>
@@ -1127,7 +1127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
-                      size="16px"
+                      size="sm"
                       :color="searchObj.meta.liveMode ? 'primary' : ''"
                     />
                   </template>
@@ -1525,7 +1525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="q-ml-xs cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
                 <span style="font-size: 14px">{{
@@ -1633,7 +1633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mx-2 tw:my-2"
                       :placeholder="t('search.searchSavedView')"
                     >
-                      <template #prepend>
+                      <template #icon-left>
                         <OIcon name="search" size="sm" />
                       </template>
                     </OInput>

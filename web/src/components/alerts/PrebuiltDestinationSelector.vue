@@ -38,7 +38,7 @@ limitations under the License. -->
             <OIcon
               v-else
               :name="getIconName(type.icon)"
-              size="1.5rem"
+              size="md"
             />
           </div>
 
@@ -57,7 +57,7 @@ limitations under the License. -->
             v-if="selectedType === type.id"
             class="check-icon"
           >
-            <OIcon name="check-circle" size="1.25rem" />
+            <OIcon name="check-circle" size="md" />
           </div>
         </div>
       </div>
@@ -72,7 +72,7 @@ limitations under the License. -->
       >
         <div class="card-content">
           <div class="card-icon">
-            <OIcon name="settings" size="1.5rem" />
+            <OIcon name="settings" size="md" />
           </div>
           <h3 data-test="destination-type-name" class="card-title">
             {{ t('alerts.customDestination') }}
@@ -84,7 +84,7 @@ limitations under the License. -->
             v-if="selectedType === 'custom'"
             class="check-icon"
           >
-            <OIcon name="check-circle" size="1.25rem" />
+            <OIcon name="check-circle" size="md" />
           </div>
         </div>
       </div>

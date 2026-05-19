@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               @clear="clearSearch"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon
                   class="o2-search-input-icon"
                   :class="
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
               :color="value ? 'grey' : 'positive'"
-              size="20px"
+              size="md"
              />
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
           </template>

@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="$emit('toggle-section', item, $event)"
                   class="tw:flex-shrink-0"
                 >
-                  <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="14px" />
+                  <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="sm" />
                   <OTooltip :content="expandedSections[item.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
                 </OButton>
               </div>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="$emit('toggle-section', child, $event)"
                         class="tw:flex-shrink-0"
                       >
-                        <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="14px" />
+                        <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="sm" />
                         <OTooltip :content="expandedSections[child.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
                       </OButton>
                     </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'hover:tw:bg-blue-50 tw:text-gray-600'
                         ]"
                       >
-                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="8px" class="tw:opacity-60" />
+                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="tw:opacity-60" />
                         <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
                       </div>
                     </div>

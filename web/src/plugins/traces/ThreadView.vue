@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge">
-            <OIcon name="settings" size="11px" class="q-mr-xs" />
+            <OIcon name="settings" size="xs" class="q-mr-xs" />
             System
           </span>
           <span
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="thread-system__toggle">
             <OIcon
               :name="showSystemFull ? 'expand-less' : 'expand-more'"
-              size="18px"
+              size="sm"
             />
           </span>
         </div>
@@ -276,30 +276,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Footer. -->
           <div class="thread-turn__footer">
             <span class="thread-metric" :title="`Started at ${formatTime(turn.span.start_time)}`">
-              <OIcon name="schedule" size="11px" />
+              <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
             <span class="thread-metric thread-metric--model" :title="getModel(turn.span)">
-              <OIcon name="bolt" size="11px" />
+              <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
             <span class="thread-metric" title="Duration">
-              <OIcon name="timer" size="11px" />
+              <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
             <span class="thread-metric" title="Tokens">
-              <OIcon name="data-usage" size="11px" />
+              <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
             <span class="thread-metric" title="Cost">
-              <OIcon name="payments" size="11px" />
+              <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
               class="thread-metric thread-metric--error"
             >
-              <OIcon name="error-outline" size="11px" />
+              <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button

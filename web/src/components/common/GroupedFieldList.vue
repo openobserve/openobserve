@@ -34,7 +34,7 @@
           >
             <OIcon
               :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
-              size="14px"
+              size="sm"
             />
           </OButton>
         </div>

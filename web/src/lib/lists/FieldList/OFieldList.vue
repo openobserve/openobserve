@@ -17,7 +17,7 @@
         @update:model-value="onSearchChange"
       >
         <template #icon-left>
-          <OIcon name="search" size="1rem" class="o-field-list__search-icon" />
+          <OIcon name="search" size="sm" class="o-field-list__search-icon" />
         </template>
       </OInput>
     </div>

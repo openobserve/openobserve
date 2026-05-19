@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 v-else
                 :name="destType.icon"
-                size="28px"
+                size="lg"
                 class="card-icon"
               />
               <div class="card-label">{{ destType.label }}</div>

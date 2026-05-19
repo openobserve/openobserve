@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else-if="!traceId">
       <div class="q-pa-md text-center text-grey-7">
-        <OIcon name="info" size="1.5rem" class="q-mb-sm" />
+        <OIcon name="info" size="md" class="q-mb-sm" />
         <div>No trace information available for this event</div>
       </div>
     </template>

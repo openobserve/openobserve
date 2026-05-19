@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OIcon
               name="error"
-              size="1.1rem"
+              size="sm"
               class="tw:mx-1 tw:text-red-500"
             />
             <OTooltip :content="t('traces.showErrorOnly')" />
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="
                       searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
-                    size="16px"
+                    size="sm"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
                   />
                 </template>

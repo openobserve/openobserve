@@ -28,8 +28,8 @@
           @update:model-value="applyFilters"
           clearable
         >
-          <template #prepend>
-            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
+          <template #icon-left>
+            <OIcon class="o2-search-input-icon" size="sm" name="search" />
           </template>
         </OInput>
       </div>
@@ -175,7 +175,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <OIcon name="error-outline" size="4em" />
+                <OIcon name="error-outline" style="width: 4em; height: 4em;" />
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
@@ -195,7 +195,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <OIcon name="hub" size="5em" />
+                <OIcon name="hub" style="width: 5em; height: 5em;" />
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
@@ -298,6 +298,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -319,6 +320,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
+    const $q = useQuasar();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
