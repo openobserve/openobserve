@@ -3679,7 +3679,8 @@
     "errSave": "Falha ao salvar",
     "errLoadModel": "Falha ao carregar o modelo",
     "tierDefaultName": "Padrão",
-    "tierConditionalName": "Nível condicional"
+    "tierConditionalName": "Nível condicional",
+    "shadowedWarningBanner": "As regras abaixo são sombreadas por “{name}” — substituídas por uma regra de maior prioridade e não serão usadas para cálculos de custos."
   },
   "overview": {
     "title": "Visão geral do sistema",

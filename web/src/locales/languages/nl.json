@@ -3690,7 +3690,8 @@
     "errSave": "Opslaan is mislukt",
     "errLoadModel": "Het laden van het model is mislukt",
     "tierDefaultName": "Standaard",
-    "tierConditionalName": "Voorwaardelijke laag"
+    "tierConditionalName": "Voorwaardelijke laag",
+    "shadowedWarningBanner": "De onderstaande regels worden overschaduwd door „{name}” — vervangen door een regel met een hogere prioriteit en worden niet gebruikt voor kostenberekeningen."
   },
   "overview": {
     "title": "Overzicht van het systeem",

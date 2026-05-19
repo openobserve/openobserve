@@ -3690,7 +3690,8 @@
     "errSave": "Kaydedilemedi",
     "errLoadModel": "Model yüklenemedi",
     "tierDefaultName": "Varsayılan",
-    "tierConditionalName": "Koşullu Katman"
+    "tierConditionalName": "Koşullu Katman",
+    "shadowedWarningBanner": "Aşağıdaki kurallar “{name}” ile gölgelenmiştir - daha yüksek öncelikli bir kural tarafından geçersiz kılınır ve maliyet hesaplamalarında kullanılmaz."
   },
   "overview": {
     "title": "Sisteme Genel Bakış",

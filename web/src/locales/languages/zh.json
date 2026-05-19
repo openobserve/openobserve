@@ -3683,7 +3683,8 @@
     "errSave": "保存失败",
     "errLoadModel": "加载模型失败",
     "tierDefaultName": "默认",
-    "tierConditionalName": "有条件的等级"
+    "tierConditionalName": "有条件的等级",
+    "shadowedWarningBanner": "以下规则被 “{name}” 遮盖——由更高优先级的规则覆盖，不会用于成本计算。"
   },
   "overview": {
     "title": "系统概述",

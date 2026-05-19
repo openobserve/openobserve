@@ -3679,7 +3679,8 @@
     "errSave": "保存できませんでした",
     "errLoadModel": "モデルを読み込めませんでした",
     "tierDefaultName": "デフォルト",
-    "tierConditionalName": "条件付き階層"
+    "tierConditionalName": "条件付き階層",
+    "shadowedWarningBanner": "以下のルールは「{name}」に覆われています。優先度の高いルールでは無効になり、コスト計算には使用されません。"
   },
   "overview": {
     "title": "システム概要",

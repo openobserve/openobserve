@@ -3688,7 +3688,8 @@
     "errSave": "Salvataggio non riuscito",
     "errLoadModel": "Caricamento del modello non riuscito",
     "tierDefaultName": "Predefinito",
-    "tierConditionalName": "Livello condizionale"
+    "tierConditionalName": "Livello condizionale",
+    "shadowedWarningBanner": "Le regole seguenti sono ombreggiate da «{name}», sostituite da una regola con priorità più alta e non verranno utilizzate per il calcolo dei costi."
   },
   "overview": {
     "title": "Panoramica del sistema",
