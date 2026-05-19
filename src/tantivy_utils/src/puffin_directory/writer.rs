@@ -20,7 +20,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use tantivy::{
     HasLen,
     directory::{Directory, MmapDirectory, WatchCallback, WatchHandle, error::OpenReadError},
@@ -38,6 +38,8 @@ pub struct PuffinDirWriter {
     mmap_directory: Arc<MmapDirectory>,
     /// record all the files paths in the puffin file
     file_paths: Arc<RwLock<HashSet<PathBuf>>>,
+    /// file-level puffin properties (written to PuffinMeta.properties)
+    properties: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl Default for PuffinDirWriter {
@@ -51,6 +53,7 @@ impl Clone for PuffinDirWriter {
         PuffinDirWriter {
             mmap_directory: self.mmap_directory.clone(),
             file_paths: self.file_paths.clone(),
+            properties: self.properties.clone(),
         }
     }
 }
@@ -63,6 +66,7 @@ impl PuffinDirWriter {
                     .expect("failed to create temporary mmap directory"),
             ),
             file_paths: Arc::new(RwLock::new(HashSet::default())),
+            properties: Arc::new(RwLock::new(HashMap::default())),
         }
     }
 
@@ -75,10 +79,20 @@ impl PuffinDirWriter {
             .collect()
     }
 
+    pub fn set_property(&self, key: impl Into<String>, value: impl Into<String>) {
+        self.properties
+            .write()
+            .expect("poisoned lock")
+            .insert(key.into(), value.into());
+    }
+
     // This function will serialize the directory into a single puffin file
     pub fn to_puffin_bytes(&self) -> Result<Vec<u8>> {
         let mut puffin_buf: Vec<u8> = Vec::new();
         let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
+        for (k, v) in self.properties.read().expect("poisoned lock").iter() {
+            puffin_writer.set_property(k.clone(), v.clone());
+        }
         let mut segment_id = String::new();
 
         let file_paths = self.file_paths.read().expect("poisoned lock");

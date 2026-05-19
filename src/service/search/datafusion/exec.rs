@@ -817,6 +817,7 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 segment_ids: None,
+                row_group_size: None,
             }];
 
             let result = register_metrics_table(&session, schema, "test_table", files).await;
@@ -856,6 +857,7 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 segment_ids: None,
+                row_group_size: None,
             }];
 
             let builder = TableBuilder::new().sorted_by_time(true);

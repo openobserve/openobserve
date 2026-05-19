@@ -29,9 +29,10 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
-    RowIdsBitVec(usize, BitVec),
-    // true number in bitmap, bitmap, parquet row numbers
-    RowIdsRoaring(usize, RoaringBitmap, usize),
+    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
+    RowIdsBitVec(BitVec, usize, Option<u32>),
+    /// (sparse_row_ids, matched_row_count, parquet_row_count, row_group_size_from_index_file)
+    RowIdsRoaring(RoaringBitmap, usize, usize, Option<u32>),
     Count(usize),              // simple count optimization
     Histogram(Vec<u64>),       // simple histogram optimization
     TopN(Vec<(String, u64)>),  // simple top n optimization
@@ -41,15 +42,15 @@ pub enum CacheEntry {
 impl From<CacheEntry> for TantivyResult {
     fn from(entry: CacheEntry) -> Self {
         match entry {
-            CacheEntry::RowIdsBitVec(num_rows, bitvec) => {
-                TantivyResult::RowIdsBitVec(num_rows, bitvec)
+            CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
+                TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size)
             }
-            CacheEntry::RowIdsRoaring(num_rows, roaring, parquet_rows) => {
+            CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size) => {
                 let mut bitvec = BitVec::repeat(false, parquet_rows);
                 for i in roaring.into_iter() {
                     bitvec.set(i as usize, true);
                 }
-                TantivyResult::RowIdsBitVec(num_rows, bitvec)
+                TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size)
             }
             CacheEntry::Count(count) => TantivyResult::Count(count),
             CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
@@ -62,10 +63,10 @@ impl From<CacheEntry> for TantivyResult {
 impl CacheEntry {
     pub fn get_memory_size(&self) -> usize {
         match self {
-            CacheEntry::RowIdsBitVec(_, bitvec) => {
+            CacheEntry::RowIdsBitVec(bitvec, ..) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
             }
-            CacheEntry::RowIdsRoaring(_, roaring, _) => {
+            CacheEntry::RowIdsRoaring(roaring, ..) => {
                 roaring.serialized_size()
                     + std::mem::size_of::<RoaringBitmap>()
                     + std::mem::size_of::<usize>() * 2
@@ -177,7 +178,7 @@ mod tests {
         bitvec.set(10, true);
         bitvec.set(20, true);
         bitvec.set(30, true);
-        CacheEntry::RowIdsBitVec(3, bitvec)
+        CacheEntry::RowIdsBitVec(bitvec, 3, None)
     }
 
     fn create_test_count_result() -> CacheEntry {
@@ -209,7 +210,7 @@ mod tests {
         bitvec.set(10, true);
         bitvec.set(20, true);
         bitvec.set(30, true);
-        CacheEntry::RowIdsBitVec(3, bitvec)
+        CacheEntry::RowIdsBitVec(bitvec, 3, None)
     }
 
     #[test]
@@ -230,7 +231,7 @@ mod tests {
         assert!(retrieved.is_some());
         assert!(matches!(
             retrieved.unwrap(),
-            TantivyResult::RowIdsBitVec(_, _)
+            TantivyResult::RowIdsBitVec(_, _, _)
         ));
     }
 
@@ -453,11 +454,11 @@ mod tests {
         let mut bitvec = BitVec::repeat(false, 100);
         bitvec.set(10, true);
         bitvec.set(20, true);
-        let bitvec_result = CacheEntry::RowIdsBitVec(25, bitvec);
+        let bitvec_result = CacheEntry::RowIdsBitVec(bitvec, 25, None);
 
         cache.put("percent_key".to_string(), bitvec_result);
 
-        if let Some(TantivyResult::RowIdsBitVec(percent, _)) = cache.get("percent_key") {
+        if let Some(TantivyResult::RowIdsBitVec(_, percent, ..)) = cache.get("percent_key") {
             assert_eq!(percent, 25);
         } else {
             panic!("Expected RowIdsBitVec result");
