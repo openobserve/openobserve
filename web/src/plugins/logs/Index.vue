@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <template #after>
-                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                <div class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
