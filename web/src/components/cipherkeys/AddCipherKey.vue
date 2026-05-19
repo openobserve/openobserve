@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
+      <div class="q-mt-md" style="height: calc(100vh -  var(--navbar-height) - 300px);">
       <OStepper
         v-model="step"
         orientation="vertical"
