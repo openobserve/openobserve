@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-px-md q-py-sm">
+  <OCard class="tw:flex tw:flex-col o2-card-wrapper">
+    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
-        <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
-        <div class="o2-card-subtitle q-mt-sm">
+        <div class="o2-card-title tw:pt-2">{{ t("billing.proPlanLabel") }}</div>
+        <div class="o2-card-subtitle tw:mt-2">
           {{ t("billing.proPlanSubtitle") }}
         </div>
       </div>
       <OBadge
         v-if="planType == planName"
         variant="primary-soft"
-        class="q-mt-sm text-caption q-px-sm q-py-md"
+        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
         style="border-radius: 0px"
       >
         {{ t("billing.subscribed") }}
@@ -35,17 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator class="tw:my-2" />
 
-    <div class="q-px-md q-py-sm">
+    <div class="tw:px-3 tw:py-2">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">
+      <div class="o2-page-subtitle2 tw:mb-3 tw:mt-1">
         {{ t("billing.included") }}
       </div>
 
       <div
         v-if="pricingError && !features?.length"
-        class="row items-center q-mb-sm text-negative"
+        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
       >
-        <OIcon name="warning" size="sm" class="q-mr-sm" />
+        <OIcon name="warning" size="sm" class="tw:mr-2" />
         <span class="o2-page-subtitle3"
           >Failed to load pricing details. Please refresh the page.</span
         >
@@ -53,21 +53,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="row items-center justify-between q-mb-sm"
+        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
       >
-        <div class="row items-center">
+        <div class="tw:flex tw:items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="sm"
-            class="q-mr-sm"
+            class="tw:mr-2"
           />
-          <OIcon v-else name="" color="green" size="sm" class="q-mr-sm" />
+          <OIcon v-else name="" color="green" size="sm" class="tw:mr-2" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="q-mx-sm"
+          class="tw:mx-2"
           style="
             flex: 1;
             border-top: 1px dotted #454f5b;
@@ -75,55 +75,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             opacity: 0.4;
           "
         ></div>
-        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
+        <div class="o2-page-subtitle3 tw:font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
+    <div class="o2-page-subtitle2 tw:px-3 tw:pt-2">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </div>
 
-    <div class="row justify-between q-pa-md">
+    <div class="tw:flex tw:justify-between tw:p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="full-width text-center">
+      <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
         <OBadge
           variant="success-soft"
           icon="check_circle"
-          class="q-px-md q-py-sm"
+          class="tw:px-3 tw:py-2"
         >
           Managed via AWS Marketplace
         </OBadge>
-        <div class="text-caption text-grey-7 q-mt-sm">
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
       <div
         v-else-if="billingProvider === 'azure'"
-        class="full-width text-center"
+        class="tw:w-full tw:text-center"
       >
         <OBadge
           variant="success-soft"
           icon="check_circle"
-          class="q-px-md q-py-sm"
+          class="tw:px-3 tw:py-2"
         >
           Managed via Azure Marketplace
         </OBadge>
-        <div class="text-caption text-grey-7 q-mt-sm">
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
       <div
         v-else-if="subscriptionType === 'external-contract'"
-        class="full-width text-center"
+        class="tw:w-full tw:text-center"
       >
-        <OBadge variant="default" icon="description" class="q-px-md q-py-sm">
+        <OBadge variant="default" icon="description" class="tw:px-3 tw:py-2">
           Managed via contract
         </OBadge>
-        <div class="text-caption text-grey-7 q-mt-sm">
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>

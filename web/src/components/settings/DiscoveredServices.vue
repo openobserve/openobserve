@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon
         name="error-outline"
         class="tw:mb-4" style="width: 3rem; height: 3rem;" />
-      <div class="text-body1 text-negative">{{ error }}</div>
+      <div class="tw:text-base tw:text-red-500">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
         variant="outline"
@@ -44,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
       <OIcon name="search-off" class="tw:mb-4" style="width: 3rem; height: 3rem;" />
-      <div class="text-body1">
+      <div class="tw:text-base">
         {{ t("settings.correlation.noServicesYet") }}
       </div>
-      <div class="text-body2 text-grey-6 tw:mt-2">
+      <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
       <OButton
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Filter bar -->
           <div class="tw:flex tw:items-center tw:gap-2">
-            <span class="tw:text-md tw:text-grey-6">{{
+            <span class="tw:text-md tw:text-gray-400">{{
               t("settings.correlation.filterBy")
             }}</span>
             <OSelect

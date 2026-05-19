@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
     >
       <OIcon name="hub" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" style="width: 48px; height: 48px;" />
-      <div class="tw-text-center">
+      <div class="tw:text-center">
         <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
           Service Graph Unavailable
         </div>

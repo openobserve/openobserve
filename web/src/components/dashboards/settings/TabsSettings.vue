@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </DashboardHeader>
-    <div class="table-header flex justify-between text-bold">
+    <div class="table-header flex tw:justify-between tw:font-bold">
       <div class="header-content">
         <div class="spacer"></div>
         <div class="name-column" data-test="dashboard-tab-settings-name">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="draggable-handle">
             <OIcon
               name="drag-indicator" size="sm"
-              class="'q-mr-xs"
+              class="tw:mr-1"
               data-test="dashboard-tab-settings-drag-handle"
             />
           </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <div v-else class="edit-container">
               <input
-                :class="store.state.theme === 'dark' ? 'bg-grey-10' : ''"
+                :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
                 v-model="editTabObj.data.name"
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"

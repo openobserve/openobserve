@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full ">
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
+      <div class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
         <div class="q-table__title tw:font-[600]" data-test="invitation-title-text">
           {{ t("invitation.pendingInvitations") }}
         </div>

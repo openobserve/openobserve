@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
+      class="stream-routing-container tw:w-full tw:pt-1 tw:pb-3 tw:px-3"
     >
       <div class="tw:flex tw:items-center">
         <OSwitch
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="q-pb-sm container text-body2 tw:inline-block tw:pl-4 tw:text-gray-600"
+          class="tw:pb-2 container tw:text-sm tw:inline-block tw:pl-4 tw:text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
@@ -56,12 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           v-if="!createNewFunction"
-          class="flex justify-start items-center full-width"
+          class="flex tw:justify-start tw:items-center tw:w-full"
           style="padding-top: 0px"
         >
           <div
             data-test="associate-function-select-function-input"
-            class="alert-stream-type o2-input q-mr-sm full-width"
+            class="alert-stream-type o2-input tw:mr-2 tw:w-full"
             style="padding-top: 0"
           >
             <OSelect
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OCard class="function-definition-card">
             <OCardSection role="header" class="function-definition-header">
-              <div class="text-body1 text-weight-medium text-primary">
+              <div class="tw:text-base text-weight-medium text-primary">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="o2-input full-width"
+          class="o2-input tw:w-full"
           style="padding-top: 12px"
           v-if="!createNewFunction"
         >

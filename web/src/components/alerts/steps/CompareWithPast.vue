@@ -23,13 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw:px-3 tw:pb-2">
       <!-- Alert set for header -->
-      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
+      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-3">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
+      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container tw:px-3 tw:py-2">
         <div class="multi-window-text tw:w-auto tw:text-left">
           {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                class="tw:ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm">
+      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-2">
         <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
+        class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 tw:px-3 tw:py-2"
       >
         <div class="multi-window-text tw:w-auto tw:text-left">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                class="tw:ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
             </span>
@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                class="tw:ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Action Buttons Section -->
-      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm">
+      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 tw:mt-2">
         <OButton
           data-test="multi-time-range-alerts-add-btn"
           variant="outline"

@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="q-pt-sm q-pb-xs flex justify-start">
+      <div class="tw:pt-2 tw:pb-1 flex tw:justify-start">
         <div
           data-test="back-button"
-          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
+          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -32,11 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <span class="text-bold">{{ t("rum.eventID") }}:</span>
+        <span class="tw:font-bold">{{ t("rum.eventID") }}:</span>
         <span
           data-test="error-id"
           :title="error.error_id"
-          class="q-pl-xs cursor-pointer"
+          class="tw:pl-1 cursor-pointer"
           >{{ error.error_id }}
           <OIcon
             size="xs"
@@ -44,17 +44,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="hover:tw:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
-        <span class="q-ml-lg">{{ error.timestamp }}</span>
+        <span class="tw:ml-4">{{ error.timestamp }}</span>
       </div>
-      <div class="row items-center no-wrap q-my-xs">
-        <div class="error_type text-bold">{{ error.type }}</div>
+      <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
+        <div class="error_type tw:font-bold">{{ error.type }}</div>
       </div>
-      <div class="error_message q-pt-xs row items-center">
+      <div class="error_message tw:pt-1 tw:flex tw:items-center">
         <div
           v-if="error.error_handling === 'unhandled'"
           :class="
             error.error_handling === 'unhandled'
-              ? 'unhandled_error text-red-6 q-px-xs q-mr-sm'
+              ? 'unhandled_error text-red-6 tw:px-1 tw:mr-2'
               : ''
           "
         >

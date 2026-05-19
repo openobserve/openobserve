@@ -23,21 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div
-        class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
+        class="tw:font-bold tw:ml-3 tw:px-2 rounded tw:mt-2 tw:py-1 learn-web-vitals-link flex tw:items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <OIcon
           name="info"
           size="sm"
-          class="material-symbols-outlined q-mr-xs"
+          class="material-symbols-outlined tw:mr-1"
         />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
           href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
-          class="q-ml-xs"
+          class="tw:ml-1"
           target="_blank"
-          :class="store.state.theme === 'dark' ? 'text-white' : 'text-dark'"
+          :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-800'"
         >
           {{ t("rum.clickHereLabel") }}
         </a>
@@ -54,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="text-center full-width">Loading Dashboard</div>
+        <div class="tw:text-center tw:w-full">Loading Dashboard</div>
       </div>
     </div>
   </div>

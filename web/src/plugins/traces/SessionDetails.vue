@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="turnDetailLoading[trace.traceId]" class="turn-grid">
               <!-- Messages skeleton -->
               <div class="turn-messages">
-                <!-- User block skeleton -->
+                <!-- User tw:block skeleton -->
                 <div class="msg-block msg-block--user">
                   <div class="msg-block__header">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 2.5rem; height: 0.7rem" />
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSkeleton type="rect" class="tw:rounded" style="width: 45%; height: 0.65rem" />
                   </div>
                 </div>
-                <!-- Assistant block skeleton -->
+                <!-- Assistant tw:block skeleton -->
                 <div class="msg-block msg-block--assistant">
                   <div class="msg-block__header">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 7rem; height: 0.7rem" />
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="turn-grid">
               <!-- Messages column -->
               <div class="turn-messages">
-                <!-- USER block -->
+                <!-- USER tw:block -->
                 <div class="msg-block msg-block--user">
                   <div class="msg-block__header">
                     <span class="msg-block__role">{{ t('traces.sessionDetail.roles.user') }}</span>
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- ASSISTANT block -->
+                <!-- ASSISTANT tw:block -->
                 <div class="msg-block msg-block--assistant">
                   <div class="msg-block__header">
                     <span class="msg-block__role">
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Fullscreen turn dialog -->
   <ODialog v-model:open="fullscreenOpen" size="full" :show-close="false">
     <div class="fullscreen-turn-dialog" v-if="fullscreenTraceId && fullscreenTrace">
-      <!-- Header — mirrors the inline turn-header row -->
+      <!-- Header — mirrors the tw:inline turn-header row -->
       <div
         class="fullscreen-turn-dialog__header"
         :class="{
@@ -740,7 +740,7 @@ async function toggleTurn(traceId: string) {
     turnDetails[traceId] = td;
   } catch (e: any) {
     console.error("Turn detail fetch error:", e?.raw ?? e);
-    // Surface as an empty turn so the user sees the block instead of a
+    // Surface as an empty turn so the user sees the tw:block instead of a
     // forever-spinning loader — they can still inspect the trace.
     turnDetails[traceId] = {
       traceId,

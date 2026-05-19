@@ -11,7 +11,7 @@ defineSlots<TimelineItemSlots>();
 /**
  * Maps each variant to the CSS custom property holding the dot colour.
  * Tailwind JIT cannot generate `bg-[var(...)]` utilities from dynamic
- * strings, so we use inline style instead of a class map.
+ * strings, so we use tw:inline style instead of a class map.
  */
 const dotColorMap: Record<TimelineItemVariant, string> = {
   primary: "var(--color-timeline-dot-primary)",

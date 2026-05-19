@@ -26,7 +26,7 @@
               size="sm"
             />
           </span>
-          <span class="field_label ellipsis tw:flex tw:items-center" :title="row.name">
+          <span class="field_label tw:truncate tw:flex tw:items-center" :title="row.name">
             {{ row.name }}
           </span>
         </template>

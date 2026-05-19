@@ -22,15 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <div
-        class="flex content-center ellipsis full-width field-expansion-header tw:relative"
+        class="flex content-center tw:truncate tw:w-full field-expansion-header tw:relative"
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
         <div
-          class="field_label full-width"
+          class="field_label tw:w-full"
           :data-test="`logs-field-list-item-${field.name}`"
         >
-          <div class="ellipsis tw:flex tw:flex-1 tw:min-w-0">
+          <div class="tw:truncate tw:flex tw:flex-1 tw:min-w-0">
             <span class="field-type-container">
               <OIcon
                 class="field-expand-icon"

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="variablesData.values?.length > 0"
     :key="variablesData.isVariablesLoading"
-    class="flex q-mt-xs q-ml-xs"
+    class="flex tw:mt-1 tw:ml-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'constant'">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'textbox'">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           style="max-width: 150px !important"
           :debounce="1000"
           v-model="item.value"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
         <VariableAdHocValueSelector
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-2">
       <OButton
         variant="outline"
         size="sm"

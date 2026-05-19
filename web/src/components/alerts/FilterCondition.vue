@@ -33,7 +33,7 @@
       </div>
         <div
           data-test="alert-conditions-select-column"
-          class="q-ml-none"
+          class="tw:ml-0"
         >
           <OSelect
             v-model="condition.column"
@@ -56,7 +56,7 @@
         </div>
         <div
           data-test="alert-conditions-operator-select"
-          class="q-ml-none"
+          class="tw:ml-0"
         >
           <OSelect
             v-model="condition.operator"
@@ -72,7 +72,7 @@
         </div>
         <div
           data-test="alert-conditions-value-input"
-          class="q-ml-none"
+          class="tw:ml-0"
         >
           <OInput
             v-model="condition.value"

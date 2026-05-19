@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
       <div class="tw:flex-shrink-0">
@@ -86,10 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <div
               v-if="!templates.length"
-              class="full-width flex column justify-center items-center text-center"
+              class="tw:w-full flex column tw:justify-center tw:items-center tw:text-center"
             >
-              <div style="width: 600px" class="q-mt-xl">
-                <div class="text-subtitle1">
+              <div style="width: 600px" class="tw:mt-6">
+                <div class="tw:text-base tw:font-medium">
                   It looks like you haven't created any Templates yet. To create
                   an Alert, you'll need to have at least one Destination and one
                   Template in place
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="primary"
                   size="sm"
-                  class="q-mt-md"
+                  class="tw:mt-3"
                   @click="routeTo('alertTemplates')"
                 >Create Template</OButton>
               </div>

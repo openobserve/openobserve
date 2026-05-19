@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-py-sm">
-    <div class="row tw:gap-1">
+  <div class="tw:py-2">
+    <div class="tw:flex tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"

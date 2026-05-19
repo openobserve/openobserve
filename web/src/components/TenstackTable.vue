@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="q-ml-xs pivot-sort-icon"
+                class="tw:ml-1 pivot-sort-icon"
                 :class="{
                   'pivot-sort-active': pivotSortState.sortBy === col.name,
                 }"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="q-ml-xs pivot-sort-icon"
+                class="tw:ml-1 pivot-sort-icon"
                 :class="{
                   'pivot-sort-active':
                     pivotSortState.sortBy === cell._sortColumn,
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="!header.isPlaceholder"
                   :data-test="`o2-table-th-sort-${header.id}`"
-                  :class="['text-left', 'cursor-pointer tw:gap-1']"
+                  :class="['tw:text-left', 'cursor-pointer tw:gap-1']"
                   @click="
                     handleHeaderSortClick(
                       $event,
@@ -283,11 +283,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
-                    class="q-ma-none close-icon cursor-pointer"
+                    class="tw:m-0 close-icon cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-white'
-                        : 'text-grey-7'
+                        : 'tw:text-gray-400'
                     "
                     :title="t('common.close')"
                     size="sm"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="loading && tableRows.length === 0" class="tw:w-full">
             <td
               :colspan="columnOrder.length"
-              class="text-bold"
+              class="tw:font-bold"
               :style="{
                 background:
                   store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <slot name="loading">
                 <div
-                  class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
+                  class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center"
                 >
                   <OSpinner size="xs" data-test="tenstack-table-loading-indicator" />
                   {{ t("confirmDialog.loading") }}
@@ -328,11 +328,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="!loading && errMsg != ''" class="tw:w-full">
             <td
               :colspan="columnOrder.length"
-              class="text-bold"
+              class="tw:font-bold"
               style="opacity: 0.7"
             >
-              <div class="text-subtitle2 text-weight-bold bg-warning">
-                <OIcon size="sm" name="warning" class="q-mr-xs" />
+              <div class="tw:text-sm tw:font-medium text-weight-bold tw:bg-amber-500">
+                <OIcon size="sm" name="warning" class="tw:mr-1" />
                 {{ errMsg }}
               </div>
             </td>
@@ -340,11 +340,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
             <td
               :colspan="columnOrder.length"
-              class="text-bold"
+              class="tw:font-bold"
               style="opacity: 0.6"
             >
               <div
-                class="text-subtitle2 text-weight-bold q-pl-sm"
+                class="tw:text-sm tw:font-medium text-weight-bold tw:pl-2"
                 :class="
                   store.state.theme === 'dark'
                     ? 'tw:bg-yellow-600'
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="expandFunctionError"
                 >
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               :colspan="columnOrder.length"
               style="opacity: 0.7"
-              class="q-px-sm"
+              class="tw:px-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'tw:bg-yellow-600'
@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn q-mr-xs"
+                      class="copy-btn tw:mr-1"
                     >
                       <OButton
                         variant="ghost"
@@ -517,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </OButton>
                     </span>
-                    <!-- JSON field inline renderer -->
+                    <!-- JSON field tw:inline renderer -->
                     <JsonFieldRenderer
                       v-if="
                         (cell.column.columnDef.meta as any)?.showFieldAsJson
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn q-ml-xs"
+                      class="copy-btn tw:ml-1"
                     >
                       <OButton
                         variant="ghost"
@@ -752,7 +752,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="enableRowExpand && cellIndex == 0"
                       variant="ghost"
                       size="icon-xs-sq"
-                      class="q-mr-xs"
+                      class="tw:mr-1"
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
                     >
@@ -780,9 +780,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :item="cell.row.original"
                       :cell="cell"
                     />
-                    <!-- Otherwise render the default cell content inline -->
+                    <!-- Otherwise render the default cell content tw:inline -->
                     <template v-else>
-                      <!-- Pivot merge: skip content for hidden (merged) cells -->
+                      <!-- Pivot merge: skip content for tw:hidden (merged) cells -->
                       <template
                         v-if="
                           !isPivotMergeHidden(
@@ -799,7 +799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn q-mr-xs"
+                          class="copy-btn tw:mr-1"
                         >
                           <OButton
                             variant="ghost"
@@ -822,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </OButton>
                         </span>
-                        <!-- Dashboard: JSON field inline renderer -->
+                        <!-- Dashboard: JSON field tw:inline renderer -->
                         <JsonFieldRenderer
                           v-if="
                             (cell.column.columnDef.meta as any)?.showFieldAsJson
@@ -888,7 +888,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn q-ml-xs"
+                          class="copy-btn tw:ml-1"
                         >
                           <OButton
                             variant="ghost"
@@ -1145,7 +1145,7 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  /** Show expand chevron and inline JSON row expansion. Default: true */
+  /** Show expand chevron and tw:inline JSON row expansion. Default: true */
   enableRowExpand: {
     type: Boolean,
     default: true,
@@ -1191,7 +1191,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Optional function to compute inline style string for a cell.
+  /** Optional function to compute tw:inline style string for a cell.
    *  Use this to add cell background coloring from the parent.
    *  Returns empty string by default (no coloring). */
   getCellStyle: {
@@ -2058,14 +2058,14 @@ const expandRow = async (index: number) => {
     // COLLAPSE OPERATION
     expandedRowIndices.value.delete(index);
 
-    // Clear cached height for collapsed row
+    // Clear cached height for collapsed "row"
     delete expandedRowHeights.value[index + 1];
 
     // Remove the expanded row from tableRows
     tableRows.value.splice(index + 1, 1);
     isCollapseOperation = true;
 
-    // Update all expanded indices that come after this collapsed row
+    // Update all expanded indices that come after this collapsed "row"
     const updatedIndices = new Set<number>();
     expandedRowIndices.value.forEach((i) => {
       updatedIndices.add(i > index ? i - 1 : i);
@@ -2083,7 +2083,7 @@ const expandRow = async (index: number) => {
     updatedIndices.add(index);
     expandedRowIndices.value = updatedIndices;
 
-    // Insert the expanded row
+    // Insert the expanded "row"
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
@@ -2199,14 +2199,14 @@ const sendToAiChat = (
   append: boolean = true,
 ) => {
   if (isEntireRow) {
-    //here we will get the original value of the row
+    //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
     //the format of the props.columns is like this:
     //if user have not applied any filter then the props.columns will be like this:
     //it contains _timestamp column and source column
     //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
     const row = JSON.parse(value);
-    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the "row"
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
       emits("sendToAiChat", JSON.stringify(row), append);
@@ -2303,7 +2303,7 @@ defineExpose({
   font-weight: 600;
 }
 
-// Cells hidden by pivot row merging (duplicates suppressed)
+// Cells tw:hidden by pivot row merging (duplicates suppressed)
 .pivot-no-border {
   border-bottom: none !important;
 }

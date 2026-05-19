@@ -27,7 +27,7 @@ const hasDefaultSlot = computed(() => !!slots.default);
 
 // ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a hidden DOM anchor span and attaches hover listeners to it.
+// parent element via a tw:hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);

@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="activeTab"
               dense
               align="left"
-              class="text-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
+              class="tw:font-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
               <OTab

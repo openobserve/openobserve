@@ -26,14 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
    
     <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
+    <div v-if="loading" class="flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
     <!-- Cloud: storage not enabled -->
     <div
       v-else-if="isCloud && !orgStorageEnabled"
-      class="text-body2 text-grey q-py-md"
+      class="tw:text-sm tw:text-gray-500 tw:py-3"
     >
       {{ t('storage_settings.notEnabled') }}
     </div>
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== CONFIGURED ========== -->
     <div v-else>
 
-      <div class="q-pa-md">
+      <div class="tw:p-3">
       <OCard
         class="storage-card"
         :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
@@ -175,14 +175,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Card header: logo + name + badge | update button -->
         <OCardSection role="header">
-          <div class="row items-center no-wrap" style="gap: 14px;">
+          <div class="tw:flex tw:items-center tw:flex-nowrap" style="gap: 14px;">
             <img
               :src="configuredProviderImage"
               :alt="configuredProviderLabel"
               style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;"
             />
             <div>
-              <div class="text-subtitle1" style="font-weight: 700; line-height: 1.3;">
+              <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
               <OBadge
@@ -241,14 +241,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Timestamps -->
         <OCardSection v-if="configTimestamps">
-          <div class="row" style="gap: 40px;">
-            <div v-if="configTimestamps.created_at" class="row items-center" style="gap: 6px;">
+          <div class="tw:flex" style="gap: 40px;">
+            <div v-if="configTimestamps.created_at" class="tw:flex tw:items-center" style="gap: 6px;">
               <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
-              <span class="text-body2">{{ configTimestamps.created_at }}</span>
+              <span class="tw:text-sm">{{ configTimestamps.created_at }}</span>
             </div>
-            <div v-if="configTimestamps.updated_at" class="row items-center" style="gap: 6px;">
+            <div v-if="configTimestamps.updated_at" class="tw:flex tw:items-center" style="gap: 6px;">
               <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
-              <span class="text-body2">{{ configTimestamps.updated_at }}</span>
+              <span class="tw:text-sm">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
         </OCardSection>
@@ -496,7 +496,7 @@ onMounted(() => {
     margin-bottom: 28px;
   }
 
-  // provider logos inline beneath the CTA
+  // provider logos tw:inline beneath the CTA
   &__inline-providers {
     display: flex;
     align-items: center;
@@ -705,7 +705,7 @@ onMounted(() => {
     }
   }
 
-  // fact chips row
+  // fact chips "row"
   &__chips {
     display: flex;
     align-items: center;

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :class="isCompact ? 'tw:flex tw:items-center' : 'q-pl-sm float-left'">
+  <div :class="isCompact ? 'tw:flex tw:items-center' : 'tw:pl-2 float-left'">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
     <ODropdown
       v-if="isCompact"
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <div class="tw:w-[300px] tw:p-2">
-        <div class="row">
-          <div class="col col-12 q-pa-sm" style="text-align: center">
+        <div class="tw:flex">
+          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -52,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <OSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+        <q-separator />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="col col-4 q-pa-sm"
+            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
             style="text-align: center"
           >
             <OButton
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-toolbar"
         >
-          <div class="row items-center no-wrap">
+          <div class="tw:flex tw:items-center tw:flex-nowrap">
             <OIcon
               left
               name="update"
@@ -104,14 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 isAnimating ? 'text-primary' : '',
               ]"
             />
-            <div class="text-center">{{ selectedLabel }}</div>
+            <div class="tw:text-center">{{ selectedLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
           </div>
         </OButton>
       </template>
       <div class="tw:w-[300px] tw:p-2">
-        <div class="row">
-          <div class="col col-12 q-pa-sm" style="text-align: center">
+        <div class="tw:flex">
+          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -129,11 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <ODropdownSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="col col-4 q-pa-sm"
+            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
             style="text-align: center"
           >
             <OButton

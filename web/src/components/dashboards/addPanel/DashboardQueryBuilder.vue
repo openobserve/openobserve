@@ -27,19 +27,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- x axis container -->
     <div
       style="display: flex; flex-direction: row; width: 100%"
-      class="q-pl-md"
+      class="tw:pl-3"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
               <OTooltip :content="xAxisHint" />
           </div>
           <span class="layout-separator">:</span>
           <div
-            class="axis-container droppable scroll row"
+            class="axis-container droppable scroll tw:flex"
             :class="{
               'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
               'drop-entered':
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="row q-mr-sm q-my-xs"
+              class="tw:flex tw:mr-2 tw:my-1"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                     >
                       <div>
-                        <div class="q-mr-xs q-mb-sm">
+                        <div class="tw:mr-1 tw:mb-2">
                           <DynamicFunctionPopUp
                             v-model="
                               dashboardPanelData.data.queries[
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-caption text-weight-bold text-center q-py-xs"
+              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="q-mt-xs">{{ xAxisHint }}</div>
+              <div class="tw:mt-1">{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="q-pl-md">
+        <div style="display: flex; flex-direction: row" class="tw:pl-3">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="tw:mr-4" />
           <div class="layout-name" style="min-width: 0 !important">
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
               <OTooltip side="top" align="center">
                 <template #content>
                   <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span class="layout-separator">:</span>
           <div
-            class="axis-container droppable scroll row"
+            class="axis-container droppable scroll tw:flex"
             :class="{
               'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
               'drop-entered':
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="row q-mr-sm q-my-xs"
+              class="tw:flex tw:mr-2 tw:my-1"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                     >
                       <div>
-                        <div class="q-mr-xs q-mb-sm">
+                        <div class="tw:mr-1 tw:mb-2">
                           <DynamicFunctionPopUp
                             v-model="
                               dashboardPanelData.data.queries[
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-caption text-weight-bold text-center q-py-xs"
+              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="q-mt-xs">{{ bAxisHint }}</div>
+              <div class="tw:mt-1">{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -361,15 +361,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- y axis container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
           <OTooltip :content="yAxisHint" />
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll row"
+        class="axis-container droppable scroll tw:flex"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="row q-mr-sm q-my-xs"
+          class="tw:flex tw:mr-2 tw:my-1"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 >
                   <div>
-                    <div class="q-mr-xs q-mb-sm">
+                    <div class="tw:mr-1 tw:mb-2">
                       <DynamicFunctionPopUp
                         v-model="
                           dashboardPanelData.data.queries[
@@ -491,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             align-items: center;
           "
         >
-          <div class="q-mt-xs">{{ yAxisHint }}</div>
+          <div class="tw:mt-1">{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
@@ -512,17 +512,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
-      <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div style="display: flex; flex-direction: row" class="tw:pl-3">
         <div class="layout-name">
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+          <OIcon name="info-outline" size="sm" class="tw:ml-1" />
             <OTooltip :content="zAxisHint" />
         </div>
         <span class="layout-separator">:</span>
         <div
-          class="axis-container droppable scroll row"
+          class="axis-container droppable scroll tw:flex"
           :class="{
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="row q-mr-sm q-my-xs"
+            class="tw:flex tw:mr-2 tw:my-1"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }"
                   >
                     <div>
-                      <div class="q-mr-xs q-mb-sm">
+                      <div class="tw:mr-1 tw:mb-2">
                         <DynamicFunctionPopUp
                           v-model="
                             dashboardPanelData.data.queries[
@@ -640,7 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
           </div>
           <div
-            class="text-caption text-weight-bold text-center q-py-xs"
+            class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -653,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align-items: center;
             "
           >
-            <div class="q-mt-xs">{{ zAxisHint }}</div>
+            <div class="tw:mt-1">{{ zAxisHint }}</div>
           </div>
         </div>
       </div>

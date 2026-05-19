@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="container">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-px-sm q-mr-md ">
-      <OIcon name="info" class="q-mr-xs " size="sm" />
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text flex  tw:items-center tw:px-2 tw:mr-3 ">
+      <OIcon name="info" class="tw:mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
    
    <!-- Edge deletion help notification -->
    <div v-if="showEdgeHelpNotification" class="edge-help-notification">
-     <OIcon name="info" class="q-mr-xs" size="sm" />
+     <OIcon name="info" class="tw:mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
    

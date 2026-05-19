@@ -1,5 +1,5 @@
 <template>
-  <div class="row">
+  <div class="tw:flex">
     <OSelect
       v-model="fields.functionName"
       label="Select Function"

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="backfill-jobs-back-btn"
               icon-left="chevron-left"
             />
-            <div class="q-table__title tw:font-[600] q-ml-sm">
+            <div class="q-table__title tw:font-[600] tw:ml-2">
               Backfill Jobs
             </div>
           </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Time Range Column -->
             <template #cell-time_range="{ row }">
-              <div class="text-caption">
+              <div class="tw:text-xs">
                 {{
                   formatTimeRange(row.start_time, row.end_time)
                 }}
@@ -130,13 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="progress-bar"
                   >
                     <template #label>
-                      <span class="text-caption tw:font-semibold">{{ row.progress_percent }}%</span>
+                      <span class="tw:text-xs tw:font-semibold">{{ row.progress_percent }}%</span>
                     </template>
                   </OProgressBar>
                 </div>
                 <div
                   v-if="row.chunks_total"
-                  class="text-caption text-grey-6 tw:whitespace-nowrap tw:pr-8"
+                  class="tw:text-xs tw:text-gray-400 tw:whitespace-nowrap tw:pr-8"
                 >
                   {{ row.chunks_completed || 0 }}/{{
                     row.chunks_total
@@ -148,14 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Created At Column -->
             <template #cell-created_at="{ row }">
-              <div class="text-caption">
+              <div class="tw:text-xs">
                 {{ formatTimestamp(row.created_at) }}
               </div>
             </template>
 
             <!-- Last Triggered At Column -->
             <template #cell-last_triggered_at="{ row }">
-              <div class="text-caption">
+              <div class="tw:text-xs">
                 {{ formatTimestamp(row.last_triggered_at) }}
               </div>
             </template>
@@ -258,22 +258,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div v-if="errorDialogData">
-        <div class="q-mb-md">
-          <div class="text-caption text-grey-6">Job ID</div>
-          <div class="text-body2 text-weight-medium">
+        <div class="tw:mb-3">
+          <div class="tw:text-xs tw:text-gray-400">Job ID</div>
+          <div class="tw:text-sm text-weight-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
-        <div class="q-mb-md">
-          <div class="text-caption text-grey-6">Pipeline</div>
-          <div class="text-body2">
+        <div class="tw:mb-3">
+          <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
+          <div class="tw:text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
+          <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
           <div class="error-message-box">
             {{ errorDialogData.error }}
           </div>

@@ -119,7 +119,7 @@ function triggerClasses(step: StepRegistration): string {
   >
     <!--
       Horizontal header bar ΓÇö rendered from registered step metadata.
-      OStep children register themselves on mount; this row re-renders
+      OStep children register themselves on mount; this tw:flex re-renders
       reactively whenever a step's done/error state changes.
     -->
     <div

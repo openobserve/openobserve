@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="justify-between date-time-container">
+  <div icon="info" class="tw:justify-between date-time-container">
     <ODropdown
       v-model:open="menuOpen"
       side="bottom"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="date-time-menu"
         class="date-time-dialog"
       >
-        <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
+        <div v-if="!disableRelative" class="flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
             class="tab-button"
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator />
         <OTabPanels v-model="selectedType" animated>
-          <OTabPanel v-if="!disableRelative" name="relative" class="q-pa-none">
+          <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
             <div class="date-time-table relative column">
               <div
-                class="relative-row q-pl-md q-py-sm"
+                class="relative-row tw:pl-3 tw:py-2"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="relative-row q-px-md q-py-sm">
+              <div class="relative-row tw:px-3 tw:py-2">
                 <div class="relative-period-name">{{ t("common.custom") }}</div>
                 <OTooltip
                   side="right"
@@ -129,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="queryRangeRestrictionMsg"
                 />
 
-                <div class="row q-gutter-sm">
-                  <div class="col">
+                <div class="tw:flex tw:gap-2">
+                  <div class="tw:flex tw:flex-col">
                     <OInput
                       v-model.number="relativeValue"
                       type="number"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onCustomPeriodSelect"
                     />
                   </div>
-                  <div class="col">
+                  <div class="tw:flex tw:flex-col">
                     <OSelect
                       v-model="relativePeriod"
                       :options="relativePeriodsSelect"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="notePara">* You can choose multiple date</div>
               <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
-              <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
+              <table v-if="!hideRelativeTime" class="tw:px-3 startEndTime">
                 <tbody>
                   <tr>
                     <td class="label tw:px-2">Start time</td>
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="isTimezoneSelectOpen = false"
           class="timezone-select"
         />
-        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
+        <div v-if="!autoApply" class="flex tw:justify-end tw:py-2 tw:px-3">
           <OSeparator class="tw:my-2" />
           <OButton
             data-test="date-time-apply-btn"

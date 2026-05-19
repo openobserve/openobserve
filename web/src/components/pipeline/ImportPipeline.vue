@@ -35,11 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
         <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           textTransform: 'lowercase',
                         }"
                         color="input-border"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         use-input
                         hide-selected
                         fill-input
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span
                                 class="tw:text-sm"
                                 :class="{
-                                  'text-grey-6': scope.opt.disable,
+                                  'tw:text-gray-400': scope.opt.disable,
                                 }"
                               >
                                 {{ scope.opt.label }}
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="touchedStreamType[index] && !userSelectedStreamType[index] ? 'Stream type is required' : ''"
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index]"
                         :error-message="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index] ? 'Stream type is required' : ''"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         searchable
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         @update:model-value="(val: any) => {
                           userSelectedOrgId[index] = val;
                           updateOrgId(val?.value || val, index);
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
                         :label="'Function Name'"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex]"
                         :error-message="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex] ? 'Function name is required' : ''"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]"
                         :error-message="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index] ? 'Remote destination is required' : ''"
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="timezoneOptions"
                         :label="'Timezone'"
                         searchable
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
                         :error-message="touchedTimezone[index] && !userSelectedTimezone[index] ? 'Timezone is required' : ''"
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item text-bold': true,
+                  'error-item tw:font-bold': true,
                   'text-green': val.success,
                   'text-red': !val.success,
                 }"

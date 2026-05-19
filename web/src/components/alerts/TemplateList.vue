@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
       <div
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:justify-end tw:gap-2">
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input"
+              class="tw:ml-auto no-border o2-search-input"
               :placeholder="t('template.search')"
             >
               <template #icon-left>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm-action"
-            class="q-ml-sm"
+            class="tw:ml-2"
             @click="importTemplate"
             data-test="template-import"
             >{{ t(`dashboard.import`) }}</OButton
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-add-btn"
             variant="primary"
             size="sm-action"
-            class="q-ml-sm"
+            class="tw:ml-2"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton
           >
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <OButton
             title="Export Template"
-            class="q-ml-xs"
+            class="tw:ml-1"
             variant="ghost"
             size="icon-circle-sm"
             @click.stop="exportTemplate(row)"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-update-template`"
-            class="q-ml-xs"
+            class="tw:ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-delete-template`"
-            class="q-ml-xs"
+            class="tw:ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.delete')"

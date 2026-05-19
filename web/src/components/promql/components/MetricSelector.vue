@@ -1,6 +1,6 @@
 <template>
   <div class="metric-selector">
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">{{ t("panel.metric") }}</div>
       <span class="layout-separator">:</span>
       <div class="axis-container">

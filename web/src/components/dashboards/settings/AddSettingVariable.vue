@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="scrollable-content">
         <OForm greedy ref="addVariableForm" @submit="onSubmit" class="tw:px-0.5">
-          <div class="q-mt-md">
-            <div class="q-mb-md">
+          <div class="tw:mt-3">
+            <div class="tw:mb-3">
             <OSelect
                 helpText="Variables will be applied to all tabs and panels if global is selected."
                 v-model="variableData.scope"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 variableData.scope === 'tabs' || variableData.scope === 'panels'
               "
-              class="q-mt-md q-mb-md"
+              class="tw:mt-3 tw:mb-3"
             >
               <OSelect
                 help-text="Variables will be available only in the selected tabs."
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variableData.scope === 'panels' &&
                 (selectedTabs.length > 0 || isFromAddPanel)
               "
-              class="q-mt-md"
+              class="tw:mt-3"
             >
               <OSelect
                 help-text="Variables will be available only in the selected panels."
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="col">
+          <div class="tw:flex tw:flex-col">
             <div>
               <OSelect
                 class="showLabelOnTop"
@@ -87,11 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="text-body1 text-bold q-mt-md">
+            <div class="tw:text-base tw:font-bold tw:mt-3">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="row tw:gap-4">
-              <div class="textbox col">
+            <div class="tw:flex tw:gap-4">
+              <div class="textbox tw:flex tw:flex-col">
                 <OInput
                   v-model="variableData.name"
                   :label="t('dashboard.nameOfVariable') + ' *'"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-name"
                 />
               </div>
-              <div class="textbox col">
+              <div class="textbox tw:flex tw:flex-col">
                 <OInput
                   v-model="variableData.label"
                   :label="t('dashboard.labelOfVariable')"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-md"
+              class="tw:flex tw:justify-between tw:w-full tw:text-base tw:font-bold tw:mt-3"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
-              <div class="row tw:gap-x-4 tw:items-end">
+              <div class="tw:flex tw:gap-x-4 tw:items-end">
                 <OSelect
                   v-model="variableData.query_data.stream_type"
                   :label="t('dashboard.selectStreamType') + ' *'"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OSelect>
               </div>
-              <div class="row">
+              <div class="tw:flex">
               <OSelect
                 v-model="variableData.query_data.field"
                 :label="t('dashboard.selectField') + ' *'"
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
-                    class="text-body1 text-bold q-mt-lg"
+                    class="tw:text-base tw:font-bold tw:mt-4"
                   >
                     Filters
                   </div>
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
-              class="row"
+              class="tw:flex"
             >
               <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
               <OInput
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- multiselect toggle for query values and custom variables-->
           <div
             v-if="['query_values', 'custom'].includes(variableData.type)"
-            class="q-mt-md"
+            class="tw:mt-3"
           >
             <OSwitch
               v-model="variableData.multiSelect"
@@ -448,10 +448,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="q-mt-md"
+                class="tw:mt-3"
                 style="flex-wrap: wrap"
               >
-                <div class="flex q-mr-sm" style="width: 50%">
+                <div class="flex tw:mr-2" style="width: 50%">
                   <OInput
                     v-model="variableData.customMultiSelectValue[index]"
                     placeholder="Enter value"
@@ -487,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- hide on dashboard toggle -->
-          <div class="q-mt-md">
+          <div class="tw:mt-3">
             <OSwitch
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- escape single quotes toggle -->
-          <div class="q-mt-sm">
+          <div class="tw:mt-2">
             <OSwitch
               v-model="variableData.escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"

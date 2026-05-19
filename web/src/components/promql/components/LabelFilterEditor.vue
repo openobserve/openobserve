@@ -1,9 +1,9 @@
 <template>
   <div class="label-filter-editor tw:py-[0.25rem]">
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">{{ t("panel.labelFilters") }}</div>
       <span class="layout-separator">:</span>
-      <div class="axis-container scroll row">
+      <div class="axis-container scroll tw:flex">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
@@ -33,7 +33,7 @@
                     v-model="label.label"
                     :options="filteredLabelOptions"
                     label="Label"
-                    class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
+                    class="label-filter-label-select showLabelOnTop tw:normal-case! tw:mb-2"
                     input-class="tw:normal-case!"
                     use-input
                     fill-input
@@ -46,7 +46,7 @@
                   >
                     <template v-slot:no-option>
                       <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <div class="tw:text-gray-500 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             loadingLabels
                               ? "Loading labels..."
@@ -62,7 +62,7 @@
                     v-model="label.op"
                     :options="operatorOptions"
                     label="Operator"
-                    class="label-filter-operator-select showLabelOnTop q-mb-sm"
+                    class="label-filter-operator-select showLabelOnTop tw:mb-2"
                     data-test="promql-operator-select"
                   />
 
@@ -89,7 +89,7 @@
                   >
                     <template v-slot:no-option>
                       <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <div class="tw:text-gray-500 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             !label.label
                               ? "Select a label first"
@@ -107,7 +107,7 @@
                           <span class="tw:text-sm">{{ scope.opt.label }}</span>
                           <span
                             v-if="scope.opt.isVariable"
-                            class="tw:block tw:text-xs tw:text-muted-foreground text-grey-7"
+                            class="tw:block tw:text-xs tw:text-muted-foreground tw:text-gray-400"
                           >
                             Variable
                           </span>

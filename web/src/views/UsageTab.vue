@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         role="region"
         aria-label="Streams overview section"
       >
-        <div class="row justify-between items-center streams-header">
-          <div class="row tw:items-center tw:gap-2">
+        <div class="tw:flex tw:justify-between tw:items-center streams-header">
+          <div class="tw:flex tw:items-center tw:gap-2">
             <div class="tile-icon icon-bg-blue" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tiles-grid">
           <div class="tile">
             <div
-              class="tile-content rounded-borders text-center column justify-between"
+              class="tile-content tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -96,8 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Streams count statistics"
             >
-              <div class="column justify-between">
-                <div class="row justify-between">
+              <div class="column tw:justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.streams") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
                     <img :src="streamsIcon" alt="" />
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-streams-count"
               >
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile">
             <div
-              class="tile-content rounded-borders text-center column justify-between"
+              class="tile-content tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -137,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Events count statistics"
             >
-              <div class="column justify-between">
-                <div class="row justify-between">
+              <div class="column tw:justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
                     <img :src="recordsIcon" alt="" />
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-events-count"
               >
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile">
             <div
-              class="tile-content rounded-borders text-center column justify-between"
+              class="tile-content tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -178,8 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Ingested data size statistics"
             >
-              <div class="column justify-between">
-                <div class="row justify-between">
+              <div class="column tw:justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="tile-title">
                     {{ t("home.totalDataIngested") }}
                   </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-ingested-size"
               >
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content rounded-borders text-center column justify-between"
+              class="tile-content tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -221,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Compressed data size statistics"
             >
-              <div class="column justify-between">
-                <div class="row justify-between">
+              <div class="column tw:justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="tile-title">
                     {{ t("home.totalDataCompressed") }}
                   </div>
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-compressed-size"
               >
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content rounded-borders text-center column justify-between"
+              class="tile-content tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -264,8 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Index size statistics"
             >
-              <div class="column justify-between">
-                <div class="row justify-between">
+              <div class="column tw:justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
                     <img :src="indexSizeIcon" alt="" />
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-index-size"
               >
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="functions-dashboards-column">
           <div class="tile-wrapper">
             <div
-              class="feature-card rounded-borders text-center column justify-between"
+              class="feature-card tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -311,9 +311,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Functions count statistics"
             >
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <div
-                  class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
+                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
                   <div
                     class="tile-icon icon-bg-orange tw:flex-shrink-0"
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-functions-count"
               >
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile-wrapper">
             <div
-              class="feature-card rounded-borders text-center column justify-between"
+              class="feature-card tw:rounded tw:text-center column tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -376,9 +376,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Dashboards count statistics"
             >
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <div
-                  class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
+                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
                   <div
                     class="tile-icon icon-bg-orange tw:flex-shrink-0"
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display row items-end"
+                class="data-to-display tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-dashboards-count"
               >
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="feature-card first-chart-container rounded-borders tw:p-4"
+          class="feature-card first-chart-container tw:rounded tw:p-4"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-label="Alerts overview section"
         >
           <div class="details-container">
-            <div class="row justify-between items-center">
+            <div class="tw:flex tw:justify-between tw:items-center">
               <span class="text-title tw:flex tw:items-center tw:gap-2">
                 <div class="tile-icon icon-bg-blue" aria-hidden="true">
                   <img :src="alertsIcon" alt="" />
@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></router-link>
               </OButton>
             </div>
-            <div class="row tw:pt-2 home-stat-row">
+            <div class="tw:flex tw:pt-2 home-stat-row">
               <div class="column">
                 <span class="text-subtitle">{{
                   t("home.scheduledAlert")
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="feature-card second-chart-container rounded-borders tw:p-4"
+          class="feature-card second-chart-container tw:rounded tw:p-4"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -526,7 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-label="Pipelines overview section"
         >
           <div class="details-container">
-            <div class="row justify-between items-center">
+            <div class="tw:flex tw:justify-between tw:items-center">
               <span class="text-title tw:flex tw:items-center tw:gap-2">
                 <div class="tile-icon icon-bg-blue" aria-hidden="true">
                   <img :src="pipelinesIcon" alt="" />
@@ -560,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></router-link>
               </OButton>
             </div>
-            <div class="row tw:pt-2 home-stat-row">
+            <div class="tw:flex tw:pt-2 home-stat-row">
               <div class="column">
                 <span class="text-subtitle">
                   {{ t("home.schedulePipelineTitle") }}</span
@@ -604,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:p-4 row items-start tw:gap-4 home-no-data-panel"
+      class="tw:p-4 tw:flex tw:items-start tw:gap-4 home-no-data-panel"
       data-test="home-usage-tab-no-data"
     >
       <TrialPeriod></TrialPeriod>

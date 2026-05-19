@@ -66,17 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.stream.selectedStreamFields.length == 0) &&
         searchObj.loading == false
       "
-      class="index-table q-mt-xs"
+      class="index-table tw:mt-1"
     >
       <div
         data-test="logs-search-no-field-found-text"
-        class="text-center col-10 q-mx-none q-pt-md"
+        class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
       >
         <OIcon name="info" size="xs" class="tw:align-middle tw:mr-1" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>
-    <div v-else class="index-table q-mt-xs">
+    <div v-else class="index-table tw:mt-1">
       <GroupedFieldList
         ref="fieldListRef"
         :fields="streamFieldsRows"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]">
-            <div class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center">
+            <div class="tw:text-sm tw:font-medium text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center">
               <OSpinner size="sm" />
               {{ t("search.loadingStream") }}
             </div>
@@ -1655,7 +1655,7 @@ export default defineComponent({
             });
           });
 
-          // [NEW] Background capture into IndexedDB — does not block return
+          // [NEW] Background capture into IndexedDB — does not tw:block return
           if (streamValues.length > 0 && fieldName) {
             captureFromValuesApi(
               {

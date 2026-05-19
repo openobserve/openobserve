@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div
-                class="text-bold q-px-sm q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2"
+                class="tw:font-bold tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2"
               >
                 {{ t("dashboard.folderLabel") }}
                 <div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
               <!-- Search Input -->
-              <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
+              <div class="flex folder-item tw:py-1 tw:w-full tw:px-2">
                 <OInput
                   v-model="folderSearchQuery"
                   data-test="folder-search"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-folder-tab-${tab.folderId}`"
                 >
                   <div
-                    class="folder-item full-width row justify-between no-wrap tw:group/row"
+                    class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row"
                   >
                     <span class="folder-name text-truncate" :title="tab.name">{{
                       tab.name
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="selectedIds.length > 0"
                     variant="outline"
                     size="sm"
-                    class="q-mr-sm tw:h-9"
+                    class="tw:mr-2 tw:h-9"
                     data-test="dashboard-list-move-across-folders-btn"
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="selectedIds.length > 0"
                     variant="outline"
                     size="sm"
-                    class="q-mr-sm tw:h-9"
+                    class="tw:mr-2 tw:h-9"
                     icon-left="download"
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="selectedIds.length > 0"
                     variant="outline"
                     size="sm"
-                    class="q-mr-sm tw:h-9"
+                    class="tw:mr-2 tw:h-9"
                     icon-left="delete"
                     data-test="dashboard-list-delete-dashboards-btn"
                     @click="openBulkDeleteDialog"

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
       <OCardSection class="tw:pt-0">
-        <OTabs v-model="activeTab" dense class="text-grey" align="justify">
+        <OTabs v-model="activeTab" dense class="tw:text-gray-500" align="justify">
           <OTab name="light" label="Light Mode" />
           <OTab name="dark" label="Dark Mode" />
         </OTabs>
@@ -46,16 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
-              class="theme-card-compact q-mb-sm"
+              class="theme-card-compact tw:mb-2"
             >
-              <div class="row items-center no-wrap">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
                   :style="{ backgroundColor: theme.light.themeColor }"
                 ></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ theme.light.themeColor }}
                   </div>
                 </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="isThemeApplied(theme, 'light')"
                   variant="success"
                   size="sm"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
                   variant="primary"
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact q-mb-sm">
-              <div class="row items-center no-wrap">
+            <div class="theme-card-compact tw:mb-2">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customLightColor }"
@@ -93,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">Custom Color</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ customLightColor }}
                   </div>
                 </div>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="isCustomThemeApplied('light')"
                   variant="success"
                   size="sm"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
                   variant="primary"
@@ -120,16 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
-              class="theme-card-compact q-mb-sm"
+              class="theme-card-compact tw:mb-2"
             >
-              <div class="row items-center no-wrap">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
                   :style="{ backgroundColor: theme.dark.themeColor }"
                 ></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ theme.dark.themeColor }}
                   </div>
                 </div>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="isThemeApplied(theme, 'dark')"
                   variant="success"
                   size="sm"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
                   variant="primary"
@@ -149,8 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact q-mb-sm">
-              <div class="row items-center no-wrap">
+            <div class="theme-card-compact tw:mb-2">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customDarkColor }"
@@ -167,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">Custom Color</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ customDarkColor }}
                   </div>
                 </div>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="isCustomThemeApplied('dark')"
                   variant="success"
                   size="sm"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
                   variant="primary"
@@ -195,9 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OCardSection class="tw:pt-0 tw:pb-2">
         <OSeparator class="tw:mb-2" />
         <div
-          class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
+          class="tw:text-xs tw:text-gray-400 tw:flex tw:items-start tw:gap-1"
         >
-          <OIcon name="info-outline" size="xs" class="q-mt-xs" />
+          <OIcon name="info-outline" size="xs" class="tw:mt-1" />
           <span
             >Theme preferences are stored locally on this device and will not
             sync across different browsers or devices.</span

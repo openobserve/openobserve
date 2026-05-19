@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
-            <div class="text-subtitle2 q-mb-sm">
+            <div class="tw:text-sm tw:font-medium tw:mb-2">
               Time Range <span class="text-red-600">*</span>
             </div>
             <date-time
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
-              class="text-caption text-red-600 q-mt-xs"
+              class="tw:text-xs text-red-600 tw:mt-1"
             >
               Please select a valid time range
             </div>
@@ -57,10 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <div class="q-pa-md tw:space-y-2 tw:mt-2">
+            <div class="tw:p-3 tw:space-y-2 tw:mt-2">
               <!-- Chunk Period -->
               <div>
-                <div class="text-caption q-mb-xs">
+                <div class="tw:text-xs tw:mb-1">
                   Chunk Period (minutes)
                   <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Delay Between Chunks -->
               <div>
-                <div class="text-caption q-mb-xs">
+                <div class="tw:text-xs tw:mb-1">
                   Delay Between Chunks (seconds)
                   <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
@@ -105,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="formData.deleteBeforeBackfill"
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
-                  <div class="flex items-start">
-                    <OIcon name="warning" size="sm" class="q-mr-sm tw-mt-0.5" />
-                    <div class="text-caption text-orange-800">
+                  <div class="flex tw:items-start">
+                    <OIcon name="warning" size="sm" class="tw:mr-2 tw-mt-0.5" />
+                    <div class="tw:text-xs text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">
                         This will permanently delete all data in the destination stream for the specified time
@@ -126,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCollapsible>
 
       <!-- Error Message -->
-      <div v-if="errorMessage" class="text-negative">
-        <OIcon name="error" size="sm" class="q-mr-sm" />
+      <div v-if="errorMessage" class="tw:text-red-500">
+        <OIcon name="error" size="sm" class="tw:mr-2" />
         {{ errorMessage }}
       </div>
     </div>

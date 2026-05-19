@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="col column full-height"
+    class="tw:flex tw:flex-col column full-height"
     style="
       overflow: hidden !important;
       padding: 0 !important;
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="search-list full-height full-width tw:flex tw:flex-col"
+      class="search-list full-height tw:w-full tw:flex tw:flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="row tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
+      <div class="tw:flex tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
         <div
-          class="col-8 text-left q-pl-lg bg-warning text-white rounded-borders"
+          class="tw:w-2/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-8 text-left q-pl-lg warning flex items-center" data-test="logs-search-result-title">
+        <div v-else class="tw:w-2/3 tw:text-left tw:pl-4 warning flex tw:items-center" data-test="logs-search-result-title">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
               : noOfRecordsTitle
           }}
-          <span v-if="searchObj.loadingCounter" class="q-ml-md">
+          <span v-if="searchObj.loadingCounter" class="tw:ml-3">
             <OSpinner size="xs" class="search-spinner" />
           </span>
           <div
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="q-ml-md tw:cursor-pointer"
+            class="tw:ml-3 tw:cursor-pointer"
             :class="
               store.state.theme == 'dark'
                 ? 'histogram-unavailable-text'
@@ -109,40 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="col-4 q-pr-sm pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
-          <!-- Wrap Content Button -->
-          <OButton
-            v-if="
-              searchObj.meta.logsVisualizeToggle === 'logs' ||
-              searchObj.meta.logsVisualizeToggle === 'patterns'
-            "
-            data-test="logs-search-result-wrap-table-content-btn"
-            variant="ghost"
-            size="icon"
-            class="wrap-content-btn"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
-              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
-            "
-          >
-            <OIcon name="wrap-text" size="sm" />
-            <OTooltip :content="t('search.messageWrapContent')" />
-          </OButton>
-          <OSelect
-            v-if="
-              searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs' &&
-              !searchObj.loading
-            "
-            data-test="logs-search-result-records-per-page"
-            v-model="searchObj.meta.resultGrid.rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="select-pagination"
-            size="sm"
-            @update:model-value="getPageData('recordsPerPage')"
-          />
+        <div class="tw:w-1/3 tw:text-right tw:pr-2 tw:gap-1 pagination-block">
           <OPagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
@@ -166,10 +133,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
-            class="paginator-section"
+            class="float-right paginator-section"
             @update:model-value="getPageData('pageChange')"
             data-test="logs-search-result-pagination"
           />
+          <OSelect
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs' &&
+              !searchObj.loading
+            "
+            data-test="logs-search-result-records-per-page"
+            v-model="searchObj.meta.resultGrid.rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="float-right select-pagination"
+            size="sm"
+            @update:model-value="getPageData('recordsPerPage')"
+          />
+          <!-- Wrap Content Button -->
+          <OButton
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
+            data-test="logs-search-result-wrap-table-content-btn"
+            variant="ghost"
+            size="icon"
+            class="wrap-content-btn float-right"
+            :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }"
+            @click="
+              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
+            "
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
         </div>
       </div>
 
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loading
             "
           >
-            <h6 class="text-center">
+            <h6 class="tw:text-center">
               <span class="histogram-empty__message">
                 <OIcon name="warning" size="xs"></OIcon> No
                 data found for histogram.</span
@@ -230,14 +230,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Object.keys(plotChart)?.length === 0
             "
           >
-            <h5 class="text-center">
+            <h5 class="tw:text-center">
               <span class="histogram-empty__message" style="color: transparent"
                 >.</span
               >
             </h5>
           </div>
 
-          <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
+          <div class="tw:pb-2 histogram-loader" v-if="histogramLoader">
             <OSpinner size="xs" class="search-spinner" />
           </div>
         </div>
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h6
-            class="text-center histogram-error"
+            class="tw:text-center histogram-error"
             v-if="
               searchObj.data.histogram.errorCode != 0 &&
               searchObj.data.histogram.errorCode != -1
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h6>
           <h6
-            class="text-center"
+            class="tw:text-center"
             v-else-if="searchObj.data.histogram.errorCode != -1"
           >
             <SanitizedHtmlRenderer
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
             :highlight-query="searchObj.data.highlightQuery"
             :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="col-12"
+            class="tw:w-full"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
             :scroll-el="scrollContainerRef"
             :scroll-margin="0"
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
+    <!-- Correlation Dashboard (for tw:inline expanded logs, opens as separate dialog) -->
     <TelemetryCorrelationDashboard
       v-if="shouldShowInlineDialog"
       mode="dialog"
@@ -1179,7 +1179,7 @@ export default defineComponent({
 
       if (index === -1 || index === undefined) {
         console.error(
-          "[SearchResult] Could not find row index for correlation",
+          "[SearchResult] Could not find tw:flex index for correlation",
           {
             rowTimestamp: row[timestampColumn],
             hitsCount: searchObj.data.queryResults?.hits?.length,
@@ -1315,7 +1315,7 @@ export default defineComponent({
           });
         }
 
-        // For inline expanded logs, open the correlation dashboard as a dialog
+        // For tw:inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
         if (!searchObj.meta.showDetailTab) {
           showCorrelation.value = true;
@@ -1487,7 +1487,7 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
-      // Clear correlation data when closing sidebar so it doesn't persist to next row
+      // Clear correlation data when closing sidebar so it doesn't persist to next "row"
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
       correlationError.value = null;
@@ -1570,7 +1570,7 @@ export default defineComponent({
     );
 
     // Watch for sidebar close to clear correlation data
-    // This ensures fresh correlation data when reopening with a different row
+    // This ensures fresh correlation data when reopening with a different "row"
     watch(
       () => searchObj.meta.showDetailTab,
       (isOpen, wasOpen) => {

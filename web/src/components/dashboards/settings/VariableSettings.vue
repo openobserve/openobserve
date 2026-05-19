@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">{{ t("dashboard.type") }}</div>
           <div class="header-item">{{ t("dashboard.selectType") }}</div>
           <div class="header-item">Scope</div>
-          <div class="header-item q-ml-lg q-pl-lg">
+          <div class="header-item tw:ml-4 tw:pl-4">
             {{ t("dashboard.actions") }}
           </div>
         </div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="draggable-handle">
               <OIcon
                 name="drag-indicator" size="sm"
-                class="'q-mr-xs"
+                class="'tw:mr-1"
                 data-test="dashboard-variable-settings-drag-handle"
               />
             </div>

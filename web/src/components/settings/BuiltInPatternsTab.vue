@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="built-in-patterns-container card-container">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar q-pa-md">
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-md-6">
+    <div class="filters-bar tw:p-3">
+      <div class="tw:flex tw:gap-3">
+        <div class="tw:w-full col-md-6">
           <OInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="tw:w-full col-md-4">
           <OSelect
             v-model="selectedTags"
             :options="tagOptions"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-tag-filter"
           />
         </div>
-        <div class="col-12 col-md-2">
+        <div class="tw:w-full col-md-2">
           <OButton
             variant="outline"
             size="sm"
@@ -60,15 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && patterns.length === 0" class="text-center q-pa-xl">
+    <div v-if="loading && patterns.length === 0" class="tw:text-center tw:p-6">
       <OSpinner size="lg" />
-      <div class="q-mt-md">{{ t("regex_patterns.loading_patterns") }}</div>
+      <div class="tw:mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center q-pa-xl">
+    <div v-else-if="error" class="tw:text-center tw:p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="q-mt-md text-negative">{{ error }}</div>
+      <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
           {{ t("regex_patterns.try_again") }}
@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Patterns List -->
     <div v-else class="patterns-list">
-      <div class="q-pa-md">
-        <div class="text-subtitle2 q-mb-md">
+      <div class="tw:p-3">
+        <div class="tw:text-sm tw:font-medium tw:mb-3">
           {{
             t("regex_patterns.showing_patterns", {
               count: filteredPatterns.length,
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ pattern.name }}
               </span>
               <span class="tw:block tw:text-xs tw:text-muted-foreground tw:line-clamp-2">
-                <div class="q-mb-xs">
+                <div class="tw:mb-1">
                   <OBadge
                     v-for="tag in pattern.tags.slice(0, 3)"
                     :key="tag"
@@ -142,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
 
           <li v-if="filteredPatterns.length === 0" class="tw:flex tw:items-center tw:px-3 tw:py-2">
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-grey-6">
-              <div class="q-pa-xl">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-gray-400">
+              <div class="tw:p-6">
                 <OIcon name="search-off" style="width: 50px; height: 50px;" />
-                <div class="q-mt-md">
+                <div class="tw:mt-3">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
               </div>
@@ -167,8 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="importSinglePattern"
     >
       <div style="max-height: 60vh; overflow-y: auto">
-        <div class="q-mb-md">
-          <div class="text-weight-bold q-mb-xs">
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">
             {{ t('regex_patterns.description') }}
           </div>
           <div>
@@ -176,8 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="q-mb-md">
-          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.pattern') }}</div>
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.pattern') }}</div>
           <OTextarea
             :model-value="previewedPattern?.pattern"
             readonly
@@ -185,8 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="q-mb-md">
-          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.tags') }}</div>
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
           <OBadge
             v-for="tag in previewedPattern?.tags"
             :key="tag"
@@ -196,16 +196,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
         </div>
 
-        <div class="q-mb-md">
-          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.rarity') }}</div>
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.rarity') }}</div>
           <div>{{ previewedPattern?.rarity }}</div>
         </div>
 
         <div
           v-if="previewedPattern?.examples?.Valid?.length > 0"
-          class="q-mb-md"
+          class="tw:mb-3"
         >
-          <div class="text-weight-bold q-mb-xs">
+          <div class="text-weight-bold tw:mb-1">
             {{ t('regex_patterns.valid_examples') }}
           </div>
           <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">

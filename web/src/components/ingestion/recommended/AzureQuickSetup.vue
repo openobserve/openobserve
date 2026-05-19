@@ -89,11 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </h6>
 
               <div class="tw:mb-4">
-                <div class="row q-col-gutter-sm">
+                <div class="tw:flex tw:gap-2">
                   <div
                     v-for="service in includedServices"
                     :key="service.name"
-                    class="col-12 col-sm-6"
+                    class="tw:w-full col-sm-6"
                   >
                     <div class="service-item tw:p-2 tw:rounded tw:border">
                       <div class="tw:flex tw:items-start tw:gap-2">

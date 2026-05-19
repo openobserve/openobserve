@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-  <div class="q-px-md q-py-sm" data-test="dashboard-folder-move-body">
+  <div class="tw:px-3 tw:py-2" data-test="dashboard-folder-move-body">
       <div class="tw:flex tw:flex-col tw:gap-3">
         <OInput
           :model-value="

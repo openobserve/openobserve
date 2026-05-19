@@ -27,27 +27,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="selectedPattern">
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">
-          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternStatistics") }}
           </div>
-          <div class="row q-col-gutter-md">
-            <div class="col-6">
+          <div class="tw:flex tw:gap-3">
+            <div class="tw:w-1/2">
               <OCard
                 class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <OCardSection class="tw:p-[0.375rem]">
                   <div
-                    class="text-caption"
+                    class="tw:text-xs"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-7'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     {{ t("search.patternOccurrences") }}
                   </div>
                   <div
-                    class="text-h5 text-weight-bold text-primary q-mt-xs"
+                    class="tw:text-2xl tw:font-semibold text-weight-bold text-primary tw:mt-1"
                   >
                     {{
                       selectedPattern.pattern.frequency.toLocaleString()
@@ -56,21 +56,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OCardSection>
               </OCard>
             </div>
-            <div class="col-6">
+            <div class="tw:w-1/2">
               <OCard class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
                 <OCardSection class="tw:p-[0.375rem]">
                   <div
-                    class="text-caption"
+                    class="tw:text-xs"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-7'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     {{ t("search.patternPercentage") }}
                   </div>
                   <div
-                    class="text-h5 text-weight-bold text-primary q-mt-xs"
+                    class="tw:text-2xl tw:font-semibold text-weight-bold text-primary tw:mt-1"
                   >
                     {{ selectedPattern.pattern.percentage.toFixed(2) }}%
                   </div>
@@ -80,25 +80,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="selectedPattern.pattern.is_anomaly"
-            class="q-mt-md"
+            class="tw:mt-3"
           >
             <div
               class="tw-rounded tw-border tw-border-solid tw-border-negative tw-px-3 tw-py-2 tw-flex tw-gap-3 tw-items-start"
-              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'"
+              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'bg-white'"
             >
               <OIcon name="warning" size="sm" class="tw-mt-[2px] tw-flex-shrink-0" />
               <div>
-                <div class="text-weight-bold text-negative">{{ t("search.patternAnomalyDetected") }}</div>
+                <div class="text-weight-bold tw:text-red-500">{{ t("search.patternAnomalyDetected") }}</div>
                 <div
-                  class="text-caption q-mt-xs"
-                  :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+                  class="tw:text-xs tw:mt-1"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500'"
                 >
                   {{ anomalyExplanationForSelected }}
                 </div>
                 <div
                   v-if="selectedPattern.pattern.z_score !== undefined && selectedPattern.pattern.z_score < -1.5 && selectedPattern.pattern.avg_frequency"
-                  class="text-caption q-mt-xs"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  class="tw:text-xs tw:mt-1"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                 >
                   {{ t("search.patternZScore", { zScore: selectedPattern.pattern.z_score.toFixed(2), avgFrequency: Math.round(selectedPattern.pattern.avg_frequency).toLocaleString() }) }}
                 </div>
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Variables Summary -->
         <div class="tw-mb-[1rem]">
-          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternVariablesHeader") }}
           </div>
           <div
             class="tw:px-[0.625rem] tw:py-[0.375rem] tw:rounded tw:border-l-[0.25rem] tw:border-solid tw:border-l-[var(--q-primary)]"
             :class="
-              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+              store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
             "
           >
             {{
@@ -128,13 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pattern Template -->
         <div class="tw-mb-[1rem]">
-          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternTemplate") }}
           </div>
           <div
             class="tw-px-[0.625rem] tw-py-[0.375rem] pattern-detail-text tw-text-[0.8125rem] tw-leading-[1.6] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)] tw-break-all tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[2px]"
             :class="
-              store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+              store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
             "
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OBadge
                   size="sm"
-                  class="wildcard-chip-detail q-my-none q-mx-none"
+                  class="wildcard-chip-detail tw:my-0 tw:mx-0"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
                   {{ wildcardLabel(tok.value, tok.sampleValues) }}
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:mb-[1rem]"
         >
-          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternVariablesWithCount", { count: selectedPattern.pattern.variables.length }) }}
           </div>
           <OTable
@@ -177,17 +177,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           >
             <template #cell-name="{ row }">
-              <div class="text-left text-weight-bold text-primary">
+              <div class="tw:text-left text-weight-bold text-primary">
                 {{ row.name || "var_" + row.index }}
               </div>
             </template>
 
             <template #cell-type="{ row }">
-              <div class="text-left">
+              <div class="tw:text-left">
                 <OBadge
                   size="sm"
                   :class="
-                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'
+                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-200'
                   "
                 >
                   {{ row.var_type || "unknown" }}
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:mb-[1rem]"
         >
-          <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternExampleLogsWithCount", { count: selectedPattern.pattern.examples.length }) }}
           </div>
           <div
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="exIdx"
             class="tw:px-[0.625rem] tw:py-[0.375rem] tw:mb-[0.375rem] pattern-detail-text tw:text-[0.75rem] tw:leading-[1.6] tw:rounded tw:break-all tw:whitespace-pre-wrap tw:border-l-[0.1875rem] tw:border-solid"
             :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10 tw:border-l-[#3a3a3a]' : 'bg-grey-1 tw:border-l-[#e0e0e0]'
+              store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-l-[#3a3a3a]' : 'tw:bg-gray-50 tw:border-l-[#e0e0e0]'
             ]"
           >
             <LogsHighLighting
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer Navigation -->
     <template #footer>
-      <div class="row items-center no-wrap justify-between">
+      <div class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between">
           <div class="col-auto">
             <OButton
               variant="outline"
@@ -243,8 +243,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('search.patternNavPrevious') }}
             </OButton>
           </div>
-          <div class="col-auto text-center">
-            <span class="text-caption text-grey-7">
+          <div class="col-auto tw:text-center">
+            <span class="tw:text-xs tw:text-gray-400">
               {{ t("search.patternXofYShort", { index: selectedPattern.index + 1, total: totalPatterns }) }}
             </span>
           </div>

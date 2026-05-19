@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <OIcon name="tune" size="sm" class="q-mr-sm" />
+          <OIcon name="tune" size="sm" class="tw:mr-2" />
           <span>Configure Dedup</span>
         </div>
         <div
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <OIcon name="edit" size="sm" class="q-mr-sm" />
+          <OIcon name="edit" size="sm" class="tw:mr-2" />
           <span>Edit Alert</span>
         </div>
         <div
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <OIcon name="history" size="sm" class="q-mr-sm" />
+          <OIcon name="history" size="sm" class="tw:mr-2" />
           <span>View Alert History</span>
         </div>
       </div>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <OIcon name="close" size="sm" class="q-mr-sm" />
+          <OIcon name="close" size="sm" class="tw:mr-2" />
           <span>Cancel</span>
         </div>
       </div>

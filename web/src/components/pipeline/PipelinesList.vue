@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]"
+          class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]"
         >
           <div
             class="q-table__title tw:font-[600]"
@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("pipeline.header") }}
           </div>
-          <div class="tw:flex tw:items-center q-ml-auto">
+          <div class="tw:flex tw:items-center tw:ml-auto">
             <app-tabs
               data-test="pipeline-list-tabs"
-              class="q-mr-sm"
+              class="tw:mr-2"
               :tabs="tabs"
               v-model:active-tab="activeTab"
               @update:active-tab="updateActiveTab"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!shouldCollapseToolbar">
               <OButton
                 data-test="pipeline-list-history-btn"
-                class="q-ml-sm"
+                class="tw:ml-2"
                 variant="outline"
                 size="sm-action"
                 @click="goToPipelineHistory"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="config.isEnterprise == 'true'"
                 data-test="pipeline-list-backfill-btn"
-                class="q-ml-sm"
+                class="tw:ml-2"
                 variant="outline"
                 size="sm-action"
                 @click="goToBackfillJobs"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 data-test="pipeline-list-import-pipeline-btn"
-                class="q-ml-sm"
+                class="tw:ml-2"
                 variant="outline"
                 size="sm-action"
                 @click="routeToImportPipeline"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               data-test="pipeline-list-add-pipeline-btn"
-              class="q-ml-sm"
+              class="tw:ml-2"
               variant="primary"
               size="sm-action"
               @click="routeToAddPipeline"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown v-if="shouldCollapseToolbar">
               <template #trigger>
                 <OButton
-                  class="q-ml-sm"
+                  class="tw:ml-2"
                   variant="outline"
                   size="sm-action"
                   data-test="pipeline-list-overflow-menu-btn"
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <div class="tw:flex tw:flex-col">
                       <div>View Error</div>
-                      <div class="text-caption text-grey">
+                      <div class="tw:text-xs tw:text-gray-500">
                         {{
                           new Date(
                             row.last_error.last_error_timestamp / 1000,
@@ -277,9 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="row?.sql_query"
                 data-test="scheduled-pipeline-expanded-content"
-                class="text-left tw:px-2 q-mb-sm expanded-content"
+                class="tw:text-left tw:px-2 tw:mb-2 expanded-content"
               >
-                <div class="tw:flex tw:items-center q-py-sm">
+                <div class="tw:flex tw:items-center tw:py-2">
                   <strong
                     >{{ t("pipeline_list.sql_query") }} : <span></span
                   ></strong>

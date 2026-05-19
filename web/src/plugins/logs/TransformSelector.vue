@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow tw:border tw:border-button-outline-border"
+    class="tw:p-0 float-left tw:mr-1 transform-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input q-mx-sm"
+            class="logs-transform-type o2-input tw:mx-2"
             style="padding-top: 0"
           >
             <OSelect

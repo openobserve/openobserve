@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div>
-      <div v-if="!customQuery && !modelValue.isDerived" class="q-mr-xs q-mb-sm">
+      <div v-if="!customQuery && !modelValue.isDerived" class="tw:mr-1 tw:mb-2">
         <DynamicFunctionPopUp
           :modelValue="modelValue"
           @update:modelValue="(newValue) => emit('update:modelValue', newValue)"

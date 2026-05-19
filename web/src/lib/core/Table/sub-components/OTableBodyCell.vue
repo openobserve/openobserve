@@ -126,7 +126,7 @@ const highlightedHtml = computed(() => {
   return raw ? sanitize(raw) : null;
 });
 
-// ── Tree mode: inline chevron + indent for the designated tree column ──
+// ── Tree mode: tw:inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",

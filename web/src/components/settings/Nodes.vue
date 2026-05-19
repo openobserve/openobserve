@@ -24,14 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="overflow: hidden; height: calc(100vh - 64px)"
     >
       <template v-slot:before>
-        <div class="q-pt-sm tw:mt-4 tw:flex tw:flex-col" style="height: calc(100vh - 64px)">
-          <div class="sticky-header q-px-sm tw:shrink-0">
-            <span class="q-ma-none q-pa-sm" style="font-size: 18px">
+        <div class="tw:pt-2 tw:mt-4 tw:flex tw:flex-col" style="height: calc(100vh - 64px)">
+          <div class="sticky-header tw:px-2 tw:shrink-0">
+            <span class="tw:m-0 tw:p-2" style="font-size: 18px">
               {{ t("nodes.filter_header") }}
               <OIcon name="filter-list" size="sm" />
               <div class="float-right">
                 <a
-                  class="cursor-pointer text-caption tw:underline"
+                  class="cursor-pointer tw:text-xs tw:underline"
                   :class="filterApplied ? 'text-primary' : ''"
                   @click="clearAll()"
                   >{{ t("nodes.clear_all") }}</a
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
-                    class="full-width filter-input"
+                    class="tw:w-full filter-input"
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
@@ -78,9 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedRegionIdsUpdate"
                     >
                       <template #empty>
-                        <div class="full-width text-center q-pa-md">
+                        <div class="tw:w-full tw:text-center tw:p-3">
                           <OIcon name="warning" size="md" />
-                          <span class="q-ml-sm">No data available</span>
+                          <span class="tw:ml-2">No data available</span>
                         </div>
                       </template>
                     </OTable>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       clearable
                       :debounce="1"
                       :placeholder="t('nodes.searchCluster')"
-                      class="full-width filter-input"
+                      class="tw:w-full filter-input"
                     >
                       <template #icon-left>
                         <OIcon name="search" size="sm" />
@@ -124,9 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedClusterIdsUpdate"
                     >
                       <template #empty>
-                        <div class="full-width text-center q-pa-md">
+                        <div class="tw:w-full tw:text-center tw:p-3">
                           <OIcon name="warning" size="md" />
-                          <span class="q-ml-sm">No data available</span>
+                          <span class="tw:ml-2">No data available</span>
                         </div>
                       </template>
                     </OTable>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #cell-name="{ row }">
                         <span
                           :class="`status-${row.name.toLowerCase()}`"
-                          class="q-mr-xs"
+                          class="tw:mr-1"
                         ></span
                         >{{ row.name }}
                       </template>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-2"
                 >
                   <div class="tw:p-0">
-                    <div class="row items-center q-gutter-sm q-ml-xs">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
                         type="number"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         max="100"
                         v-model="cpuUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
+                      <span class="tw:px-2">to</span>
                       <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxCPUUsage"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
                   </div>
                 </OCollapsible>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-2"
                 >
                   <div class="tw:p-0">
-                    <div class="row items-center q-gutter-sm q-ml-xs">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
                         type="number"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         max="100"
                         v-model="memoryUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
+                      <span class="tw:px-2">to</span>
                       <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxMemoryUsage"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
                   </div>
                 </OCollapsible>
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="establishedToggle"
                       :label="t('nodes.establishedLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-min"
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
+                      <span class="tw:px-2">to</span>
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
@@ -318,16 +318,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxEstablished"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
 
                     <OCheckbox
                       type="checkbox"
-                      class="q-mt-sm"
+                      class="tw:mt-2"
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-min"
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
+                      <span class="tw:px-2">to</span>
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
@@ -359,16 +359,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxClosewait"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
 
                     <OCheckbox
                       type="checkbox"
-                      class="q-mt-sm"
+                      class="tw:mt-2"
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-min"
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
+                      <span class="tw:px-2">to</span>
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxWaittime"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
                   </div>
                 </OCollapsible>
@@ -420,9 +420,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
-        <div class="row full-width q-pt-sm flex items-center tw:shrink-0">
+        <div class="tw:flex tw:w-full tw:pt-2 flex tw:items-center tw:shrink-0">
           <div
-            class="col q-table__title items-start"
+            class="tw:flex tw:flex-col q-table__title tw:items-start"
             data-test="cipher-keys-list-title"
           >
             {{ t("nodes.header") }}
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:h-[36px] tw:mb-2">
             <OInput
               v-model="filterQuery"
-              class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
+              class="tw:ml-0 tw:mb-1 tw:mr-2 o2-search-input"
               style="width: 400px"
               :placeholder="t('nodes.search')"
             >
@@ -480,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <OBadge variant="default" class="badge-region q-mr-xs"
+            <OBadge variant="default" class="badge-region tw:mr-1"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
             </OBadge>

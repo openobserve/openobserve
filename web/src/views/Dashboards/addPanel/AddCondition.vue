@@ -40,8 +40,8 @@
             </OButton>
           </div>
           <div style="height: 100%">
-            <div class="q-pa-xs" style="height: 100%">
-              <div class="q-gutter-xs" style="height: 100%">
+            <div class="tw:p-1" style="height: 100%">
+              <div class="tw:gap-1" style="height: 100%">
                 <OTabs v-model="condition.type" dense>
                   <OTab
                     name="list"

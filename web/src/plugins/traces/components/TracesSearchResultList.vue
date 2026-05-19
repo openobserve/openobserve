@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
       v-if="noResults"
-      class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
+      class="tw:text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
       <OIcon name="info" size="md" />
       {{ t("traces.noTracesFoundAdjust") }}
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #loading-banner>
             <div
               data-test="traces-table-loading-banner-row"
-              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
               <OSpinner
                 size="xs"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #loading>
             <div
               data-test="traces-table-loading-row"
-              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
               <OSpinner
                 size="xs"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-operation_name="{ item }">
             <span
-              class="text-caption ellipsis tw:text-[var(--o2-text-1)]!"
+              class="tw:text-xs tw:truncate tw:text-[var(--o2-text-1)]!"
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="text-caption" data-test="trace-row-duration">
+            <span class="tw:text-xs" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="text-caption" data-test="trace-row-input-tokens">
+            <span class="tw:text-xs" data-test="trace-row-input-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="text-caption" data-test="trace-row-output-tokens">
+            <span class="tw:text-xs" data-test="trace-row-output-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="text-caption" data-test="trace-row-cost">
+            <span class="tw:text-xs" data-test="trace-row-cost">
               {{
                 isLLMTrace(item)
                   ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`

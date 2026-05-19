@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span
           v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold tw:ml-2"
+          class="tw:text-sm tw:font-medium text-weight-bold tw:ml-2"
           >{{ t("panel.sql") }}</span
         >
         <div
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'visibility-off'
                     : 'visibility'
                 "
-                class="q-ml-xs dashboard-query-visibility-icon"
+                class="tw:ml-1 dashboard-query-visibility-icon"
                 @click.stop="toggleQueryVisibility(index)"
                 style="cursor: pointer"
                 size="sm"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
                 "
                 name="close"
-                class="q-ml-sm dashboard-query-remove-icon"
+                class="tw:ml-2 dashboard-query-remove-icon"
                 @click.stop="removeTab(index)"
                 style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="col"
+    class="tw:flex tw:flex-col"
     :style="
       !dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'
     "
@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-query"
   >
     <div class="column" style="width: 100%; height: 100%">
-      <div class="col" style="width: 100%; height: 100%">
-        <div class="row" style="height: 100%">
+      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
+        <div class="tw:flex" style="height: 100%">
           <q-splitter
             no-scroll
             style="width: 100%; height: 100%"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-splitter>
         </div>
       </div>
-      <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
+      <div style="color: red; z-index: 100000" class="tw:mx-2 col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>

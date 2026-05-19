@@ -139,7 +139,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         The children <ul> has pl-5 (1.25rem = 20px) indentation, so the
         connector span starts 20px to the RIGHT of the parent row.
         The parent's chevron (size-4 = 16px) is centered at +8px from the
-        parent row start, so relative to the connector span start:
+        parent tw:flex start, so relative to the connector span start:
           chevronCenterX = 8px - 20px = -12px = -0.75rem
         Accounting for the 1.5px border center (subtract 0.75px):
           left = calc(-0.75rem - 0.75px)

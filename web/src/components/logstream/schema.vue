@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- #header override: complex stream header with name badge, timeline info,
          and close button — cannot be expressed with title + sub-slots -->
     <template #header-left>
-      <div class="row items-center no-wrap">
-        <div class="col">
+      <div class="tw:flex tw:items-center tw:flex-nowrap">
+        <div class="tw:flex tw:flex-col">
           <div
             class="tw:text-[18px] tw:flex tw:items-center"
             data-test="schema-title-text"
@@ -91,12 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div v-if="indexData.schema">
-      <div class="q-ma-none q-pa-none">
+      <div class="tw:m-0 tw:p-0">
         <div @submit.prevent="onSubmit">
           <!-- we will show loading state here -->
           <div
             v-if="loadingState"
-            class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
+            class="tw:pt-3 tw:text-center q-w-md tw:mx-4 tw:flex tw:justify-center"
             style="max-width: 450px"
           >
             <OSpinner size="md" />
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
               >
                 <div>
-                  <div class="flex justify-start">
+                  <div class="flex tw:justify-start">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -373,8 +373,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </div>
                   </div>
-                  <div class="flex justify-between items-center full-width">
-                    <div class="flex items-center">
+                  <div class="flex tw:justify-between tw:items-center tw:w-full">
+                    <div class="flex tw:items-center">
                       <div class="app-tabs-container">
                         <OToggleGroup
                           v-if="isSchemaUDSEnabled"
@@ -405,10 +405,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OToggleGroup>
                       </div>
 
-                      <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                      <div v-if="hasUserDefinedSchema" class="tw:ml-2">
                         <OIcon
                           name="info"
-                          class="q-mr-xs"
+                          class="tw:mr-1"
                           size="sm"
                           style="color: #f5a623; cursor: pointer"
                         >
@@ -421,12 +421,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <div class="flex items-center tw:gap-2">
+                    <div class="flex tw:items-center tw:gap-2">
                       <OInput
                         data-test="schema-field-search-input"
                         v-model="filterField"
                         data-cy="schema-index-field-search-input"
-                        class="q-ml-auto no-border o2-search-input"
+                        class="tw:ml-auto no-border o2-search-input"
                         :placeholder="t('search.searchField')"
                       >
                         <template #icon-left>
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="isDialogOpen"
                         variant="outline"
                         size="icon-sm"
-                        class="q-my-sm"
+                        class="tw:my-2"
                         @click.stop="openDialog"
                         title="Add Field(s)"
                         icon-left="add"
@@ -456,15 +456,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="q-mb-md" v-if="isDialogOpen">
+                  <div class="tw:mb-3" v-if="isDialogOpen">
                     <OCard class="add-fields-card">
                       <!-- Header Section -->
                       <OCardSection
-                        class="q-pa-none"
+                        class="tw:p-0"
                         style="padding: 4px 16px 4px 16px"
                       >
                         <div class="tw:flex tw:justify-between tw:items-center">
-                          <div class="text-h6">Add Field(s)</div>
+                          <div class="tw:text-xl tw:font-semibold">Add Field(s)</div>
                           <div>
                             <OButton
                               data-test="add-stream-cancel-btn"
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
                       <OCardSection
-                        class="q-pa-none"
+                        class="tw:p-0"
                         style="
                           flex: 1;
                           overflow-y: auto;
@@ -536,9 +536,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ row.name }}
                             <OTooltip
                               v-if="row.name.length > 30"
-                              :content="row.name"
-                              content-class="tw:text-[12px]"
-                            />
+                              class="tw:text-[12px]"
+                            >
+                              {{ row.name }}
+                            </OTooltip>
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -549,10 +550,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :alt="t('logStream.envQuickModeMsg')"
                               class="tw:w-[20px] tw:h-[20px]"
                             />
-                            <OTooltip
-                              :content="t('logStream.envQuickModeMsg')"
-                              content-class="tw:text-[12px] tw:w-[200px]"
-                            />
+                            <OTooltip class="tw:text-[12px] tw:w-[200px]">
+                              {{ t("logStream.envQuickModeMsg") }}
+                            </OTooltip>
                           </span>
                         </div>
                       </template>
@@ -818,11 +818,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- red button tab -->
                 <div v-else-if="activeMainTab == 'redButton'">
                   <div
-                    class="mapping-warning-msg q-mt-sm"
+                    class="mapping-warning-msg tw:mt-2"
                     style="width: fit-content"
                   >
                     <span style="font-weight: 600">
-                      <OIcon name="info" class="q-mr-xs" size="sm" />
+                      <OIcon name="info" class="tw:mr-1" size="sm" />
 
                       Additional
                       {{
@@ -832,12 +832,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ranges</span
                     >
                   </div>
-                  <div class="q-mt-sm">
-                    <div class="text-center q-mt-sm tw:flex items-center">
-                      <div class="flex items-center">
-                        <span class="text-bold"> Select Date</span>
+                  <div class="tw:mt-2">
+                    <div class="tw:text-center tw:mt-2 tw:flex tw:items-center">
+                      <div class="flex tw:items-center">
+                        <span class="tw:font-bold"> Select Date</span>
                         <date-time
-                          class="q-mx-sm"
+                          class="tw:mx-2"
                           @on:date-change="dateChangeValue"
                           disable-relative
                           hide-relative-time
@@ -845,10 +845,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :minDate="minDate"
                         />
                       </div>
-                      <span class="text-bold"> (UTC Timezone) </span>
+                      <span class="tw:font-bold"> (UTC Timezone) </span>
                     </div>
 
-                    <div class="q-mt-sm" style="margin-bottom: 10px">
+                    <div class="tw:mt-2" style="margin-bottom: 10px">
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="redBtnRows"
@@ -894,7 +894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @change="formDirtyFlag = true"
                     />
 
-                    <!-- Organization-level cross-links (read-only, hidden when empty) -->
+                    <!-- Organization-level cross-links (read-only, tw:hidden when empty) -->
                     <template v-if="orgCrossLinks.length > 0">
                       <OSeparator class="tw:my-4" />
                       <CrossLinkManager
@@ -914,12 +914,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'dark-theme-floating-buttons'
                       : 'light-theme-floating-buttons'
                   "
-                  class="floating-buttons q-px-sm q-py-xs"
+                  class="floating-buttons tw:px-2 tw:py-1"
                 >
                   <!-- LLM Evaluation tab footer -->
                   <div
                     v-if="activeMainTab === 'llmEvaluation'"
-                    class="flex items-center justify-end tw:gap-2"
+                    class="flex tw:items-center tw:justify-end tw:gap-2"
                   >
                     <OButton
                       v-close-popup="true"
@@ -943,12 +943,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-else-if="indexData.schema.length > 0"
-                    class="flex items-center justify-between"
+                    class="flex tw:items-center tw:justify-between"
                   >
-                    <div class="flex items-center tw:gap-2">
+                    <div class="flex tw:items-center tw:gap-2">
                       <span
                         v-if="activeMainTab == 'schemaSettings'"
-                        class="q-px-sm q-py-sm"
+                        class="tw:px-2 tw:py-2"
                         ><strong> {{ selectedFields.length }}</strong> fields
                         selected</span
                       >
@@ -966,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="updateDefinedSchemaFields"
                       >
                         <span
-                          class="flex items-center justify-start tw:gap-1 tw:mr-1"
+                          class="flex tw:items-center tw:justify-start tw:gap-1 tw:mr-1"
                         >
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
@@ -1003,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("logStream.delete") }}
                       </OButton>
                     </div>
-                    <div class="flex justify-end tw:gap-2">
+                    <div class="flex tw:justify-end tw:gap-2">
                       <OButton
                         data-test="schema-cancel-button"
                         variant="outline"
@@ -1030,7 +1030,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-else class="q-pa-md">
+    <div v-else class="tw:p-3">
       <h5>Wait while loading...</h5>
     </div>
   </ODrawer>
@@ -1123,8 +1123,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -1173,8 +1171,6 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
-    OCard,
-    OCardSection,
     OCheckbox,
   },
   setup({ modelValue }) {

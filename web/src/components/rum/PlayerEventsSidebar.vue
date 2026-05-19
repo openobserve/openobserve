@@ -20,27 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="row q-pa-sm event-metadata tw:px-[0.375rem]"
+        class="tw:flex tw:p-2 event-metadata tw:px-[0.375rem]"
       >
-        <div class="col-12 row">
-          <div class="col-12 q-pb-sm text-caption">
-            <OIcon name="mail" size="sm" class="q-pr-xs" />
+        <div class="tw:w-full tw:flex">
+          <div class="tw:w-full tw:pb-2 tw:text-xs">
+            <OIcon name="mail" size="sm" class="tw:pr-1" />
             {{ sessionDetails.user_email || "Unknown User" }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <OIcon name="schedule" size="sm" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
+            <OIcon name="schedule" size="sm" class="tw:pr-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <OIcon name="settings" size="sm" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
+            <OIcon name="settings" size="sm" class="tw:pr-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <OIcon name="language" size="sm" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
+            <OIcon name="language" size="sm" class="tw:pr-1" />
             {{ sessionDetails.ip }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <OIcon name="location-on" size="sm" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
+            <OIcon name="location-on" size="sm" class="tw:pr-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="flex items-center justify-between col-12 q-pt-sm tw:px-[0.375rem]"
+        class="flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
       >
-        <div class="q-pr-xs tw:w-[60%]">
+        <div class="tw:pr-1 tw:w-[60%]">
           <OInput
             v-model="searchEvent"
             clearable
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="q-pl-xs event-type-selector tw:w-[40%] relative-position">
+        <div class="tw:pl-1 event-type-selector tw:w-[40%] relative-position">
           <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -77,16 +77,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
+            class="tw:mt-1 tw:px-2 event-container tw:py-2 cursor-pointer tw:rounded"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="ellipsis">
-              <div class="q-mr-md inline" data-test="event-display-time">
+            <div class="tw:truncate">
+              <div class="tw:mr-3 tw:inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <div
-                class="q-mr-md inline event-type q-px-xs tw:rounded-[0.25rem]"
+                class="tw:mr-3 tw:inline event-type tw:px-1 tw:rounded-[0.25rem]"
                 :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
                 data-test="event-type-badge"
               >
@@ -100,11 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="q-mr-xs inline"
+                  class="tw:mr-1 tw:inline"
                 />
               </template>
               <div
-                class="inline"
+                class="tw:inline"
                 :title="filteredEvent.name"
                 data-test="event-name"
               >

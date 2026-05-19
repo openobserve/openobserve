@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Header variant: full-width top bar above the toolbar -->
+  <!-- Header variant: tw:w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
     class="webinar-top-bar"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner q-mb-md"
+    class="webinar-home-banner tw:mb-3"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <OIcon name="arrow-forward" size="sm" class="q-ml-sm" />
+        <OIcon name="arrow-forward" size="sm" class="tw:ml-2" />
       </OButton>
     </div>
   </div>

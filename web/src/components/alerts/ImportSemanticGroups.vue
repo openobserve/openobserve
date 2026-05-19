@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #full-width-content>
       <div class="import-semantic-groups-container">
         <!-- Compact Header with File Upload -->
-        <div class="card-container q-pa-sm q-mb-sm">
-          <div class="row items-center">
-            <div class="col-12 col-md-8">
+        <div class="card-container tw:p-2 tw:mb-2">
+          <div class="tw:flex tw:items-center">
+            <div class="tw:w-full col-md-8">
               <OFile
                 v-model="jsonFile"
                 label="Select JSON file"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFile>
             </div>
-            <div class="col-12 col-md-4 text-right q-pl-sm">
+            <div class="tw:w-full col-md-4 tw:text-right tw:pl-2">
               <OButton
                 v-if="diffData"
                 variant="primary"
@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Diff Preview Section with Scrollable Content -->
         <div v-if="diffData" class="diff-container">
           <!-- Compact Summary Bar -->
-          <div class="card-container q-pa-sm q-mb-sm">
-            <div class="row items-center q-col-gutter-sm">
+          <div class="card-container tw:p-2 tw:mb-2">
+            <div class="tw:flex tw:items-center tw:gap-2">
               <div class="col-auto">
                 <OBadge variant="success" class="summary-chip">
                   <strong>{{ diffData.additions.length }}</strong
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ diffData.unchanged.length }} Unchanged
                 </OBadge>
               </div>
-              <div class="col">
+              <div class="tw:flex tw:flex-col">
                 <OButtonGroup class="float-right">
                   <OButton
                     variant="ghost-primary"
@@ -120,8 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Scrollable Groups Container -->
           <div class="card-container groups-scroll-container">
             <!-- Additions -->
-            <div v-if="diffData.additions.length > 0" class="q-mb-sm">
-              <div class="section-header text-positive q-pa-xs">
+            <div v-if="diffData.additions.length > 0" class="tw:mb-2">
+              <div class="section-header tw:text-green-500 tw:p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="tw:text-[13px] tw:font-medium">{{ group.display }}</span>
                     <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OBadge v-if="group.normalize" variant="primary" class="q-ml-xs">norm</OBadge>
+                      <OBadge v-if="group.normalize" variant="primary" class="tw:ml-1">norm</OBadge>
                     </span>
                   </div>
                   <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
@@ -162,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Modifications -->
-            <div v-if="diffData.modifications.length > 0" class="q-mb-sm">
-              <div class="section-header text-warning q-pa-xs">
+            <div v-if="diffData.modifications.length > 0" class="tw:mb-2">
+              <div class="section-header tw:text-amber-500 tw:p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
@@ -231,13 +231,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Diff State -->
         <div
           v-else-if="!isImporting && !diffData"
-          class="card-container q-pa-lg text-center"
+          class="card-container tw:p-4 tw:text-center"
         >
-          <OIcon name="cloud-upload" class="q-mb-md" style="width: 64px; height: 64px;" />
-          <div class="text-h6 text-grey-7 q-mb-sm">
+          <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
+          <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">
             Upload a JSON file to get started
           </div>
-          <div class="text-body2 text-grey-6">
+          <div class="tw:text-sm tw:text-gray-400">
             The system will analyze the file and show you what will change
           </div>
         </div>
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-subtitle2 q-mb-sm">
+      <div class="tw:text-sm tw:font-medium tw:mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
       <OBadge
@@ -264,11 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="field"
         color="primary"
         text-color="white"
-        class="q-ma-xs"
+        class="tw:m-1"
       >
         {{ field }}
       </OBadge>
-      <div class="q-mt-md">
+      <div class="tw:mt-3">
         <OBadge v-if="selectedGroup?.normalize" variant="primary"
           >Normalized</OBadge
         >
@@ -287,10 +287,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Close"
     @click:primary="showModificationDialog = false"
   >
-    <div class="row q-col-gutter-md">
-      <div class="col-6">
-        <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-        <div class="text-caption q-mb-xs">
+    <div class="tw:flex tw:gap-3">
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
+        <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
         <div class="field-chips-container">
@@ -299,15 +299,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`current-${field}`"
             color="grey-4"
             size="sm"
-            class="q-ma-xs"
+            class="tw:m-1"
           >
             {{ field }}
           </OBadge>
         </div>
       </div>
-      <div class="col-6">
-        <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-        <div class="text-caption q-mb-xs">
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
+        <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
         <div class="field-chips-container">
@@ -317,14 +317,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :color="isNewField(field) ? 'positive' : 'grey-4'"
             :text-color="isNewField(field) ? 'white' : 'black'"
             size="sm"
-            class="q-ma-xs"
+            class="tw:m-1"
           >
             {{ field }}
             <OIcon
               v-if="isNewField(field)"
               name="add"
               size="xs"
-              class="q-ml-xs"
+              class="tw:ml-1"
             />
           </OBadge>
         </div>

@@ -626,7 +626,7 @@ const dynamicMaxChips = computed(() => {
   for (let i = 0; i < total; i++) {
     const chipW = estimateChipWidth(selectedLabels.value[i]);
     const remaining = total - i - 1;
-    // If there'll be hidden chips after this one, reserve space for the
+    // If there'll be tw:hidden chips after this one, reserve space for the
     // "+N more" pill so it can still fit on the row.
     const overflowReserve =
       remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
@@ -983,7 +983,7 @@ const fieldWidthClass = computed(() => {
                     }"
                   >
                     <!-- Group header — non-interactive label. Virtualisation
-                         renders each row as a sibling, so a real ListboxGroup
+                         renders each tw:flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                     <div

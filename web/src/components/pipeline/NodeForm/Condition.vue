@@ -25,15 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-condition-section"
-      class="stream-routing-section full-width"
+      class="stream-routing-section tw:w-full"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
 
 
-    <div class="stream-routing-container q-px-md q-pt-md">
+    <div class="stream-routing-container tw:px-3 tw:pt-3">
       <div>
         <div
-          class="q-pt-sm showLabelOnTop text-bold text-h7"
+          class="tw:pt-2 showLabelOnTop tw:font-bold text-h7"
           data-test="add-condition-query-input-title"
         >
           <div></div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="q-pa-md text-grey-7">Loading conditions...</div>
+            <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
           <OCard class="note-container">
             <OCardSection class="tw:p-2">

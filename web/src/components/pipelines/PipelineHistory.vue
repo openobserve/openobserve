@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="pipeline-history-page" class="q-pa-none flex">
+  <div data-test="pipeline-history-page" class="tw:p-0 flex">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
+          class="flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
         >
-          <div class="flex items-center">
+          <div class="flex tw:items-center">
             <OButton
               variant="ghost"
               size="icon-xs-sq"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="chevron-left"
             />
             <div
-              class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
+              class="q-table__title tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
             </div>
           </div>
-          <div class="flex q-ml-auto items-center">
-            <div class="q-mr-sm">
+          <div class="flex tw:ml-auto tw:items-center">
+            <div class="tw:mr-2">
               <DateTime
                 ref="dateTimeRef"
                 auto-apply
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t(`pipeline.searchHistory`) || 'Select or search pipeline...'
               "
               data-test="pipeline-history-search-select"
-              class="o2-search-input q-mr-sm"
+              class="o2-search-input tw:mr-2"
               style="min-width: 250px"
               clearable
             >
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-xs-sq"
-              class="q-mr-sm"
+              class="tw:mr-2"
               @click="manualSearch"
               data-test="pipeline-history-manual-search-btn"
               :disabled="loading"
@@ -175,19 +175,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-is_partial="{ row }">
-            <OTooltip
+            <OIcon
               v-if="
                 row.is_partial !== null &&
                 row.is_partial !== undefined
               "
-              :content="row.is_partial ? 'Partial Results' : 'Complete Results'"
+              :name="row.is_partial ? 'warning' : 'check-circle'"
+              :color="row.is_partial ? 'warning' : 'positive'"
+              size="xs"
             >
-              <OIcon
-                :name="row.is_partial ? 'warning' : 'check-circle'"
-                :color="row.is_partial ? 'warning' : 'positive'"
-                size="xs"
-              />
-            </OTooltip>
+              <q-tooltip>
+                {{
+                  row.is_partial
+                    ? "Partial Results"
+                    : "Complete Results"
+                }}
+              </q-tooltip>
+            </OIcon>
             <span v-else>-</span>
           </template>
 
@@ -243,20 +247,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
-        <div class="q-gutter-sm">
+        <div class="tw:gap-2">
           <!-- Basic Information -->
           <div class="detail-section">
-            <div class="row q-col-gutter-md">
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
                   Pipeline Name
                 </div>
-                <div class="text-body2 text-weight-medium">
+                <div class="tw:text-sm text-weight-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">Status</div>
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
                 <OBadge
                   :variant="getStatusVariant(selectedRow.status)"
                   size="sm"
@@ -271,16 +275,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Time Information -->
           <div class="detail-section">
-            <div class="row q-col-gutter-md">
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">Timestamp</div>
-                <div class="text-body2">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Timestamp</div>
+                <div class="tw:text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">Duration</div>
-                <div class="text-body2">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Duration</div>
+                <div class="tw:text-sm">
                   {{
                     formatDuration(
                       selectedRow.end_time - selectedRow.start_time,
@@ -295,28 +299,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Pipeline Configuration -->
           <div class="detail-section">
-            <div class="row q-col-gutter-md">
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">Type</div>
-                <div class="text-body2">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Type</div>
+                <div class="tw:text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                    class="q-mr-xs"
+                    class="tw:mr-1"
                     size="xs"
                   />
                   {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
                 </div>
               </div>
-              <div class="col-6">
-                <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
-                <div class="text-body2">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Silenced</div>
+                <div class="tw:text-sm">
                   <OIcon
                     v-if="selectedRow.is_silenced"
                     name="volume-off"
                     size="xs"
-                    class="q-mr-xs"
+                    class="tw:mr-1"
                   />
-                  <OIcon v-else name="volume-up" size="xs" class="q-mr-xs" />
+                  <OIcon v-else name="volume-up" size="xs" class="tw:mr-1" />
                   {{ selectedRow.is_silenced ? "Yes" : "No" }}
                 </div>
               </div>
@@ -336,47 +340,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSeparator class="tw:my-2" />
             <div class="detail-section">
-              <div class="row q-col-gutter-md">
-                <div v-if="selectedRow.evaluation_took_in_secs" class="col-4">
-                  <div class="text-caption text-grey-7 q-mb-xs">
+              <div class="tw:flex tw:gap-3">
+                <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
                     Evaluation Time
                   </div>
-                  <div class="text-body2">
+                  <div class="tw:text-sm">
                     {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                   </div>
                 </div>
-                <div v-if="selectedRow.query_took" class="col-4">
-                  <div class="text-caption text-grey-7 q-mb-xs">Query Time</div>
-                  <div class="text-body2">
+                <div v-if="selectedRow.query_took" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Query Time</div>
+                  <div class="tw:text-sm">
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
-                <div v-if="selectedRow.retries > 0" class="col-4">
-                  <div class="text-caption text-grey-7 q-mb-xs">Retries</div>
-                  <div class="text-body2">{{ selectedRow.retries }}</div>
+                <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Retries</div>
+                  <div class="tw:text-sm">{{ selectedRow.retries }}</div>
                 </div>
-                <div v-if="selectedRow.delay_in_secs" class="col-4">
-                  <div class="text-caption text-grey-7 q-mb-xs">Delay</div>
-                  <div class="text-body2">{{ selectedRow.delay_in_secs }}s</div>
+                <div v-if="selectedRow.delay_in_secs" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Delay</div>
+                  <div class="tw:text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
                   v-if="
                     selectedRow.is_partial !== null &&
                     selectedRow.is_partial !== undefined
                   "
-                  class="col-4"
+                  class="tw:w-1/3"
                 >
-                  <div class="text-caption text-grey-7 q-mb-xs">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
                     Result Status
                   </div>
-                  <div class="text-body2">
+                  <div class="tw:text-sm">
                     <OIcon
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
                       :color="selectedRow.is_partial ? 'warning' : 'positive'"
                       size="xs"
-                      class="q-mr-xs"
+                      class="tw:mr-1"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}
                   </div>
@@ -389,8 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="tw:my-2" />
             <div class="detail-section">
-              <div class="text-caption text-grey-7 q-mb-xs">Source Node</div>
-              <div class="text-body2 text-mono">
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Source Node</div>
+              <div class="tw:text-sm text-mono">
                 {{ selectedRow.source_node }}
               </div>
             </div>
@@ -400,15 +404,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.error">
             <OSeparator class="tw:my-2" />
             <div class="detail-section">
-              <div class="text-caption text-grey-7 q-mb-xs">
-                <OIcon name="error" size="xs" class="q-mr-xs" />
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <OIcon name="error" size="xs" class="tw:mr-1" />
                 Error Details
               </div>
               <div
-                class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-negative/5"
+                class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-red-500/5"
               >
                 <pre
-                  class="text-body2"
+                  class="tw:text-sm"
                   style="
                     white-space: pre-wrap;
                     word-break: break-word;
@@ -426,15 +430,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.success_response">
             <OSeparator class="tw:my-2" />
             <div class="detail-section">
-              <div class="text-caption text-grey-7 q-mb-xs">
-                <OIcon name="check-circle" size="xs" class="q-mr-xs" />
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <OIcon name="check-circle" size="xs" class="tw:mr-1" />
                 Response
               </div>
               <div
-                class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-positive/5"
+                class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-green-500/5"
               >
                 <pre
-                  class="text-body2"
+                  class="tw:text-sm"
                   style="
                     white-space: pre-wrap;
                     word-break: break-word;

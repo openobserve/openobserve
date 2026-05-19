@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <template v-if="!showImportRegexPatternDialog">
     <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0">
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OInput
         v-model="filterQuery"
-        class="q-ml-auto no-border o2-search-input"
+        class="tw:ml-auto no-border o2-search-input"
         :placeholder="t('regex_patterns.search')"
       >
         <template #icon-left>
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OInput>
       <OButton
-        class="q-ml-sm"
+        class="tw:ml-2"
         variant="outline"
         size="sm-action"
         @click="importRegexPattern"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t("regex_patterns.import") }}</OButton>
       <OButton
         data-test="regex-pattern-list-add-pattern-btn"
-        class="q-ml-sm"
+        class="tw:ml-2"
         variant="primary"
         size="sm-action"
         @click="createRegexPattern"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
+        <div v-if="!listLoading && filterQuery == ''" class="tw:w-full column flex-center tw:mt-1 full-height" style="font-size: 1.5rem">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
         </div>
         <NoData v-else-if="!listLoading && filterQuery != ''" />

@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-start!">
       <div
-        class="float-right col flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
+        class="float-right tw:flex tw:flex-col flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
       >
         <!-- View Mode Toggle Group -->
         <OToggleGroup
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButtonGroup
           v-if="!shouldMoveSavedViewToMenu"
-          class="q-ml-xs q-pa-none element-box-shadow tw:border tw:border-button-outline-border"
+          class="tw:ml-1 tw:p-0 element-box-shadow tw:border tw:border-button-outline-border"
         >
           <!-- Save current view -->
           <OButton
@@ -182,9 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="searchObj.loadingSavedView == true"
-                      class="full-width float-left q-pa-xs"
+                      class="tw:w-full float-left tw:p-1"
                     >
-                      <div class="text-subtitle2 text-weight-bold float-left">
+                      <div class="tw:text-sm tw:font-medium text-weight-bold float-left">
                         <OSpinner size="xs" />
                         {{ t("confirmDialog.loading") }}
                       </div>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         v-if="paginatedSavedViews.length === 0"
-                        class="q-pl-sm q-pt-sm"
+                        class="tw:pl-2 tw:pt-2"
                       >
                         <span class="tw:text-sm">{{
                           t("search.savedViewsNotFound")
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="localSavedViews.length > 0"
                   >
                     <div class="tw:p-0">
-                      <div class="q-pa-sm text-bold favorite-label">
+                      <div class="tw:p-2 tw:font-bold favorite-label">
                         {{ t("search.favoriteViews") }}
                       </div>
                     </div>
@@ -728,7 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="search-time float-left" style="order: 2">
           <div class="flex">
             <OButtonGroup
-              class="q-pa-none q-mr-xs element-box-shadow el-border"
+              class="tw:p-0 tw:mr-1 element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -744,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="outline"
                     size="sm"
-                    class="region-dropdown-btn q-px-xs"
+                    class="region-dropdown-btn tw:px-1"
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
@@ -757,12 +757,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OInput
                     clearable
-                    class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
+                    class="tw:mb-[0.375rem]! indexlist-search-input tw:mx-2 tw:mt-2"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
                   <OTree
-                    class="col-12 col-sm-6 q-mx-sm q-mb-sm"
+                    class="tw:w-full col-sm-6 tw:mx-2 tw:mb-2"
                     :nodes="store.state.regionInfo"
                     node-key="label"
                     :filter="regionFilter"
@@ -788,7 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -808,7 +808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
+                  class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
@@ -888,7 +888,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -909,7 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
+                  class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
@@ -996,7 +996,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow"
+                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
                     ? 'search-button-enterprise-border-radius'
@@ -1016,7 +1016,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
-                class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
+                class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
@@ -1057,7 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   name="autorenew"
                   size="xs"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                 />
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1175,7 +1175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <auto-refresh-interval
-                class="q-ml-xs"
+                class="tw:ml-1"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -1190,9 +1190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="row query-editor-container">
+    <div class="tw:flex query-editor-container">
       <div
-        class="col tw:h-full"
+        class="tw:flex tw:flex-col tw:h-full"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
@@ -1204,7 +1204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="
                 searchObj.data.transformType &&
                 searchObj.meta.showTransformEditor
@@ -1321,9 +1321,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <OIcon name="warning" size="md" class="q-mx-sm" />
+                      <OIcon name="warning" size="md" class="tw:mx-2" />
                       <span
-                        class="text-negative q-pa-sm"
+                        class="tw:text-red-500 tw:p-2"
                         style="font-weight: 600; font-size: 14px"
                         >VRL function is only supported for table chart.</span
                       >
@@ -1354,7 +1354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon"
         @click="isFocused = !isFocused"
-        class="q-pa-xs tw:absolute! tw:z-50 fullscreen-hover-btn"
+        class="tw:p-1 tw:absolute! tw:z-50 fullscreen-hover-btn"
         :style="{
           top:
             (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
@@ -1422,14 +1422,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="downloadCustomRange"
         :options="downloadCustomRangeOptions"
         :label="t('search.range')"
-        class="q-py-sm"
+        class="tw:py-2"
       />
-      <div class="q-py-sm file-type">
-        <label class="q-pr-sm">{{ t("search.fileType") }}</label
+      <div class="tw:py-2 file-type">
+        <label class="tw:pr-2">{{ t("search.fileType") }}</label
         ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
-          class="file-type-button-group q-mt-xs"
+          class="file-type-button-group tw:mt-1"
         >
           <OButton
             v-for="option in downloadCustomFileTypeOptions"
@@ -1473,7 +1473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           labelKey="view_name"
           valueKey="view_id"
           :label="t('search.savedViewName')"
-          class="q-py-sm"
+          class="tw:py-2"
           :error="!!savedViewSelectError"
           :error-message="savedViewSelectError"
           @update:model-value="savedViewSelectError = ''"
@@ -1523,7 +1523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           valueKey="name"
           :label="t('search.saveFunctionName')"
           :placeholder="'Select Function Name'"
-          class="q-py-sm"
+          class="tw:py-2"
           :error="!!savedFunctionSelectError"
           :error-message="savedFunctionSelectError"
           @update:model-value="savedFunctionSelectError = ''"
@@ -1544,9 +1544,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="addJobScheduler"
     >
       <div>
-        <div class="text-left q-mb-xs">
+        <div class="tw:text-left tw:mb-1">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="q-ml-xs cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="tw:ml-1 cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
                 <span style="font-size: 14px">{{
@@ -1562,11 +1562,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="100"
         />
       </div>
-      <div class="text-left">
+      <div class="tw:text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div style="opacity: 0.8" class="text-left mapping-warning-msg q-mt-md">
-        <OIcon name="warning" size="sm" class="q-mr-sm" />
+      <div style="opacity: 0.8" class="tw:text-left mapping-warning-msg tw:mt-3">
+        <OIcon name="warning" size="sm" class="tw:mr-2" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1583,7 +1583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
-      <div class="text-left q-mb-xs">Trace ID:</div>
+      <div class="tw:text-left tw:mb-1">Trace ID:</div>
       <OInput
         v-model="searchInspectTraceId"
         placeholder="Enter trace ID"
@@ -1645,7 +1645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="saved-view-table full-height o2-table-hide-header"
               >
                 <template #top>
-                  <div class="full-width">
+                  <div class="tw:w-full">
                     <OInput
                       data-test="log-search-saved-view-field-search-input"
                       v-model="searchObj.data.savedViewFilterFields"
@@ -1661,9 +1661,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="searchObj.loadingSavedView == true"
-                    class="full-width q-pa-sm"
+                    class="tw:w-full tw:p-2"
                   >
-                    <div class="text-subtitle2 text-weight-bold">
+                    <div class="tw:text-sm tw:font-medium text-weight-bold">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
                     </div>
@@ -1672,7 +1672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-view_name="{ row, value }">
                   <div class="field_list">
                     <div
-                      class="q-pa-xs saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
+                      class="tw:p-1 saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
                       :data-test="`logs-search-bar-dialog-saved-view-row-${value}`"
                     >
                       <div
@@ -1684,7 +1684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span
-                          class="ellipsis"
+                          class="tw:truncate"
                           style="max-width: 140px"
                           >{{ value }}</span
                         >
@@ -1749,7 +1749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="searchObj.loadingSavedView == false"
-                    class="text-center q-pa-sm tw:w-full"
+                    class="tw:text-center tw:p-2 tw:w-full"
                   >
                     <span>{{
                       t("search.savedViewsNotFound")
@@ -1774,16 +1774,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #top>
                   <div
-                    class="q-pa-sm text-bold favorite-label tw:text-xs tw:uppercase tw:tracking-wide tw:text-muted-foreground"
+                    class="tw:p-2 tw:font-bold favorite-label tw:text-xs tw:uppercase tw:tracking-wide tw:text-muted-foreground"
                   >
                     {{ t("search.favoriteViews") }}
                   </div>
                   <div class="tw:border-t tw:my-1 tw:border-border" />
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div class="field_list q-pa-xs">
+                  <div class="field_list tw:p-1">
                     <div
-                      class="q-pa-xs saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
+                      class="tw:p-1 saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
                       :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     >
                       <div
@@ -1794,7 +1794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span
-                          class="ellipsis"
+                          class="tw:truncate"
                           style="max-width: 90px"
                           >{{ value }}</span
                         >

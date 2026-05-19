@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
+      class="flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
     >
-      <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
-        <div class="flex items-center">
+      <div data-test="iam-users-selection-show-toggle" class="tw:mr-3">
+        <div class="flex tw:items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Show
           </span>
           <OToggleGroup
-            class="q-ml-xs"
+            class="tw:ml-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-users-selection-search-input"
-        class="q-mr-md"
+        class="tw:mr-3"
         style="width: 400px"
       >
         <OInput
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-          class="q-mx-sm current-organization"
+          class="tw:mx-2 current-organization"
         >
         <OSelect
           v-if="
@@ -108,19 +108,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-email="{ row }">
-          <div class="flex items-center">
+          <div class="flex tw:items-center">
             <span>{{ row.email }}</span>
             <OIcon
               v-if="shouldShowWarning(row)"
               name="info"
               size="sm"
-              class="q-ml-xs cursor-pointer"
+              class="tw:ml-1 cursor-pointer"
               :data-test="`iam-external-user-warning-icon-${row.email}`"
              />
               <OTooltip side="right">
                 <div style="font-size: 12px; line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                  <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                  <div class="tw:mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
               </OTooltip>
           </div>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="running-queries-page tw:rounded-md q-pa-none"
+    class="running-queries-page tw:rounded-md tw:p-0"
     style="min-height: inherit; height: calc(100vh - var(--navbar-height));"
   >
     <div>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="searchFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="q-pa-none tw:w-[140px]"
+                class="tw:p-0 tw:w-[140px]"
                 data-test="running-queries-search-fields-select"
                 @update:model-value="filterQuery = ''"
               />

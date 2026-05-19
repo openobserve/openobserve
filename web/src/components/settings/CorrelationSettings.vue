@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
     <!-- Sticky header: title + tabs -->
     <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]">
-      <div class="q-px-md q-py-md">
+      <div class="tw:px-3 tw:py-3">
         <div class="general-page-title">
           {{ t("settings.correlation.title") }}
         </div>

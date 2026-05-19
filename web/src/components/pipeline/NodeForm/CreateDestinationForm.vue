@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OForm
       :default-values="formDefaultValues"
       @submit="createDestination"
-      class="col-12 pipeline-add-remote-destination-form"
+      class="tw:w-full pipeline-add-remote-destination-form"
     >
       <!-- Stepper for Create New Destination -->
       <OStepper
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
           :navigable="step > 1"
         >
-          <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
+          <div class="tw:text-sm tw:font-medium tw:mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
           <div class="destination-type-grid">
@@ -82,11 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
           :navigable="step > 2"
         >
-          <div class="text-subtitle2 q-mb-lg" style="font-weight: 500">
+          <div class="tw:text-sm tw:font-medium tw:mb-4" style="font-weight: 500">
             Connection Details
           </div>
 
-          <div class="q-gutter-sm">
+          <div class="tw:gap-2">
             <OFormInput
               data-test="add-destination-name-input"
               v-model="formData.name"
@@ -114,9 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="row q-col-gutter-xs q-mt-xs q-ml-xs"
+              class="tw:flex tw:gap-1 tw:mt-1 tw:ml-1"
             >
-              <div class="col-6">
+              <div class="tw:w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   v-model="openobserveOrg"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="col-6">
+              <div class="tw:w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   v-model="openobserveStream"
@@ -229,8 +229,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="q-gutter-sm q-mt-md">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
+          <div v-if="showMetadataFields" class="tw:gap-2 tw:mt-3">
+            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
               Metadata Configuration
             </div>
 
@@ -313,16 +313,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <div class="q-gutter-sm">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
+          <div class="tw:gap-2">
+            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
               Headers
             </div>
             <div
               v-for="(header, index) in apiHeaders"
               :key="header.uuid"
-              class="row q-col-gutter-xs q-ml-xs"
+              class="tw:flex tw:gap-1 tw:ml-1"
             >
-              <div class="col-5">
+              <div class="tw:w-5/12">
                 <OInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   v-model="header.key"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="col-5">
+              <div class="tw:w-5/12">
                 <OInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   v-model="header.value"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="col-2 headers-btns">
+              <div class="tw:w-1/6 headers-btns">
                 <OButton
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
                   variant="ghost-destructive"
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="col-12 q-mt-md tw:inline-flex">
+          <div class="tw:w-full tw:mt-3 tw:inline-flex">
             <OSwitch
               data-test="add-destination-skip-tls-verify-toggle"
               v-model="formData.skip_tls_verify"
@@ -371,38 +371,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Connection Notes Card -->
           <OCard
             class="connection-notes-card tw:mb-6 tw:mt-4"
-            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'"
+            :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'bg-blue-1'"
           >
             <OCardSection role="body">
-              <div class="row items-center q-mb-sm">
+              <div class="tw:flex tw:items-center tw:mb-2">
                 <OIcon
                   name="info"
                   size="md"
-                  class="q-mr-sm"
+                  class="tw:mr-2"
                 />
-                <div class="text-subtitle2 text-weight-medium">
+                <div class="tw:text-sm tw:font-medium text-weight-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
-              <div class="text-body2">
-                <ol class="connection-steps q-pl-md q-mb-none">
+              <div class="tw:text-sm">
+                <ol class="connection-steps tw:pl-3 tw:mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="q-mb-xs"
+                    class="tw:mb-1"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="q-mt-sm q-pa-sm example-url"
+                  class="tw:mt-2 tw:p-2 example-url"
                   :class="
-                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-white'
+                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'bg-white'
                   "
                 >
                   <strong>Example:</strong>
-                  <code class="q-ml-xs">{{ connectionNotes.example }}</code>
+                  <code class="tw:ml-1">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OStepper>
 
       <!-- Form buttons -->
-      <div class="flex justify-start q-mb-md">
+      <div class="flex tw:justify-start tw:mb-3">
         <div v-if="step === 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step1-cancel-btn"

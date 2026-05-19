@@ -10,10 +10,10 @@
     ></SearchBar>
     <div class="stream-data-table">
       <template v-if="isLoading.length">
-        <div class="full-height flex justify-center items-center">
-          <div class="q-pb-lg">
+        <div class="full-height flex tw:justify-center tw:items-center">
+          <div class="tw:pb-4">
             <OSpinner size="md" class="tw:mx-auto tw:block" />
-            <span class="text-center">
+            <span class="tw:text-center">
               Hold on tight, we're fetching your stream data.
             </span>
           </div>

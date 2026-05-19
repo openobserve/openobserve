@@ -77,8 +77,8 @@ limitations under the License. -->
         >
           <template #trigger>
             <div class="expansion-header">
-              <OIcon name="info" size="xs" class="q-mr-xs" />
-              <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
+              <OIcon name="info" size="xs" class="tw:mr-1" />
+              <span class="tw:text-xs">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
 

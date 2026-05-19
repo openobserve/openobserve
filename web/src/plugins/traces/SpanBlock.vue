@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center"
+    class="flex wrap tw:justify-start tw:items-center"
     :class="[
       defocusSpan ? 'defocus' : '',
       store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
+      class="flex tw:justify-between tw:items-end cursor-pointer span-block relative-position"
       :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width: '100%',
           overflow: 'hidden',
         }"
-        class="cursor-pointer flex items-center no-wrap position-relative"
+        class="cursor-pointer flex tw:items-center tw:flex-nowrap position-relative"
         :class="defocusSpan ? 'defocus' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
             position: 'relative',
           }"
-          class="flex justify-start items-center no-wrap"
+          class="flex tw:justify-start tw:items-center tw:flex-nowrap"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="text-caption flex items-center"
+          class="tw:text-xs flex tw:items-center"
           data-test="span-block-duration"
         >
           <div>

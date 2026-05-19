@@ -38,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
         <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :class="{
-                      'error-item text-bold': true,
+                      'error-item tw:font-bold': true,
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
@@ -143,8 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 50px);"
   >
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-        <div class="col">
+      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+        <div class="tw:flex tw:flex-col">
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
                 variant="ghost"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="regex-pattern-import-back-btn"
               icon-left="chevron-left"
               />
-              <div class="text-h6">
+              <div class="tw:text-xl tw:font-semibold">
                 {{ t("regex_patterns.import_title") }}
               </div>
             </div>

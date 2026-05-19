@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="flex q-mt-xs">
+  <div data-test="incident-list" class="flex tw:mt-1">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header with title and search -->
       <div class="card-container tw:mb-[0.625rem]">

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-500'"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-500'"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSpinner size="lg" data-test="pattern-list-loading-indicator" />
       <div
-        class="q-mt-md text-body2"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        class="tw:mt-3 tw:text-sm"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
       >
         Extracting patterns from logs...
       </div>
@@ -94,19 +94,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:text-[3rem] tw:mb-[1rem] tw:opacity-30">📊</div>
       <div
-        class="text-h6 q-mb-sm"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        class="tw:text-xl tw:font-semibold tw:mb-2"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
       >
         No patterns found
       </div>
       <div
-        class="text-body2 tw:max-w-[31.25rem]"
-        :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'"
+        class="tw:text-sm tw:max-w-[31.25rem]"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
       >
         <div v-if="totalLogsAnalyzed">
           Only {{ totalLogsAnalyzed }} logs were analyzed.
         </div>
-        <div class="q-mt-sm">
+        <div class="tw:mt-2">
           Try increasing the time range or selecting a different stream with
           more log data.
           <br />Pattern extraction works best with at least 1000+ logs.

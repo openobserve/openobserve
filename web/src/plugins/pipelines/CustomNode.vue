@@ -487,7 +487,7 @@ function getIcon(data, ioType) {
 
     <div
       v-if="data.node_type == 'function'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-function-node`"
       data-node-type="function"
       style="
@@ -507,7 +507,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -517,7 +517,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row node-label-text"
+          class="tw:flex node-label-text"
           align="left"
           style="
             text-align: left;
@@ -591,7 +591,7 @@ function getIcon(data, ioType) {
 
     <div
       v-if="data.node_type == 'stream'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-stream-node`"
       data-node-type="stream"
       style="
@@ -611,7 +611,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -622,7 +622,7 @@ function getIcon(data, ioType) {
       <div class="container">
         <div
           v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-          class="row node-label-text"
+          class="tw:flex node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -634,7 +634,7 @@ function getIcon(data, ioType) {
         </div>
         <div
           v-else
-          class="row node-label-text"
+          class="tw:flex node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -676,7 +676,7 @@ function getIcon(data, ioType) {
     </div>
     <div
       v-if="data.node_type == 'remote_stream'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-remote-stream-node`"
       data-node-type="remote_stream"
       style="
@@ -696,7 +696,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -706,7 +706,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row node-label-text"
+          class="tw:flex node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -749,7 +749,7 @@ function getIcon(data, ioType) {
 
     <div
       v-if="data.node_type == 'query'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-query-node`"
       data-node-type="query"
       style="
@@ -769,7 +769,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -779,7 +779,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row node-label-text"
+          class="tw:flex node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -823,7 +823,7 @@ function getIcon(data, ioType) {
 
     <div
       v-if="data.node_type == 'condition'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-condition-node`"
       data-node-type="condition"
       style="
@@ -842,7 +842,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -897,7 +897,7 @@ function getIcon(data, ioType) {
     <!-- LLM Evaluation Node -->
     <div
       v-if="data.node_type == 'llm_evaluation'"
-      class="q-pa-none btn-fixed-width"
+      class="tw:p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-llm-evaluation-node`"
       data-node-type="llm_evaluation"
       style="
@@ -916,7 +916,7 @@ function getIcon(data, ioType) {
         <OIcon
           :name="getIcon(data, io - type)"
           size="md"
-          class="q-my-sm q-mr-sm"
+          class="tw:my-2 tw:mr-2"
         />
       </div>
 
@@ -948,8 +948,8 @@ function getIcon(data, ioType) {
             max-width="400px"
           >
             <template #content>
-              <div class="q-pa-sm">
-                <div class="text-bold q-mb-sm">
+              <div class="tw:p-2">
+                <div class="tw:font-bold tw:mb-2">
                   {{ t("pipeline.llmEvaluationNodeTitle") }}
                 </div>
                 <div>
@@ -965,7 +965,7 @@ function getIcon(data, ioType) {
                   <strong>{{ t("pipeline.samplingLabel") }}:</strong>
                   {{ t("pipeline.samplingAllTraces") }}
                 </div>
-                <div class="q-mt-sm text-caption text-grey-5">
+                <div class="tw:mt-2 tw:text-xs tw:text-gray-400">
                   {{ t("pipeline.llmEvaluationDescription") }}
                 </div>
               </div>

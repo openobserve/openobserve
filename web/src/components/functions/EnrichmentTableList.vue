@@ -21,14 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
-          <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
+          <div class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
             <div class="q-table__title tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
-            <div class="tw:flex tw:items-center q-ml-auto">
+            <div class="tw:flex tw:items-center tw:ml-auto">
               <app-tabs
                 data-test="enrichment-tables-list-tabs"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 :tabs="filterTabs"
                 v-model:active-tab="selectedFilter"
                 @update:active-tab="updateActiveTab"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OInput>
               <OButton
-                class="q-ml-sm"
+                class="tw:ml-2"
                 variant="primary"
                 size="sm-action"
                 @click="showAddUpdateFn({})"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="{'text-primary': row.urlJobs.length > 1}"
                     >
                       Url
-                      <span v-if="row.urlJobs.length > 1" class="text-grey-7"> ({{ row.urlJobs.length }})</span>
+                      <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
                       <OIcon
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="enrichment-tables-bulk-delete-btn"
                     variant="outline"
                     size="sm-action"
-                    class="q-mr-sm"
+                    class="tw:mr-2"
                     icon-left="delete"
                     @click="openBulkDeleteDialog"
                   >
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:p-4">
         <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
-          <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+          <div class="tw:text-xl tw:font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
           <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
@@ -286,14 +286,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </span>
-                  <span v-if="job.status === 'failed'" class="tw:block tw:text-xs tw:text-negative tw:mt-2">
+                  <span v-if="job.status === 'failed'" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
                     Error: {{ job.error_message }}
                   </span>
                 </div>
               </li>
             </ul>
           </div>
-          <div v-else class="text-center q-pa-md text-grey-7">
+          <div v-else class="tw:text-center tw:p-3 tw:text-gray-400">
             No URL jobs found
           </div>
       </div>

@@ -8,7 +8,7 @@
     "
   >
     <div
-      class="tw:flex tw:items-center no-wrap tw:justify-between tw:px-4 tw:py-2"
+      class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between tw:px-4 tw:py-2"
     >
       <div class="tw:flex tw:items-center">
         <div class="col-auto"></div>
@@ -59,7 +59,7 @@
               <OCollapsible
                 v-model="appliedPatternsExpandedRef"
                 :label="`Applied Patterns (${appliedPatterns.length})`"
-                class="q-mt-sm tw:text-[14px] tw:font-[600]"
+                class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
                 <div style="height: 100%">
@@ -109,7 +109,7 @@
               <OCollapsible
                 v-model="allPatternsExpandedRef"
                 :label="`All Patterns (${resultTotal})`"
-                class="q-mt-sm tw:text-[14px] tw:font-[600]"
+                class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
                 <div style="height: 100%">
@@ -489,7 +489,7 @@
               <OButton
                 variant="outline"
                 size="sm-action"
-                class="q-mr-md"
+                class="tw:mr-3"
                 @click="handleAddOrRemovePattern"
                 :icon-left="
                   checkIfPatternIsApplied(userClickedPattern.pattern_id)

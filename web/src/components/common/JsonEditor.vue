@@ -1,11 +1,11 @@
 <template>
   <div :class="store.state.theme === 'dark' ? 'dark-mode' : ''">
     <div class="tw:h-[calc(100vh-65px)] tw:flex">
-      <div class="row common-json-editor column tw:h-[calc(100vh-65px)]"
+      <div class="tw:flex common-json-editor column tw:h-[calc(100vh-65px)]"
       :class="store.state.isAiChatEnabled ? 'tw:w-[64.5vw]' : 'tw:w-[90vw]'"
       >
 
-      <div class="col q-pa-none">
+      <div class="tw:flex tw:flex-col tw:p-0">
       <query-editor
         data-test="common-json-editor"
         ref="queryEditorRef"
@@ -21,10 +21,10 @@
     <!-- Display validation errors -->
     <div
       v-if="validationErrors.length > 0"
-      class="q-pa-md text-negative validation-errors"
+      class="tw:p-3 tw:text-red-500 validation-errors"
     >
-      <div class="text-bold q-mb-sm">Please fix the following issues:</div>
-      <ul class="q-ml-md">
+      <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
+      <ul class="tw:ml-3">
         <li v-for="(error, index) in validationErrors" :key="index">
           {{ error }}
         </li>
@@ -33,7 +33,7 @@
 
     <div class="tw:flex-1" />
 
-    <div class="tw:flex tw:justify-end tw:gap-2 q-pa-md">
+    <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3">
       <OButton
         variant="outline"
         size="sm-action"
@@ -50,7 +50,7 @@
     </div>
     <!-- o2aichat enableddd -->
 
-    <div  class="q-ml-sm tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+    <div  class="tw:ml-2 tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
             <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
           </div>
     </div>

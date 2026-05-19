@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width scheduled-pipeline-container">
+  <div class="tw:w-full scheduled-pipeline-container">
     <!-- <OSeparator /> -->
 
-    <div class="q-mb-sm stepper-header tw:w-full tw:flex tw:h-full">
+    <div class="tw:mb-2 stepper-header tw:w-full tw:flex tw:h-full">
       <div
         :class="store.state.isAiChatEnabled ? 'tw:w-[75%]' : 'tw:w-[100%]'"
         style="height: 100% !important"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="selectedStreamType"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="no-case full-width q-mb-xs"
+                        class="no-case tw:w-full tw:mb-1"
                         @update:model-value="getStreamList"
                       />
 
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         :label="t('alerts.stream_name')"
-                        class="q-my-xs no-case full-width"
+                        class="tw:my-1 no-case tw:w-full"
                         @update:model-value="getStreamFields"
                         @open="getStreamList"
                       />
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-show="expandState.setVariables"
-                  class="flex justify-between q-pl-sm full-height"
+                  class="flex tw:justify-between tw:pl-2 full-height"
                   style="overflow-y: auto !important"
                 >
                   <div>
@@ -215,18 +215,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tab === 'promql' &&
                         promqlCondition
                       "
-                      class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
+                      class="flex tw:justify-start tw:items-center tw:font-bold tw:mb-2 tw:mt-3 o2-input"
                     >
                       <div style="width: 130px">
                         {{ t("pipeline.trigger") }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right" max-width="300px">
@@ -241,14 +241,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </template>
                           </OTooltip>
                       </div>
-                      <div class="flex justify-start items-center">
+                      <div class="flex tw:justify-start tw:items-center">
                         <div
                           data-test="scheduled-pipeline-promlq-condition-operator-select"
                         >
                           <OSelect
                             v-model="promqlCondition.operator"
                             :options="triggerOperators"
-                            class="no-case q-py-none q-mr-xs"
+                            class="no-case tw:py-0 tw:mr-1"
                             style="width: 88px; border-right: none"
                             @update:model-value="updatePromqlCondition"
                           />
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="tab === 'custom'"
-                      class="flex justify-start items-center text-bold q-mb-lg"
+                      class="flex tw:justify-start tw:items-center tw:font-bold tw:mb-4"
                     >
                       <div
                         data-test="scheduled-pipeline-aggregation-title"
@@ -287,17 +287,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="_isAggregationEnabled && aggregationData"
-                      class="flex items-center no-wrap q-mr-sm q-mb-sm"
+                      class="flex tw:items-center tw:flex-nowrap tw:mr-2 tw:mb-2"
                     >
                       <div
                         data-test="scheduled-pipeline-group-by-title"
-                        class="text-bold"
+                        class="tw:font-bold"
                         style="width: 190px"
                       >
                         {{ t("alerts.groupBy") }}
                       </div>
                       <div
-                        class="flex justify-start items-center flex-wrap"
+                        class="flex tw:justify-start tw:items-center flex-wrap"
                         style="width: calc(100% - 190px)"
                       >
                         <template
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <div
                             :data-test="`scheduled-pipeline-group-by-${index + 1}`"
-                            class="flex justify-start items-center no-wrap o2-input"
+                            class="flex tw:justify-start tw:items-center tw:flex-nowrap o2-input"
                           >
                             <div
                               data-test="scheduled-pipeline-group-by-column-select"
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-group-by-delete-btn"
                               variant="ghost-destructive"
                               size="icon-xs-sq"
-                              class="q-mb-sm q-ml-xs q-mr-sm"
+                              class="tw:mb-2 tw:ml-1 tw:mr-2"
                               :title="t('alert_templates.delete')"
                               @click="deleteGroupByColumn(index)"
                               icon-left="delete"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="scheduled-pipeline-group-by-add-btn"
                           variant="ghost"
                           size="icon-xs-sq"
-                          class="q-mb-sm q-ml-xs q-mr-sm"
+                          class="tw:mb-2 tw:ml-1 tw:mr-2"
                           :title="t('common.add')"
                           @click="addGroupByColumn()"
                           icon-left="add"
@@ -352,11 +352,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="!disableThreshold"
-                      class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+                      class="flex tw:justify-start tw:items-center tw:mb-1 tw:flex-nowrap tw:pb-3"
                     >
                       <div
                         data-test="scheduled-pipeline-threshold-title"
-                        class="text-bold flex items-center"
+                        class="tw:font-bold flex tw:items-center"
                         style="width: 190px"
                       >
                         {{ t("alerts.threshold") + " *" }}
@@ -364,11 +364,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right" max-width="300px">
@@ -390,10 +390,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template
                           v-if="_isAggregationEnabled && aggregationData"
                         >
-                          <div class="flex justify-start items-center">
+                          <div class="flex tw:justify-start tw:items-center">
                             <div
                               data-test="scheduled-pipeline-threshold-function-select"
-                              class="threshould-input q-mr-xs o2-input"
+                              class="threshould-input tw:mr-1 o2-input"
                             >
                               <OSelect
                                 v-model="aggregationData.function"
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div
-                              class="threshould-input q-mr-xs o2-input"
+                              class="threshould-input tw:mr-1 o2-input"
                               data-test="scheduled-pipeline-threshold-column-select"
                             >
                               <OSelect
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                             <div
                               data-test="scheduled-pipeline-threshold-operator-select"
-                              class="threshould-input q-mr-xs o2-input q-mt-sm"
+                              class="threshould-input tw:mr-1 o2-input tw:mt-2"
                             >
                               <OSelect
                                 v-model="aggregationData.having.operator"
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 @update:model-value="updateAggregation"
                               />
                             </div>
-                            <div class="flex items-center q-mt-sm">
+                            <div class="flex tw:items-center tw:mt-2">
                               <div
                                 data-test="scheduled-pipeline-threshold-value-input"
                                 style="width: 250px; margin-left: 0 !important"
@@ -451,14 +451,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !aggregationData.having.value.toString().trim()
                                 .length
                             "
-                            class="text-red-8 q-pt-xs absolute"
+                            class="text-red-8 tw:pt-1 absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
                           </div>
                         </template>
                         <template v-else>
-                          <div class="flex justify-start items-center">
+                          <div class="flex tw:justify-start tw:items-center">
                             <div
                               class="threshould-input"
                               data-test="scheduled-pipeline-threshold-operator-select"
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div
-                              class="flex items-center"
+                              class="flex tw:items-center"
                               style="
                                 border: 1px solid rgba(0, 0, 0, 0.05);
                                 border-left: none;
@@ -502,10 +502,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 "
                                 :class="
                                   store.state.theme === 'dark'
-                                    ? 'bg-grey-10'
-                                    : 'bg-grey-2'
+                                    ? 'tw:bg-gray-800'
+                                    : 'tw:bg-gray-100'
                                 "
-                                class="flex justify-center items-center"
+                                class="flex tw:justify-center tw:items-center"
                               >
                                 {{ t("alerts.times") }}
                               </div>
@@ -517,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !triggerData.operator ||
                               !Number(triggerData.threshold)
                             "
-                            class="text-red-8 q-pt-xs absolute"
+                            class="text-red-8 tw:pt-1 absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
@@ -525,21 +525,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </div>
                     </div>
-                    <div class="flex items-center q-mr-sm">
+                    <div class="flex tw:items-center tw:mr-2">
                       <div
                         data-test="scheduled-pipeline-cron-toggle-title"
-                        class="text-bold flex items-center"
+                        class="tw:font-bold flex tw:items-center"
                         style="width: 130px"
                       >
                         {{ t("alerts.crontitle") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right" max-width="300px">
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div style="min-height: 58px">
                         <div
-                          class="flex items-center q-mr-sm"
+                          class="flex tw:items-center tw:mr-2"
                           style="width: fit-content"
                         >
                           <div
@@ -568,10 +568,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center justify-start q-mr-sm">
+                    <div class="flex tw:items-center tw:justify-start tw:mr-2">
                       <div
                         data-test="scheduled-pipeline-frequency-title"
-                        class="text-bold flex items-center q-mr-xs"
+                        class="tw:font-bold flex tw:items-center tw:mr-1"
                         :style="{
                           width:
                             triggerData.frequency_type == 'minutes'
@@ -583,11 +583,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right">
@@ -640,9 +640,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                         </template>
                       </div>
-                      <div style="max-height: 50px" class="q-mb-sm">
+                      <div style="max-height: 50px" class="tw:mb-2">
                         <div
-                          class="flex items-center q-mr-sm"
+                          class="flex tw:items-center tw:mr-2"
                           style="width: fit-content"
                         >
                           <div
@@ -684,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :options="filteredTimezone"
                                 :label="t('logStream.timezone') + ' *'"
                                 :title="triggerData.timezone"
-                                class="timezone-select q-ml-sm"
+                                class="timezone-select tw:ml-2"
                                 style="width: 200px"
                               />
                             </div>
@@ -701,10 +701,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :class="
                               store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
+                                ? 'tw:bg-gray-800'
+                                : 'tw:bg-gray-100'
                             "
-                            class="flex justify-center items-center"
+                            class="flex tw:justify-center tw:items-center"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
@@ -718,28 +718,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               triggerData.cron == '') ||
                             cronJobError
                           "
-                          class="text-red-8 q-pt-xs"
+                          class="text-red-8 tw:pt-1"
                           style="font-size: 11px; line-height: 12px"
                         >
                           {{ cronJobError || t("pipeline.fieldRequired") }}
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center q-mr-sm tw:mt-8">
+                    <div class="flex tw:items-center tw:mr-2 tw:mt-8">
                       <div
                         data-test="scheduled-pipeline-period-title"
-                        class="text-bold flex items-center q-pb-sm"
+                        class="tw:font-bold flex tw:items-center tw:pb-2"
                         style="width: 130px"
                       >
                         {{ t("alerts.period") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right" max-width="300px">
@@ -756,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div style="min-height: 58px">
                         <div
-                          class="flex items-center q-mr-sm"
+                          class="flex tw:items-center tw:mr-2"
                           style="
                             border: 1px solid rgba(0, 0, 0, 0.05);
                             width: fit-content;
@@ -790,10 +790,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :class="
                               store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
+                                ? 'tw:bg-gray-800'
+                                : 'tw:bg-gray-100'
                             "
-                            class="flex justify-center items-center"
+                            class="flex tw:justify-center tw:items-center"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
@@ -802,7 +802,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="scheduled-pipeline-period-error-text"
                         v-if="!Number(triggerData.period)"
-                        class="text-red-8 q-pt-xs"
+                        class="text-red-8 tw:pt-1"
                         style="font-size: 11px; line-height: 12px"
                       >
                         Field is required!
@@ -810,7 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="scheduled-pipeline-period-warning-text"
                         v-else
-                        class="text-primary q-pt-xs"
+                        class="text-primary tw:pt-1"
                         style="
                           font-size: 12px;
                           line-height: 12px;
@@ -820,21 +820,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Note: The period should be the same as frequency.
                       </div>
                     </div>
-                    <div class="flex items-center q-mr-sm q-mt-lg">
+                    <div class="flex tw:items-center tw:mr-2 tw:mt-4">
                       <div
                         data-test="scheduled-pipeline-delay-title"
-                        class="text-bold flex items-center q-pb-sm"
+                        class="tw:font-bold flex tw:items-center tw:pb-2"
                         style="width: 130px"
                       >
                         {{ t("pipeline.delay") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="q-ml-xs cursor-pointer"
+                          class="tw:ml-1 cursor-pointer"
                           :class="
                             store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
+                              ? 'tw:text-gray-400'
+                              : 'tw:text-gray-400'
                           "
                          />
                           <OTooltip side="right" max-width="300px">
@@ -851,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div style="min-height: 58px">
                         <div
-                          class="flex items-center q-mr-sm"
+                          class="flex tw:items-center tw:mr-2"
                           style="
                             border: 1px solid rgba(0, 0, 0, 0.05);
                             width: fit-content;
@@ -879,10 +879,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :class="
                               store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
+                                ? 'tw:bg-gray-800'
+                                : 'tw:bg-gray-100'
                             "
-                            class="flex justify-center items-center"
+                            class="flex tw:justify-center tw:items-center"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
@@ -894,7 +894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div></div>
 
                   <div
-                    class="flex justify-start items-end q-mt-lg q-pb-lg full-width"
+                    class="flex tw:justify-start tw:items-end tw:mt-4 tw:pb-4 tw:w-full"
                     :class="
                       store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
                     "
@@ -919,7 +919,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div class="full-width tw:flex tw:flex-col" style="height: 100%">
+            <div class="tw:w-full tw:flex tw:flex-col" style="height: 100%">
               <div
                 class="tw:flex-1 tw:overflow-auto"
                 style="height: calc(100vh - 200px) !important; width: 100%"
@@ -969,7 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="loading && expandState.output && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important"
-                    class="flex justify-center items-center"
+                    class="flex tw:justify-center tw:items-center"
                   >
                     <OSpinner size="md" />
                   </div>
@@ -998,7 +998,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <h6
                       v-if="selectedStreamName == ''"
                       data-test="logs-search-no-stream-selected-text"
-                      class="text-center col-10 q-mx-none"
+                      class="tw:text-center tw:w-5/6 tw:mx-0"
                     >
                       <OIcon
                         name="info"
@@ -1010,14 +1010,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <h6
                       v-else-if="notificationMsgValue != ''"
                       data-test="logs-search-no-stream-selected-text"
-                      class="text-center col-10 q-mx-none"
+                      class="tw:text-center tw:w-5/6 tw:mx-0"
                     >
                       {{ notificationMsgValue }}
                     </h6>
                     <h6
                       v-else
                       data-test="logs-search-no-stream-selected-text"
-                      class="text-center col-10 q-mx-none"
+                      class="tw:text-center tw:w-5/6 tw:mx-0"
                     >
                       <OIcon name="info" size="md" />
                       {{ t("search.applySearch") }}
@@ -1040,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
                 :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
               >
-                <div class="flex justify-end tw:gap-2">
+                <div class="flex tw:justify-end tw:gap-2">
                   <OButton
                     v-if="pipelineObj.isEditNode"
                     data-test="stream-routing-query-delete-btn"
@@ -1086,7 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="q-ml-sm"
+        class="tw:ml-2"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 25%;

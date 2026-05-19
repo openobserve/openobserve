@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                     <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:tracking-wider">
                       {{ formatDimLabel(dim.dimension) }}
                     </div>
-                    <!-- Pass/Fail inline -->
+                    <!-- Pass/Fail tw:inline -->
                     <OBadge
                       v-if="isTemplateDimension(dim.dimension)"
                       :variant="getDimVerdict(dim.score) === 'PASS' ? 'success' : 'error'"

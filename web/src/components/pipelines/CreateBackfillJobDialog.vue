@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <span
         :class="[
-          'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+          'tw:text-xl tw:font-semibold tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
           store.state.theme === 'dark'
             ? 'tw:text-blue-400 tw:bg-blue-900/50'
             : 'tw:text-blue-600 tw:bg-blue-50'
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Range Section -->
           <div>
             <div class="tw:flex tw:items-center tw:gap-4">
-              <div class="text-subtitle2 tw:whitespace-nowrap">
+              <div class="tw:text-sm tw:font-medium tw:whitespace-nowrap">
                 Time Range <span class="text-red-600">*</span>
               </div>
               <date-time
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
-              class="text-caption text-red-600 q-mt-xs"
+              class="tw:text-xs text-red-600 tw:mt-1"
             >
               Please select a valid time range
             </div>
@@ -89,10 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chunk Period -->
               <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
                 <div class="tw:col-span-5">
-                  <div class="text-subtitle2 tw:mb-1">
+                  <div class="tw:text-sm tw:font-medium tw:mb-1">
                     Chunk Period (minutes)
                   </div>
-                  <div :class="['text-caption', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['tw:text-xs', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
                     Size of each processing chunk
                   </div>
                 </div>
@@ -117,10 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Delay Between Chunks -->
               <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
                 <div class="tw:col-span-5">
-                  <div class="text-subtitle2 tw:mb-1">
+                  <div class="tw:text-sm tw:font-medium tw:mb-1">
                     Delay Between Chunks (seconds)
                   </div>
-                  <div :class="['text-caption', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['tw:text-xs', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
                     Wait time between processing chunks
                   </div>
                 </div>
@@ -163,11 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="warning" :color="store.state.theme === 'dark' ? 'orange-4' : 'orange'" size="md" class="tw:mt-0.5" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
-                      <div :class="['text-caption tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <div :class="['tw:text-xs tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
                         This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
                       </div>
                       <div :class="['tw:font-semibold tw:text-sm tw:mb-1', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements (UTC):</div>
-                      <ul :class="['text-caption tw:ml-5 tw:space-y-1 tw:list-disc', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <ul :class="['tw:text-xs tw:ml-5 tw:space-y-1 tw:list-disc', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -194,15 +194,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="schedule" size="sm" />
                 <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
               </div>
-              <div v-if="estimatedInfo.chunks" class="text-caption tw:ml-6">
+              <div v-if="estimatedInfo.chunks" class="tw:text-xs tw:ml-6">
                 Estimated Chunks: {{ estimatedInfo.chunks }}
               </div>
             </div>
           </div>
 
           <!-- Error Message -->
-          <div v-if="errorMessage" class="text-negative">
-            <OIcon name="error" size="sm" class="q-mr-sm" />
+          <div v-if="errorMessage" class="tw:text-red-500">
+            <OIcon name="error" size="sm" class="tw:mr-2" />
             {{ errorMessage }}
           </div>
         </div>

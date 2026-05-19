@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" data-test="incident-detail-page" style="height: calc(100vh - 50px); overflow: hidden;">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
+  <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page" style="height: calc(100vh - 50px); overflow: hidden;">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1 tw:pb-[0.625rem]">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
-      <div class="flex items-center tw:gap-3 tw:flex-1">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
+      <div class="flex tw:items-center tw:gap-3 tw:flex-1">
         <div
           data-test="incident-detail-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-h6">
+        <div class="tw:text-xl tw:font-semibold">
           {{ t('alerts.incidents.incident') }}
         </div>
         <!-- Incident name with colored indicator -->
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTab>
 
-          <!-- Telemetry tabs always inline -->
+          <!-- Telemetry tabs always tw:inline -->
           <OTab
             name="logs"
             :label="t('common.logs')"
@@ -1009,14 +1009,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
-            <div class="text-h6 q-mt-md">
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1024,7 +1024,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
+              class="tw:mt-3"
             ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
@@ -1058,14 +1058,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
-            <div class="text-h6 q-mt-md">
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1073,7 +1073,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
+              class="tw:mt-3"
             ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
@@ -1114,14 +1114,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
-            <div class="text-h6 q-mt-md">
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1129,7 +1129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
+              class="tw:mt-3"
             ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 

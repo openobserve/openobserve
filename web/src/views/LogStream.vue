@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+  <div data-test="alert-list-page" class="tw:p-0 flex flex-col">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]"
+          class="flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div
             class="q-table__title tw:font-[600]"
@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logStream.header") }}
           </div>
-          <div class="flex items-start">
-            <div class="flex justify-between items-end">
+          <div class="flex tw:items-start">
+            <div class="flex tw:justify-between tw:items-end">
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
-                class="q-mr-sm"
+                class="tw:mr-2"
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div data-test="streams-search-stream-input">
               <OInput
                 v-model="filterQuery"
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+                class="tw:ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               >
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-stream-refresh-stats-btn"
               variant="outline"
               size="sm-action"
-              class="q-ml-sm"
+              class="tw:ml-2"
               @click="getLogStream(true)"
             >
               {{ t(`logStream.refreshStats`) }}
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-stream-add-stream-btn"
               variant="primary"
               size="sm-action"
-              class="q-ml-sm"
+              class="tw:ml-2"
               @click="addStream"
             >
               {{ t(`logStream.add`) }}
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
               >
                 <div
-                  class="tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]"
+                  class="tw:flex tw:items-center tw:w-full tw:font-bold tw:text-[14px]"
                 >
                   {{ scope.totalRows }} Stream(s)
                   <OButton

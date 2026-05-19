@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
-    <div class="row tw:m-0! tw:p-[0.375rem]">
-      <div class="float-right col flex items-center tw:gap-[0.375rem]">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]">
+      <div class="float-right tw:flex tw:flex-col flex tw:items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+              class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="q-pa-none tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
+              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? 'search-button-enterprise-border-radius'
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="autorenew"
                 size="xs"
-                class="q-mr-xs"
+                class="tw:mr-1"
               />
               {{ t("search.runQuery") }}
             </OButton>
@@ -411,10 +411,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
-      class="row tw:h-[calc(100%-3.1rem)]!"
+      class="tw:flex tw:h-[calc(100%-3.1rem)]!"
     >
       <div
-        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
+        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
       >
         <code-query-editor
           ref="queryEditorRef"

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
+    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         data-test="model-pricing-editor-back-btn"
-        class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius"
+        class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius"
         :title="t('modelPricing.goBack')"
         @click="goBack"
       >
@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="info"
                   size="xs"
-                  class="q-ml-xs cursor-pointer"
+                  class="tw:ml-1 cursor-pointer"
                   :class="
-                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                   "
                  />
                   <OTooltip
@@ -103,11 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="info"
                     size="xs"
-                    class="q-ml-xs cursor-pointer"
+                    class="tw:ml-1 cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-7'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                    />
                     <OTooltip
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         :class="
                           copiedPattern === ex.match_pattern
-                            ? 'text-positive'
+                            ? 'tw:text-green-500'
                             : ''
                         "
                       />
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <div
-                      class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b"
+                      class="tw:px-4 tw:py-2 tw:text-xs tw:text-gray-500 tw:font-semibold tw:border-b"
                       style="border-color: var(--o2-border-color)"
                     >
                       {{ t("modelPricing.pricePreview") }}
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <thead>
                         <tr
-                          class="tw:text-left text-grey-7 tw:border-b"
+                          class="tw:text-left tw:text-gray-400 tw:border-b"
                           style="border-color: var(--o2-border-color)"
                         >
                           <th class="tw:px-4 tw:py-2 tw:font-medium">
@@ -456,14 +456,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="border-color: var(--o2-border-color)"
                         >
                           <td
-                            class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium"
+                            class="tw:px-4 tw:py-2 tw:text-gray-600 tw:font-medium"
                           >
                             {{ entry.key }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 text-grey-9">
+                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
                             ${{ formatPreviewCost(entry.value, 1000) }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 text-grey-9">
+                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
                             ${{ formatPreviewCost(entry.value, 1000000) }}
                           </td>
                         </tr>
@@ -572,7 +572,7 @@ const nameError = computed(() => {
 });
 
 /**
- * Strip Rust/PCRE inline flag groups that JavaScript RegExp doesn't understand.
+ * Strip Rust/PCRE tw:inline flag groups that JavaScript RegExp doesn't understand.
  * Handles: (?i), (?m), (?s), (?x), (?u), and combinations like (?ims).
  * Does NOT strip flag-scoped groups like (?i:...) — those are left as non-capturing groups.
  */
@@ -587,7 +587,7 @@ const regexError = computed(() => {
   if (!pattern || !pattern.trim()) return t("modelPricing.patternRequired");
   if (pattern.length > 512) return t("modelPricing.patternTooLong");
   try {
-    // Strip Rust-specific inline flags before testing with JS RegExp.
+    // Strip Rust-specific tw:inline flags before testing with JS RegExp.
     // The backend (Rust regex crate) is the authority; this is a best-effort client check.
     new RegExp(stripInlineFlags(pattern));
     return "";
@@ -865,7 +865,7 @@ async function save() {
     }
   }
 
-  // Name and pattern have inline errors — just mark fields as touched so errors show,
+  // Name and pattern have tw:inline errors — just mark fields as touched so errors show,
   // no duplicate snackbar needed.
   if (nameError.value || regexError.value) {
     nameTouched.value = true;
@@ -873,7 +873,7 @@ async function save() {
     return;
   }
 
-  // Require at least one price in the default tier (no inline field for this)
+  // Require at least one price in the default tier (no tw:inline field for this)
   const defaultTier = m.tiers?.[0];
   if (defaultTier) {
     const priceValues = Object.values(defaultTier.prices || {}) as number[];
@@ -1120,7 +1120,7 @@ onBeforeMount(async () => {
   opacity: 0.65;
 }
 
-/* ── Condition block ───────────────────────────────── */
+/* ── Condition tw:block ───────────────────────────────── */
 .condition-block {
   padding: 12px 14px;
   border-radius: 8px;

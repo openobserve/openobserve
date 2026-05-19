@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="tw:font-bold">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!fields.length">
@@ -9,7 +9,7 @@
         variant="outline"
         size="sm-action"
         icon-left="add"
-        class="q-mt-sm"
+        class="tw:mt-2"
         @click="addApiHeader"
       >
         {{ t("logStream.addField") }}
@@ -19,17 +19,17 @@
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="flex justify-start items-end q-col-gutter-sm"
+        class="flex tw:justify-start tw:items-end tw:gap-2"
         :data-test="`alert-conditions-${index + 1}`"
       >
         <div
           data-test="add-stream-field-name-input"
-          class="q-ml-none o2-input flex items-center"
+          class="tw:ml-0 o2-input flex tw:items-center"
         >
           <OInput
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
-            class="q-py-sm"
+            class="tw:py-2"
             :error="!!fieldNameErrors[index]"
             :error-message="fieldNameErrors[index] || ''"
             @update:model-value="fieldNameErrors[index] = ''"
@@ -41,7 +41,7 @@
         <!-- <div
           v-if="visibleInputs.type"
           data-test="alert-conditions-operator-select"
-          class="q-ml-none o2-input"
+          class="tw:ml-0 o2-input"
         >
           <OSelect
             v-model="field.type"
@@ -49,7 +49,7 @@
             :popup-content-style="{ textTransform: 'capitalize' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm"
+            class="tw:py-2"
             stack-label
             outlined
             filled
@@ -62,13 +62,13 @@
         <div
           v-if="visibleInputs.index_type"
           data-test="add-stream-field-type-select-input"
-          class="q-ml-none flex items-end o2-input"
+          class="tw:ml-0 flex tw:items-end o2-input"
         >
           <OSelect
             v-model="field.index_type"
             :options="streamIndexType"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            class="q-py-sm"
+            class="tw:py-2"
             multiple
             :max-values="2"
             :option-disable="(_option: any) => disableOptions(field, _option)"
@@ -93,13 +93,13 @@
         <div
           v-if="visibleInputs.data_type"
           data-test="add-stream-field-type-select-input"
-          class="q-ml-none flex items-end o2-input"
+          class="tw:ml-0 flex tw:items-end o2-input"
         >
           <OSelect
             v-model="field.type"
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            class="q-py-sm"
+            class="tw:py-2"
             label-key="label"
             value-key="value"
             clearable
@@ -120,13 +120,13 @@
             @blur="handleDataTypeBlur"
           />
         </div>
-        <div class="q-ml-none" style="margin-bottom: 8px">
+        <div class="tw:ml-0" style="margin-bottom: 8px">
           <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
             variant="outline"
             size="icon-sm"
-            class="q-ml-xs"
+            class="tw:ml-1"
             :disabled="
               field.name === '' || (fields.length === 1 && field.name == '')
             "
@@ -137,7 +137,7 @@
             data-test="add-stream-delete-field-btn"
             variant="outline-destructive"
             size="icon-sm"
-            class="q-ml-xs"
+            class="tw:ml-1"
             :title="t('alert_templates.edit')"
             icon-left="delete"
             />

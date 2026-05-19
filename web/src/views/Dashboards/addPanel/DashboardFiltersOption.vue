@@ -9,12 +9,12 @@
         )
       "
       style="display: flex; flex-direction: row"
-      class="q-pl-md"
+      class="tw:pl-3"
     >
       <div class="layout-name">{{ t("panel.filters") }}</div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll row"
+        class="axis-container droppable scroll tw:flex"
         data-test="dashboard-filter-layout"
       >
         <Group

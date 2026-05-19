@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center" data-test="dashboard-table-pagination-controls">
+  <div class="tw:flex tw:items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
+    <div v-if="showPagination" class="tw:flex tw:items-center tw:gap-2">
+      <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <OSelect
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Count display -->
-    <span class="text-caption q-px-sm" data-test="dashboard-table-row-count">
+    <span class="tw:text-xs tw:px-2" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 

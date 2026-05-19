@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="tw:rounded-md quota-page text-left card-container"
+  <div class="tw:rounded-md quota-page tw:text-left card-container"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -24,22 +24,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:h-full">
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="q-px-md q-py-sm">
+        <div class="tw:px-3 tw:py-2">
           <div
-            class="q-table__title full-width q-pb-sm"
+            class="q-table__title tw:w-full tw:pb-2"
             data-test="user-title-text"
           >
             {{ t("quota.header") }}
           </div>
-          <div class="flex items-center justify-between full-width q-mb-sm">
-            <div class="flex items-center">
+          <div class="flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
+            <div class="flex tw:items-center">
               <OSelect
                 :loading="isOrgLoading"
                 :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
                 searchable
                 placeholder="Select Organization"
-                class="q-py-sm no-case q-mr-md input-width org-select"
+                class="tw:py-2 no-case tw:mr-3 input-width org-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleOrgSelect"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class="flex items-center" v-if="selectedOrganization">
+            <div class="flex tw:items-center" v-if="selectedOrganization">
               <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="flex items-center justify-between full-width q-mb-sm">
+          <div class="flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
             <div
               v-if="selectedOrganization && activeType == 'table'"
-              class="flex items-center"
+              class="flex tw:items-center"
             >
               <OInput
                 data-test="pipeline-list-search-input"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 clearable
                 placeholder="Select API Category"
                 style="padding: 0px"
-                class="no-case q-mr-md input-width q-ml-md category-select"
+                class="no-case tw:mr-3 input-width tw:ml-3 category-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
@@ -108,9 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="flex items-center float-right q-ml-auto"
+              class="flex tw:items-center float-right tw:ml-auto"
             >
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit q-mr-md">
+              <div class="app-tabs-container tw:h-[36px] tw:w-fit tw:mr-3">
                 <app-tabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           loading &&
           !apiLimitsRows.length
         "
-        class="flex justify-center items-center"
+        class="flex tw:justify-center tw:items-center"
       >
         <OSpinner size="md" />
       </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2 tw:gap-2"
+        class="flex tw:justify-end w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md tw:gap-2"
+        class="flex tw:justify-end w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2"
         v-if="editTable && activeType == 'json'"
       >
         <OButton

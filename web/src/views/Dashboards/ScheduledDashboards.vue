@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :loading="loading"
       style="width: 100%"
-      class="q-px-md"
+      class="tw:px-3"
     >
       <template #cell-name="{ row }">
         <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>

@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="edit-role-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
-    <div class="card-container q-py-sm">
-          <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
+    <div class="card-container tw:py-2">
+          <span style="font-size: 18px;" class="tw:px-3 ">{{ editingRole }}</span> 
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isFetchingInitialRoles">
       <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
         <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="text-center full-width">
+        <div class="tw:text-center tw:w-full">
           Hold on tight, we're fetching your role details...
         </div>
       </div>
@@ -68,18 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="card-container tw:flex tw:flex-col tw:h-full"
         >
           <div
-            class="flex justify-between items-center tw:flex-shrink-0"
+            class="flex tw:justify-between tw:items-center tw:flex-shrink-0"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class=" flex items-start q-px-md q-py-sm justify-start"
+              class=" flex tw:items-start tw:px-3 tw:py-2 tw:justify-start"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="flex items-center q-mr-md"
+                class="flex tw:items-center tw:mr-3"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Show
                 </span>
                 <OToggleGroup
-                  class="q-ml-xs"
+                  class="tw:ml-1"
                   :model-value="filter.permissions"
                   @update:model-value="(v) => updateTableData(v as string)"
                 >
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
+                  class="no-border tw:mr-3 o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div></div>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
-              class="q-mr-md q-my-xs"
+              class="tw:mr-3 tw:my-1"
               :model-value="permissionsUiType"
               @update:model-value="(v) => updatePermissionsUi(v as string)"
             >
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
+          <div data-test="edit-role-permissions-table-section" class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -163,20 +163,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
-              <div class="flex items-center justify-between">
-                <div class="q-mb-md text-bold">
+              <div class="flex tw:items-center tw:justify-between">
+                <div class="tw:mb-3 tw:font-bold">
                   {{ selectedPermissionsHash.size }} Permission
                 </div>
                 <div
-                  class="flex items-center cursor-pointer"
+                  class="flex tw:items-center cursor-pointer"
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
                   <OIcon name="help" size="sm" />
-                  <span class="q-ml-xs"> Help </span>
+                  <span class="tw:ml-1"> Help </span>
                 </div>
               </div>
-              <div class="flex no-wrap">
+              <div class="flex tw:flex-nowrap">
                 <div
                   :style="
                     isHelpOpen
@@ -187,15 +187,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <query-editor
                     data-test="logs-vrl-function-editor"
                     editor-id="add-function-editor"
-                    class="monaco-editor q-mt-sm"
+                    class="monaco-editor tw:mt-2"
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
                     style="height: calc(100vh - var(--navbar-height) - 295px)"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
-                  <div class="flex justify-between items-center q-px-sm">
+                <div v-if="isHelpOpen" style="width: 350px" class="tw:p-2">
+                  <div class="flex tw:justify-between tw:items-center tw:px-2">
                     <div style="font-size: 16px">Quick Reference</div>
                     <OIcon
                       class="cursor-pointer"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <OSeparator class="tw:mt-2 tw:mb-4" />
-                  <div class="q-mt-sm q-px-sm">
+                  <div class="tw:mt-2 tw:px-2">
                     <div>
                       Configure access with JSON objects specifying "object"
                       (resource) and "permission" (access level).
@@ -218,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre
                     >
                     <div>
-                      <span class="text-bold">Child Resource:</span> <br />
+                      <span class="tw:font-bold">Child Resource:</span> <br />
                       Specific instance or
-                      <span class="text-bold">organizationID</span> for all
+                      <span class="tw:font-bold">organizationID</span> for all
                       instances within a main resource.
                     </div>
                   </div>
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
+        class="flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">

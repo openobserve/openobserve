@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-sm"
         :class="[
-          noBorder ? 'syntax-guide-no-border' : 'q-ml-xs',
+          noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
           sqlmode ? 'sql-mode' : 'normal-mode',
         ]"
       >

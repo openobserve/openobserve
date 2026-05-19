@@ -29,10 +29,10 @@
     <!-- Display validation errors -->
     <div
       v-if="validationErrors.length > 0"
-      class="q-pa-md text-negative validation-errors"
+      class="tw:p-3 tw:text-red-500 validation-errors"
     >
-      <div class="text-bold q-mb-sm">Please fix the following issues:</div>
-      <ul class="q-ml-md">
+      <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
+      <ul class="tw:ml-3">
         <li v-for="(error, index) in validationErrors" :key="index">
           {{ error }}
         </li>

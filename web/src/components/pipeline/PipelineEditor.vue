@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
     <div class="card-container tw:h-[calc(100vh-50px)]">
-      <div class="flex justify-between items-start q-py-sm q-px-sm">
-        <div class="flex items-center tw:pl-3">
-          <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
+      <div class="flex tw:justify-between tw:items-start tw:py-2 tw:px-2">
+        <div class="flex tw:items-center tw:pl-3">
+          <div class="tw:text-xl tw:font-semibold" v-if="pipelineObj.isEditPipeline == true">
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
-          <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
+          <div class="tw:text-xl tw:font-semibold" v-if="pipelineObj.isEditPipeline == false">
             <OInput
               ref="pipelineNameInputRef"
               v-model="pipelineObj.currentSelectedPipeline.name"
@@ -66,17 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OSeparator class="tw:mb-2 tw:px-2" />
 
-      <div class="flex q-mt-md q-px-sm">
-        <div class="nodes-drag-container q-pr-md">
+      <div class="flex tw:mt-3 tw:px-2">
+        <div class="nodes-drag-container tw:pr-3">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header q-mb-sm q-mx-sm"
+            class="nodes-header tw:mb-2 tw:mx-2"
           >
             {{ t("pipeline.nodes") }}
           </div>
 
 
-          <div class="flex q-mt-sm">
+          <div class="flex tw:mt-2">
             <NodeSidebar
               v-show="
                 !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="pipelineChartContainer"
           ref="chartContainerRef"
           class="relative-position pipeline-chart-container o2vf_node"
-          :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
+          :class="store.state.theme === 'dark' ? '' : 'tw:bg-gray-100'"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
           <PipelineFlow />

@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="semantic-field-groups-config">
-    <div class="section-header q-mb-md">
-      <div class="text-h6">
+    <div class="section-header tw:mb-3">
+      <div class="tw:text-xl tw:font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="text-caption text-grey-7">
+      <div class="tw:text-xs tw:text-gray-400">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
 
     <!-- Category Filter -->
-    <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-4">
+    <div class="tw:flex tw:gap-3 tw:mb-3">
+      <div class="tw:w-full col-md-4">
         <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSelect>
       </div>
-      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
+      <div class="tw:w-full col-md-8 flex tw:items-center tw:justify-end tw:gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="groups-list q-mb-md">
+    <div v-if="filteredGroups.length > 0" class="groups-list tw:mb-3">
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="text-center q-pa-lg text-grey-7">
-      <OIcon name="info" size="md" class="q-mb-sm" />
+    <div v-else class="tw:text-center tw:p-4 tw:text-gray-400">
+      <OIcon name="info" size="md" class="tw:mb-2" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
+    <div v-if="localGroups.length > 0" class="tw:text-xs tw:text-gray-400 tw:mt-2">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="fingerprint-section q-mt-lg"
+      class="fingerprint-section tw:mt-4"
     >
-      <div class="text-subtitle1 q-mb-sm">
+      <div class="tw:text-base tw:font-medium tw:mb-2">
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="text-caption text-grey-7 q-mb-md">
+      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="fingerprint-checkboxes">
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="localFingerprintFields.length === 0"
-        class="text-negative text-caption q-mt-sm"
+        class="tw:text-red-500 tw:text-xs tw:mt-2"
       >
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>

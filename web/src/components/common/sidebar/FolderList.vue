@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw:font-bold tw:px-2  tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -36,16 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
 
         <!-- Search Input -->
-        <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
+        <div style="width: 100%;" class="flex folder-item tw:py-1">
           <OInput
             v-model="searchQuery"
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
             clearable
-            class="tw:w-full"
+            class="tw:mx-2 tw:px-1"
           >
             <template #icon-left>
-              <OIcon name="search" size="sm" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
         </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item full-width row justify-between no-wrap">
+          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap">
               <span class="folder-name" :title="tab.name">{{
               tab.name
               }}</span>

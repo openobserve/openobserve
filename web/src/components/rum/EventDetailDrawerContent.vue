@@ -22,13 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header>
       <div class="tw:px-2 tw:py-[0.625rem] tw:w-full">
-        <div class="row items-center no-wrap">
-        <div class="col">
+        <div class="tw:flex tw:items-center tw:flex-nowrap">
+        <div class="tw:flex tw:flex-col">
           <!-- Event Header -->
           <div>
-            <div class="row items-center justify-between tw:mb-[0.625rem]">
+            <div class="tw:flex tw:items-center tw:justify-between tw:mb-[0.625rem]">
               <div
-                class="row items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
+                class="tw:flex tw:items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
               >
                 <div
                   class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
-                    class="q-mr-xs inline"
+                    class="tw:mr-1 tw:inline"
                   />
                 </template>
                 <div
@@ -69,33 +69,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="event-session-meta-data"
-              class="row items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
+              class="tw:flex tw:items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
             >
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <OIcon name="language" size="xs" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="language" size="xs" class="tw:pr-1" />
                 {{ sessionDetails.ip }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <OIcon name="code" size="sm" class="q-pr-xs" />
+              <div class="tw:text-xs tw:flex tw:items-center">
+                <OIcon name="code" size="sm" class="tw:pr-1" />
                 {{ rawEvent.service || "Unknown User" }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
+              <div class="tw:text-xs tw:flex tw:items-center">
                 V {{ rawEvent.version || "Unknown User" }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <OIcon name="mail" size="xs" class="q-pr-xs" />
+              <div class="tw:text-xs tw:flex tw:items-center">
+                <OIcon name="mail" size="xs" class="tw:pr-1" />
                 {{ sessionDetails.user_email || "Unknown User" }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <OIcon name="settings" size="xs" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="settings" size="xs" class="tw:pr-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <OIcon name="location-on" size="xs" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="location-on" size="xs" class="tw:pr-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <OIcon name="schedule" size="xs" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="schedule" size="xs" class="tw:pr-1" />
                 {{ sessionDetails.date }}
               </div>
             </div>
@@ -106,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Tabs Navigation -->
-    <div class="row q-pt-sm q-px-sm">
-      <div class="col-12">
+    <div class="tw:flex tw:pt-2 tw:px-2">
+      <div class="tw:w-full">
         <OTabs v-model="activeTab" align="left">
           <OTab
             data-test="event-detail-overview-tab"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-red-6 tw:border tw:border-solid tw:border-red-6'
-                        : 'text-grey-8'
+                        : 'tw:text-gray-500'
                     "
                   >
                     {{ rawEvent.error_handling }}
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Loading Type:
                 </div>
-                <div class="tw:flex-1 text-capitalize tw:break-words">
+                <div class="tw:flex-1 tw:capitalize tw:break-words">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
               </div>
@@ -285,9 +285,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Related Events for Actions -->
           <div v-if="event.type === 'action'" class="tw:mb-3">
             <template v-if="isLoadingRelatedResources">
-              <div class="tw:mt-2 tw:p-2 text-center">
+              <div class="tw:mt-2 tw:p-2 tw:text-center">
                 <OSpinner size="xs" />
-                <div class="tw:mt-1 text-grey-7 tw:text-xs">
+                <div class="tw:mt-1 tw:text-gray-400 tw:text-xs">
                   Loading related events...
                 </div>
               </div>
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
-                  <div class="row items-center tw:mb-0.5">
+                  <div class="tw:flex tw:items-center tw:mb-0.5">
                     <div
                       class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
                       :class="getEventTypeClass(item.type)"
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="tw:mr-1 text-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
+                        class="tw:mr-1 tw:font-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="tw:flex items-center text-grey-7 tw:text-[10px]">
+                  <div class="tw:flex tw:items-center tw:text-gray-400 tw:text-[10px]">
                     <OIcon name="schedule" size="xs" class="tw:mr-1" />
                     <span class="tw:mr-2">{{
                       formatTimestamp(item.date)
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div
-                class="row items-center tw:gap-x-3 tw:text-[10px] text-grey-7"
+                class="tw:flex tw:items-center tw:gap-x-3 tw:text-[10px] tw:text-gray-400"
               >
                 <div class="tw:flex tw:items-center">
                   <OIcon name="access-time" size="xs" class="tw:mr-1" />
@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-else
-          class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm"
+          class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm"
           data-test="network-empty-state"
         >
           No network requests found for this event
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
+        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
           Console logs coming soon
         </div>
       </OTabPanel>
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="sm"
         data-test="performance-tab"
       >
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
+        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
           Performance metrics coming soon
         </div>
       </OTabPanel>
@@ -491,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="content-copy"
             variant="outline"
             size="sm-action"
-            class="q-px-sm"
+            class="tw:px-2"
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >
@@ -640,7 +640,7 @@ const viewFields = computed(() => [
     key: "view_loading_type",
     label: "Loading Type",
     value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "text-capitalize",
+    valueClass: "tw:capitalize",
   },
   {
     key: "view_url",
@@ -660,7 +660,7 @@ const actionFields = computed(() => [
     key: "action_type",
     label: "Action Type",
     value: props.rawEvent?.action_type || "N/A",
-    valueClass: "text-capitalize",
+    valueClass: "tw:capitalize",
   },
   {
     key: "action_target_name",

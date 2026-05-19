@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
       </OButton>
-      <div class="flex items-center app-tabs-container">
+      <div class="flex tw:items-center app-tabs-container">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"
@@ -77,15 +77,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="full-width stream-routing-section"
+      class="tw:w-full stream-routing-section"
       :class="[
         store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >
-    <div class="stream-routing-container q-px-md">
+    <div class="stream-routing-container tw:px-3">
       <div>
-        <div class="full-width">
+        <div class="tw:w-full">
           <scheduled-pipeline
             ref="scheduledPipelineRef"
             :columns="filteredColumns"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:stream_type="updateStreamType"
             @expandLog="toggleExpandLog"
             @update:delay="updateDelay"
-            class="q-mt-sm"
+            class="tw:mt-2"
           />
         </div>
       </div>

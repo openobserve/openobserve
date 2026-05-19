@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="orgMemberData.first_name"
           :label="t('user.name')"
-          class="q-py-md showLabelOnTop"
+          class="tw:py-3 showLabelOnTop"
           readonly
         />
 
@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="orgMemberData.role"
           :label="t('user.role')"
           :options="roleOptions"
-          class="q-pt-md q-pb-sm showLabelOnTop"
+          class="tw:pt-3 tw:pb-2 showLabelOnTop"
         />
 
-        <div class="flex justify-center q-mt-lg tw:gap-2">
+        <div class="flex tw:justify-center tw:mt-4 tw:gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"

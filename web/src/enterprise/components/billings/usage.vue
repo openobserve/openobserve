@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="q-pa-md " style="height: calc(100vh - 130px); width: 100%;" >
-      <div class="row items-baseline justify-between">
-        <div class="row q-table__title tw:font-[600] q-pb-md usage-title">
+    <div class="tw:p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+      <div class="tw:flex tw:items-baseline tw:justify-between">
+        <div class="tw:flex q-table__title tw:font-[600] tw:pb-3 usage-title">
           <span>{{ t("billing.totalUsage") }}</span>
           <span> {{ new Date(startTime/1000).toDateString() }} </span>
           <span>-</span>
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
-          <div class="text-h6 text-weight-medium text-center">
+          <div class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
             {{ t("billing.messageDataNotFound") }}
           </div>
         </div>
@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
-        <div v-if="false" class="row wrap justify-evenly q-gutter-md ">
+        <div v-if="false" class="tw:flex wrap tw:justify-evenly tw:gap-3 ">
             <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <!-- Title row -->
-                <div class="row justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title"> Action Scripts</div>
                   <div style="opacity: 0.8;">
                     <img :src="actionScriptIcon" />
@@ -50,17 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
+            <div class="usage-data-to-display tw:flex tw:items-end ">
               2
             </div>
             </div>
             </div>
             <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <!-- Title row -->
-                <div class="row justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title">Error Tracking</div>
                   <div style="opacity: 0.8;">
                     <img :src="errorTrackingIcon" />
@@ -69,17 +69,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
+            <div class="usage-data-to-display tw:flex tw:items-end ">
               300
             </div>
             </div>
             </div>
             <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <!-- Title row -->
-                <div class="row justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
+            <div class="usage-data-to-display tw:flex tw:items-end ">
               20
             </div>
             </div>
@@ -96,14 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <!-- new section introduced to show the usage for ingestion , search , functions -->
-        <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="row wrap justify-evenly q-gutter-md ">
+        <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="tw:flex wrap tw:justify-evenly tw:gap-3 ">
             <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column justify-between">
+              <div class="column tw:justify-between">
                 <!-- Title row -->
-                <div class="row justify-between">
+                <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title"> Ingestion</div>
                   <div style="opacity: 0.8;">
                     <img :src="ingestionIcon" />
@@ -112,17 +112,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
+            <div class="usage-data-to-display tw:flex tw:items-end ">
                {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }}
             </div>
             </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column justify-between">
+                <div class="column tw:justify-between">
                     <!-- Title row -->
-                    <div class="row justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Search</div>
                     <div style="opacity: 0.8;">
                         <img :src="searchIcon" />
@@ -131,17 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.search }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column justify-between">
+                <div class="column tw:justify-between">
                     <!-- Title row -->
-                    <div class="row justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Functions</div>
                     <div style="opacity: 0.8;">
                         <img :src="functionsIcon" />
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.functions }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
@@ -158,26 +158,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-4 tw:w-full">
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
-                <div class="column justify-between">
-                    <div class="row justify-between">
+              <div class="tile-content tw:text-center column tw:justify-between ">
+                <div class="column tw:justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
                     <div style="opacity: 0.8;">
                         <img :src="aiIcon" />
                     </div>
                     </div>
                 </div>
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.ai_credits }} Credits
                 </div>
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column justify-between">
+                <div class="column tw:justify-between">
                     <!-- Title row -->
-                    <div class="row justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#E6EFFE] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="pipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
@@ -186,17 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column justify-between">
+                <div class="column tw:justify-between">
                     <!-- Title row -->
-                    <div class="row justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Remote Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#F2DCF5] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="remotePipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
@@ -205,17 +205,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content text-center column justify-between ">
+              <div class="tile-content tw:text-center column tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column justify-between">
+                <div class="column tw:justify-between">
                     <!-- Title row -->
-                    <div class="row justify-between">
+                    <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Data Retention</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#FFF4E6] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="dataRetentionIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display row items-end ">
+                <div class="usage-data-to-display tw:flex tw:items-end ">
                 {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }}
                 </div>
                 </div>
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-      <div v-if="dataLoading" class="text-h6 text-weight-medium text-center">Loading...</div>
+      <div v-if="dataLoading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">Loading...</div>
     </div>
   </template>
   <script lang="ts">

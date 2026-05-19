@@ -4,12 +4,12 @@
     style="min-width: 480px; max-width: 800px"
   >
     <!-- Header -->
-    <div class="q-px-sm q-py-md">
+    <div class="tw:px-2 tw:py-3">
       <OCardSection role="header">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold" data-test="queryList-title-text">
-              {{ t("queries.queryList") }}123
+        <div class="tw:flex tw:items-center tw:flex-nowrap">
+          <div class="tw:flex tw:flex-col">
+            <div class="tw:text-base tw:font-bold" data-test="queryList-title-text">
+              {{ t("queries.queryList") }}
             </div>
           </div>
           <div class="col-auto">

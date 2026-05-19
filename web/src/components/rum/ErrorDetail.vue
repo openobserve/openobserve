@@ -20,25 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ column.error_type || "Error" }}
     </div>
     <div
-      class="error_message cursor-pointer ellipsis q-mt-xs"
+      class="error_message cursor-pointer tw:truncate tw:mt-1"
       :title="column.error_message"
     >
       {{ column.error_message }}
     </div>
-    <div class="error_time row items-center q-mt-xs">
-      <span class="q-mr-md text-grey-8"> {{ column.service }}</span>
+    <div class="error_time tw:flex tw:items-center tw:mt-1">
+      <span class="tw:mr-3 tw:text-gray-500"> {{ column.service }}</span>
       <div
-        class="q-mr-md"
+        class="tw:mr-3"
         :class="
           column.error_handling === 'unhandled'
-            ? 'unhandled_error text-red-6 q-px-xs'
-            : 'handled_error text-grey-8'
+            ? 'unhandled_error text-red-6 tw:px-1'
+            : 'handled_error tw:text-gray-500'
         "
       >
         {{ column.error_handling }}
       </div>
-      <OIcon name="schedule" size="sm" class="text-grey-8" />
-      <span class="q-pl-xs text-grey-8">{{
+      <OIcon name="schedule" size="sm" class="tw:text-gray-500" />
+      <span class="tw:pl-1 tw:text-gray-500">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>
     </div>

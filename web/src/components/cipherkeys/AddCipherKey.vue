@@ -14,25 +14,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit;">
-    <div class="row items-center no-wrap q-mx-md q-pt-sm">
-      <div class="flex items-center tw:py-2">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit;">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
+      <div class="flex tw:items-center tw:py-2">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="add-template-title">
-          <div v-if="isUpdatingCipherKey" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="add-template-title">
+          <div v-if="isUpdatingCipherKey" class="tw:text-xl tw:font-semibold">
             {{ t("cipherKey.update") }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("cipherKey.add") }}
           </div>
         </div>
@@ -43,13 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-cipher-form"
     >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
-      <div class="row">
-        <div class="col-4 o2-input flex q-mx-md q-mt-md">
+      <div class="tw:flex">
+        <div class="tw:w-1/3 o2-input flex tw:mx-3 tw:mt-3">
           <OInput
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
             :label="t('cipherKey.name') + ' *'"
-            class="full-width"
+            class="tw:w-full"
             v-bind:readonly="isUpdatingCipherKey"
             v-bind:disable="isUpdatingCipherKey"
             :error="!!nameError"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         orientation="vertical"
         animated
         navigable
-        class="q-mx-md q-pa-none tw:h-full"
+        class="tw:mx-3 tw:p-0 tw:h-full"
       >
         <OStep
           data-test="cipher-key-key-store-detils-step"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-cipher-key-type-input"
                 v-model="formData.key.store.type"
                 :label="t('cipherKey.type') + ' *'"
-                class="full-width"
+                class="tw:w-full"
                 :options="cipherKeyTypes"
                 labelKey="label"
                 valueKey="value"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="flex justify-end q-px-sm q-py-lg full-width tw:gap-2"
+            <div class="flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton

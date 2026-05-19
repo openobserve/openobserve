@@ -70,7 +70,7 @@ const canClick = computed<boolean>(() => {
 })
 
 // ΓöÇΓöÇ Registration ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// OStep registers its metadata with OStepper so the horizontal header row
+// OStep registers its metadata with OStepper so the horizontal header "row"
 // can be rendered without requiring a separate data prop on OStepper itself.
 function buildRegistration() {
   return {

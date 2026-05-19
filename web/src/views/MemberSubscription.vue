@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="subscription_message q-btn-primary"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <OButton variant="primary" class="q-mt-md" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
+      <OButton variant="primary" class="tw:mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
   </div>
 </template>

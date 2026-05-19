@@ -8,7 +8,7 @@
       (isPartialData && !isPanelLoading) ||
       (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
     "
-    class="row items-center no-wrap"
+    class="tw:flex tw:items-center tw:flex-nowrap"
   >
     <OButton
       v-if="error"

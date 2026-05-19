@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="built-in-model-pricing-container card-container">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar q-pa-md">
+    <div class="filters-bar tw:p-3">
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
@@ -50,15 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && models.length === 0" class="text-center q-pa-xl">
+    <div v-if="loading && models.length === 0" class="tw:text-center tw:p-6">
       <OSpinner size="lg" />
-      <div class="q-mt-md">{{ t("modelPricing.loadingModels") }}</div>
+      <div class="tw:mt-3">{{ t("modelPricing.loadingModels") }}</div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center q-pa-xl">
+    <div v-else-if="error" class="tw:text-center tw:p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="q-mt-md text-negative">{{ error }}</div>
+      <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
           {{ t("modelPricing.tryAgain") }}
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <div v-else class="q-mb-md q-px-md">
+    <div v-else class="tw:mb-3 tw:px-3">
       <OTable
         :data="filteredModels"
         :columns="columns"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:font-semibold">{{ value }}</div>
           <div
             v-if="row.description"
-            class="text-caption"
+            class="tw:text-xs"
             style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--o2-text-muted)"
           >
             {{ row.description }}
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pattern -->
         <template #cell-pattern="{ row, value }">
           <code
-            class="text-caption"
+            class="tw:text-xs"
             style="word-break: break-all; white-space: normal"
           >
             {{ value || "—" }}
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tier-row"
               :class="{ 'tier-conditional': !!tier.condition }"
             >
-              <div class="tier-name text-caption">
+              <div class="tier-name tw:text-xs">
                 <span v-if="tier.condition">
                   {{ tier.name }}
                   <span style="font-weight: 400; color: var(--o2-text-muted)">
@@ -138,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="full-width column flex-center q-pa-xl">
+          <div class="tw:w-full column flex-center tw:p-6">
             <OIcon name="search-off" style="width: 50px; height: 50px;" />
-            <div class="q-mt-md" style="color: var(--o2-text-muted)">
+            <div class="tw:mt-3" style="color: var(--o2-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
             </div>
           </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption"
+            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 tw:text-xs"
             style="color: var(--o2-text-muted)"
           >
             <span

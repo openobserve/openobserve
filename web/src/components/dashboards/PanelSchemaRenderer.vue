@@ -68,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="col column"
+          class="tw:flex tw:flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
-            class="col"
+            class="tw:flex tw:flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="col column"
+          class="tw:flex tw:flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
-            class="col"
+            class="tw:flex tw:flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
           style="width: 100%; height: 100%"
-          class="col"
+          class="tw:flex tw:flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="row"
+        class="tw:flex"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
         <LoadingProgress
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="isCursorOverPanel"
-        class="flex items-center q-gutter-x-xs"
+        class="flex tw:items-center q-gutter-x-xs"
         style="
           position: absolute;
           top: 0px;
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon
               size="xs"
-              class="q-mr-sm"
+              class="tw:mr-2"
               :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
             <span>{{ drilldown.name }}</span>
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="annotationPopupRef"
       >
         <div
-          class="q-px-sm q-py-xs"
+          class="tw:px-2 tw:py-1"
           style="
             display: flex;
             flex-direction: row;

@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="panel-editor">
-    <div class="row" :style="rowStyle">
+    <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div class="tw:pl-[0.625rem]">
         <div
-          class="col scroll card-container tw:mr-[0.625rem]"
+          class="tw:flex tw:flex-col scroll card-container tw:mr-[0.625rem]"
           style="
             overflow-y: auto;
             height: 100%;
@@ -76,16 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="col scroll card-container"
+                class="tw:flex tw:flex-col scroll card-container"
                 :style="fieldListContainerStyle"
               >
                 <div class="column" style="height: 100%">
-                  <div class="col-auto q-pa-sm">
+                  <div class="col-auto tw:p-2">
                     <span class="text-weight-bold">{{
                       t("panel.fields")
                     }}</span>
                   </div>
-                  <div class="col" :style="fieldListInnerStyle">
+                  <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
                     <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="mainContentAreaClass" :style="afterSlotStyle">
               <div :class="afterSlotInnerClass" :style="afterSlotInnerStyle">
                 <div
-                  class="layout-panel-container col"
+                  class="layout-panel-container tw:flex tw:flex-col"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="col tw:relative tw:overflow-hidden"
+                    class="tw:flex tw:flex-col tw:relative tw:overflow-hidden"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column"
+                  class="tw:flex column"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- HTML Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'html'"
-        class="col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column tw:mr-[0.625rem]"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 q-mb-sm"
+            class="tw:flex-shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Markdown Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'markdown'"
-        class="col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column tw:mr-[0.625rem]"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 q-mb-sm"
+            class="tw:flex-shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Chart Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'custom_chart'"
-        class="col tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col tw:mr-[0.625rem]"
         style="
           overflow-y: auto;
           display: flex;
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
               <div
-                class="col scroll card-container"
+                class="tw:flex tw:flex-col scroll card-container"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
               >
                 <div
@@ -457,12 +457,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="column"
                   style="height: 100%"
                 >
-                  <div class="col-auto q-pa-sm">
+                  <div class="col-auto tw:p-2">
                     <span class="text-weight-bold">{{
                       t("panel.fields")
                     }}</span>
                   </div>
-                  <div class="col" style="width: 100%">
+                  <div class="tw:flex tw:flex-col" style="width: 100%">
                     <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
@@ -495,11 +495,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="row card-container"
+              class="tw:flex card-container"
               :style="{ height: contentHeight, overflowY: 'auto' }"
             >
               <div
-                class="col scroll"
+                class="tw:flex tw:flex-col scroll"
                 style="height: 100%; display: flex; flex-direction: column"
               >
                 <!-- Editor/Preview splitter -->
@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor for custom chart -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column"
+                  class="tw:flex column"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -889,9 +889,9 @@ const chartAreaStyle = computed(() => {
 // Main content area class - logs needs flat background without card styling
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "row card-container";
+    return "tw:flex card-container";
   }
-  return "row card-container";
+  return "tw:flex card-container";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
@@ -905,9 +905,9 @@ const rowStyle = computed(() => {
 // Main content container class - logs/build uses vertical flex, others use horizontal
 const mainContentContainerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "col flex column";
+    return "tw:flex tw:flex-col flex column";
   }
-  return "col tw:mr-[0.625rem]";
+  return "tw:flex tw:flex-col tw:mr-[0.625rem]";
 });
 
 // Main content container style
@@ -952,12 +952,12 @@ const afterSlotStyle = computed(() => {
   return {};
 });
 
-// After slot inner div class - logs/build uses "col", others use "col scroll"
+// After slot inner div class - logs/build uses "tw:flex tw:flex-col", others use "tw:flex tw:flex-col scroll"
 const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "col";
+    return "tw:flex tw:flex-col";
   }
-  return "col scroll";
+  return "tw:flex tw:flex-col scroll";
 });
 
 // After slot inner div style

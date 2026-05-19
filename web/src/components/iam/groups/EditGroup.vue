@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="edit-group-section-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
-    <div class="card-container q-py-sm">
-      <span style="font-size: 18px" class="q-px-md ">
+    <div class="card-container tw:py-2">
+      <span style="font-size: 18px" class="tw:px-3 ">
       {{ groupDetails.group_name }}
       </span>
   <OSeparator />
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex justify-end tw:w-full tw:flex-shrink-0"
+    class="flex tw:justify-end tw:w-full tw:flex-shrink-0"
       style="z-index: 2"
     >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">

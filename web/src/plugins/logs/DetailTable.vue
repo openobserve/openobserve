@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column no-wrap searchdetaildialog"
+    class="column tw:flex-nowrap searchdetaildialog"
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
-    <div class="row justify-between q-pt-sm items-center">
-      <div class="col tw:flex tw:items-center tw:gap-2">
+    <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
+      <div class="tw:flex tw:flex-col tw:flex tw:items-center tw:gap-2">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-show="tab === 'table'"
-        class="col-auto flex justify-end align-center q-pr-md"
+        class="col-auto flex tw:justify-end align-center tw:pr-3"
       >
         <OSwitch
           data-test="log-detail-wrap-values-toggle-btn"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:p-[0.675rem] tw:mb-6"
           data-test="log-detail-table-content"
         >
-          <div v-if="rowData.length == 0" class="q-pt-md tw:max-w-[350px]">
+          <div v-if="rowData.length == 0" class="tw:pt-3 tw:max-w-[350px]">
             No data available.
           </div>
           <OTable
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-field="{ row, value }">
               <div
                 :data-test="`log-detail-${value}-key`"
-                class="text-left"
+                class="tw:text-left"
                 :class="
                   store.state.theme == 'dark'
                     ? 'tw:text-[#f67a7aff]'
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-value="{ row }">
-              <div class="text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
+              <div class="tw:text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
                 <div class="tw:flex tw:items-start tw:gap-2">
                   <ODropdown v-model:open="tableDropdownOpenMap[row.field]" side="bottom" align="start">
                     <template #trigger>
@@ -336,8 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
     <OCardSection v-if="tab === 'json' || tab === 'table'" class="tw:p-4 tw:pb-4 tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
-      <div class="row items-center no-wrap justify-between">
-        <div class="col-1">
+      <div class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between">
+        <div class="tw:w-1/12">
           <OButton
             data-test="log-detail-previous-detail-btn"
             variant="outline"
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="col row justify-center align-center q-gutter-sm"
+          class="tw:flex tw:flex-col tw:flex tw:justify-center align-center tw:gap-2"
         >
           <div class="tw:leading-10 tw:font-bold">
             {{ t("common.noOfRecords") }}
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t('common.searchAround') }}</OButton>
           </div>
         </div>
-        <div class="col-1 items-end" style="display: contents;">
+        <div class="tw:w-1/12 tw:items-end" style="display: contents;">
           <OButton
             data-test="log-detail-next-detail-btn"
             variant="outline"

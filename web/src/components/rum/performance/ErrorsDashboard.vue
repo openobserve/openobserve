@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="text-center full-width">Loading Dashboard</div>
+        <div class="tw:text-center tw:w-full">Loading Dashboard</div>
       </div>
     </div>
   </div>

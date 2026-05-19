@@ -62,9 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
-              ? 'tw:w-[75%] q-pl-sm'
-              : 'tw:w-[65%] q-pl-sm'
-            : 'tw:w-[100%] q-px-md'
+              ? 'tw:w-[75%] tw:pl-2'
+              : 'tw:w-[65%] tw:pl-2'
+            : 'tw:w-[100%] tw:px-3'
         "
       >
         <OForm
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="isEdit"
               v-model="regexPatternInputs.description"
               :label="t('regex_patterns.description')"
-              class="q-pb-md"
+              class="tw:pb-3"
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-            <div class="regex-pattern-test-string-container q-mb-sm">
+            <div class="regex-pattern-test-string-container tw:mb-2">
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="q-ml-sm"
+        class="tw:ml-2"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;

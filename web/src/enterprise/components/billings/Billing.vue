@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md q-pa-none q-pt-xs" style="min-height: inherit;" >
-    <div class="tw:flex tw:justify-between tw:items-center q-pb-md card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
+  <div class="tw:rounded-md tw:p-0 tw:pt-1" style="min-height: inherit;" >
+    <div class="tw:flex tw:justify-between tw:items-center tw:pb-3 card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}
     </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             labelKey="label"
             valueKey="value"
             @update:model-value="selectUsageDate"
-            class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
+            class="tw:p-0 tw:mx-0 tw:h-[40px] tw:mt-1"
           >
           <template v-slot:prepend>
             <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container q-pb-md"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+          <div class="card-container tw:pb-3"  style="height: calc(100vh - var(--navbar-height) - 87px);">
             <router-view title=""> </router-view>
           </div>
         </div>

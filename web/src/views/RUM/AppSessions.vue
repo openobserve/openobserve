@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
           <div
-            class="text-right tw:p-[0.375rem] flex align-center justify-between"
+            class="tw:text-right tw:p-[0.375rem] flex align-center tw:justify-between"
           >
             <syntax-guide />
-            <div class="flex align-center justify-end metrics-date-time">
+            <div class="flex align-center tw:justify-end metrics-date-time">
               <date-time
                 auto-apply
                 :default-type="sessionState.data.datetime.valueType"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   sessionState.data.datetime.relativeTimePeriod
                 "
                 data-test="logs-search-bar-date-time-dropdown"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 @on:date-change="updateDateChange"
               />
               <OButton
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="card-container tw:h-full">
               <template v-if="isLoading.length">
                 <div
-                  class="q-pb-lg flex items-center justify-center text-center tw:h-full"
+                  class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:h-full"
                 >
                   <div>
                     <OSpinner
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mx-auto tw:block"
                       data-test="app-sessions-loading-indicator"
                     />
-                    <div class="text-center full-width">
+                    <div class="tw:text-center tw:w-full">
                       {{ t("rum.loadingSessions") }}
                     </div>
                   </div>
@@ -138,12 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
-          <div class="q-pa-lg enable-rum tw:max-w-[64rem]">
-            <div class="q-pb-lg">
-              <div class="text-left text-h6 text-bold q-pb-md">
+          <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
+            <div class="tw:pb-4">
+              <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
                 {{ t("rum.discoverSessionTitle") }}
               </div>
-              <div class="text-subtitle1">
+              <div class="tw:text-base tw:font-medium">
                 {{ t("rum.discoverSessionMessage") }}
               </div>
               <div>

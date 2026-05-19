@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showDestinationEditor" class="tw:flex tw:flex-col tw:h-full">
       <div
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:justify-end tw:gap-2">
           <OInput
             v-model="filterQuery"
-            class="q-ml-auto no-border o2-search-input"
+            class="tw:ml-auto no-border o2-search-input"
             :placeholder="t('pipeline_destinations.search')"
           >
             <template #icon-left>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="pipeline-destination-list-add-btn"
             variant="primary"
             size="sm-action"
-            class="q-ml-sm"
+            class="tw:ml-2"
             @click="editDestination(null)"
             >{{ t(`alert_destinations.add`) }}</OButton
           >

@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div :key="store.state.selectedOrganization.identifier">
     <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
       <div class="card-container">
-        <div class="flex justify-between items-center q-py-sm q-px-md">
+        <div class="flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
           <div class="performance_title">
             {{ t("rum.performanceSummaryLabel") }}
           </div>
-          <div class="flex items-center tw:gap-[0.5rem]">
+          <div class="flex tw:items-center tw:gap-[0.5rem]">
             <DateTimePickerDashboard
               class="rum-date-time-picker"
               ref="dateTimePicker"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <OTabs
-          class="q-px-md"
+          class="tw:px-3"
           v-model="activePerformanceTab"
           align="left"
           dense

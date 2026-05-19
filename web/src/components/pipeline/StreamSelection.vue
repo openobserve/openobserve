@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div>
-      <div class="flex justify-between items-center q-px-md q-py-sm">
+      <div class="flex tw:justify-between tw:items-center tw:px-3 tw:py-2">
         <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
@@ -33,9 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="full-width bg-grey-4" style="height: 1px" />
+      <div class="tw:w-full tw:bg-gray-300" style="height: 1px" />
 
-      <div class="q-px-md">
+      <div class="tw:px-3">
         <div
           data-test="add-pipeline-name-input"
           class="alert-name-input o2-input"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="add-pipeline-description-input"
-          class="alert-name-input o2-input q-mb-sm"
+          class="alert-name-input o2-input tw:mb-2"
         >
           <OInput
             v-model="formData.description"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="add-pipeline-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm q-mb-sm"
+          class="alert-stream-type o2-input tw:mr-2 tw:mb-2"
           style="padding-top: 0"
         >
           <OSelect
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="tw:flex tw:gap-2 q-mt-lg q-px-md">
+      <div class="tw:flex tw:gap-2 tw:mt-4 tw:px-3">
         <OButton
           variant="outline"
           size="sm-action"

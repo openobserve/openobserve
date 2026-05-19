@@ -14,7 +14,7 @@
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="q-mb-md flex items-start tw:w-full tw:flex"
+      class="tw:mb-3 flex tw:items-start tw:w-full tw:flex"
       style="gap: 15px"
     >
       <OSelect
@@ -25,7 +25,7 @@
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         class="tw:flex-1"
       />
-      <div class="tw:flex items-center" style="width: 60%; gap: 10px">
+      <div class="tw:flex tw:items-center" style="width: 60%; gap: 10px">
 <OSelect
             v-model="overrideConfig.config[0].type"
             :label="t('dashboard.overrideConfigTypeLabel')"
@@ -38,7 +38,7 @@
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <OSelect            v-model="overrideConfig.config[0].value.unit"           :label="t('dashboard.overrideConfigUnitLabel')"            :options="unitOptions"            :disabled="!overrideConfig.field.value"            style="flex-grow: 1; width: 50%"            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"            class="tw:flex-1"          />
@@ -53,7 +53,7 @@
 
         <div
           v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <OCheckbox

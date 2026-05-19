@@ -14,19 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <!-- Header -->
-    <div class="row items-center no-wrap q-mx-md q-pt-sm">
-      <div class="flex items-center tw:py-2">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
+      <div class="flex tw:items-center tw:py-2">
         <div
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           :title="t('common.goBack')"
           @click="$emit('cancel:hideform')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col">
-          <div class="text-h6">
+        <div class="tw:flex tw:flex-col">
+          <div class="tw:text-xl tw:font-semibold">
             {{ isEditing ? t("aiToolset.update") : t("aiToolset.add") }}
           </div>
         </div>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="ai-toolset-name-input"
             v-model="form.name"
             :label="t('aiToolset.name') + ' *'"
-            class="showLabelOnTop full-width"
+            class="showLabelOnTop tw:w-full"
             :readonly="isEditing"
             :disabled="isEditing"
             :error="!!nameError"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="kindOptions"
             labelKey="label"
             valueKey="value"
-            class="showLabelOnTop full-width"
+            class="showLabelOnTop tw:w-full"
             :disabled="isEditing"
             :error="!!kindError"
             :error-message="kindError"
@@ -76,13 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="ai-toolset-description-input"
             v-model="form.description"
             :label="t('aiToolset.description')"
-            class="showLabelOnTop full-width"
+            class="showLabelOnTop tw:w-full"
           />
         </div>
 
         <!-- MCP fields -->
         <template v-if="form.kind === 'mcp'">
-          <div class="text-subtitle1 tw:font-semibold tw:mb-3">
+          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-3">
             {{ t("aiToolset.mcpConfig") }}
           </div>
           <div class="o2-input tw:mb-4">
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-toolset-mcp-url"
               v-model="mcpData.url"
               :label="t('aiToolset.mcpUrl') + ' *'"
-              class="showLabelOnTop full-width"
+              class="showLabelOnTop tw:w-full"
               placeholder="https://api.example.com/mcp/"
               :error="!!mcpUrlError"
               :error-message="mcpUrlError"
@@ -102,13 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-toolset-mcp-timeout"
               v-model.number="mcpData.timeout_seconds"
               :label="t('aiToolset.timeoutSeconds')"
-              class="showLabelOnTop full-width"
+              class="showLabelOnTop tw:w-full"
               type="number"
               min="1"
             />
           </div>
           <!-- Headers -->
-          <div class="tw:mb-2 text-subtitle2">{{ t("aiToolset.headers") }}</div>
+          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.headers") }}</div>
           <div
             v-for="(header, idx) in mcpHeaders"
             :key="idx"
@@ -149,11 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- CLI fields -->
         <template v-if="form.kind === 'cli'">
           <div class="tw:flex tw:items-center tw:gap-3 tw:mb-4">
-            <div class="text-subtitle1 tw:font-semibold">
+            <div class="tw:text-base tw:font-medium tw:font-semibold">
               {{ t("aiToolset.cliConfig") }}
             </div>
             <div class="tw:flex tw:items-center tw:gap-1">
-              <span class="text-caption text-grey-6"
+              <span class="tw:text-xs tw:text-gray-400"
                 >{{ t("aiToolset.presets") }}:</span
               >
               <OBadge
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-toolset-cli-command"
               v-model="cliData.command"
               :label="t('aiToolset.cliCommand') + ' *'"
-              class="showLabelOnTop full-width"
+              class="showLabelOnTop tw:w-full"
               placeholder="kubectl"
               :error="!!cliCommandError"
               :error-message="cliCommandError"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="cliData.allowed_subcommands_raw"
               :label="t('aiToolset.allowedSubcommands')"
               :helpText="t('aiToolset.subcommandsHint')"
-              class="showLabelOnTop full-width"
+              class="showLabelOnTop tw:w-full"
               placeholder="get, describe, logs"
             />
           </div>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 v-model.number="cliData.timeout_seconds"
                 :label="t('aiToolset.timeoutSeconds')"
-                class="showLabelOnTop full-width"
+                class="showLabelOnTop tw:w-full"
                 type="number"
                 min="1"
               />
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 v-model.number="cliData.max_output_bytes"
                 :label="t('aiToolset.maxOutputBytes')"
-                class="showLabelOnTop full-width"
+                class="showLabelOnTop tw:w-full"
                 type="number"
                 min="1"
               />
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <!-- Env vars -->
-          <div class="tw:mb-2 text-subtitle2">{{ t("aiToolset.envVars") }}</div>
+          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.envVars") }}</div>
           <div
             v-for="(env, idx) in cliEnvVars"
             :key="'env-' + idx"
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <!-- Credential files -->
-          <div class="tw:mb-2 text-subtitle2">
+          <div class="tw:mb-2 tw:text-sm tw:font-medium">
             {{ t("aiToolset.credentialFiles") }}
           </div>
           <div
@@ -302,22 +302,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Skill fields -->
         <template v-if="form.kind === 'skill'">
-          <div class="text-subtitle1 tw:font-semibold tw:mb-2">
+          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-2">
             {{ t("aiToolset.skillConfig") }}
           </div>
-          <div class="tw:mb-1 text-caption text-grey-7">
+          <div class="tw:mb-1 tw:text-xs tw:text-gray-400">
             {{ t("aiToolset.skillContent") }} *
           </div>
           <query-editor
             data-test="ai-toolset-skill-content"
             editor-id="skill-content-editor"
-            class="monaco-editor q-mb-md"
+            class="monaco-editor tw:mb-3"
             language="markdown"
             v-model:query="skillData.content"
           />
           <div
             v-if="skillContentError"
-            class="text-negative text-caption tw:mt-[-12px] tw:mb-4"
+            class="tw:text-red-500 tw:text-xs tw:mt-[-12px] tw:mb-4"
           >
             {{ t("aiToolset.skillContentRequired") }}
           </div>

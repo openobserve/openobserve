@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="flex relative-position q-mr-sm"
+      class="flex relative-position tw:mr-2"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm tw:flex tw:items-center"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 cursor-pointer tw:mr-2 tw:flex tw:items-center"
         @click="goToHome"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="flex relative-position q-mr-sm logo-container">
+    <div v-else class="flex relative-position tw:mr-2 logo-container">
       <img
         class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
@@ -148,7 +148,7 @@ size="xs" class="warning" />{{
       <OButton
         variant="secondary"
         size="sm"
-        class="q-ma-xs"
+        class="tw:m-1"
         @click="router.replace('/billings/plans')"
       >
         Upgrade to PRO Plan
@@ -205,7 +205,7 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="q-mx-sm row">
+      <div data-test="navbar-organizations-select" class="tw:mx-2 tw:flex">
         <ODropdown
           v-model:open="orgMenuOpen"
           side="bottom"
@@ -219,11 +219,11 @@ size="xs" class="warning" />{{
               style="max-width: 250px"
               class="tw:text-ellipsis tw:overflow-hidden"
             >
-              <div class="row items-center no-wrap full-width">
-                <div class="col tw:truncate">
+              <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
+                <div class="tw:flex tw:flex-col tw:truncate">
                   {{ userClickedOrg?.label || "" }}
                 </div>
-                <OIcon name="arrow-drop-down" size="sm" class="q-ml-xs" />
+                <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
               </div>
             </OButton>
           </template>
@@ -254,7 +254,7 @@ size="xs" class="warning" />{{
             >
               <!-- Search input for filtering organizations -->
               <template #top>
-                <div class="full-width">
+                <div class="tw:w-full">
                   <OInput
                     data-test="organization-search-input"
                     v-model="searchQuery"
@@ -300,7 +300,7 @@ size="xs" class="warning" />{{
               <template #empty>
                 <div
                   data-test="organization-menu-no-data"
-                  class="text-center q-pa-sm tw:w-full tw:flex tw:justify-center"
+                  class="tw:text-center tw:p-2 tw:w-full tw:flex tw:justify-center"
                 >
                   No organizations found
                 </div>

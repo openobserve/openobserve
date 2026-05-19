@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-splitter
           v-model="splitterModel"
           :limits="splitterLimits"
-          class="full-height full-width analysis-splitter-smooth"
+          class="full-height tw:w-full analysis-splitter-smooth"
           @update:model-value="onSplitterUpdate"
         >
           <!-- LEFT: Dimension Selector Sidebar -->
@@ -1189,7 +1189,7 @@ watch(
 
 .analysis-content {
   flex: 1;
-  overflow: hidden; // Changed to hidden - q-splitter handles overflow
+  overflow: hidden; // Changed to tw:hidden - q-splitter handles overflow
   min-height: 0;
   background: #f5f5f5 !important;
 }

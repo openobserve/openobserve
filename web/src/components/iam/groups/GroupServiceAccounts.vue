@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:flex-col tw:h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
+       class="flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
       >
-        <div data-test="iam-service-accounts-selection-show-toggle" class="q-mr-md">
-          <div class="flex items-center">
+        <div data-test="iam-service-accounts-selection-show-toggle" class="tw:mr-3">
+          <div class="flex tw:items-center">
             <span
               data-test="iam-service-accounts-selection-show-text"
               style="font-size: 14px"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Show
             </span>
             <OToggleGroup
-              class="q-ml-xs"
+              class="tw:ml-1"
               :model-value="usersDisplay"
               @update:model-value="(v) => updateUserTable(v as string)"
             >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="iam-service-accounts-selection-search-input"
-          class="q-mr-md"
+          class="tw:mr-3"
         >
           <OInput
             data-test="service-accounts-list-search-input"

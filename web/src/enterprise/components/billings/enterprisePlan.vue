@@ -15,19 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-px-md q-py-sm">
+  <OCard class="tw:flex tw:flex-col o2-card-wrapper">
+    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
-        <div class="o2-card-title q-pt-sm">
+        <div class="o2-card-title tw:pt-2">
           {{ t("billing.enterpriseLabel") }}
         </div>
-        <div class="o2-card-subtitle q-mt-sm">
+        <div class="o2-card-subtitle tw:mt-2">
           {{ t("billing.enterpriseSubtitle") }}
         </div>
       </div>
       <OBadge
         variant="primary-soft"
-        class="q-mt-sm text-caption q-px-sm q-py-md"
+        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
         style="border-radius: 0px"
       >
         {{ t("billing.discountTag") }}
@@ -36,17 +36,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator class="tw:my-2" />
 
-    <div class="q-px-md q-pt-sm tw:h-[550px]">
+    <div class="tw:px-3 tw:pt-2 tw:h-[550px]">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">
+      <div class="o2-page-subtitle2 tw:mb-3 tw:mt-1">
         {{ t("billing.included") }}
       </div>
 
       <div
         v-if="pricingError && !features?.length"
-        class="row items-center q-mb-sm text-negative"
+        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
       >
-        <OIcon name="warning" size="sm" class="q-mr-sm" />
+        <OIcon name="warning" size="sm" class="tw:mr-2" />
         <span class="o2-page-subtitle3"
           >Failed to load pricing details. Please refresh the page.</span
         >
@@ -54,30 +54,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="row items-center justify-between q-mb-sm"
+        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
       >
-        <div class="row items-center">
+        <div class="tw:flex tw:items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="sm"
-            class="q-mr-sm"
+            class="tw:mr-2"
           />
-          <OIcon v-else name="" color="green" size="sm" class="q-mr-sm" />
+          <OIcon v-else name="" color="green" size="sm" class="tw:mr-2" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
-        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
+        <div class="o2-page-subtitle3 tw:font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
+    <div class="o2-page-subtitle2 tw:px-3 tw:pt-2">
       {{ t("billing.enterpriseNote") }}
     </div>
 
-    <div class="row justify-between q-pa-md tw:mt-[18px]">
-      <OButton variant="primary" size="sm-action" block @click="contactSales">
+    <div class="tw:flex tw:justify-between tw:p-3 tw:mt-[18px]">
+      <OButton variant="primary" size="sm-action" tw:block @click="contactSales">
         {{ t("billing.contactLabel") }}
       </OButton>
     </div>

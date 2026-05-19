@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
-        <div class="col">
+      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]" :class="headerClass">
+        <div class="tw:flex tw:flex-col">
           <div class="flex">
             <OButton
               variant="ghost"
@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
-            <div :class="titleClass" class="q-ml-md">{{ title }}</div>
+            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
           </div>
         </div>
 
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="flex justify-center tw:gap-2">
+        <div class="flex tw:justify-center tw:gap-2">
           <OButton
             v-close-popup
             variant="outline"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
                     <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
-                      <div style="width: 100%" class="q-pr-sm">
+                      <div style="width: 100%" class="tw:pr-2">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
@@ -126,11 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab === 'import_json_file'"
                 class="editor-container-json card-container tw:py-1"
               >
-                <div class="tw:mx-2 q-mt-md tw:pb-2">
+                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
-                      <div style="width: 100%" class="q-pr-sm">
+                    <div style="width: calc(100% - 10px)" class="tw:mb-1 flex">
+                      <div style="width: 100%" class="tw:pr-2">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
@@ -189,10 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-h6 tw:py-2">Output Messages</div>
+                  <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
                   <OSeparator class="tw:mx-4 tw:mt-4" />
                   <div class="error-report-container">
-                    <div class="text-center q-pa-md text-grey-6">
+                    <div class="tw:text-center tw:p-3 tw:text-gray-400">
                       No messages to display
                     </div>
                   </div>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
 
-        <!-- Slot for full-width content (when splitter is not shown) -->
+        <!-- Slot for tw:w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
       </div>
     </div>
@@ -297,7 +297,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs",
+      default: "tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1",
     },
     containerStyle: {
       type: String,

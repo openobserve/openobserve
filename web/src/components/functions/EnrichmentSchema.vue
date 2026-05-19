@@ -28,7 +28,7 @@
         <div>
         <div
           v-if="loadingState"
-          class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
+          class="tw:pt-3 tw:text-center q-w-md tw:mx-4 tw:flex tw:justify-center"
           style="max-width: 450px"
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
@@ -43,14 +43,14 @@
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs" > {{ schemaData.name }}</span>
+                <span class="title tw:pl-1" > {{ schemaData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.docsCount") }}
-                <span class="title q-pl-xs">
+                <span class="title tw:pl-1">
                   {{
                     parseInt(schemaData.stats.doc_num).toLocaleString("en-US")
                   }}
@@ -58,7 +58,7 @@
               </div>
               <div data-test="schema-stream-title-text">
                 {{ t("logStream.storageSize") }}
-                <span class="title q-pl-xs">
+                <span class="title tw:pl-1">
                   {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
                 >
               </div>
@@ -67,13 +67,13 @@
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.compressedSize") }}
-                <span class="title q-pl-xs">
+                <span class="title tw:pl-1">
                   {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
                 >
               </div>
             </div>
           </div>
-          <div class="flex items-center justify-between tw:gap-4 tw:mt-4">
+          <div class="flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
             <div class="tw:text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>
@@ -98,7 +98,7 @@
                   : 'light-theme-table'
               "
               style="margin-bottom: 30px"
-              class="q-mt-lg"
+              class="tw:mt-4"
             >
               <OTable
                 data-test="schema-log-stream-field-mapping-table"

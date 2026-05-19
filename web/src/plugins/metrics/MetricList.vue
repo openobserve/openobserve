@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
     <div class="metric-list">
       <div
-        class="metrics-label-table q-mt-xs"
+        class="metrics-label-table tw:mt-1"
         data-test="log-search-index-list-fields-table"
       >
         <OTable
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   row.name === store.state.zoConfig.timestamp_column
                 "
               >
-                <div class="field_label ellipsis q-pl-lg">
+                <div class="field_label tw:truncate tw:pl-4">
                   {{ row.name }}
                 </div>
               </template>
@@ -106,10 +106,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #trigger>
                     <div
-                      class="flex content-center ellipsis"
+                      class="flex content-center tw:truncate"
                       :title="row.name"
                     >
-                      <div class="field_label ellipsis">
+                      <div class="field_label tw:truncate">
                         {{ row.name }}
                       </div>
                       <div class="field_overlay">
@@ -118,19 +118,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
                           variant="ghost"
                           size="icon-xs"
-                          class="q-mr-none"
+                          class="tw:mr-0"
                           @click.stop="addValueToEditor(row.name, '', '=')"
                         />
                       </div>
                     </div>
                   </template>
-                  <div class="q-pl-md q-pr-xs q-py-xs">
+                  <div class="tw:pl-3 tw:pr-1 tw:py-1">
                       <div class="filter-values-container">
                         <div
                           v-show="
                             metricLabelValues[row.name]?.isLoading
                           "
-                          class="q-pl-md q-py-xs"
+                          class="tw:pl-3 tw:py-1"
                           style="height: 60px"
                         >
                           <OInnerLoading
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ?.length &&
                             !metricLabelValues[row.name]?.isLoading
                           "
-                          class="q-pl-md q-py-xs text-subtitle2"
+                          class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium"
                         >
                           No values found
                         </div>
@@ -157,33 +157,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="value.key + value.count"
                         >
                           <ul>
-                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 q-pr-none">
+                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 tw:pr-0">
                               <div
-                                class="flex row wrap justify-between"
+                                class="flex tw:flex wrap tw:justify-between"
                                 style="width: calc(100% - 46px)"
                                 :class="
                                   store.state.theme === 'dark'
-                                    ? 'text-grey-4'
-                                    : 'text-grey-8'
+                                    ? 'tw:text-gray-300'
+                                    : 'tw:text-gray-500'
                                 "
                               >
                                 <div
                                   :title="value.key"
-                                  class="ellipsis q-pr-xs"
+                                  class="tw:truncate tw:pr-1"
                                   style="width: calc(100% - 50px)"
                                 >
                                   {{ value.key }}
                                 </div>
                                 <div
                                   :title="value.count?.toString()"
-                                  class="ellipsis text-right q-pr-sm"
+                                  class="tw:truncate tw:text-right tw:pr-2"
                                   style="width: 50px"
                                 >
                                   {{ value.count }}
                                 </div>
                               </div>
                               <div
-                                class="flex row"
+                                class="flex tw:flex"
                                 :class="
                                   store.state.theme === 'dark'
                                     ? 'text-white'
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 "
                               >
                                 <OButton
-                                  class="q-mr-xs"
+                                  class="tw:mr-1"
                                   size="icon-xs"
                                   variant="ghost"
                                   title="Include Term"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <EqualIcon class="tw:size-3" />
                                 </OButton>
                                 <OButton
-                                  class="q-mr-xs"
+                                  class="tw:mr-1"
                                   size="icon-xs"
                                   variant="ghost"
                                   title="Exclude Term"

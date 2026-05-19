@@ -29,7 +29,7 @@ const hasTrailing = computed(
 const tag = computed(() => (props.clickable ? "button" : "span"));
 
 // ── Variant class map ─────────────────────────────────────────────────────
-// Each entry is a complete token-based class string. No inline colours.
+// Each entry is a complete token-based class string. No tw:inline colours.
 const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
   // Solid
   default:

@@ -22,25 +22,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('search.queryPlan')"
     @update:open="(v) => !v && onClose()"
   >
-    <div class="query-plan-content full-height q-pa-none">
+    <div class="query-plan-content full-height tw:p-0">
       <q-splitter v-model="splitterPosition" class="full-height">
         <!-- Left Pane: SQL Query -->
         <template #before>
           <div class="sql-query-pane full-height">
             <div
-              class="pane-header q-pa-sm tw:px-[1rem] row items-center"
+              class="pane-header tw:p-2 tw:px-[1rem] tw:flex tw:items-center"
               :class="
                 store.state.theme === 'dark'
                   ? 'pane-header-dark'
                   : 'pane-header-light'
               "
             >
-              <OIcon name="code" size="md" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-medium">SQL Query</div>
+              <OIcon name="code" size="md" class="tw:mr-2" />
+              <div class="tw:text-base tw:font-medium text-weight-medium">SQL Query</div>
             </div>
             <OSeparator />
             <div
-              class="sql-query-content q-pa-md"
+              class="sql-query-content tw:p-3"
               :class="
                 store.state.theme === 'dark'
                   ? 'sql-query-content-dark'
@@ -58,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="explain-results-pane full-height">
             <div
-              class="pane-header q-pa-sm tw:px-[1rem] row items-center"
+              class="pane-header tw:p-2 tw:px-[1rem] tw:flex tw:items-center"
               :class="
                 store.state.theme === 'dark'
                   ? 'pane-header-dark'
                   : 'pane-header-light'
               "
             >
-              <div class="text-subtitle1 text-weight-medium">
+              <div class="tw:text-base tw:font-medium text-weight-medium">
                 {{
                   showAnalyzeResults
                     ? t("search.analyzeResults")
@@ -86,10 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSeparator />
 
-            <div v-if="loading" class="flex flex-center q-pa-xl full-height">
-              <div class="text-center">
+            <div v-if="loading" class="flex flex-center tw:p-6 full-height">
+              <div class="tw:text-center">
                 <OSpinner variant="dots" size="lg" />
-                <div class="q-mt-md">
+                <div class="tw:mt-3">
                   {{
                     isAnalyzing
                       ? t("search.runningAnalyze")
@@ -99,17 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-else-if="error" class="q-pa-md">
+            <div v-else-if="error" class="tw:p-3">
               <OBanner variant="error" icon="error" :content="error" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
-            <div v-else-if="showAnalyzeResults" class="plan-container q-pa-md">
+            <div v-else-if="showAnalyzeResults" class="plan-container tw:p-3">
               <!-- Metrics Summary Card -->
               <MetricsSummaryCard
                 v-if="summaryMetrics"
                 :metrics="summaryMetrics"
-                class="q-mb-md"
+                class="tw:mb-3"
               />
 
               <!-- Execution Plan Tree -->
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :tree="planTree"
                       :is-analyze="true"
                     />
-                    <div v-else class="q-pa-md text-grey-6">
+                    <div v-else class="tw:p-3 tw:text-gray-400">
                       {{ t("search.noAnalyzePlanFound") }}
                     </div>
                   </div>
@@ -130,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
-            <div v-else class="plan-container q-pa-md">
+            <div v-else class="plan-container tw:p-3">
               <OCard class="plan-card">
-                <OTabs v-model="activeTab" dense class="text-grey" align="left">
+                <OTabs v-model="activeTab" dense class="tw:text-gray-500" align="left">
                   <OTab name="logical" :label="t('search.logicalPlan')" />
                   <OTab name="physical" :label="t('search.physicalPlan')" />
                 </OTabs>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="q-pa-md text-grey-6">
+                      <div v-else class="tw:p-3 tw:text-gray-400">
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="q-pa-md text-grey-6">
+                      <div v-else class="tw:p-3 tw:text-gray-400">
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>

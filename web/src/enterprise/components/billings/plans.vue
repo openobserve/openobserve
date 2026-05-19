@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
-    <div class="row justify-between items-center">
+  <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
+    <div class="tw:flex tw:justify-between tw:items-center">
       <div>
         <span class="o2-page-title">{{ t("billing.title") }}</span
         ><br />
         <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
       </div>
     </div>
-    <trial-period class="q-mb-md" currentPage="billing"></trial-period>
+    <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
       <div class="feature-card">
-        <div class="tile-content text-center column justify-between">
-          <div class="column justify-between">
-            <div class="row justify-between items-center">
+        <div class="tile-content tw:text-center column tw:justify-between">
+          <div class="column tw:justify-between">
+            <div class="tw:flex tw:justify-between tw:items-center">
               <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
               <div style="opacity: 0.8;">
                 <img :src="aiIcon" />
@@ -37,24 +37,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OBadge
               :variant="aiModeBadgeVariant"
-              class="q-mt-sm"
+              class="tw:mt-2"
               style="width: fit-content;"
             >{{ aiModeLabel }}</OBadge>
           </div>
-          <div class="q-mt-md q-mb-sm">
+          <div class="tw:mt-3 tw:mb-2">
             <OProgressBar
               :value="aiUsageRatio"
               size="sm"
               :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
-          <div class="usage-data-to-display row items-end">
+          <div class="usage-data-to-display tw:flex tw:items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="text-negative q-mt-sm" style="font-size: 13px;">
+          <div v-if="aiUsage.mode === 'exhausted'" class="tw:text-red-500 tw:mt-2" style="font-size: 13px;">
             {{ t("billing.aiExhaustedMessage") }}
           </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info q-mt-sm" style="font-size: 13px;">
+          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info tw:mt-2" style="font-size: 13px;">
             {{ t("billing.aiPaygMessage") }}
           </div>
         </div>
@@ -65,15 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.selectedOrganization.hasOwnProperty('note') &&
         store.state.selectedOrganization.note
       "
-      class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"
+      class="tw:flex tw:justify-start warning-message tw:text-red-500 tw:text-xl tw:font-semibold tw:pl-6 tw:pb-4"
     >
-      <OIcon name="warning" size="sm" class="q-pt-sm" />
+      <OIcon name="warning" size="sm" class="tw:pt-2" />
       >{{ store.state.selectedOrganization.note }}
     </div>
     <div v-if="loading">
       <OSpinner size="md" class="tw:mx-auto tw:block" />
     </div>
-    <div v-else class="row q-gutter-md justify-center">
+    <div v-else class="tw:flex tw:gap-3 tw:justify-center">
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"

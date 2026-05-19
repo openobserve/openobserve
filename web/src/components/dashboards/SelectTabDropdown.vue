@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-end tw:gap-2">
+  <div class="flex tw:items-end tw:gap-2">
     <!-- select new tab -->
     <OSelect
       v-model="selectedTab"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-tab-new-add"
       variant="outline"
       size="icon-sm"
-      class="q-mb-xs"
+      class="tw:mb-1"
       @click="
         () => {
           showAddTabDialog = true;

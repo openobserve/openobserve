@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config q-mt-sm">
+  <div class="tw:w-full service-identity-config tw:mt-2">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
       <OSpinner size="sm" />
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showIcon="false"
         class="tw:mb-2"
       />
-      <div class="text-body2 tw:mb-4">
+      <div class="tw:text-sm tw:mb-4">
         {{ t("settings.correlation.serviceIdentityDescription") }}
       </div>
 
@@ -40,11 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
           store.state.theme === 'dark'
-            ? 'bg-grey-9 tw:border-gray-700'
-            : 'bg-grey-2 tw:border-gray-200'
+            ? 'tw:bg-gray-700 tw:border-gray-700'
+            : 'tw:bg-gray-100 tw:border-gray-200'
         "
       >
-        <div class="tw:p-4 text-body2 tw:leading-relaxed">
+        <div class="tw:p-4 tw:text-sm tw:leading-relaxed">
           <div class="tw:mb-3">
             <div class="tw:font-semibold text-primary tw:mb-1">
               {{ t("settings.correlation.serviceIdentityLabel") }}
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             class="tw:mb-3 tw:p-3 tw:rounded"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'"
+            :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'bg-white'"
           >
             <div class="tw:font-semibold text-primary tw:mb-1">
               {{ t("settings.correlation.exampleLabel") }}

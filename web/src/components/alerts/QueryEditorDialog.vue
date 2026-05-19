@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="q-ml-sm"
+        class="tw:ml-2"
         v-if="store.state.isAiChatEnabled"
         style="width: 24.5vw; max-width: 100%; min-width: 75px;"
         :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"

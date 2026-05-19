@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"
         :class="[
-          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
+          store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
             ? 'tw:flex-wrap tw:break-all'
             : 'tw:flex-nowrap tw:overflow-hidden',
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OBadge
               size="sm"
-              class="wildcard-chip q-my-none q-mx-none"
+              class="wildcard-chip tw:my-0 tw:mx-0"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
+        class="tw:text-red-500 text-weight-bold tw:text-[0.625rem] tw:cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="tw:text-[0.6875rem] tw:opacity-80"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
         :data-test="`pattern-card-${index}-percentage`"
       >
         {{ pattern.percentage.toFixed(2) }}%
@@ -243,7 +243,7 @@ function highlightLevels(text: string): HighlightSegment[] {
   padding: 0 0.3125rem;
   border-radius: 0.1875rem;
   line-height: 1.125rem;
-  // Prevent chips from inheriting the truncate overflow of the parent row
+  // Prevent chips from inheriting the truncate overflow of the parent "row"
   flex-shrink: 0;
 }
 </style>

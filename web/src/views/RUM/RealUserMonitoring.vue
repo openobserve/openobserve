@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:h-[calc(100vh-var(--navbar-height)-10px)] tw:overflow-hidden tw:pt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
+        class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
           <OSpinner
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-auto tw:block"
             data-test="rum-loading-indicator"
           />
-          <div class="text-center full-width">
+          <div class="tw:text-center tw:w-full">
             {{ t("rum.loadingMsg") }}
           </div>
         </div>
@@ -71,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="">
         <div
-          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:h-[calc(100vh - 3.125rem)]"
+          class="card-container tw:p-4 tw:mx-[0.625rem] tw:max-w-full tw:h-[calc(100vh - 3.125rem)]"
         >
-          <div class="q-pb-lg">
-            <div class="text-left text-h6 text-bold q-pb-md">
+          <div class="tw:pb-4">
+            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
               {{ t("rum.aboutRUMTitle") }}
             </div>
-            <div class="text-subtitle1">
+            <div class="tw:text-base tw:font-medium">
               {{ t("rum.aboutRUMMessage") }}
             </div>
             <div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <template #icon-right><OIcon name="arrow-forward" size="sm" class="q-ml-xs" /></template>
+            <template #icon-right><OIcon name="arrow-forward" size="sm" class="tw:ml-1" /></template>
           </OButton>
         </div>
       </div>

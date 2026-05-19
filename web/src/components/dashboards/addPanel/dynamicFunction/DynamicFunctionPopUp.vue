@@ -14,7 +14,7 @@
           <input
             v-model="fields.label"
             :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
+              store.state.theme === 'dark' ? 'tw:bg-gray-800' : '',
               'edit-input',
             ]"
             data-test="dynamic-function-popup-label-input"
@@ -26,7 +26,7 @@
             v-model="fields.alias"
             disabled
             :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
+              store.state.theme === 'dark' ? 'tw:bg-gray-800' : '',
               'edit-input',
             ]"
             data-test="dynamic-function-popup-alias-input"
@@ -148,7 +148,7 @@
           </OButton>
         </div>
       </div>
-      <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
+      <div v-if="chartType === 'table'" class="tw:mt-2 tw:mb-2">
         <div>
           <OCheckbox
             v-model="fields.treatAsNonTimestamp"
@@ -156,7 +156,7 @@
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
-        <div class="q-mt-xs">
+        <div class="tw:mt-1">
           <OCheckbox
             v-model="fields.showFieldAsJson"
             label="Render Data as JSON / Array"
