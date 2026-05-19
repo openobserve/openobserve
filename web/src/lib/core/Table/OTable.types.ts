@@ -178,6 +178,7 @@ export interface OTableProps<TData = any> {
   bordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
+  showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
   /** Fixed table width (CSS value) */
