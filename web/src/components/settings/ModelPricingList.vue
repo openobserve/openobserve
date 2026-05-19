@@ -574,8 +574,7 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
-    size: 280,
-    meta: { align: "left" },
+    meta: { align: "left" , autoWidth: true },
   },
   {
     id: "match_pattern",
