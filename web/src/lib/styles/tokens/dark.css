@@ -290,6 +290,29 @@
     --color-progress-bar-warning: var(--color-warning-400);
     --color-progress-bar-danger: var(--color-error-500);
     --color-progress-bar-track: var(--color-grey-700);
+
+    /* Banner (OBanner) */
+    --color-banner-default-bg:     var(--color-grey-800);
+    --color-banner-default-text:   var(--color-grey-200);
+    --color-banner-info-bg:        color-mix(in srgb, var(--color-info-800) 20%, transparent);
+    --color-banner-info-border:    var(--color-info-700);
+    --color-banner-info-text:      var(--color-info-100);
+    --color-banner-success-bg:     color-mix(in srgb, var(--color-success-900) 20%, transparent);
+    --color-banner-success-border: var(--color-success-700);
+    --color-banner-success-text:   var(--color-success-100);
+    --color-banner-warning-bg:     color-mix(in srgb, var(--color-warning-900) 20%, transparent);
+    --color-banner-warning-border: var(--color-warning-600);
+    --color-banner-warning-text:   var(--color-warning-100);
+    --color-banner-error-bg:       var(--color-error-700);
+    --color-banner-error-text:     var(--color-grey-0);
+
+    /* Note Container */
+    --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
+    --color-note-border:           var(--color-note-dark-border);
+    --color-note-text:             var(--color-note-dark-text);
+    --color-note-highlight:        var(--color-note-highlight-dark);
+    --color-note-emphasis:         var(--color-grey-300);
+    --color-note-code:             var(--color-note-code-dark);
 }
 
 /* ToggleGroup — primary variant dark overrides */

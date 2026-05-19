@@ -1,7 +1,8 @@
-# Quasar Banner Component ΓÇö Props, Emits & Slots Audit
+# Quasar Banner Component — Props, Emits & Slots Audit
 
-> Scanned **all Vue files** under `web/src/` containing `<q-banner`.
-> Found **6 distinct usages** across **5 files**.
+> Re-audited **all Vue files** under `web/src/` containing `<q-banner` on **May 19, 2026**.
+> Found **8 distinct usages** across **7 files** (2 new usages added since initial audit; 0 of original 6 migrated).
+> `OBanner.vue` **exists** at `web/src/lib/feedback/Banner/OBanner.vue` — ready to use.
 > Counts represent number of occurrences across the codebase.
 > Props prefixed with `:` are dynamically bound (`:prop="expr"`); without prefix they are static string / boolean attributes.
 
@@ -25,7 +26,8 @@
 | `:class` | 1 | Dynamic class binding ΓÇö theme-aware Tailwind utilities for dark/light mode |
 | `dense` | 2 | Boolean ΓÇö compact layout, reduces padding (`Condition.vue`, `AssociateFunction.vue`) |
 | `inline` | 2 | Boolean ΓÇö layout modifier; content and actions appear side by side (`Condition.vue`, `AssociateFunction.vue`) |
-| `rounded` | 1 | Boolean ΓÇö applies `border-radius` to the banner (`ServiceIdentitySetup.vue`) |
+| `rounded` | 2 | Boolean — applies `border-radius` to the banner (`ServiceIdentitySetup.vue`, `CreateReport.vue`) |
+| `style` | 1 | Inline style (`CreateReport.vue`: `font-size: 13px`) |
 | `data-test` | 2 | Static test attribute (`ServiceIdentitySetup.vue`, `SearchJobInspector.vue`) |
 | `v-if` | 1 | Conditional rendering (`SearchJobInspector.vue`) |
 
@@ -37,16 +39,16 @@
 
 | Slot | Count | Notes |
 |---|---|---|
-| `default` | 6 | Main banner content ΓÇö plain text, interpolated text, or rich markup (`div` blocks with icons and text) |
-| `#avatar` / `v-slot:avatar` | 4 | Icon/avatar displayed on the left side of the banner. Always a `<q-icon>` in practice |
+| `default` | 8 | Main banner content — plain text, interpolated text, or rich markup (`div` blocks with icons and text) |
+| `#avatar` / `v-slot:avatar` | 6 | Icon/avatar displayed on the left side of the banner. All now use `<OIcon>` (icons already migrated from `<q-icon>`) |
 | `#action` | 0 | Action buttons (right side / below content). Not used in the current codebase. |
 
 ---
 
 ## Observed Usage Patterns
 
-### Pattern 1 ΓÇö Error Banner (Error state, full-width, with icon)
-**Files**: `SearchJobInspector.vue`, `TraceDAG.vue`
+### Pattern 1 — Error Banner (Error state, full-width, with icon)
+**Files**: `SearchJobInspector.vue`, `TraceDAG.vue`, `QueryPlanDialog.vue`
 
 ```vue
 <!-- SearchJobInspector.vue -->
@@ -56,7 +58,7 @@
   data-test="inspector-error-banner"
 >
   <template v-slot:avatar>
-    <q-icon name="error" />
+    <OIcon name="error" size="sm" />
   </template>
   {{ errorMessage }}
 </q-banner>
@@ -64,21 +66,29 @@
 <!-- TraceDAG.vue -->
 <q-banner class="bg-negative text-white">
   <template #avatar>
-    <q-icon name="error" color="white" />
+    <OIcon name="error" size="sm" />
   </template>
   Failed to load DAG: {{ error }}
+</q-banner>
+
+<!-- QueryPlanDialog.vue -->
+<q-banner class="bg-negative text-white">
+  <template v-slot:avatar>
+    <OIcon name="error" size="sm" />
+  </template>
+  {{ error }}
 </q-banner>
 ```
 
 **Observations**:
 - `class="bg-negative text-white"` = Quasar semantic error color (red)
-- Icon: `q-icon name="error"` in `#avatar` slot
+- Icon: `OIcon` (already migrated from `q-icon`) in `#avatar` slot
 - Plain / interpolated text in default slot
 - No actions
 
 ---
 
-### Pattern 2 ΓÇö Warning Banner (Rounded, multi-line, with icon)
+### Pattern 2 — Warning Banner (Rounded, multi-line, with icon)
 **File**: `ServiceIdentitySetup.vue`
 
 ```vue
@@ -88,7 +98,7 @@
   data-test="service-identity-warnings-banner"
 >
   <template #avatar>
-    <q-icon name="warning" color="warning" />
+    <OIcon name="warning" size="sm" />
   </template>
   <div class="tw:flex tw:flex-col tw:gap-1">
     <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
@@ -103,21 +113,21 @@
 - Full custom Tailwind class for background/border (no Quasar semantic color)
 - Dark mode variant via `dark:` prefix
 - Rich content (iterated list) in default slot
-- Icon: `q-icon name="warning"` in `#avatar` slot
+- Icon: `OIcon` (already migrated) in `#avatar` slot
 
 ---
 
-### Pattern 3 ΓÇö Info / Note Banner (Inline, dense, no avatar)
+### Pattern 3 — Info / Note Banner (Inline, dense, no avatar)
 **Files**: `Condition.vue`, `AssociateFunction.vue`
 
 ```vue
 <q-banner inline dense class="note-info">
   <div>
-    <q-icon name="info" color="orange" class="q-mr-sm" />
+    <OIcon name="info" size="sm" class="q-mr-sm" />
     <span>...</span>
   </div>
   <div>
-    <q-icon name="warning" color="red" class="q-mr-sm" />
+    <OIcon name="warning" size="sm" class="q-mr-sm" />
     <span>...</span>
   </div>
 </q-banner>
@@ -125,13 +135,14 @@
 
 **Observations**:
 - `inline` + `dense` used together for compact inline layout
-- No `#avatar` slot ΓÇö icons are embedded directly in the default slot content
+- No `#avatar` slot — icons are embedded directly in the default slot content
 - Custom CSS class `note-info` for visual styling
 - Multiple `<div>` rows of content
+- Icons already migrated to `OIcon`
 
 ---
 
-### Pattern 4 ΓÇö Warning Banner (Dynamic theme-aware classes, no Quasar color)
+### Pattern 4 — Warning Banner (Dynamic theme-aware classes, no Quasar color)
 **File**: `ConfirmDialog.vue`
 
 ```vue
@@ -142,10 +153,10 @@
     : 'tw:bg-orange-50 tw:border-orange-400'
 ]">
   <template v-slot:avatar>
-    <q-icon
+    <OIcon
       name="warning"
       :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'"
-      size="24px"
+      size="md"
     />
   </template>
   <div :class="[
@@ -158,11 +169,37 @@
 ```
 
 **Observations**:
-- Fully dynamic `:class` binding ΓÇö no static Quasar semantic color
+- Fully dynamic `:class` binding — no static Quasar semantic color
 - Manual dark/light mode switching via `store.state.theme` (should be handled by design tokens in O2)
 - `border-l-4` left-accent border style
-- Icon in `#avatar` slot with dynamic color class
-- Rich text content in default slot
+- Icon in `#avatar` slot — already migrated to `OIcon size="md"` with dynamic color class
+- `warningMessage` is a plain string in a `<div>` wrapper in default slot
+
+---
+
+### Pattern 5 — Info Banner (Rounded, static text, with icon)
+**File**: `CreateReport.vue`
+
+```vue
+<q-banner
+  rounded
+  class="bg-orange-1 text-orange-9"
+  style="font-size: 13px"
+>
+  <template v-slot:avatar>
+    <OIcon name="info" size="sm" />
+  </template>
+  PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages.
+</q-banner>
+```
+
+**Observations**:
+- `rounded` prop used
+- Quasar palette classes (`bg-orange-1 text-orange-9`) — not standard Tailwind
+- Inline `style` for font-size override (can be dropped — OBanner `dense` or default sizing covers this)
+- Static text in default slot — promotable to `content` prop
+- Icon: `OIcon` (already migrated) in `v-slot:avatar`
+- Variant: `info` (orange tones closest to info intent)
 
 ---
 
@@ -172,11 +209,13 @@ All `q-banner` usages map to one of three visual intents:
 
 | Visual Intent | Quasar Implementation | Count | O2 Equivalent |
 |---|---|---|---|
-| **Error** | `class="bg-negative text-white"` | 2 | `variant="error"` |
+| **Error** | `class="bg-negative text-white"` | 3 | `variant="error"` |
 | **Warning** | Custom Tailwind amber/orange classes + `store.state.theme` | 2 | `variant="warning"` |
-| **Info / Note** | Custom CSS class `note-info` | 2 | `variant="info"` |
+| **Info / Note** | Custom CSS class `note-info` or Quasar orange palette | 3 | `variant="info"` |
 
 > **Key insight**: No usage leverages Quasar's built-in color props (`color`, `text-color`, `bg-color`). Colors are applied exclusively via `class` or `:class`. The O2 `variant` prop eliminates all of this boilerplate.
+>
+> **Migration note**: All `#avatar` / `v-slot:avatar` slots already use `<OIcon>` — the icon primitive is migrated. Only the `q-banner` wrapper itself remains to be replaced.
 
 ---
 
@@ -186,15 +225,15 @@ All `q-banner` usages map to one of three visual intents:
 
 | Need | Seen in | OBanner Prop |
 |---|---|---|
-| Semantic error style | `SearchJobInspector.vue`, `TraceDAG.vue` | `variant="error"` |
+| Semantic error style | `SearchJobInspector.vue`, `TraceDAG.vue`, `QueryPlanDialog.vue` | `variant="error"` |
 | Semantic warning style | `ServiceIdentitySetup.vue`, `ConfirmDialog.vue` | `variant="warning"` |
-| Semantic info / note style | `Condition.vue`, `AssociateFunction.vue` | `variant="info"` |
+| Semantic info / note style | `Condition.vue`, `AssociateFunction.vue`, `CreateReport.vue` | `variant="info"` |
 | Compact layout | `Condition.vue`, `AssociateFunction.vue` | `dense` |
 | Inline content + actions | `Condition.vue`, `AssociateFunction.vue` | `inline-actions` |
-| Rounded corners | `ServiceIdentitySetup.vue` | `rounded` (automatic via design tokens per variant) |
+| Rounded corners | `ServiceIdentitySetup.vue`, `CreateReport.vue` | automatic via design tokens per variant |
 | Conditional render | `SearchJobInspector.vue` | `v-if` on OBanner (pass-through) |
 | Test selector | Multiple | `data-test` pass-through |
-| Icon shorthand | All 4 avatar usages | `icon` prop (replaces `#icon` slot when icon name only) |
+| Icon shorthand | All 6 avatar usages | `icon` prop (replaces `#icon` slot when icon name only) |
 
 ### Slots needed by the codebase
 
@@ -226,13 +265,15 @@ This removes the need for screen-reader-only text patterns.
 
 ---
 
-## Full File List (6 usages ┬╖ 5 files)
+## Full File List (8 usages · 7 files)
 
-| File | Usage Count | Variant | Props Used | Slots Used |
-|---|---|---|---|---|
-| `src/plugins/logs/SearchJobInspector.vue` | 1 | error | `v-if`, `class`, `data-test` | `#avatar`, `default` |
-| `src/plugins/traces/TraceDAG.vue` | 1 | error | `class` | `#avatar`, `default` |
-| `src/components/settings/ServiceIdentitySetup.vue` | 1 | warning | `rounded`, `class`, `data-test` | `#avatar`, `default` |
-| `src/components/pipeline/NodeForm/Condition.vue` | 1 | info | `inline`, `dense`, `class` | `default` (icons inline in content) |
-| `src/components/pipeline/NodeForm/AssociateFunction.vue` | 1 | info | `inline`, `dense`, `class` | `default` (icons inline in content) |
-| `src/components/ConfirmDialog.vue` | 1 | warning | `:class` (dynamic) | `v-slot:avatar`, `default` |
+| File | Usage Count | Variant | Props Used | Slots Used | Status |
+|---|---|---|---|---|---|
+| `src/plugins/logs/SearchJobInspector.vue` | 1 | error | `v-if`, `class`, `data-test` | `#avatar` (OIcon), `default` | ✗ Not migrated |
+| `src/plugins/traces/TraceDAG.vue` | 1 | error | `class` | `#avatar` (OIcon), `default` | ✗ Not migrated |
+| `src/components/QueryPlanDialog.vue` | 1 | error | `class` | `v-slot:avatar` (OIcon), `default` | ✗ Not migrated *(new)* |
+| `src/components/settings/ServiceIdentitySetup.vue` | 1 | warning | `rounded`, `class`, `data-test` | `#avatar` (OIcon), `default` | ✗ Not migrated |
+| `src/components/ConfirmDialog.vue` | 1 | warning | `:class` (dynamic) | `v-slot:avatar` (OIcon `size="md"`), `default` | ✗ Not migrated |
+| `src/components/pipeline/NodeForm/Condition.vue` | 1 | info | `inline`, `dense`, `class` | `default` (OIcons inline in content) | ✗ Not migrated |
+| `src/components/pipeline/NodeForm/AssociateFunction.vue` | 1 | info | `inline`, `dense`, `class` | `default` (OIcons inline in content) | ✗ Not migrated |
+| `src/components/reports/CreateReport.vue` | 1 | info | `rounded`, `class`, `style` | `v-slot:avatar` (OIcon), `default` | ✗ Not migrated *(new)* |

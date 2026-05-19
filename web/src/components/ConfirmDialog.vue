@@ -28,26 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="dialog-box" class="tw:text-center">
       <div class="para">{{ message }}</div>
       <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4 tw:text-left">
-        <q-banner :class="[
-          'tw:border-l-4 tw:p-4 tw:rounded',
-          store.state.theme === 'dark'
-            ? 'tw:bg-gray-800/60 tw:border-yellow-600/70'
-            : 'tw:bg-orange-50 tw:border-orange-400'
-        ]">
-          <template v-slot:avatar>
-            <OIcon
-              name="warning"
-              :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'"
-              size="md"
-            />
-          </template>
-          <div :class="[
-            'tw:font-medium tw:text-sm tw:leading-relaxed tw:text-left',
-            store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-orange-800'
-          ]">
-            {{ warningMessage }}
-          </div>
-        </q-banner>
+        <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
     </div>
   </ODialog>
@@ -57,15 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { ODialog,
-    OIcon,
-},
+  components: { ODialog, OBanner },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: { type: String },
@@ -75,7 +53,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n();
-    const store = useStore();
 
     const open = computed({
       get: () => props.modelValue ?? false,
@@ -94,7 +71,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
       open,
       onCancel,
       onConfirm,

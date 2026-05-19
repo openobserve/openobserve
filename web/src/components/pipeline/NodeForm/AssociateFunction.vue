@@ -131,22 +131,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCard class="note-container">
             <OCardSection class="tw:p-2">
               <div class="note-heading">Function Execution Guidelines:</div>
-              <q-banner inline dense class="note-info">
-                <div>
-                  <OIcon name="info" size="sm" class="q-mr-sm" />
+              <OBanner variant="warning" dense>
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
                   <span
                     ><span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened</span
                   >
                 </div>
-                <div>
-                  <OIcon name="info" size="sm" class="q-mr-sm" />
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
                   <span
                     ><span class="highlight">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened</span
                   >
                 </div>
-              </q-banner>
+              </OBanner>
             </OCardSection>
           </OCard>
         </div>
@@ -203,6 +203,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getImageURL } from "@/utils/zincutils";
@@ -447,10 +448,10 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .note-container {
-  background-color: #f9f290;
+  background-color: var(--color-note-bg);
   border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  border: 1px solid var(--color-note-border);
+  color: var(--color-note-text);
   width: 100%;
   margin-bottom: 20px;
   margin-top: 10px;
@@ -458,34 +459,26 @@ const filterFunctions = (val: any, update: any) => {
 
 .note-container .highlight {
   font-weight: bold;
-  color: #007bff; /* Blue color to highlight key terms */
+  color: var(--color-note-highlight);
 }
 
 .note-container .emphasis {
   font-style: italic;
-  color: #555; /* Subtle dark gray for emphasis */
+  color: var(--color-note-emphasis);
 }
 
 .note-container .code {
   font-family: monospace;
   padding: 2px 4px;
   border-radius: 3px;
-  color: #d63384; /* Soft pinkish-red for code */
+  color: var(--color-note-code);
 }
 
 .note-heading {
   font-size: medium;
 }
 
-.note-info {
-  font-size: small;
-  color: #865300;
-  background-color: #f9f290;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  justify-content: space-between;
-}
+
 
 /* Function definition display - OpenObserve style */
 .function-definition-section {

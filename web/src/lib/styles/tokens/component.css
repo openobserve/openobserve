@@ -543,6 +543,38 @@
   /* Row height tokens — change these to resize all OTable rows globally */
   --table-row-height-dense: 2.25rem;   /* 36px */
   --table-row-height-normal: 2.75rem;  /* 44px */
+
+  /* ── Banner (OBanner) ──────────────────────────────────── */
+  /* default */
+  --color-banner-default-bg:      var(--color-grey-100);
+  --color-banner-default-text:    var(--color-grey-800);
+
+  /* info */
+  --color-banner-info-bg:         var(--color-info-50);
+  --color-banner-info-border:     var(--color-info-200);
+  --color-banner-info-text:       var(--color-info-900);
+
+  /* success */
+  --color-banner-success-bg:      var(--color-success-50);
+  --color-banner-success-border:  var(--color-success-200);
+  --color-banner-success-text:    var(--color-success-900);
+
+  /* warning */
+  --color-banner-warning-bg:      var(--color-warning-50);
+  --color-banner-warning-border:  var(--color-warning-300);
+  --color-banner-warning-text:    var(--color-warning-900);
+
+  /* error */
+  --color-banner-error-bg:        var(--color-error-600);
+  --color-banner-error-text:      var(--color-grey-0);
+
+  /* ── Note Container (pipeline guideline cards) ─────────── */
+  --color-note-bg:               var(--color-note-light-bg);
+  --color-note-border:           var(--color-note-light-border);
+  --color-note-text:             var(--color-note-light-text);
+  --color-note-highlight:        var(--color-note-highlight-light);
+  --color-note-emphasis:         var(--color-grey-600);
+  --color-note-code:             var(--color-note-code-light);
 }
 
 
