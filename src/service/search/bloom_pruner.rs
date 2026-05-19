@@ -41,7 +41,7 @@ use std::{collections::HashMap, ops::Range};
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
 use infra::{
-    bloom::{BloomReader, MAGIC, VERSION, path::bloom_path},
+    bloom::{BLOOM_FOOTER_CACHE, BloomReader, MAGIC, VERSION, path::bloom_path},
     cache::{file_data, storage as cache_storage},
 };
 use object_store::{GetOptions, GetRange};
@@ -293,15 +293,25 @@ async fn fetch_bloom_reader(
         );
     }
 
-    // Stage B: cache miss. Suffix probe (footer + tail of body) — meta.size
-    // comes back in the GetResult, so no separate head request.
-    let opts = GetOptions {
-        range: Some(GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)),
-        ..Default::default()
+    // Stage B: footer cache hit avoids the suffix GET entirely. `.bf`
+    // files are immutable (append-only `bloom_ver` in the path), so the
+    // cached suffix bytes stay valid for the lifetime of the file.
+    let (total_size, suffix_bytes) = if let Some((total, suffix)) = BLOOM_FOOTER_CACHE.get(path) {
+        (total as usize, suffix)
+    } else {
+        // Stage C: miss everywhere. One `GetRange::Suffix(N)` brings
+        // back the footer + tail of body; meta.size is the total file
+        // length, so no separate head request.
+        let opts = GetOptions {
+            range: Some(GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)),
+            ..Default::default()
+        };
+        let suffix_result = cache_storage::get_opts(account, &path.into(), opts).await?;
+        let total = suffix_result.meta.size;
+        let suffix = suffix_result.bytes().await?;
+        BLOOM_FOOTER_CACHE.put(path.to_string(), total, suffix.clone());
+        (total as usize, suffix)
     };
-    let suffix_result = cache_storage::get_opts(account, &path.into(), opts).await?;
-    let total_size = suffix_result.meta.size as usize;
-    let suffix_bytes = suffix_result.bytes().await?;
 
     // Schedule a background full-file download so future prune calls
     // touching this `.bf` get a Stage A hit. Failure here is non-fatal —

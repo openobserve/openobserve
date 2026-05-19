@@ -1807,6 +1807,12 @@ pub struct Limit {
     )]
     pub footer_cache_max_size: usize,
     #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
@@ -3112,6 +3118,17 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+    if cfg.limit.bloom_footer_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // order of magnitude smaller than tantivy footers (footer payload
+        // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
+        // `.bf`), so the cache holds 4-32 K entries at this size.
+        cfg.limit.bloom_footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }

@@ -234,10 +234,12 @@ Skipped (search-side prune treats those files as "keep"):
 
 1. **Split**: files with `bloom_ver = 0` pass through untouched.
 2. **Group** remaining files by `(date, bloom_ver)` so each `.bf` is fetched only once. For each group, compute the `(field, file_id)` targets the predicates will check.
-3. **Fetch per group**, bounded by `stream::buffer_unordered(BLOOM_PREFETCH_CONCURRENCY = 32)`:
-   - **Cache hit**: `file_data::get_opts(remote=false)` returns the full blob from memory or disk → `BloomReader::parse` over the whole thing.
-   - **Cache miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` request to the object store. `GetResult.meta.size` is the total file length (so no separate `head`), and the suffix bytes contain the footer plus the tail of the body. If the probe covered the whole file (small `.bf`), parse directly. Otherwise build a partial blob (header + zeros + suffix), parse the footer via `BloomReader::parse`, call `body_ranges_for(targets)` to learn which body bytes we still need, drop ranges already inside the suffix, `coalesce_ranges` adjacent ranges, fetch each remaining range via `cache_storage::get_range`, and splice with `BloomReader::splice_body_bytes`.
-   - **Cache fill** is delegated to `file_downloader::queue_download` so the synchronous prune path never blocks on a full-file GET. The next query touching the same `.bf` takes the cache-hit branch.
+3. **Fetch per group**, bounded by `stream::buffer_unordered(BLOOM_PREFETCH_CONCURRENCY = 32)`. Four-stage ladder:
+   - **Stage A — full-blob cache hit**: `file_data::get_opts(remote=false)` returns the whole `.bf` from memory or disk → `BloomReader::parse` directly.
+   - **Stage B — footer cache hit**: `BLOOM_FOOTER_CACHE.get(path)` returns the cached suffix bytes (footer + tail of body) plus the `.bf` total size. No object-store IO.
+   - **Stage C — full miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` to the object store. `GetResult.meta.size` is the total file length (no separate `head`); the suffix bytes go into `BLOOM_FOOTER_CACHE` for the next query.
+   - **Body fetch** (B and C only): build a partial blob (header + zeros + suffix), parse the footer via `BloomReader::parse`, call `body_ranges_for(targets)` to learn which body bytes the query needs, drop ranges already inside the suffix, `coalesce_ranges` adjacent ranges, fetch each remaining range via `cache_storage::get_range`, and splice with `BloomReader::splice_body_bytes`. If the probe covered the whole file (small `.bf`), skip straight to a full `parse`.
+   - **Cache fill** of the full blob is delegated to `file_downloader::queue_download` so the synchronous prune path never blocks on a full-file GET. Subsequent queries that touch the same `.bf` take Stage A.
 4. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates).
 5. Files with unknown field/file_id (schema drift) → conservatively keep.
 
@@ -287,10 +289,16 @@ Healthy steady state: `keep_ratio` near zero for high-cardinality lookups, `buil
 
 ## 9. Configuration
 
-Single feature gate, reused from the (now-removed) parquet-column-bloom path:
+Feature gate (reused from the now-removed parquet-column-bloom path):
 
 ```
 ZO_BLOOM_FILTER_ENABLED = true
+```
+
+Footer cache size (mirrors `ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE`):
+
+```
+ZO_BLOOM_FOOTER_CACHE_MAX_SIZE = 0  # MB; 0 = auto-size to 1% of total mem, clamped [32, 256]
 ```
 
 When `false`:
@@ -532,7 +540,8 @@ Capabilities we **don't have yet** but might want, separate from the
 | `src/infra/src/bloom/mod.rs` | Module root, magic + version constants |
 | `src/infra/src/bloom/path.rs` | `bloom_path` / `bloom_dir` helpers |
 | `src/infra/src/bloom/writer.rs` | `BloomBuilder`, `FieldBloom`, `BloomWriter::serialize`, `WriteError` |
-| `src/infra/src/bloom/reader.rs` | `BloomReader::parse / check`, `ReadError` |
+| `src/infra/src/bloom/reader.rs` | `BloomReader::parse / check / body_ranges_for / splice_body_bytes`, `ReadError` |
+| `src/infra/src/bloom/footer_cache.rs` | `BLOOM_FOOTER_CACHE` (path → suffix bytes) |
 | `src/infra/src/bloom/DESIGN.md` | This document |
 | `src/infra/src/file_list/mod.rs` | `FileList::update_bloom_ver` trait |
 | `src/infra/src/file_list/{sqlite,postgres}.rs` | DB impls + DDL + migrations |

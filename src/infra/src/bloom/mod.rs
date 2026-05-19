@@ -56,10 +56,12 @@
 //! layout, no custom hash. `Sbbf::insert` / `check` apply XxHash64
 //! internally per spec.
 
+pub mod footer_cache;
 pub mod path;
 pub mod reader;
 pub mod writer;
 
+pub use footer_cache::{BLOOM_FOOTER_CACHE, BloomFooterCache};
 pub use reader::{BloomReader, ReadError};
 pub use writer::{BloomBuilder, BloomWriter, FieldBloom};
 
