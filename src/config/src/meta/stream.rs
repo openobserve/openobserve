@@ -631,7 +631,6 @@ impl From<&FileMeta> for cluster_rpc::FileMeta {
             original_size: req.original_size,
             compressed_size: req.compressed_size,
             index_size: req.index_size,
-            bloom_ver: req.bloom_ver,
         }
     }
 }
@@ -646,7 +645,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
-            bloom_ver: req.bloom_ver,
+            bloom_ver: 0,
         }
     }
 }
@@ -2274,24 +2273,6 @@ mod tests {
     fn test_file_meta_default_bloom_ver_is_zero() {
         let m = FileMeta::default();
         assert_eq!(m.bloom_ver, 0);
-    }
-
-    #[test]
-    fn test_file_meta_grpc_roundtrip_preserves_bloom_ver() {
-        let original = FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 10,
-            original_size: 1024,
-            compressed_size: 512,
-            index_size: 64,
-            flattened: false,
-            bloom_ver: 1_715_000_000_000_000,
-        };
-        let rpc = cluster_rpc::FileMeta::from(&original);
-        assert_eq!(rpc.bloom_ver, original.bloom_ver);
-        let back = FileMeta::from(&rpc);
-        assert_eq!(back.bloom_ver, original.bloom_ver);
     }
 
     #[test]
