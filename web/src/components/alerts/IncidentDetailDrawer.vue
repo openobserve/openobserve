@@ -1222,6 +1222,7 @@ export default defineComponent({
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
+    const $q = useQuasar();
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();

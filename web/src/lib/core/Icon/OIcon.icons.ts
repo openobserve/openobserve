@@ -165,6 +165,15 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
+// Material Symbols replacements for `@quasar/extras/material-symbols-outlined`
+// (these specific icons don't ship an `-outline` variant in @iconify/material-symbols;
+// the base names render the outlined glyph by default)
+import SoundSampler from "~icons/material-symbols/sound-sampler";
+import ClockLoader20 from "~icons/material-symbols/clock-loader-20";
+import DataInfoAlert from "~icons/material-symbols/data-info-alert";
+import FunctionIcon from "~icons/material-symbols/function";
+import ListIcon from "~icons/material-symbols/list";
+import NumbersIcon from "~icons/material-symbols/123";
 import PaidIcon from "~icons/material-symbols/paid-outline-rounded";
 import AutorenewIcon from "~icons/material-symbols/autorenew";
 import CardGiftcardIcon from "~icons/material-symbols/redeem";
@@ -458,6 +467,12 @@ export const iconRegistry = {
   "assignment": AssignmentIcon,
   "attach-file": AttachFileIcon,
   "attach-money": AttachMoneyIcon,
+  "sound-sampler": SoundSampler,
+  "clock-loader-20": ClockLoader20,
+  "data-info-alert": DataInfoAlert,
+  "function": FunctionIcon,
+  "list": ListIcon,
+  "123": NumbersIcon,
   "paid": PaidIcon,
   "autorenew": AutorenewIcon,
   "card-giftcard": CardGiftcardIcon,

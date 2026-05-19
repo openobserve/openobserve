@@ -40,7 +40,7 @@
       data-test="panel-limit-number-of-series-warning"
     >
       <template #icon-left
-        ><OIcon :name="symOutlinedDataInfoAlert" size="sm"
+        ><OIcon name="data-info-alert" size="sm"
       /></template>
       <OTooltip side="bottom" align="end">
         <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
@@ -64,7 +64,7 @@
       data-test="panel-partial-data-warning"
     >
       <template #icon-left
-        ><OIcon :name="symOutlinedClockLoader20" size="sm"
+        ><OIcon name="clock-loader-20" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
     </OButton>
@@ -94,10 +94,6 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import {
-  symOutlinedClockLoader20,
-  symOutlinedDataInfoAlert,
-} from "@quasar/extras/material-symbols-outlined";
 export default defineComponent({
   name: "PanelErrorButtons",
   components: { RelativeTime, OButton, OIcon, OTooltip },
@@ -142,8 +138,6 @@ export default defineComponent({
   setup() {
     return {
       outlinedRunningWithErrors: "running-with-errors",
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
     };
   },
 });

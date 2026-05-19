@@ -343,10 +343,6 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import {
-  symOutlinedClockLoader20,
-  symOutlinedDataInfoAlert,
-} from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import {
@@ -893,8 +889,6 @@ export default defineComponent({
       outlinedReportProblem: "report-problem",
       outlinedDashboardCustomize: "dashboard-customize",
       outlinedFileDownload: "file-download",
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
       store,
       metaDataValue,
       handleResultMetadataUpdate,
