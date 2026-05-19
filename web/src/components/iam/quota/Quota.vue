@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center">
               <OSelect
                 :loading="isOrgLoading"
-                v-model="selectedOrganization"
+                :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
                 searchable
                 placeholder="Select Organization"
                 class="q-py-sm no-case q-mr-md input-width org-select"
                 labelKey="label"
                 valueKey="value"
-                @update:model-value="updateOrganization()"
+                @update:model-value="handleOrgSelect"
               />
               <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                 <app-tabs
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-if="activeTab == 'role-limits'"
                 :loading="isApiCategoryLoading"
-                v-model="selectedApiCategory"
+                :model-value="selectedApiCategory?.value"
                 :options="apiCategories"
                 searchable
                 clearable
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="no-case q-mr-md input-width q-ml-md category-select"
                 labelKey="label"
                 valueKey="value"
-                @update:model-value="filterModulesBasedOnCategory()"
+                @update:model-value="handleApiCategorySelect"
               />
             </div>
             <div
@@ -1424,6 +1424,19 @@ export default defineComponent({
         }
       }
     };
+    const handleOrgSelect = async (val: any) => {
+      if (!organizationToDisplay.value.length) {
+        selectedOrganization.value = null;
+        return;
+      }
+      selectedOrganization.value = organizationToDisplay.value.find((o: any) => o.value === val) ?? null;
+      if (!selectedOrganization.value) return;
+      await updateOrganization();
+    };
+    const handleApiCategorySelect = (val: any) => {
+      selectedApiCategory.value = apiCategories.value.find((o: any) => o.value === val) ?? null;
+      filterModulesBasedOnCategory();
+    };
     //here we are filtering the modules based on the selected api category
     const filterModulesBasedOnCategory = () => {
       //here we filter based upon selectedapicategory so we only user can able to see one module at a time
@@ -1544,6 +1557,8 @@ export default defineComponent({
       roleLevelLoading,
       getRoleLimitsByOrganization,
       selectedApiCategory,
+      handleOrgSelect,
+      handleApiCategorySelect,
       rolesToBeDisplayed,
       isApiCategoryLoading,
       filteredRoleLevelModuleRows,

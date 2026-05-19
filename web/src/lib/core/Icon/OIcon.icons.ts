@@ -272,6 +272,8 @@ import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
 import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
 import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
+import Favorite from "~icons/material-symbols/favorite";
+import FavoriteBorder from "~icons/material-symbols/favorite-outline";
 
 import type { Component } from "vue";
 
@@ -287,6 +289,8 @@ export const iconRegistry = {
   "article": Article,
   "attachment": Attachment,
   "stars": Stars,
+  "favorite": Favorite,
+  "favorite-border": FavoriteBorder,
   "backpack": Backpack,
   "block": Block,
   "bolt": Bolt,
