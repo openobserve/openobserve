@@ -99,6 +99,13 @@ export interface SelectProps {
    * @see FieldWidth
    */
   width?: FieldWidth;
+  /**
+   * Controls where the label is rendered.
+   * - `"outside"` (default): label sits above the trigger as a separate element.
+   * - `"inside"`: label is rendered as a compact inline prefix inside the trigger,
+   *   saving vertical space when the label is short (e.g. in config panels).
+   */
+  labelPosition?: "inside" | "outside";
 }
 
 export interface SelectEmits {
