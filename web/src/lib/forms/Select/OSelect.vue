@@ -68,6 +68,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
+  labelPosition: "outside",
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -670,7 +671,7 @@ const fieldWidthClass = computed(() => {
   <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
-      v-if="label || $slots.tooltip"
+      v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
@@ -699,7 +700,7 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :class="[
-              'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border',
+              'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
               $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3',
               'tw:bg-select-bg',
               hasError
@@ -711,9 +712,17 @@ const fieldWidthClass = computed(() => {
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed',
               triggerEndPadding,
-              heightClasses[size ?? 'md'],
+              labelPosition === 'inside' && label
+                ? 'tw:items-end tw:h-10'
+                : ['tw:items-center', heightClasses[size ?? 'md']],
             ]"
           >
+            <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
+            <span
+              v-if="label && labelPosition === 'inside'"
+              class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+            >{{ label }}</span>
+
             <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
             <span
               v-if="$slots['icon-left']"
@@ -1075,7 +1084,7 @@ const fieldWidthClass = computed(() => {
         <SelectTrigger
           :id="inputId"
           :class="[
-            'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:ps-3',
+            'tw:relative tw:flex tw:w-full tw:rounded-md tw:border tw:ps-3',
             'tw:bg-select-bg',
             hasError
               ? 'tw:border-select-border-error'
@@ -1086,9 +1095,17 @@ const fieldWidthClass = computed(() => {
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed',
             triggerEndPadding,
-            heightClasses[size ?? 'md'],
+            labelPosition === 'inside' && label
+              ? 'tw:items-end tw:h-10 tw:pb-1.5'
+              : ['tw:items-center', heightClasses[size ?? 'md']],
           ]"
         >
+          <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
+          <span
+            v-if="label && labelPosition === 'inside'"
+            class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+          >{{ label }}</span>
+
           <SelectValue
             :placeholder="placeholder"
             :class="[

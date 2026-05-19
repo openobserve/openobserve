@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="min-width: 150px"
       v-model="selectedValue"
       :label="variableItem?.label || variableItem?.name"
+      label-position="inside"
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
