@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><MessagesSquare class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="forum" size="xs" class="tw:shrink-0"
             /></template>
             Sessions
           </OToggleGroupItem>
@@ -499,7 +499,6 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
-    MessagesSquare,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
