@@ -1425,7 +1425,12 @@ export default defineComponent({
       }
     };
     const handleOrgSelect = async (val: any) => {
+      if (!organizationToDisplay.value.length) {
+        selectedOrganization.value = null;
+        return;
+      }
       selectedOrganization.value = organizationToDisplay.value.find((o: any) => o.value === val) ?? null;
+      if (!selectedOrganization.value) return;
       await updateOrganization();
     };
     const handleApiCategorySelect = (val: any) => {
