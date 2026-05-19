@@ -1,6 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import { createRouter, createWebHistory, createMemoryHistory } from 'vue-router';
@@ -8,9 +7,7 @@ import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock the organizations service
 vi.mock("@/services/organizations", () => ({

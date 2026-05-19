@@ -102,7 +102,14 @@ const treeConnectorX = computed(() => {
   const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
   const cellPaddingLeft = 8; // tw:px-2
   const halfChevron = 9; // 18px / 2
-  return selectionWidth + expansionWidth + cellPaddingLeft + halfChevron;
+  const parentDepth = treeMeta.value?.depth ?? 0;
+  return (
+    selectionWidth +
+    expansionWidth +
+    cellPaddingLeft +
+    parentDepth * 16 +
+    halfChevron
+  );
 });
 
 function onClick(event: MouseEvent) {

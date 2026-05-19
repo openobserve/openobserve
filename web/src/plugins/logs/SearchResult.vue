@@ -521,7 +521,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -1402,13 +1402,10 @@ export default defineComponent({
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
-      copyToClipboard(copyData).then(() =>
-        toast({
-          variant: "success",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(copyData, {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     const redirectToTraces = (log: any) => {

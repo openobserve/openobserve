@@ -324,7 +324,6 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
 }
 
 export interface ValidationContext {
-  q: any;
   store: any;
   validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
@@ -360,7 +359,6 @@ export interface AlertFormData {
 }
 
 export interface JsonValidationContext {
-  q: any;
   store: any;
   streams: any;
   getStreams: (streamType: string, schema: boolean) => Promise<any>;
@@ -374,8 +372,6 @@ export const validateInputs = (
   context: ValidationContext,
   notify: boolean = true,
 ): boolean => {
-  const { q } = context;
-
   if (isNaN(Number(input.trigger_condition.silence))) {
     notify &&
       toast({
@@ -486,7 +482,6 @@ export const validateSqlQuery = async (
 ): Promise<void> => {
   const {
     store,
-    q,
     validateSqlQueryPromise,
     sqlQueryErrorMsg,
     vrlFunctionError,
@@ -567,7 +562,6 @@ export const saveAlertJson = async (
   context: JsonValidationContext,
 ): Promise<void> => {
   const {
-    q,
     store,
     streams,
     getParser,

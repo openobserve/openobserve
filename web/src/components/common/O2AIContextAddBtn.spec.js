@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog } from 'quasar';
 import O2AIContextAddBtn from './O2AIContextAddBtn.vue';
 import { getImageURL } from '@/utils/zincutils';
 import store from '@/test/unit/helpers/store';
@@ -24,9 +23,7 @@ node.setAttribute('id', 'app');
 document.body.appendChild(node);
 
 // Install Quasar
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe('O2AIContextAddBtn', () => {
   let wrapper;

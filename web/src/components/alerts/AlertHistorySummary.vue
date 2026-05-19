@@ -78,7 +78,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 
 const { t } = useI18n();
 const store = useStore();
@@ -181,7 +181,7 @@ const formatFrequency = (seconds: number | null) => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+  return formatToReadable(timestamp);
 };
 
 const fetchHistorySummary = async () => {

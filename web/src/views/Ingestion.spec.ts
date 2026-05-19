@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import Ingestion from "@/views/Ingestion.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,9 +25,7 @@ import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
 // Install Quasar plugins
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({

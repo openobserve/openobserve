@@ -16,11 +16,10 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 import HorizontalStepper from "@/components/alerts/HorizontalStepper.vue";
 

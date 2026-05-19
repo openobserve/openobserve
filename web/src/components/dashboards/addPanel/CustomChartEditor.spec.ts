@@ -16,13 +16,10 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Use vi.hoisted to define mock data that can be used in vi.mock
 const { globalMockStore, globalMockDashboardPanelData } = vi.hoisted(() => {

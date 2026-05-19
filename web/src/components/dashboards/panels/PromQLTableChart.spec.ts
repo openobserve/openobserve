@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
-
 // ── TenstackTable mocks (required because PromQLTableChart → TableRenderer → TenstackTable) ──
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: (optsRef: any) => ({
@@ -89,9 +87,7 @@ import PromQLTableChart from "@/components/dashboards/panels/PromQLTableChart.vu
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 const mockTableData = {
   columns: [

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog } from 'quasar';
 import i18n from '@/locales';
 
 // Stub route guard and utils before router/component are imported
@@ -38,7 +37,7 @@ import store from '@/test/unit/helpers/store';
 router.isReady = () => Promise.resolve();
 import Quota from '@/components/iam/quota/Quota.vue';
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 // Mocks
 vi.mock('@/services/organizations', () => ({

@@ -325,7 +325,8 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { date, copyToClipboard } from "quasar";
+import { subtractRelativeTime } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -714,7 +715,7 @@ function getConsumableDateTime() {
         searchObj.data.resultGrid.currentDateTime = endTimeStamp;
       }
 
-      const startTimeStamp = date.subtractFromDate(
+      const startTimeStamp = subtractRelativeTime(
         endTimeStamp,
         JSON.parse(subtractObject),
       );

@@ -2,13 +2,12 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { defineComponent } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog } from 'quasar';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 import router from '@/test/unit/helpers/router';
 
 // Ensure Quasar plugin
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 // Avoid waiting for router readiness / guards to hang
 // @ts-ignore

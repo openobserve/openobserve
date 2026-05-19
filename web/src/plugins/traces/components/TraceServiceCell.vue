@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-weight-bold ellipsis tw:min-w-0 tw:text-[var(--o2-text-1)]! tw:text-[0.8rem]! tw:tracking-[0.03rem]!"
       >
         {{ item.service_name }}
-        <QTooltip anchor="bottom middle" self="top middle">
-          {{ item.service_name }}
-        </QTooltip>
+        <OTooltip side="bottom" align="center">
+          <template #content>{{ item.service_name }}</template>
+        </OTooltip>
       </span>
     </div>
   </div>
@@ -42,11 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useQuasar, QTooltip } from "quasar";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
-
-const $q = useQuasar();
 
 const props = defineProps<{
   item: Record<string, any>;
@@ -62,7 +60,7 @@ const rootColor = computed(
 const serviceIconUrl = computed(() =>
   getServiceIconDataUrl(
     props.item.service_name,
-    $q.dark.isActive,
+    document.documentElement.classList.contains("dark"),
     rootColor.value,
   ),
 );

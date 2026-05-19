@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Progress</div>
-            <OCard class="tw:p-4">
+            <q-card flat bordered class="q-pa-md">
               <div class="flex items-center justify-between q-mb-sm">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
@@ -99,13 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>{{ estimatedCompletion }}</div>
                 </div>
               </div>
-            </OCard>
+            </q-card>
           </div>
 
           <!-- Deletion Details (if applicable) -->
           <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Deletion Details</div>
-            <OCard class="tw:p-4">
+            <q-card flat bordered class="q-pa-md">
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
@@ -128,13 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-caption text-grey-6">Error</div>
                 <div class="text-sm text-negative">{{ job.deletion_status.failed }}</div>
               </div>
-            </OCard>
+            </q-card>
           </div>
 
           <!-- Error Details (if present) -->
           <div v-if="job.error" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
-            <OCard class="tw:p-4 tw-bg-red-50 tw-border-red-200">
+            <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
               <div class="flex items-start">
                 <OIcon name="error" size="md" class="q-mr-sm tw-mt-1" />
                 <div class="tw-flex-1">
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </OCard>
+            </q-card>
           </div>
 
           <!-- Timeline -->
@@ -223,12 +223,9 @@ import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useQuasar } from "quasar";
-
-const $q = useQuasar();
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 interface Props {
   modelValue: boolean;
@@ -245,6 +242,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+
+const { confirm } = useConfirmDialog();
 
 const show = computed({
   get: () => props.modelValue,
@@ -295,15 +294,14 @@ const canCancelJob = computed(() => {
   return job.value && ["running", "pending"].includes(job.value.status);
 });
 
-const confirmCancelJob = () => {
-  $q.dialog({
+const confirmCancelJob = async () => {
+  const ok = await confirm({
     title: "Cancel Backfill Job",
     message: "Are you sure you want to cancel this backfill job?",
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    await cancelJob();
   });
+  if (ok) {
+    await cancelJob();
+  }
 };
 
 const cancelJob = async () => {

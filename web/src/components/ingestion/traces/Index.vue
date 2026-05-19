@@ -80,12 +80,11 @@ import { defineComponent, ref, onMounted, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IngestTraces",
@@ -147,28 +146,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 

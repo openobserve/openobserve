@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
-
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -82,9 +80,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Create a reactive mock dashboard panel data
 const createMockDashboardPanelData = () => {

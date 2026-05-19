@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
-
 // Mock dashboard service
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -59,9 +57,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import dashboardService from "@/services/dashboards";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("AddDashboard", () => {
   let wrapper: any;

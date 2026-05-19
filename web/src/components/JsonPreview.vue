@@ -75,7 +75,7 @@
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard as quasarCopyToClipboard } from "quasar";
+import { copyToClipboard as copyTextToClipboard } from "@/utils/clipboard";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -83,8 +83,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-
 export default {
   name: "JsonPreview",
   components: {
@@ -123,10 +121,8 @@ export default {
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
-      quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
-      toast({
-        variant: "success",
-        message: t("common.copyToClipboard") + "!",
+      copyTextToClipboard(JSON.stringify(props.value, null, 2), {
+        successMessage: t("common.copyToClipboard") + "!",
         timeout: 1500,
       });
       emit("copy", props.value);

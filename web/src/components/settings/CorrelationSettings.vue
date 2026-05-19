@@ -109,7 +109,7 @@ import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsCo
 import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useQuasar } from 'quasar';
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "CorrelationSettings",
@@ -125,7 +125,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -245,18 +245,13 @@ export default defineComponent({
       },
     ]);
 
-    const confirmDiscardUnsaved = (): Promise<boolean> => {
-      if (!isFieldAliasesDirty.value) return Promise.resolve(true);
-      return new Promise((resolve) => {
-        q.dialog({
-          title: t("common.unsavedChanges"),
-          message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
-          ok: { label: t("common.discardChanges"), flat: true },
-          cancel: { label: t("common.cancel"), flat: true },
-          persistent: true,
-        })
-          .onOk(() => resolve(true))
-          .onCancel(() => resolve(false));
+    const confirmDiscardUnsaved = async (): Promise<boolean> => {
+      if (!isFieldAliasesDirty.value) return true;
+      return confirm({
+        title: t("common.unsavedChanges"),
+        message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
+        confirmLabel: t("common.discardChanges"),
+        cancelLabel: t("common.cancel"),
       });
     };
 

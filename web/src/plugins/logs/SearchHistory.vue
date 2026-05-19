@@ -113,7 +113,7 @@
                           size="icon"
                           class="copy-btn-sql tw:ml-2"
                           @click.stop="
-                            copyToClipboard(row.sql, 'SQL Query')
+                            copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
                           "
                         >
                           <OIcon name="content-copy" size="sm" /> </OButton></span
@@ -167,7 +167,7 @@
                           @click.stop="
                             copyToClipboard(
                               row.function,
-                              'Function Defination',
+                              { successMessage: 'Function Defination Copied Successfully!', timeout: 5000 },
                             )
                           "
                         >
@@ -246,7 +246,6 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
@@ -259,6 +258,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -462,24 +462,6 @@ export default defineComponent({
       } finally {
         isLoading.value = false;
       }
-    };
-    const copyToClipboard = (text, type) => {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: `${type} Copied Successfully!`,
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
     };
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;

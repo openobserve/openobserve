@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
@@ -436,21 +436,11 @@ export default defineComponent({
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: "API Key Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy API Key.",
-            timeout: 5000,
-          });
-        });
+      copyToClipboard(this.organizationAPIKey, {
+        successMessage: "API Key Copied Successfully!",
+        errorMessage: "Error while copy API Key.",
+        timeout: 5000,
+      });
     },
   },
 });

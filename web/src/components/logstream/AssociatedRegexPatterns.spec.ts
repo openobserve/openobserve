@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar, Dialog } from 'quasar';
+import { Quasar, } from 'quasar';
 import AssociatedRegexPatterns, { PatternAssociation } from './AssociatedRegexPatterns.vue';
 import { installQuasar } from '@/test/unit/helpers';
 import regexPatternsService from '@/services/regex_pattern';
@@ -40,9 +40,7 @@ vi.mock('vuex', () => ({
   useStore: () => mockStore,
 }));
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe('AssociatedRegexPatterns.vue', () => {
   let wrapper: VueWrapper;

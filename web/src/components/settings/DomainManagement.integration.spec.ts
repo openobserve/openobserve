@@ -18,7 +18,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import {
   mockDomainData,
@@ -28,9 +27,7 @@ import {
   apiErrorScenarios,
 } from "./DomainManagement.test-helpers";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Create a unique DOM node for this test file to avoid conflicts
 const uniqueNodeId = "domain-management-test-app";

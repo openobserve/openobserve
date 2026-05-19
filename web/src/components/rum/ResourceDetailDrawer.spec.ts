@@ -81,7 +81,7 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.],
+  plugins: [],
 });
 
 // ============================================================================

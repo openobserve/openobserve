@@ -283,29 +283,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             pagination="none"
             :show-global-filter="false"
-            :get-cell-style="getCellStyle"
+            tree
+            tree-column-id="index"
             style="width: 100%; height: calc(100vh - 242px)"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
           >
             <template #cell-index="{ row }">
-              <div
-                :style="{ paddingLeft: getPaddingLeft(row.level) }"
-                class="row items-center no-wrap tree-node-content"
-              >
-                <div class="tree-icon-wrapper">
-                  <OIcon
-                    v-if="row.children && row.children.length > 0"
-                    :name="row.expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'"
-                    size="xs"
-                    class="cursor-pointer tree-expand-icon"
-                    @click="toggleNode(row)"
-                  />
-                </div>
-                <span class="tree-index-text">
-                  {{ row.index }}
-                </span>
-              </div>
+              <span class="tree-index-text">{{ row.index }}</span>
             </template>
 
             <template #cell-duration="{ row }">
@@ -389,7 +374,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 interface ProfileEvent {
   timestamp: string;
@@ -444,7 +429,6 @@ export default defineComponent({
     const loading = ref(false);
     const errorMessage = ref("");
     const profileData = ref<ProfileData | null>(null);
-    const expandedNodes = ref<Set<string>>(new Set());
     const showSqlDialog = ref(false);
     const showTraceIdDialog = ref(false);
     const copiedTraceId = ref(false);
@@ -461,7 +445,7 @@ export default defineComponent({
         id: "index",
         header: "#",
         accessorKey: "index",
-        meta: { align: "left", cellClass: "tree-cell" },
+        meta: { align: "left" },
         size: indexColumnWidth.value,
       },
       {
@@ -569,45 +553,9 @@ export default defineComponent({
       return hierarchy;
     };
 
-    const expandAllNodes = (nodes: HierarchicalEvent[]) => {
-      nodes.forEach((node) => {
-        expandedNodes.value.add(node.id);
-        if (node.children) {
-          expandAllNodes(node.children);
-        }
-      });
-    };
-
-    const toggleNode = (node: HierarchicalEvent) => {
-      if (expandedNodes.value.has(node.id)) {
-        expandedNodes.value.delete(node.id);
-      } else {
-        expandedNodes.value.add(node.id);
-      }
-    };
-
     const hierarchicalEvents = computed(() => {
       if (!profileData.value?.events) return [];
-
-      const hierarchy = buildHierarchy(profileData.value.events);
-      const flattened: any[] = [];
-
-      const flatten = (nodes: HierarchicalEvent[], level: number = 0) => {
-        nodes.forEach((node) => {
-          flattened.push({
-            ...node,
-            level,
-            expanded: expandedNodes.value.has(node.id),
-          });
-
-          if (node.children && expandedNodes.value.has(node.id)) {
-            flatten(node.children, level + 1);
-          }
-        });
-      };
-
-      flatten(hierarchy);
-      return flattened;
+      return buildHierarchy(profileData.value.events);
     });
 
     const maxDuration = computed(() => {
@@ -643,24 +591,6 @@ export default defineComponent({
       }
       return baseWidth;
     });
-
-    // Calculate padding left based on level
-    // Base padding: 44px for level 1, then add 12px for each additional level
-    const getPaddingLeft = (level: number): string => {
-      if (level === 0) return '0px';
-      return `${44 + (level - 1) * 12}px`;
-    };
-
-    const getCellStyle = ({ columnId, row }: { columnId: string; row: any; value: any }) => {
-      if (columnId !== 'index' || !row || row.level === undefined || row.level === 0) return {};
-      return {
-        '--tree-level': String(row.level),
-        '--tree-indent': `${row.level * 30}px`,
-        '--tree-has-children': '1',
-        '--tree-is-parent': (row.children && row.children.length > 0) ? '1' : '0',
-        '--tree-last-child': row.isLastChild ? '1' : '0',
-      };
-    };
 
     const calculateBarWidth = (duration: number) => {
       return (duration / maxDuration.value) * 100;
@@ -747,25 +677,29 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      navigator.clipboard.writeText(traceId.value).then(() => {
-        copiedTraceId.value = true;
-        setTimeout(() => {
-          copiedTraceId.value = false;
-        }, 2000);
-      }).catch(() => {
-        toast({ variant: "error", message: 'Failed to copy trace ID to clipboard' });
+      copyToClipboard(traceId.value, {
+        errorMessage: 'Failed to copy trace ID to clipboard',
+      }).then((success) => {
+        if (success) {
+          copiedTraceId.value = true;
+          setTimeout(() => {
+            copiedTraceId.value = false;
+          }, 2000);
+        }
       });
     };
 
     const copiedSql = ref(false);
     const copySql = () => {
-      navigator.clipboard.writeText(profileData.value?.sql || "").then(() => {
-        copiedSql.value = true;
-        setTimeout(() => {
-          copiedSql.value = false;
-        }, 2000);
-      }).catch(() => {
-        toast({ variant: "error", message: 'Failed to copy SQL to clipboard' });
+      copyToClipboard(profileData.value?.sql || "", {
+        errorMessage: 'Failed to copy SQL to clipboard',
+      }).then((success) => {
+        if (success) {
+          copiedSql.value = true;
+          setTimeout(() => {
+            copiedSql.value = false;
+          }, 2000);
+        }
       });
     };
 
@@ -780,9 +714,6 @@ export default defineComponent({
       traceId,
       columns,
       hierarchicalEvents,
-      toggleNode,
-      getPaddingLeft,
-      getCellStyle,
       indexColumnWidth,
       calculateBarWidth,
       getDurationColor,
@@ -877,95 +808,6 @@ export default defineComponent({
 
 .trace-id {
   word-break: break-all;
-}
-
-// Tree connector styles — use attribute selectors since conditions are on inline style custom properties
-.tree-cell {
-  position: relative;
-  overflow: visible !important;
-}
-
-// Vertical line connecting parent to children — always at 22px
-.tree-cell[style*="--tree-has-children:1"]::before {
-  content: '';
-  position: absolute;
-  left: 22px;
-  top: -50%;
-  height: 150%;
-  width: 1.5px;
-  background-color: var(--q-primary);
-  opacity: 0.7;
-  z-index: 1;
-}
-
-// Last child: only show vertical line up to middle
-.tree-cell[style*="--tree-last-child:1"]::before {
-  top: -50%;
-  height: 100%;
-}
-
-// Horizontal line from vertical line to child's dot
-.tree-cell[style*="--tree-has-children:1"]::after {
-  content: '';
-  position: absolute;
-  left: 22px;
-  top: 50%;
-  width: calc((var(--tree-level) - 1) * 12px + 16px);
-  height: 1.5px;
-  background-color: var(--q-primary);
-  opacity: 0.7;
-  z-index: 1;
-}
-
-// Content container
-.tree-node-content {
-  position: relative;
-  z-index: 2;
-  min-height: 24px;
-}
-
-// Junction dot for child nodes
-.tree-cell[style*="--tree-has-children:1"] .tree-node-content::before {
-  content: '';
-  position: absolute;
-  left: calc((var(--tree-level, 1) - 1) * 12px + 38px);
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  background-color: var(--q-primary);
-  opacity: 0.7;
-  border: 2px solid var(--q-background);
-  border-radius: 0; // Default square for leaf nodes
-  transform: translateY(-50%);
-  z-index: 3;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
-}
-
-// Circular dot for parent nodes (nodes with children)
-.tree-cell[style*="--tree-is-parent:1"] .tree-node-content::before {
-  border-radius: 50%;
-}
-
-// Expand/collapse icon wrapper — consistent space
-.tree-icon-wrapper {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-right: 2px;
-}
-
-// Expand/collapse icon
-.tree-expand-icon {
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-
-// Add left margin for child nodes to center icon in available space
-.tree-cell[style*="--tree-has-children:1"] .tree-expand-icon {
-  margin-left: 4px;
 }
 
 // Index text — consistent spacing

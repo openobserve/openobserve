@@ -18,7 +18,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Login from "@/components/login/Login.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -77,9 +76,7 @@ vi.mock("@openobserve/browser-rum", () => ({
   },
 }));
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

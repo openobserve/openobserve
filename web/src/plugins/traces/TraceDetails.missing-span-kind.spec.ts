@@ -36,7 +36,7 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.],
+  plugins: [],
 });
 
 
