@@ -105,6 +105,9 @@ const tree = useTableTree<TData>(
 // Provide the computed (a reactive ref). Consumers `inject` and read `.value`.
 provide(OTableTreeContextKey, tree.context);
 
+// Expose horizontalScroll to descendant cells without prop-drilling.
+provide("o2TableHorizontalScroll", computed(() => !!props.horizontalScroll));
+
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
@@ -374,7 +377,7 @@ defineExpose({
       <table
         :class="[
           'tw:w-full',
-          !props.defaultColumns ? 'tw:table-fixed' : 'tw:table-auto',
+          props.horizontalScroll || props.defaultColumns ? 'tw:table-auto' : 'tw:table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{

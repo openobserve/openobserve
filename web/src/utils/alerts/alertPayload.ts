@@ -50,7 +50,6 @@ export interface PayloadContext {
 }
 
 export interface SaveAlertContext {
-  q: any;
   store: any;
   props: any;
   emit: any;
@@ -144,7 +143,6 @@ export const prepareAndSaveAlert = async (
   context: SaveAlertContext,
 ): Promise<void> => {
   const {
-    q,
     store,
     props,
     emit,

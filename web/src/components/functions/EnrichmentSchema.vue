@@ -235,7 +235,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
         return {
         t,
-        q,
         store,
         columns,
         loadingState,

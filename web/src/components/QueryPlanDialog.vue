@@ -100,12 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-else-if="error" class="q-pa-md">
-              <q-banner class="bg-negative text-white">
-                <template v-slot:avatar>
-                  <OIcon name="error" size="sm" />
-                </template>
-                {{ error }}
-              </q-banner>
+              <OBanner variant="error" icon="error" :content="error" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
@@ -208,6 +203,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({

@@ -61,45 +61,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCard class="note-container">
             <OCardSection class="tw:p-2">
               <div class="note-heading">Condition value Guidelines:</div>
-              <q-banner inline dense class="note-info">
-                <div>
-                  <OIcon name="info" size="sm" class="q-mr-sm" />
+              <OBanner variant="warning" dense>
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
                   <span
                     >To check for an empty value, use
                     <span class="highlight">""</span>. Example:
                     <span class="code">app_name != ""</span>
                   </span>
                 </div>
-                <div>
-                  <OIcon name="info" size="sm" class="q-mr-sm" />
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
                   <span
                     >To check for an Null value, use
                     <span class="highlight">null</span>. Example:
                     <span class="code">app_name != null</span>
                   </span>
                 </div>
-                <div>
-                  <OIcon name="info" size="sm" class="q-mr-sm" />
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
                   <span
                     >To add a custom column, type column name and press
                     <span class="highlight">Enter</span>.</span
                   >
                 </div>
-                <div>
-                  <OIcon name="warning" size="sm" class="q-mr-sm" />
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="warning" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-red-500" />
                   <span
                     >If conditions are not met, the record will be
                     dropped.</span
                   >
                 </div>
-                <div>
-                  <OIcon name="warning" size="sm" class="q-mr-sm" />
+                <div class="tw:flex tw:items-start">
+                  <OIcon name="warning" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-red-500" />
                   <span
                     >If the record does not have the specified field, it will be
                     dropped.</span
                   >
                 </div>
-              </q-banner>
+              </OBanner>
             </OCardSection>
           </OCard>
         </div>
@@ -162,6 +162,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -790,10 +791,11 @@ const validateSqlQuery = () => {
 }
 
 .note-container {
-  background-color: #f9f290;
+  background-color: var(--color-note-bg);
   border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  border: 1px solid var(--color-note-border);
+  color: var(--color-note-text);
+  font-weight: normal !important;
   width: 100%;
   margin-bottom: 20px;
   margin-top: 10px;
@@ -801,34 +803,26 @@ const validateSqlQuery = () => {
 
 .note-container .highlight {
   font-weight: bold;
-  color: #007bff; /* Blue color to highlight key terms */
+  color: var(--color-note-highlight);
 }
 
 .note-container .emphasis {
   font-style: italic;
-  color: #555; /* Subtle dark gray for emphasis */
+  color: var(--color-note-emphasis);
 }
 
 .note-container .code {
   font-family: monospace;
   padding: 2px 4px;
   border-radius: 3px;
-  color: #d63384; /* Soft pinkish-red for code */
+  color: var(--color-note-code);
 }
 
 .note-heading {
   font-size: medium;
 }
 
-.note-info {
-  font-size: small;
-  color: #865300;
-  background-color: #f9f290;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  justify-content: space-between;
-}
+
 
 /* Pipeline-specific FilterGroup styling for narrow sidepanel */
 .pipeline-filter-group-wrapper {

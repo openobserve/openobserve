@@ -76,21 +76,22 @@
             :page-size-options="pageSizeOptions"
             sorting="client"
             expansion="single"
+            :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
             :show-global-filter="false"
             :default-columns="false"
+            :wrap="wrapText"
+            :horizontal-scroll="!wrapText"
             width="100%"
             :style="
               dataToBeLoaded.length > 0
                 ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;'
                 : 'height: 0px'
             "
-            @row-click="onExpandRow"
+            @update:expanded-ids="onExpandedIdsChange"
           >
             <template #cell-sql="{ row }">
-              <span
-                :style="{ whiteSpace: wrapText ? 'wrap' : 'nowrap' }"
-              >{{ row.sql }}</span>
+              <span>{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
@@ -206,7 +207,7 @@
                 class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
@@ -305,10 +306,7 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
-    const expandedUuid = ref("");
-    const expandedIds = computed(() =>
-      expandedUuid.value ? [expandedUuid.value] : [],
-    );
+    const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
@@ -344,6 +342,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
+          size: 200,
           meta: { align: "left" },
         },
         {
@@ -352,7 +351,7 @@ export default defineComponent({
           accessorKey: "sql",
           cell: " ",
           sortable: true,
-          meta: { align: "left" },
+          meta: { align: "left", autoWidth: true },
         },
       ];
     };
@@ -360,7 +359,8 @@ export default defineComponent({
     const fetchSearchHistory = async () => {
       columnsToBeRendered.value = [];
       dataToBeLoaded.value = [];
-      expandedUuid.value = "";
+      expandedIds.value = [];
+      moreDetailsToDisplay.value = "";
       try {
         const { org_identifier } = router.currentRoute.value.query;
         isLoading.value = true;
@@ -532,16 +532,16 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
-    const onExpandRow = (row: any) => {
-      moreDetailsToDisplay.value = JSON.stringify(
-        filterRow(row),
-        null,
-        2,
-      );
-      if (expandedUuid.value === row.uuid) {
-        expandedUuid.value = "";
-      } else {
-        expandedUuid.value = row.uuid;
+    const onExpandedIdsChange = (ids: string[]) => {
+      expandedIds.value = ids;
+      const expandedId = ids[0];
+      if (!expandedId) {
+        moreDetailsToDisplay.value = "";
+        return;
+      }
+      const row = dataToBeLoaded.value.find((r: any) => r.uuid === expandedId);
+      if (row) {
+        moreDetailsToDisplay.value = JSON.stringify(filterRow(row), null, 2);
       }
     };
     const goToLogs = (row) => {
@@ -637,11 +637,10 @@ export default defineComponent({
       isLoading,
       updateDateTime,
       searchDateTimeRef,
-      expandedUuid,
       expandedIds,
       goToLogs,
       goToInspector,
-      onExpandRow,
+      onExpandedIdsChange,
       copyToClipboard,
       formatTime,
       delayMessage,

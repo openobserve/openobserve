@@ -196,6 +196,14 @@ export interface OTableProps<TData = any> {
   showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
+  /**
+   * When true, cells render their natural width and the table scrolls
+   * horizontally if the total content overflows the container. Switches
+   * the inner table from `table-fixed` to `table-auto` and removes the
+   * default `overflow-hidden + text-ellipsis` clipping on non-wrapped cells.
+   * Pair with `wrap=false` for long, unbroken content (e.g. SQL strings).
+   */
+  horizontalScroll?: boolean;
   /** Fixed table width (CSS value) */
   width?: string | number;
 

@@ -47,10 +47,11 @@
             row-key="trace_id"
             pagination="client"
             expansion="single"
+            :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh  - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
-            @row-click="onExpandRow"
+            @update:expanded-ids="onExpandedIdsChange"
+            :show-global-filter="false"
           >
             <template #cell-status="{ row }">
               <div class="status-cell">
@@ -205,7 +206,7 @@
             </template>
             <template #bottom>
               <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
                 <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
@@ -333,7 +334,7 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
-    const expandedRow = ref(""); // trace_id of expanded row
+    const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const showSearchResults = ref(false);
@@ -367,12 +368,12 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "center" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "left" } },
         { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: 200, meta: { align: "center" } },
         { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: 200, meta: { align: "center" } },
         { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: 100, meta: { align: "left" } },
         { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: 200, meta: { align: "left" } },
-        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 150, meta: { align: "left", cellClass: "actions-column" } },
+        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column" } },
       ];
     };
 
@@ -402,7 +403,8 @@ export default defineComponent({
         const { org_identifier } = router.currentRoute.value.query;
         // columnsToBeRendered.value = [];
         // dataToBeLoaded.value = [];
-        expandedRow.value = "";
+        expandedIds.value = [];
+        query.value = "";
         isLoading.value = true;
         let responseToBeFetched = [];
         searchService
@@ -634,14 +636,16 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
-    const expandedIds = computed(() => expandedRow.value ? [expandedRow.value] : []);
-
-    const onExpandRow = (row: any) => {
-      query.value = JSON.stringify(filterRow(row), null, 2);
-      if (expandedRow.value === row.trace_id) {
-        expandedRow.value = "";
-      } else {
-        expandedRow.value = row.trace_id;
+    const onExpandedIdsChange = (ids: string[]) => {
+      expandedIds.value = ids;
+      const expandedId = ids[0];
+      if (!expandedId) {
+        query.value = "";
+        return;
+      }
+      const row = dataToBeLoaded.value.find((r: any) => r.trace_id === expandedId);
+      if (row) {
+        query.value = JSON.stringify(filterRow(row), null, 2);
       }
     };
     const goToLogs = (row) => {
@@ -770,10 +774,9 @@ export default defineComponent({
       pageSize,
       pageSizeOptions,
       searchDateTimeRef,
-      expandedRow,
       expandedIds,
       goToLogs,
-      onExpandRow,
+      onExpandedIdsChange,
       copyToClipboard,
       formatTime,
       delayMessage,
