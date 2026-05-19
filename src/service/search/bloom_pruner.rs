@@ -90,13 +90,17 @@ pub async fn prune(
 
     // 3. Fetch all .bf files in parallel (bounded by underlying cache / object_store concurrency;
     //    typical bucket counts are << 1k).
-    let bf_paths: Vec<(Group, String)> = groups
+    //
+    // Resolve the account synchronously here so the per-bucket async
+    // closure doesn't need to capture `org_id` (which is a borrow and
+    // can't be moved into `async move` without an extra `.to_string()`
+    // per bucket).
+    let bf_paths: Vec<(Group, String, String)> = groups
         .keys()
         .map(|(date, ver)| {
-            (
-                (date.clone(), *ver),
-                bloom_path(org_id, stream_type, stream_name, date, *ver),
-            )
+            let path = bloom_path(org_id, stream_type, stream_name, date, *ver);
+            let account = infra::storage::get_account(org_id, &path).unwrap_or_default();
+            ((date.clone(), *ver), account, path)
         })
         .collect();
 
@@ -104,8 +108,7 @@ pub async fn prune(
     // remote miss, write-through into the file_data cache so subsequent
     // prune calls touching the same .bf are cache hits.
     let fetched: Vec<(Group, String, object_store::Result<bytes::Bytes>)> = stream::iter(bf_paths)
-        .map(|(group, path)| async move {
-            let account = infra::storage::get_account(&path).unwrap_or_default();
+        .map(|(group, account, path)| async move {
             // Cache-only first; on miss, hit storage and write back.
             let cached = infra::cache::file_data::get_opts(
                 &account,

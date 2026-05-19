@@ -639,8 +639,10 @@ pub async fn merge_by_stream(
     // visited, regardless of whether any merging actually happened.
     // `build_for_bucket` is internally a no-op when nothing changed
     // (every file already has a non-zero bloom_ver) so this is cheap on
-    // already-settled buckets. Failure is non-fatal — search degrades to
-    // the pre-bloom path for affected files.
+    // already-settled buckets. Failure is non-fatal — affected files
+    // keep `bloom_ver = 0` and search degrades to the pre-bloom path
+    // for them. There is no retry; a one-shot backfill CLI handles
+    // recovery (see src/infra/src/bloom/DESIGN.md §13).
     for prefix in visited_prefixes {
         let date_key = derive_date_key_from_prefix(&prefix);
         if date_key.is_empty() {
