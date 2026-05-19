@@ -139,6 +139,19 @@ const treeMeta = computed(() => {
   return treeCtx?.value?.getMeta(props.row.original) ?? null;
 });
 const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
+/**
+ * X-offset of the chevron centre, relative to this td's left edge.
+ * Used to position connector pseudo-elements at the correct depth.
+ *   td padding-left (8px) + depth indent + half chevron (9px)
+ * For child rows we want the horizontal stub to start at the *parent's*
+ * chevron x, which is `depth - 1` indents in.
+ */
+const treeChevronX = computed(
+  () => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9,
+);
+const treeParentChevronX = computed(
+  () => 8 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
+);
 
 function onTreeToggle(event: MouseEvent) {
   event.stopPropagation();
@@ -171,7 +184,15 @@ function handleClick() {
       isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
     ]"
-    :style="cellStyle"
+    :style="[
+      cellStyle,
+      isTreeColumn
+        ? {
+            '--o2-tree-x': treeChevronX + 'px',
+            '--o2-tree-parent-x': treeParentChevronX + 'px',
+          }
+        : {},
+    ]"
     @click="handleClick"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
@@ -299,7 +320,7 @@ function handleClick() {
 .o2-tree-parent-expanded::after {
   content: "";
   position: absolute;
-  left: calc(8px + 9px); /* td px-2 (8px) + half chevron-slot (9px) */
+  left: var(--o2-tree-x);
   top: calc(50% + 9px);
   bottom: 0;
   width: 1.5px;
@@ -308,11 +329,14 @@ function handleClick() {
   z-index: 1;
 }
 
-/* Vertical + horizontal connector on child rows */
+/* Vertical + horizontal connector on child rows.
+ * The vertical line sits at the *parent's* chevron x (one indent in from this row).
+ * The horizontal stub runs from there to this row's own chevron x.
+ */
 .o2-tree-child::before {
   content: "";
   position: absolute;
-  left: calc(8px + 9px);
+  left: var(--o2-tree-parent-x);
   top: 0;
   bottom: 0;
   width: 1.5px;
@@ -326,9 +350,9 @@ function handleClick() {
 .o2-tree-child::after {
   content: "";
   position: absolute;
-  left: calc(8px + 9px);
+  left: var(--o2-tree-parent-x);
   top: 50%;
-  width: 14px;
+  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x));
   height: 1.5px;
   background-color: var(--q-primary, #6366f1);
   opacity: 0.55;
