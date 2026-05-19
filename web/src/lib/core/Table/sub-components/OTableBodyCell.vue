@@ -129,6 +129,10 @@ const highlightedHtml = computed(() => {
 
 // ── Tree mode: inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
+const horizontalScroll = inject<{ value: boolean } | null>(
+  "o2TableHorizontalScroll",
+  null,
+);
 const isTreeColumn = computed(
   () =>
     !!treeCtx?.value?.enabled &&
@@ -177,7 +181,11 @@ function handleClick() {
       alignClass,
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
       isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
-      wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+      wrap
+        ? 'tw:break-words tw:whitespace-normal'
+        : horizontalScroll?.value
+          ? 'tw:whitespace-nowrap'
+          : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
       isTreeColumn ? 'o2-tree-cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',

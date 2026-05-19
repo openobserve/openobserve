@@ -48,9 +48,9 @@
             pagination="client"
             expansion="single"
             v-model:expanded-ids="expandedIds"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh  - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
             @row-click="onExpandRow"
+            :show-global-filter="false"
           >
             <template #cell-status="{ row }">
               <div class="status-cell">
@@ -205,7 +205,7 @@
             </template>
             <template #bottom>
               <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
                 <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
@@ -366,12 +366,12 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "center" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "left" } },
         { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: 200, meta: { align: "center" } },
         { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: 200, meta: { align: "center" } },
         { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: 100, meta: { align: "left" } },
         { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: 200, meta: { align: "left" } },
-        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 150, meta: { align: "left", cellClass: "actions-column" } },
+        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column" } },
       ];
     };
 

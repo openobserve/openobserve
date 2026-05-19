@@ -79,6 +79,8 @@
             v-model:expanded-ids="expandedIds"
             :show-global-filter="false"
             :default-columns="false"
+            :wrap="wrapText"
+            :horizontal-scroll="!wrapText"
             width="100%"
             :style="
               dataToBeLoaded.length > 0
@@ -88,9 +90,7 @@
             @row-click="onExpandRow"
           >
             <template #cell-sql="{ row }">
-              <span
-                :style="{ whiteSpace: wrapText ? 'wrap' : 'nowrap' }"
-              >{{ row.sql }}</span>
+              <span>{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
@@ -206,7 +206,7 @@
                 class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
@@ -344,6 +344,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
+          size: 200,
           meta: { align: "left" },
         },
         {
@@ -352,7 +353,7 @@ export default defineComponent({
           accessorKey: "sql",
           cell: " ",
           sortable: true,
-          meta: { align: "left" },
+          meta: { align: "left", autoWidth: true },
         },
       ];
     };
