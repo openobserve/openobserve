@@ -34,9 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
               <OTooltip :content="xAxisHint" />
-            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -201,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
               <OTooltip side="top" align="center">
                 <template #content>
                   <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -217,7 +216,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
                 </template>
               </OTooltip>
-            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -366,9 +364,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="yAxisHint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -520,9 +517,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <OIcon name="info-outline" size="sm" class="q-ml-xs">
+          <OIcon name="info-outline" size="sm" class="q-ml-xs" />
             <OTooltip :content="zAxisHint" />
-          </OIcon>
         </div>
         <span class="layout-separator">:</span>
         <div
@@ -733,6 +729,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",

@@ -43,9 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="17px"
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-              >
+               />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
-              </OIcon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
@@ -96,9 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="17px"
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-              >
+               />
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
-              </OIcon>
             </span>
           </div>
           <div class="datetime-picker-wrapper tw:mt-2">
@@ -122,9 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="17px"
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-              >
+               />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
-              </OIcon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">

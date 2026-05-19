@@ -329,9 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <!-- Threshold explainer shown only when template dimensions are present -->
                 <div v-if="selectedTemplateData?.dimensions?.length" class="tw:flex tw:items-center tw:gap-1">
                   <span class="tw:text-[10px] tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.passThreshold") }}</span>
-                  <OIcon name="info-outline" size="xs">
+                  <OIcon name="info-outline" size="xs" />
                     <OTooltip :content="$t('traces.evaluations.passThresholdTooltip')" max-width="220px" />
-                  </OIcon>
                 </div>
               </div>
 

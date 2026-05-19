@@ -388,6 +388,8 @@ import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,

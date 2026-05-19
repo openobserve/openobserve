@@ -127,7 +127,7 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import { date, format } from "quasar";
+    import { date, format, useQuasar } from "quasar";
     import streamService from "../../services/stream";
     import segment from "../../services/segment_analytics";
     import {
@@ -189,6 +189,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
     setup(props) {
         const { t } = useI18n();
         const store = useStore();
+        const q = useQuasar();
         const { getStream } = useStreams();
         const columns = [
             {

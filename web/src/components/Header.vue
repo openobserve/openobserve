@@ -393,6 +393,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({

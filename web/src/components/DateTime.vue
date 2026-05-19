@@ -360,7 +360,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -1042,6 +1041,17 @@ export default defineComponent({
 
     const onShow = () => {
       emit("show");
+    };
+
+    const menuOpen = ref(false);
+    const onMenuOpenChange = (open: boolean) => {
+      if (open) {
+        onBeforeShow();
+        onShow();
+      } else {
+        onBeforeHide();
+        onHide();
+      }
     };
 
     return {

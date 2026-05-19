@@ -78,6 +78,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",

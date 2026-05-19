@@ -448,9 +448,10 @@ test.describe("Alerts Stream Switching Regression", () => {
     await destDropdown.click();
     await page.waitForTimeout(1000);
 
-    const destMenu = page.locator('.q-menu:visible');
-    await expect(destMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-    const firstDest = destMenu.locator('.q-item').first();
+    const destMenu = page.locator('[data-test="alert-destinations-select-popover"]');
+    await expect(destMenu).toBeVisible({ timeout: 5000 });
+    const firstDest = page.locator('[data-test="alert-destinations-select-option"]').first();
+    await expect(firstDest).toBeVisible({ timeout: 5000 });
     await firstDest.click();
     testLogger.info(`Selected destination`);
     await page.waitForTimeout(500);

@@ -433,9 +433,8 @@
                         @click.stop="
                           handleNavigationAction(block.navigationAction)
                         "
-                      >
+                       />
                         <OTooltip :content="block.navigationAction.label" />
-                      </OIcon>
                       <OIcon
                         v-if="
                           hasToolCallDetails(block) &&

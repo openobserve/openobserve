@@ -412,7 +412,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await options.nth(1).click();
 
     // Wait for dropdown to close
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${vars[0]}-inner-popover"]`, { timeout: 3000 });
 
     const result = await apiMonitor;
 

@@ -34,9 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
             "
-          >
+           />
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
-          </OIcon>
         </div>
         <div>
           <OSwitch

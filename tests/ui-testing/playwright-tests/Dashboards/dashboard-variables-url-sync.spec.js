@@ -471,7 +471,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${var1}-inner-popover"]`, { timeout: 3000 });
 
     const dropdown2 = page.getByLabel(var2, { exact: true });
     await dropdown2.waitFor({ state: "visible", timeout: 5000 });
@@ -481,7 +481,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${var2}-inner-popover"]`, { timeout: 3000 });
 
     // Click refresh
     await page.locator(SELECTORS.REFRESH_BTN).click();
@@ -617,7 +617,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
 
     const tabDropdown = page.getByLabel(tabVar, { exact: true });
     await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
@@ -627,7 +627,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${tabVar}-inner-popover"]`, { timeout: 3000 });
 
     // Refresh
     await page.locator(SELECTORS.REFRESH_BTN).click();

@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.latitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -142,9 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.longitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -264,9 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.weight") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="WeightHint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -408,6 +405,7 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",

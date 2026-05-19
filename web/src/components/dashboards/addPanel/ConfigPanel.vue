@@ -1100,12 +1100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:text-sm tw:font-medium">{{
           t("dashboard.configSectionValueTransformations")
         }}</span>
-        <OIcon name="info-outline" size="sm">
+        <OIcon name="info-outline" size="sm" />
           <OTooltip
             :content="t('dashboard.configSectionValueTransformationsTooltip')"
             max-width="250px"
           />
-        </OIcon>
       </template>
       <div class="config-section-body">
         <ValueMapping />
@@ -1129,12 +1128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:text-sm tw:font-medium">{{
           t("dashboard.configSectionFieldOverrides")
         }}</span>
-        <OIcon name="info-outline" size="sm">
+        <OIcon name="info-outline" size="sm" />
           <OTooltip
             :content="t('dashboard.configSectionFieldOverridesTooltip')"
             max-width="250px"
           />
-        </OIcon>
       </template>
       <div class="config-section-body hide-child-title">
         <OverrideConfig
@@ -1559,12 +1557,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-drilldown-info"
-        >
+         />
           <OTooltip
             :content="t('dashboard.drilldownTooltip')"
             max-width="250px"
           />
-        </OIcon>
       </template>
       <div class="config-section-body">
         <Drilldown :variablesData="variablesData" />
@@ -1598,12 +1595,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-time-shift-info"
-        >
+         />
           <OTooltip
             :content="t('dashboard.comparisonAgainstTooltip')"
             max-width="250px"
           />
-        </OIcon>
       </template>
       <div class="config-section-body">
         <CustomDateTimePicker
@@ -1666,12 +1662,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-markline-info"
-        >
+         />
           <OTooltip
             :content="t('dashboard.markLinesTooltip')"
             max-width="250px"
           />
-        </OIcon>
       </template>
       <div class="config-section-body">
         <MarkLineConfig />

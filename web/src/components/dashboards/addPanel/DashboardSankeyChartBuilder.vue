@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.source") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -146,9 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.target") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -272,9 +270,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.value") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -430,6 +427,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",

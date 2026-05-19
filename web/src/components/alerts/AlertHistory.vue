@@ -167,9 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'check-circle' : 'schedule'"
               :color="value ? 'positive' : 'grey'"
               size="xs"
-            >
+             />
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
-            </OIcon>
           </template>
 
           <template #cell-is_silenced="{ value }">
@@ -177,9 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'volume-off' : 'volume-up'"
               :color="value ? 'grey' : 'positive'"
               size="20px"
-            >
+             />
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
-            </OIcon>
           </template>
 
           <template #cell-duration="{ row }">

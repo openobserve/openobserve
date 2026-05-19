@@ -162,6 +162,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";

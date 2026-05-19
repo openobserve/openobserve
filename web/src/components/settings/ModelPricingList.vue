@@ -156,26 +156,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
             </span>
-            <OIcon
+            <span
               v-else-if="
                 getSource(row) === 'meta_org' ||
                 (getSource(row) === 'org' &&
                   row.org_id !== orgIdentifier)
               "
-              name="corporate-fare"
-              size="sm"
-              class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
+              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
             >
+              <OIcon
+                name="corporate-fare"
+                size="sm"
+                class="source-icon"
+               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-            </OIcon>
-            <OIcon
+            </span>
+            <span
               v-else
-              name="person"
-              size="sm"
-              class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
+              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
             >
+              <OIcon
+                name="person"
+                size="sm"
+                class="source-icon"
+               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-            </OIcon>
+            </span>
             <div class="o2-table-cell-content">{{ row.name }}</div>
             <OTooltip
               v-if="row.name.length > 30"
@@ -197,9 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="warning-amber"
               size="xs"
               class="tw:shrink-0 shadowed-icon"
-            >
+             />
               <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: row._parentName })" />
-            </OIcon>
           </div>
         </template>
         <template #cell-pricing="{ row }">
@@ -403,27 +408,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
           </span>
-          <OIcon
+          <span
             v-else-if="
               pricingDialogRow &&
               (getSource(pricingDialogRow) === 'meta_org' ||
                 (getSource(pricingDialogRow) === 'org' &&
                   pricingDialogRow.org_id !== orgIdentifier))
             "
-            name="corporate-fare"
-            size="sm"
-            class="tw:shrink-0 tw:cursor-default source-icon"
+            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
           >
-             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-          </OIcon>
-          <OIcon
+            <OIcon
+              name="corporate-fare"
+              size="sm"
+              class="source-icon"
+             />
+            <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
+          </span>
+          <span
             v-else
-            name="person"
-            size="sm"
-            class="tw:shrink-0 tw:cursor-default source-icon"
+            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
           >
+            <OIcon
+              name="person"
+              size="sm"
+              class="source-icon"
+             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-          </OIcon>
+          </span>
       </template>
 
       <div class="q-pa-md pricing-dialog-body">

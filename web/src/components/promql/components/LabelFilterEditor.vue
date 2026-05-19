@@ -23,7 +23,10 @@
                   <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
-              <div class="label-filter-editor-dropdown tw:p-4">
+              <div
+                class="label-filter-editor-dropdown tw:p-4"
+                :data-test="`promql-label-filter-${index}-menu`"
+              >
                 <div style="width: 350px">
                   <!-- Label Selection -->
                   <OSelect

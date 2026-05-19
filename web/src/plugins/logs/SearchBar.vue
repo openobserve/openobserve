@@ -1525,7 +1525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer">
+          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
                 <span style="font-size: 14px">{{
@@ -1533,7 +1533,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </template>
             </OTooltip>
-          </OIcon>
         </div>
         <OInput
           type="number"

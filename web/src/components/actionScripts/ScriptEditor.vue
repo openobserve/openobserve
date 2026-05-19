@@ -21,9 +21,8 @@
           name="info"
           class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
           size="sm"
-        >
+         />
           <OTooltip side="right" align="center" :sideOffset="10" :content="error" />
-        </OIcon>
       </template>
     </FullViewContainer>
     <div

@@ -411,13 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="q-mr-xs"
                           size="sm"
                           style="color: #f5a623; cursor: pointer"
-                        >
-                          <OTooltip side="right">
-                            Other fields show only the schema fields that
-                            existed before the stream was configured to use a
-                            user-defined schema.
-                          </OTooltip>
-                        </OIcon>
+                        />
+                        <OTooltip
+                          side="right"
+                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                        />
                       </div>
                     </div>
 
@@ -670,6 +668,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @remove="removeSchemaField"
                       />
                     </div>
+                  </div>
+                </div>
 
               <!-- Note: Drawer max-height to be dynamically calculated with JS -->
               <div
@@ -771,328 +771,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTable>
               </div>
-            </div>
-            
-            <!-- Configuration tab -->
-            <div v-if="activeMainTab == 'configuration'">
-              <div class="tw:w-full tw:h-[calc(100vh-307px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
-                <!-- Configuration Settings Card -->
-                <div 
-                  :class="[
-                    'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
-                    store.state.theme === 'dark' ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700' : 'tw:border-gray-200'
-                  ]"
-                >
-                  
-                  <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
-                    <!-- Data Retention -->
-                    <div v-if="showDataRetention" class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Data Retention (days)
-                      </label>
-                      <OInput
-                        data-test="stream-details-data-retention-input"
-                        v-model="dataRetentionDays"
-                        type="number"
-                        min="1"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                          v-if="dataRetentionDays > 0 && dataRetentionDays != ''"
-                          :class="[
-                            'tw:block tw:text-xs tw:mt-1 tw:italic',
-                            store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                          ]"
-                      >
-                        Global retention is {{ store.state.zoConfig.data_retention_days }} days
-                        
-                      </small>
-                      <!-- Error Message -->
-                      <div class="tw:text-red-500 tw:text-sm">
-                        <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
-                          Retention period must be at least 1 day
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Max Query Range -->
-                    <div class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Max Query Range (hours)
-                      </label>
-                      <OInput
-                        data-test="stream-details-max-query-range-input"
-                        v-model="maxQueryRange"
-                        type="number"
-                        min="0"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                        :class="[
-                          'tw:block tw:text-xs tw:mt-1 tw:italic',
-                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                        ]"
-                      >
-                        Maximum time range allowed for queries. Set 0 for unlimited range.
-                      </small>
-                    </div>
-
-                    <!-- Flatten Level -->
-                    <div class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        {{ t("logStream.flattenLevel") }}
-                      </label>
-                      <OInput
-                        data-test="stream-details-flatten-level-input"
-                        v-model="flattenLevel"
-                        type="number"
-                        min="0"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                        :class="[
-                          'tw:block tw:text-xs tw:mt-1 tw:italic',
-                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                        ]"
-                      >
-                        Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}
-                      </small>
-                    </div>
-
-                    <!-- Toggles -->
-                    <div 
-                      :class="[
-                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                        store.state.theme === 'dark' ? 'tw:border-gray-600' : 'tw:border-gray-200'
-                      ]"
-                    >
-                      <span 
-                        :class="[
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Use Stream Stats for Partitioning
-                      </span>
-                      <OSwitch
-                        data-test="log-stream-use_approx-toggle-btn"
-                        v-model="approxPartition"
-                        @update:model-value="formDirtyFlag = true"
-                      />
-                    </div>
-
-                    <div 
-                      :class="[
-                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                        store.state.theme === 'dark' ? 'tw:border-gray-600 tw:text-gray-200' : 'tw:border-gray-200 tw:text-gray-700'
-                      ]"
-                    >
-                      <span>Store Original Data</span>
-                      <OSwitch
-                        v-if="showStoreOriginalDataToggle"
-                        data-test="log-stream-store-original-data-toggle-btn"
-                        v-model="storeOriginalData"
-                        @update:model-value="formDirtyFlag = true"
-                      />
-                    </div>
-
-                    <div
-                      :class="[
-                        'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
-                        store.state.theme === 'dark'
-                          ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700'
-                          : 'tw:border-gray-200',
-                      ]"
-                    >
-                      <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
-                        <!-- Data Retention -->
-                        <div v-if="showDataRetention" class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Data Retention (days)
-                          </label>
-                          <OInput
-                            data-test="stream-details-data-retention-input"
-                            v-model="dataRetentionDays"
-                            type="number"
-                            min="1"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            v-if="
-                              dataRetentionDays > 0 && dataRetentionDays != ''
-                            "
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global retention is
-                            {{ store.state.zoConfig.data_retention_days }} days
-                          </small>
-                          <!-- Error Message -->
-                          <div class="tw:text-red-500 tw:text-sm">
-                            <span
-                              v-if="
-                                dataRetentionDays <= 0 ||
-                                dataRetentionDays == ''
-                              "
-                            >
-                              Retention period must be at least 1 day
-                            </span>
-                          </div>
-                        </div>
-
-                        <!-- Max Query Range -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Max Query Range (hours)
-                          </label>
-                          <OInput
-                            data-test="stream-details-max-query-range-input"
-                            v-model="maxQueryRange"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Maximum time range allowed for queries. Set 0 for
-                            unlimited range.
-                          </small>
-                        </div>
-
-                        <!-- Flatten Level -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            {{ t("logStream.flattenLevel") }}
-                          </label>
-                          <OInput
-                            data-test="stream-details-flatten-level-input"
-                            v-model="flattenLevel"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global is
-                            {{ store.state.zoConfig.ingest_flatten_level || 3 }}
-                          </small>
-                        </div>
-
-                        <!-- Toggles -->
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600'
-                              : 'tw:border-gray-200',
-                          ]"
-                        >
-                          <span
-                            :class="[
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Use Stream Stats for Partitioning
-                          </span>
-                          <OSwitch
-                            data-test="log-stream-use_approx-toggle-btn"
-                            v-model="approxPartition"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
-
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Store Original Data</span>
-                          <OSwitch
-                            v-if="showStoreOriginalDataToggle"
-                            data-test="log-stream-store-original-data-toggle-btn"
-                            v-model="storeOriginalData"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
-
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Enable Distinct Values</span>
-                          <OSwitch
-                            data-test="log-stream-enabled-distinct-values-toggle-btn"
-                            v-model="enableDistinctFields"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 <!-- red button tab -->
-                <div v-else-if="activeMainTab == 'redButton'">
+                <div v-if="activeMainTab == 'redButton'">
                   <div
                     class="mapping-warning-msg q-mt-sm"
                     style="width: fit-content"
@@ -1158,18 +839,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @dirty="llmEvalFormDirty = true"
                 />
 
-                <!-- Organization-level cross-links (read-only, hidden when empty) -->
-                <template v-if="orgCrossLinks.length > 0">
-                  <div class="tw:my-4 tw:border-t tw:border-border" />
-                  <CrossLinkManager
-                    :modelValue="orgCrossLinks"
-                    :title="t('crossLinks.orgCrossLinks')"
-                    :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
-                    readonly
-                  />
-                </template>
-              </div>
-            </div>
+                <!-- cross-linking tab -->
+                <div v-if="activeMainTab == 'crossLinking'">
+                  <div class="tw:p-4">
+                    <!-- Stream-level cross-links (editable) -->
+                    <CrossLinkManager
+                      v-model="streamCrossLinks"
+                      :title="t('crossLinks.streamCrossLinks')"
+                      :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
+                      :availableFields="streamFieldNames"
+                      @change="formDirtyFlag = true"
+                    />
 
                     <!-- Organization-level cross-links (read-only, hidden when empty) -->
                     <template v-if="orgCrossLinks.length > 0">
@@ -1183,6 +863,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
+              </div>
+            </div>
 
                 <!-- floating footer for the table -->
                 <div
@@ -1305,7 +987,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
     <div v-else class="q-pa-md">
       <h5>Wait while loading...</h5>
     </div>
@@ -1365,7 +1046,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { date, format } from "quasar";
+import { date, format, useQuasar } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import "../../styles/schema.scss";
@@ -1459,6 +1140,7 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
+    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -2914,22 +2596,15 @@ export default defineComponent({
       ) {
         return true;
       }
-      return keysToBeDisplayed || []
-    })
-  };
-  //this function is used to check if the option is present in the default env
-  //if present then we will return true else false
-  //this is used to show the tooltip in the q-select for disabled options
-  //why there are disabled
-  const checkIfOptionPresentInDefaultEnv = (name, option) => {
-    if (store.state.zoConfig.default_fts_keys.indexOf(name) > -1 && option.value == "fullTextSearchKey") {
-      return true;
-    }
-    if (store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 && option.value == "secondaryIndexKey") {
-      return true;
-  }
-  return false;
-  };
+      if (
+        store.state.zoConfig.default_secondary_index_fields.indexOf(name) >
+          -1 &&
+        option.value == "secondaryIndexKey"
+      ) {
+        return true;
+      }
+      return false;
+    };
   //this is used to upate the model value of the index_type
   const updateIndexType = (props, value) => {
     props.row.index_type = filterValueBasedOnEnv(props, value ?? []);

@@ -901,7 +901,7 @@ test.describe("Cross-Linking testcases", () => {
             await configuredBtn.click();
             await page.waitForTimeout(1000);
 
-            const crossLinkInMenu = page.locator('.q-menu .q-item').filter({ hasText: crossLinkName });
+            const crossLinkInMenu = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
             const hasCrossLink = await crossLinkInMenu.isVisible().catch(() => false);
 
             if (hasCrossLink) {
@@ -923,7 +923,7 @@ test.describe("Cross-Linking testcases", () => {
             await otherBtn.click();
             await page.waitForTimeout(1000);
 
-            const crossLinkInOtherMenu = page.locator('.q-menu .q-item').filter({ hasText: crossLinkName });
+            const crossLinkInOtherMenu = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
             const hasCrossLinkInOther = await crossLinkInOtherMenu.isVisible().catch(() => false);
 
             // Cross-link should NOT appear for _timestamp since it's not in the configured fields

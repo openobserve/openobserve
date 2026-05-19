@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Url
                       <span v-if="row.urlJobs.length > 1" class="text-grey-7"> ({{ row.urlJobs.length }})</span>
                     </span>
-                    <OIcon
-                      v-if="row.aggregateStatus === 'completed'"
-                      name="check-circle"
-                      size="sm"
-                    >
+                    <span v-if="row.aggregateStatus === 'completed'">
+                      <OIcon
+                        name="check-circle"
+                        size="sm"
+                       />
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 300px;">
@@ -105,13 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </OTooltip>
-                    </OIcon>
-                    <OIcon
-                      v-else-if="row.aggregateStatus === 'processing'"
-                      name="sync"
-                      size="sm"
-                      class="rotate-animation"
-                    >
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'processing'">
+                      <OIcon
+                        name="sync"
+                        size="sm"
+                        class="rotate-animation"
+                       />
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 300px;">
@@ -122,14 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </OTooltip>
-                    </OIcon>
-                    <OIcon
-                      v-else-if="row.aggregateStatus === 'failed'"
-                      name="warning"
-                      size="sm"
-                      class="cursor-pointer"
-                      @click="showUrlJobsDialog(row)"
-                    >
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'failed'">
+                      <OIcon
+                        name="warning"
+                        size="sm"
+                        class="cursor-pointer"
+                        @click="showUrlJobsDialog(row)"
+                       />
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 350px;">
@@ -140,12 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </OTooltip>
-                    </OIcon>
-                    <OIcon
-                      v-else-if="row.aggregateStatus === 'pending'"
-                      name="schedule"
-                      size="sm"
-                    >
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'pending'">
+                      <OIcon
+                        name="schedule"
+                        size="sm"
+                       />
                       <OTooltip>
                         <template #content>
                           <div style="max-width: 300px;">
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </OTooltip>
-                    </OIcon>
+                    </span>
                   </template>
                 </div>
               </template>

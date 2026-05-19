@@ -42,7 +42,10 @@
                       /></template>
                     </OButton>
                   </template>
-                  <div class="operations-list-dropdown tw:p-4">
+                  <div
+                    class="operations-list-dropdown tw:p-4"
+                    :data-test="`promql-operation-${index}-menu`"
+                  >
                     <div style="width: 350px">
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
@@ -150,7 +153,8 @@
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
                 :key="op.id"
-                class="tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                :data-test="`promql-operation-option-${op.id}`"
+                class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
                 @click="addOperation(op); showOperationSelector = false"
               >
                 <div class="tw:font-medium">{{ op.name }}</div>
@@ -202,6 +206,9 @@ const availableLabels = computed(
 
 // State for filtered labels in the select
 const filteredLabels = ref<string[]>([]);
+
+// Search query for filtering operations in the operation selector dialog
+const searchQuery = ref("");
 
 const categories = computed(() => promQueryModeller.getCategories());
 

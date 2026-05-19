@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     name="info-outline"
                     data-test="dashboard-variables-setting-filter-info"
-                  >
+                   />
                     <OTooltip max-width="250px">
                       <template #content>
                         In filters, you can use the value of another variable to
@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="bg-highlight">$variableName</span>.
                       </template>
                     </OTooltip>
-                  </OIcon>
                 </div>
                 <div>
                   <div

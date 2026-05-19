@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="cursor: pointer"
                 size="18px"
                 :data-test="`dashboard-panel-query-tab-visibility-${index}`"
-              >
+               />
                 <OTooltip
                   :content="
                     dashboardPanelData.layout.hiddenQueries.includes(index)
@@ -74,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('dashboard.hideQueryResults')
                   "
                 />
-              </OIcon>
               <OIcon
                 v-if="
                   index > 0 ||

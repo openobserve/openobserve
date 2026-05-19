@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <span class="nav-menu-item-label">{{ title }}</span>
+      <div class="nav-menu-item-label">{{ title }}</div>
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <span class="nav-menu-item-label">{{ title }}</span>
+      <div class="nav-menu-item-label">{{ title }}</div>
     </div>
   </a>
 
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <span class="nav-menu-item-label">{{ title }}</span>
+      <div class="nav-menu-item-label">{{ title }}</div>
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <span class="nav-menu-item-label">{{ title }}</span>
+      <div class="nav-menu-item-label">{{ title }}</div>
     </div>
   </router-link>
 </template>

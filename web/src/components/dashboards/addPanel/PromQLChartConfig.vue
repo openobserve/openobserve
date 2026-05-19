@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Visible Columns</b>
@@ -253,7 +253,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     both are set.
                   </template>
                 </OTooltip>
-              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -293,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Hidden Columns</b>
@@ -309,7 +308,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     le (histogram buckets), quantile, etc.
                   </template>
                 </OTooltip>
-              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -387,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.stickyColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Sticky Columns</b>
@@ -403,7 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <b>Note:</b> Disabled when "Sticky First Column" is enabled.
                   </template>
                 </OTooltip>
-              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">

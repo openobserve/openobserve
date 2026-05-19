@@ -37,12 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
-              </OIcon>
             </div>
             <div>
               <div class="flex items-center q-mr-sm" style="width: fit-content">
@@ -152,12 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.periodTooltip')"
                   side="right"
                 />
-              </OIcon>
             </div>
             <div>
               <div
@@ -210,12 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
-              </OIcon>
             </div>
             <div>
               <div
@@ -269,12 +266,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.destinationsTooltip')"
                   side="right"
                 />
-              </OIcon>
             </div>
             <div>
               <div class="flex items-center">
@@ -334,12 +330,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 190px; height: 28px"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer" />
               <OTooltip
                 :content="t('alerts.alertSettings.createsIncidentTooltip')"
                 side="right"
               />
-            </OIcon>
           </div>
           <OSwitch
             v-model="formData.creates_incident"
