@@ -18,12 +18,9 @@ import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vites
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Create a unique DOM node for this test file
 const uniqueNodeId = "domain-management-unit-test-app";

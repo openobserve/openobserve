@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-md"
             :title="t('serviceAccounts.copyToken')"
             class="tw:mr-1"
-            @click.stop="copyToClipboard(serviceToken)"
+            @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
           >
             <OIcon name="content-copy" size="sm" />
           </OButton>
@@ -255,6 +255,7 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -616,22 +617,6 @@ export default defineComponent({
       });
 
     }
-    const  copyToClipboard = (text:string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        toast({
-            variant: "success",
-            message: `token Copied Successfully!`,
-            timeout: 5000,
-          });
-      }).catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-      });
-    }
-
     const downloadTokenAsFile = (token:string) => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");

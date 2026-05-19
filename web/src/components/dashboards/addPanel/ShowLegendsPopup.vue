@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import {
   getSeriesColor,
@@ -244,7 +244,7 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text).then(() => {
+      copyToClipboard(text, { silent: true, timeout: 3000 }).then(() => {
         copiedLegendIndices.value.add(index);
         setTimeout(() => {
           copiedLegendIndices.value.delete(index);
@@ -254,7 +254,7 @@ export default defineComponent({
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText).then(() => {
+      copyToClipboard(allLegendsText, { silent: true, timeout: 3000 }).then(() => {
         isAllCopied.value = true;
         setTimeout(() => {
           isAllCopied.value = false;

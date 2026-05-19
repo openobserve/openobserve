@@ -1,4 +1,4 @@
-import { date } from "quasar";
+import { subtractRelativeTime } from "@/utils/date";
 import { fromZonedTime } from "date-fns-tz";
 
 /**
@@ -109,7 +109,7 @@ export function convertOffsetToSeconds(
     }
 
     // subtract period from endISOTimestamp
-    const startTimeStamp = date.subtractFromDate(
+    const startTimeStamp = subtractRelativeTime(
       endISOTimestamp,
       subtractObject,
     );

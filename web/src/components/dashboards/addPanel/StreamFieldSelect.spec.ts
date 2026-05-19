@@ -16,13 +16,10 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { createStore } from "vuex";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 const mockStore = createStore({
   state: {

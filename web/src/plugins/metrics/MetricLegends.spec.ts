@@ -16,16 +16,13 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import MetricLegends from "@/plugins/metrics/MetricLegends.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
 // Install Quasar plugins
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 /**
  * Helper to query the dropdown theme wrapper div. The migrated component

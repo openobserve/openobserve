@@ -18,13 +18,10 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CipherKeys from "./CipherKeys.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn()); // notify returns dismiss function

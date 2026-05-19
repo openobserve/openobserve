@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import alertsService from "@/services/alerts";
-import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
@@ -33,9 +32,7 @@ import { useLocalOrganization } from "@/utils/zincutils";
 
 import searchService from "@/services/search";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 vi.mock('@/composables/useStreams', () => {
   return {
     default: () => ({

@@ -315,7 +315,6 @@ import { useI18n } from "vue-i18n";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { debounce } from "quasar";
 import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";

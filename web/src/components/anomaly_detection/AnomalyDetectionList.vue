@@ -233,7 +233,7 @@ import { defineComponent, ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import anomalyDetectionService from "@/services/anomaly_detection";
-import { date } from "quasar";
+import { formatToISO } from "@/utils/date";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -310,7 +310,7 @@ export default defineComponent({
 
     const formatTimestamp = (ts: number) => {
       // timestamps come back in microseconds
-      return date.formatDate(ts / 1000, "YYYY-MM-DDTHH:mm:ssZ");
+      return formatToISO(ts);
     };
 
     const formatSeconds = (secs: number) => {

@@ -16,10 +16,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 vi.mock("@vue-flow/core", () => ({
   VueFlow: {

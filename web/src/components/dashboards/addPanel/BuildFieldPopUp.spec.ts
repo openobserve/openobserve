@@ -16,13 +16,10 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import BuildFieldPopUp from "@/components/dashboards/addPanel/BuildFieldPopUp.vue";
 import { createI18n } from "vue-i18n";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 const i18n = createI18n({
   legacy: false,

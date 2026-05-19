@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -147,29 +147,23 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL)
-            .then(() => {
-              toast({
-                variant: "success",
-                message: t("search.linkCopiedSuccessfully"),
-                timeout: 5000,
-              });
+          copyToClipboard(shortURL, {
+            successMessage: t("search.linkCopiedSuccessfully"),
+            errorMessage: t("search.errorCopyingLink"),
+            timeout: 5000,
+          }).then((success: boolean) => {
+            if (success) {
               emit("copy:success", { url: shortURL, type: "short" });
-            })
-            .catch((error) => {
-              console.error("Failed to copy short URL:", error);
-              toast({
-                variant: "error",
-                message: t("search.errorCopyingLink"),
-                timeout: 5000,
-              });
-              emit("copy:error", { error, type: "short" });
-            })
-            .finally(() => {
-              // Clean up: clear store
-              store.commit("clearPendingShortURL");
-              isLoading.value = false;
-            });
+            } else {
+              console.error("Failed to copy short URL:", shortURL);
+              emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+            }
+          })
+          .finally(() => {
+            // Clean up: clear store
+            store.commit("clearPendingShortURL");
+            isLoading.value = false;
+          });
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
           console.warn(
@@ -228,27 +222,21 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl)
-                .then(() => {
-                  toast({
-                    variant: "success",
-                    message: t("search.linkCopiedSuccessfully"),
-                    timeout: 5000,
-                  });
+              copyToClipboard(shortUrl, {
+                successMessage: t("search.linkCopiedSuccessfully"),
+                errorMessage: t("search.errorCopyingLink"),
+                timeout: 5000,
+              }).then((success: boolean) => {
+                if (success) {
                   emit("copy:success", { url: shortUrl, type: "short" });
-                })
-                .catch((error) => {
-                  console.error("Failed to copy short URL:", error);
-                  toast({
-                    variant: "error",
-                    message: t("search.errorCopyingLink"),
-                    timeout: 5000,
-                  });
-                  emit("copy:error", { error, type: "short" });
-                })
-                .finally(() => {
-                  isLoading.value = false;
-                });
+                } else {
+                  console.error("Failed to copy short URL:", shortUrl);
+                  emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+                }
+              })
+              .finally(() => {
+                isLoading.value = false;
+              });
             }
 
             emit("shorten:success", {

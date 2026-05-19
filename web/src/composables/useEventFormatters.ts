@@ -4,7 +4,7 @@
  * Reusable formatting utilities for RUM events
  */
 
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { formatDuration } from "@/utils/zincutils";
 
 export function useEventFormatters() {
@@ -13,7 +13,7 @@ export function useEventFormatters() {
    */
   const formatTimestamp = (timestamp: number): string => {
     if (!timestamp) return "N/A";
-    return date.formatDate(
+    return formatDate(
       Math.floor(timestamp),
       "MMM DD, YYYY HH:mm:ss.SSS Z",
     );

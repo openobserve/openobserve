@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import { exportFile } from "quasar";
+import { downloadFile } from "@/utils/dom";
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -332,7 +332,7 @@ export function usePanelDownload({
           ].join("\r\n");
         }
 
-        const status = exportFile(
+        const status = downloadFile(
           (title ?? "chart-export") + ".csv",
           csvContent,
           "text/csv",
@@ -372,7 +372,7 @@ export function usePanelDownload({
         // Export the data as JSON
         const content = JSON.stringify(chartData, null, 2);
 
-        const status = exportFile(
+        const status = downloadFile(
           (title ?? "data-export") + ".json",
           content,
           "application/json",

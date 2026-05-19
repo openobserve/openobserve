@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -130,7 +130,7 @@ export default defineComponent({
 
     const formatTimestamp = (timestamp: number) => {
       if (!timestamp) return "N/A";
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      return formatToReadable(timestamp);
     };
 
     const getReasonVariant = (reason: string): BadgeVariant => {

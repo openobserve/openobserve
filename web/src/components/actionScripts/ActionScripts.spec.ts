@@ -36,7 +36,7 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.],
+  plugins: [],
 });
 
 const mockActionScripts = [

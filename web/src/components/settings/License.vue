@@ -450,7 +450,8 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useQuasar } from "quasar";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -473,6 +474,7 @@ export default defineComponent({
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();
+    const { confirm } = useConfirmDialog();
     const loading = ref(false);
     const updating = ref(false);
     const licenseData = ref<any>({});
@@ -561,20 +563,13 @@ export default defineComponent({
     };
 
     const copyLicenseKey = async () => {
-      try {
-        if (!licenseData.value.key) return;
-        await navigator.clipboard.writeText(licenseData.value.key);
-        toast({
-          variant: "success",
-          message: t("about.license_key_copied"),
-        });
+      if (!licenseData.value.key) return;
+      const success = await copyToClipboard(licenseData.value.key, {
+        successMessage: t("about.license_key_copied"),
+        errorMessage: t("about.failed_to_copy_license"),
+      });
+      if (success) {
         showLicenseKeyModal.value = false;
-      } catch (error) {
-        console.error("Error copying license key:", error);
-        toast({
-          variant: "error",
-          message: t("about.failed_to_copy_license"),
-        });
       }
     };
 
@@ -585,7 +580,7 @@ export default defineComponent({
       window.open(licenseUrl, "_blank");
     };
 
-    const checkAndAutoFillLicenseFromUrl = () => {
+    const checkAndAutoFillLicenseFromUrl = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlInstallationId = urlParams.get("installation_id");
       const urlLicenseKey = urlParams.get("license_key");
@@ -599,34 +594,24 @@ export default defineComponent({
           // Check if license is already active
           if (licenseData.value.license && licenseData.value.license.active) {
             // License is active, show dialog asking if they want to update
-            $q.dialog({
+            const ok = await confirm({
               title: t("about.license_already_active_title"),
               message: t("about.license_already_active_msg"),
-              persistent: true,
-              ok: {
-                label: t("about.yes_update_license"),
-                noCaps: true,
-                unelevated: true,
-              },
-              cancel: {
-                label: t("about.no_keep_current"),
-                noCaps: true,
-                outline: true,
-              },
-            })
-              .onOk(() => {
-                // User wants to update, fill the key and show update form
-                licenseKey.value = urlLicenseKey;
-                isLicenseKeyAutoFilled.value = true;
-                showUpdateFormAndFocus();
-              })
-              .onCancel(() => {
-                // User doesn't want to update, clear URL parameters
-                const url = new URL(window.location.href);
-                url.searchParams.delete("installation_id");
-                url.searchParams.delete("license_key");
-                window.history.replaceState({}, document.title, url.toString());
-              });
+              confirmLabel: t("about.yes_update_license"),
+              cancelLabel: t("about.no_keep_current"),
+            });
+            if (ok) {
+              // User wants to update, fill the key and show update form
+              licenseKey.value = urlLicenseKey;
+              isLicenseKeyAutoFilled.value = true;
+              showUpdateFormAndFocus();
+            } else {
+              // User doesn't want to update, clear URL parameters
+              const url = new URL(window.location.href);
+              url.searchParams.delete("installation_id");
+              url.searchParams.delete("license_key");
+              window.history.replaceState({}, document.title, url.toString());
+            }
           } else {
             // No active license, proceed with normal auto-fill
             licenseKey.value = urlLicenseKey;

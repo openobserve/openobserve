@@ -258,6 +258,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import DOMPurify from "dompurify";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -368,7 +369,7 @@ export default defineComponent({
 
     const copyText = (text: string) => {
       if (!text) return;
-      navigator.clipboard.writeText(text);
+      copyToClipboard(text, { silent: true });
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

@@ -99,6 +99,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 
 // State
@@ -128,11 +129,8 @@ const generatedQuery = computed(() => {
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
-    navigator.clipboard.writeText(generatedQuery.value);
-    toast({
-      variant: "success",
-      message: "Query copied to clipboard!",
-      position: "top-center",
+    copyToClipboard(generatedQuery.value, {
+      successMessage: "Query copied to clipboard!",
     });
   }
 };

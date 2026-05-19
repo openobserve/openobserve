@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
-
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -258,9 +256,7 @@ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("ViewDashboard", () => {
   let wrapper: any;

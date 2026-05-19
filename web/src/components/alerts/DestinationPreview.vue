@@ -262,7 +262,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps({
   modelValue: {
@@ -307,18 +307,10 @@ const getDestinationTypeName = (type: string): string => {
 
 // Copy template to clipboard
 const copyTemplate = () => {
-  navigator.clipboard.writeText(props.templateContent).then(() => {
-    toast({
-      variant: "success",
-      message: 'Template copied to clipboard',
-      timeout: 2000
-    });
-  }).catch(() => {
-    toast({
-      variant: "error",
-      message: 'Failed to copy template',
-      timeout: 2000
-    });
+  copyToClipboard(props.templateContent, {
+    successMessage: 'Template copied to clipboard',
+    errorMessage: 'Failed to copy template',
+    timeout: 2000,
   });
 };
 </script>

@@ -1,6 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Dialog } from 'quasar';
 import { installQuasar } from "@/test/unit/helpers";
 import EnrichmentTableList from './EnrichmentTableList.vue';
 import streamService from '@/services/stream';
@@ -86,9 +85,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => mockRouter
 }));
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Stub for ODrawer: exposes slots and re-emits update:open so tests can drive
 // drawer open/close interactions without rendering the real overlay.
