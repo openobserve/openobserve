@@ -17,10 +17,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import { createStore } from "vuex";
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 // PerformanceFieldsDialog now wraps content in <ODialog> (migrated from
 // <q-dialog>). The dialog exposes:

@@ -39,11 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "CopyContent",
@@ -88,21 +87,11 @@ export default defineComponent({
 
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
-      copyToClipboard(content)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
+      copyToClipboard(content, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     };
 
     const displayData = ref(props.displayContent || props.content);

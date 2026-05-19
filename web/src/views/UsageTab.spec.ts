@@ -17,7 +17,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
-import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -113,7 +112,7 @@ vi.mock("quasar", async (importOriginal) => {
 import orgService from "@/services/organizations";
 import UsageTab from "./UsageTab.vue";
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 // ── Mount factory ───────────────────────────────────────────────────────────
 

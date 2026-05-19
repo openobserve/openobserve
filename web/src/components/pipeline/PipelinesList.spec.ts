@@ -26,7 +26,6 @@ import {
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
@@ -86,7 +85,7 @@ document.createElement = (tag: string) => {
   return originalCreateElement(tag);
 };
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 // Stubs for migrated ODialog (Pipeline Error Dialog) and ODrawer (Create Pipeline Drawer)
 // These replace the old q-dialog usages and allow us to assert prop forwarding

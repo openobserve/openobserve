@@ -254,7 +254,7 @@ import SearchBar from "@/plugins/traces/SearchBar.vue";
 // ---------------------------------------------------------------------------
 // Quasar setup
 // ---------------------------------------------------------------------------
-installQuasar({ plugins: [quasar.Dialog, quasar.] });
+installQuasar();
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo

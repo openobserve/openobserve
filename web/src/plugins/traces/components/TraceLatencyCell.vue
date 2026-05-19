@@ -26,45 +26,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:h-full tw:min-w-[0.125rem]"
       :style="segmentStyle(service, svc as any)"
     >
-      <QTooltip
-        class="tw:text-[var(--o2-text-4)]! tw:text-[0.8rem]! tw:p-[0.5rem]!"
-        anchor="center left"
-        self="center end"
-      >
-        <div
-          class="tw:text-[var(--o2-text-1)]! tw:font-semibold tw:mb-[0.35rem] tw:tracking-[0.03rem] tw:opacity-100 tw:text-[0.75rem]"
-        >
-          {{ item.spans }} spans across {{ serviceEntries.length }} services
-        </div>
-        <div
-          v-for="[s, sv] in serviceEntries"
-          :key="s"
-          class="tw:grid tw:items-center tw:gap-x-[0.5rem] tw:py-[0.1rem]"
-          :class="
-            s === service ? 'tw:font-bold' : 'tw:font-normal tw:opacity-75'
-          "
-          style="grid-template-columns: 0.5rem 1fr auto auto"
-        >
-          <span
-            class="tw:inline-block tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:shrink-0"
-            :style="{ backgroundColor: serviceColors[s] || '#9e9e9e' }"
-          />
-          <span class="tw:truncate">{{ s }}</span>
-          <span class="tw:text-right">{{
-            formatTimeWithSuffix((sv as any).duration)
-          }}</span>
-          <span class="tw:text-right"
-            >{{ segmentPercent(sv as any).toFixed(1) }}%</span
+      <OTooltip side="left" align="center">
+        <template #content>
+          <div
+            class="tw:font-semibold tw:mb-[0.35rem] tw:tracking-[0.03rem] tw:opacity-100 tw:text-[0.75rem]"
           >
-        </div>
-      </QTooltip>
+            {{ item.spans }} spans across {{ serviceEntries.length }} services
+          </div>
+          <div
+            v-for="[s, sv] in serviceEntries"
+            :key="s"
+            class="tw:grid tw:items-center tw:gap-x-[0.5rem] tw:py-[0.1rem]"
+            :class="
+              s === service ? 'tw:font-bold' : 'tw:font-normal tw:opacity-75'
+            "
+            style="grid-template-columns: 0.5rem 1fr auto auto"
+          >
+            <span
+              class="tw:inline-block tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:shrink-0"
+              :style="{ backgroundColor: serviceColors[s] || '#9e9e9e' }"
+            />
+            <span class="tw:truncate">{{ s }}</span>
+            <span class="tw:text-right">{{
+              formatTimeWithSuffix((sv as any).duration)
+            }}</span>
+            <span class="tw:text-right"
+              >{{ segmentPercent(sv as any).toFixed(1) }}%</span
+            >
+          </div>
+        </template>
+      </OTooltip>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { QTooltip } from "quasar";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
 

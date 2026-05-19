@@ -133,7 +133,7 @@
                           size="icon"
                           class="copy-btn-sql tw:ml-2"
                           data-test="search-scheduler-copy-sql-btn"
-                          @click.stop="copyToClipboard(row.sql, 'SQL Query')"
+                          @click.stop="copyToClipboard(row.sql, { successMessage: `SQL Query ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
@@ -171,7 +171,7 @@
                           variant="ghost"
                           size="icon"
                           class="copy-btn-function tw:ml-2"
-                          @click.stop="copyToClipboard(row.function, 'Function Defination')"
+                          @click.stop="copyToClipboard(row.function, { successMessage: `Function Defination ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
@@ -271,7 +271,7 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -284,6 +284,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -564,24 +565,6 @@ export default defineComponent({
           fetchSearchHistory();
         });
     };
-    const copyToClipboard = (text, type) => {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: `${type} ${t('search_scheduler_job.copy_success')}`,
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: t('search_scheduler_job.copy_error'),
-            timeout: 5000,
-          });
-        });
-    };
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
@@ -766,7 +749,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+      return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
     }
     const fetchSearchResults = (row) => {
       searchObj.meta.jobId = row.id;

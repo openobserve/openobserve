@@ -130,7 +130,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps({
   fields: {
@@ -422,8 +422,7 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  navigator.clipboard.writeText(value);
-  toast({ variant: "success", message: "Value copied to clipboard" });
+  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
 };
 </script>
 

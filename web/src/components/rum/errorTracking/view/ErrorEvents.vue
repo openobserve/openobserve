@@ -38,7 +38,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { ref } from "vue";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 import { useI18n } from "vue-i18n";
 
@@ -102,7 +102,7 @@ const getErrorCategory = (row: any) => {
 };
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
 <style scoped>

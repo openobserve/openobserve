@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { Dialog } from "quasar";
 import { createStore } from "vuex";
 import { useRouter } from "vue-router";
 import { createI18n } from "vue-i18n";
@@ -38,9 +37,7 @@ import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Create i18n instance
 const i18n = createI18n({

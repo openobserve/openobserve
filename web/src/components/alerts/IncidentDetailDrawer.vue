@@ -1012,7 +1012,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated logs found' }}
             </div>
@@ -1061,7 +1063,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
@@ -1117,7 +1121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
+              size="4rem"
+            />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated traces found' }}
             </div>
@@ -1169,7 +1175,7 @@ import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, o
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { date, useQuasar } from "quasar";
+import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1198,6 +1204,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1220,10 +1228,10 @@ export default defineComponent({
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
-    const $q = useQuasar();
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const { confirm } = useConfirmDialog();
 
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
@@ -1232,27 +1240,19 @@ export default defineComponent({
     const copyToClipboard = (text: string, fieldName: string) => {
       if (!text) return;
 
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
+      copyToClipboardUtil(text, {
+        successMessage: "Copied to clipboard",
+        errorMessage: "Failed to copy to clipboard",
+        timeout: 2000,
+      }).then((success) => {
+        if (success) {
           copiedField.value = fieldName;
-          toast({
-            variant: "success",
-            message: "Copied to clipboard",
-            timeout: 2000,
-          });
           // Reset the icon after 2 seconds
           setTimeout(() => {
             copiedField.value = null;
           }, 2000);
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Failed to copy to clipboard",
-            timeout: 2000,
-          });
-        });
+        }
+      });
     };
 
     const loading = ref(false);
@@ -2053,10 +2053,8 @@ export default defineComponent({
         if (isEditingTitle.value) {
           return;
         }
-        // Don't close if there are any open dialogs/menus (they should handle ESC first).
-        const hasOpenDialog = document.querySelector(
-          '[role="dialog"][data-state="open"], [role="menu"][data-state="open"]'
-        );
+        // Don't close if there are any open dialogs/menus (they should handle ESC first)
+        const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
         if (hasOpenDialog) {
           return;
         }
@@ -2417,13 +2415,14 @@ export default defineComponent({
               timeout: 3000,
             });
           } else {
-            $q.dialog({
+            const ok = await confirm({
               title: "Re-run AI Analysis?",
               message: "Severity has changed. Would you like AI to re-analyze this incident?",
-              cancel: { label: "No thanks", flat: true },
-              ok: { label: "Re-run AI analysis" },
+              confirmLabel: "Re-run AI analysis",
+              cancelLabel: "No thanks",
               persistent: false,
-            }).onOk(async () => {
+            });
+            if (ok) {
               try {
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
                 toast({
@@ -2439,7 +2438,7 @@ export default defineComponent({
                   timeout: 3000,
                 });
               }
-            });
+            }
           }
         }
       } catch (error: any) {
@@ -2458,7 +2457,7 @@ export default defineComponent({
 
     const formatTimestamp = (timestamp: number) => {
       // Backend sends microseconds
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      return formatToReadable(timestamp);
     };
 
     const formatTimestampUTC = (timestamp: number) => {

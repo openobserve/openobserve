@@ -17,7 +17,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -296,9 +295,7 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("Index List", async () => {
   let wrapper: any;

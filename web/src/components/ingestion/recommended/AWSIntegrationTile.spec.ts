@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar, Dialog } from 'quasar';
+import { Quasar, } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -151,7 +151,7 @@ describe('AWSIntegrationTile.vue', () => {
     return mount(AWSIntegrationTile, {
       props: { integration: createMockIntegration(integrationOverrides) },
       global: {
-        plugins: [[Quasar, { plugins: { Dialog } }], mockI18n, mockRouter],
+        plugins: [[Quasar, { plugins: {} }], mockI18n, mockRouter],
         provide: { store: mockStore },
         stubs: {
           ODialog: ODialogStub,

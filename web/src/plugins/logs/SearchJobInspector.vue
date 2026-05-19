@@ -374,7 +374,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 interface ProfileEvent {
   timestamp: string;
@@ -677,25 +677,29 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      navigator.clipboard.writeText(traceId.value).then(() => {
-        copiedTraceId.value = true;
-        setTimeout(() => {
-          copiedTraceId.value = false;
-        }, 2000);
-      }).catch(() => {
-        toast({ variant: "error", message: 'Failed to copy trace ID to clipboard' });
+      copyToClipboard(traceId.value, {
+        errorMessage: 'Failed to copy trace ID to clipboard',
+      }).then((success) => {
+        if (success) {
+          copiedTraceId.value = true;
+          setTimeout(() => {
+            copiedTraceId.value = false;
+          }, 2000);
+        }
       });
     };
 
     const copiedSql = ref(false);
     const copySql = () => {
-      navigator.clipboard.writeText(profileData.value?.sql || "").then(() => {
-        copiedSql.value = true;
-        setTimeout(() => {
-          copiedSql.value = false;
-        }, 2000);
-      }).catch(() => {
-        toast({ variant: "error", message: 'Failed to copy SQL to clipboard' });
+      copyToClipboard(profileData.value?.sql || "", {
+        errorMessage: 'Failed to copy SQL to clipboard',
+      }).then((success) => {
+        if (success) {
+          copiedSql.value = true;
+          setTimeout(() => {
+            copiedSql.value = false;
+          }, 2000);
+        }
       });
     };
 

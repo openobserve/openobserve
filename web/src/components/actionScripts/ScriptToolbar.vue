@@ -44,8 +44,9 @@
             size="md"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
-           />
+          >
             <OTooltip side="right" :content="String(isValidMethodName())" />
+          </OIcon>
         </div>
       </div>
     </div>
@@ -87,11 +88,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useQuasar } from "quasar";
+import { toggleFullscreen } from "@/utils/dom";
 
 const { t } = useI18n();
-
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -140,7 +139,7 @@ const actionName = computed({
 });
 
 const handleFullScreen = () => {
-  q.fullscreen.toggle();
+  toggleFullscreen();
 };
 
 const redirectToScripts = () => {

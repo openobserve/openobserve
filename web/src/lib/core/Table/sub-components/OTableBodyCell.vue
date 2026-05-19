@@ -7,6 +7,7 @@ import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -16,15 +17,13 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 async function handleCopy(event: MouseEvent) {
   event.stopPropagation();
   const value = String(props.cell.getValue() ?? "");
-  try {
-    await navigator.clipboard.writeText(value);
+  const success = await copyToClipboard(value, { silent: true });
+  if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);
     copyTimer = setTimeout(() => {
       copied.value = false;
     }, 1500);
-  } catch {
-    // clipboard write failed — silently ignore
   }
 }
 

@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -219,7 +219,7 @@ const isValid = computed(() => {
  */
 const formatTimestamp = (timestamp: number): string => {
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -285,7 +285,7 @@ const datetimeToMicros = (datetime: string): number => {
  */
 const microsToDatetime = (micros: number): string => {
   const ms = Math.floor(micros / 1000);
-  return date.formatDate(ms, "YYYY-MM-DDTHH:mm");
+  return formatDate(ms, "YYYY-MM-DDTHH:mm");
 };
 
 const onStartTimeChange = (val: string) => {

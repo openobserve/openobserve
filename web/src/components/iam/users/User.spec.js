@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -59,9 +58,7 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("User Component", () => {
   let wrapper;

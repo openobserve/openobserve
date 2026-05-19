@@ -1030,7 +1030,8 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import { debounce, copyToClipboard } from "quasar";
+import { debounce } from "lodash-es";
+import { copyToClipboard } from "@/utils/clipboard";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1519,13 +1520,11 @@ const shouldShowCopyButton = (value: any) => {
 
 const copyCellContent = (value: any, rowIndex: number, colName: string) => {
   if (value === null || value === undefined) return;
-  copyToClipboard(String(value))
-    .then(() => {
-      const key = `${rowIndex}_${colName}`;
-      copiedCells.value.set(key, true);
-      setTimeout(() => copiedCells.value.delete(key), 3000);
-    })
-    .catch(() => {});
+  copyToClipboard(String(value), { silent: true }).then(() => {
+    const key = `${rowIndex}_${colName}`;
+    copiedCells.value.set(key, true);
+    setTimeout(() => copiedCells.value.delete(key), 3000);
+  });
 };
 
 // ── Dashboard: pagination ────────────────────────────────────────────────────

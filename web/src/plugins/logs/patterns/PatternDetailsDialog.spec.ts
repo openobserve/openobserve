@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.],
+  plugins: [],
 });
 
 // Stub ODrawer so its slots render inline (no portal) and we can drive its

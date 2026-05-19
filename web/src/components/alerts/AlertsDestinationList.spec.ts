@@ -18,7 +18,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertsDestinationList from "@/components/alerts/AlertsDestinationList.vue";
 import i18n from "@/locales";
-import { Dialog, QTable } from "quasar";
+import { QTable } from "quasar";
 
 // Mock Quasar's notify globally
 const mockNotify = vi.fn(() => vi.fn()); // Return a dismiss function
@@ -35,7 +35,7 @@ vi.mock("quasar", async (importOriginal) => {
 });
 
 installQuasar({
-  plugins: [Dialog, QTable],
+  plugins: [QTable],
 });
 
 // Mock services

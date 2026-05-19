@@ -98,7 +98,6 @@ import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
-import { date } from "quasar";
 import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";

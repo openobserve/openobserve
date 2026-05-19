@@ -18,13 +18,10 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OrgStorageSettings from "./OrgStorageSettings.vue";
 import i18n from "@/locales";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 const { mockGetStorage, mockNotify } = vi.hoisted(() => ({
   mockGetStorage: vi.fn(),

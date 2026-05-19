@@ -5,9 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useQuasar } from "quasar";
-
-const $q = useQuasar();
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const emit = defineEmits<{
   (e: "load-chat", id: number): void;
@@ -21,6 +19,8 @@ const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
 );
+
+const { confirm } = useConfirmDialog();
 
 const history = ref<ChatHistoryEntry[]>([]);
 const searchTerm = ref("");
@@ -64,17 +64,16 @@ async function deleteChat(e: MouseEvent, id: number) {
   await refresh();
 }
 
-function clearAll() {
-  $q.dialog({
+async function clearAll() {
+  const ok = await confirm({
     title: t("chatHistory.clearAllTitle"),
     message: t("chatHistory.clearAllMessage"),
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
+  });
+  if (ok) {
     await clearAllHistory();
     newChat();
     await refresh();
-  });
+  }
 }
 
 function formatTime(ts: string): string {
