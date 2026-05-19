@@ -72,13 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   v-bind:readonly="isEditingReport"
                   v-bind:disable="isEditingReport"
-                  :rules="[
-                    (val: any) =>
-                      !!val
-                        ? isValidResourceName(val) ||
-                          `Characters like :, ?, /, #, and spaces are not allowed.`
-                        : t('common.nameRequired'),
-                  ]"
+                  :error="!!nameError"
+                  :error-message="nameError"
+                  @update:model-value="nameError = ''"
                   tabindex="0"
                   style="width: 330px"
                 >
@@ -172,27 +168,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="folderOptions"
                         :label="t('reports.dashboardFolder') + ' *'"
                         :loading="isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        class="tw:py-2 showLabelOnTop no-case"
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
-                        input-style="text-transform: none;"
-                        @update:model-value="
-                          onFolderSelection(dashboard.folder)
-                        "
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('folders', args[0], args[1])
-                        "
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!folderError"
+                        :error-message="index === 0 ? folderError : ''"
+                        @update:model-value="folderError = ''; onFolderSelection(dashboard.folder)"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
                     </div>
                     <div
@@ -205,27 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="dashboardOptions"
                         :label="t('reports.dashboard') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        class="tw:py-2 showLabelOnTop no-case"
-                        use-input
-                        hide-selected
-                        fill-input
-                        input-style="text-transform: none;"
-                        :input-debounce="400"
-                        @update:model-value="
-                          onDashboardSelection(dashboard.dashboard)
-                        "
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('dashboards', args[0], args[1])
-                        "
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!dashboardError"
+                        :error-message="index === 0 ? dashboardError : ''"
+                        @update:model-value="dashboardError = ''; onDashboardSelection(dashboard.dashboard)"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
                     </div>
                     <div
@@ -238,25 +200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="dashboardTabOptions"
                         :label="t('reports.dashboardTab') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        class="tw:py-2 showLabelOnTop"
-                        use-input
-                        hide-selected
-                        fill-input
-                        input-style="text-transform: none;"
-                        :input-debounce="400"
-                        :rules="[
-                          (val: any) => !!val.length || 'Field is required!',
-                        ]"
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('tabs', args[0], args[1])
-                        "
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!tabError"
+                        :error-message="index === 0 ? tabError : ''"
+                        @update:model-value="tabError = ''"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
                     </div>
 
@@ -549,16 +496,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           type="text"
                           outlined
-                          :rules="[
-                            (val: any) =>
-                              !!val.length
-                                ? cronError.length
-                                  ? cronError
-                                  : true
-                                : 'Field is required!',
-                          ]"
+                          :error="!!cronError"
+                          :error-message="cronError"
                           style="width: 100%"
-                          debounce="400"
+                          :debounce="400"
                           @update:model-value="validateFrequency"
                         />
                       </div>
@@ -566,22 +507,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
-                          :options="filteredTimezone"
-                          @blur="
-                            timezone =
-                              timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions()
-                                    .timeZone
-                                : timezone
-                          "
-                          use-input
-                          @filter="timezoneFilterFn"
-                          input-debounce="0"
-                          fill-input
-                          hide-selected
+                          :options="timezoneOptions"
                           :label="t('logStream.timezone') + ' *'"
-                          :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!timezoneError"
+                          :error-message="timezoneError"
+                          @update:model-value="timezoneError = ''"
                           class="timezone-select showLabelOnTop"
                           style="width: 300px"
                         />
@@ -634,7 +564,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           class="showLabelOnTop"
                           type="number"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!intervalError"
+                          :error-message="intervalError"
+                          @update:model-value="intervalError = ''"
                           style="width: 100%"
                         />
                       </div>
@@ -648,11 +580,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
                           :label="'Frequency *'"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
                           class="tw:pt-2 tw:pb-0 showLabelOnTop no-case"
-                          behavior="menu"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!periodError"
+                          :error-message="periodError"
+                          @update:model-value="periodError = ''"
                           style="width: 100% !important"
                         />
                       </div>
@@ -687,22 +618,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
-                          :options="filteredTimezone"
-                          @blur="
-                            timezone =
-                              timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions()
-                                    .timeZone
-                                : timezone
-                          "
-                          use-input
-                          @filter="timezoneFilterFn"
-                          input-debounce="0"
-                          fill-input
-                          hide-selected
+                          :options="timezoneOptions"
                           :label="t('logStream.timezone') + ' *'"
-                          :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!timezoneError"
+                          :error-message="timezoneError"
+                          @update:model-value="timezoneError = ''"
                           class="timezone-select showLabelOnTop"
                           style="width: 300px"
                         />
@@ -747,11 +667,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="formData.title"
                       :label="t('reports.title') + ' *'"
-                      color="input-border"
-                      class="showLabelOnTop"
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
+                      :error="!!titleError"
+                      :error-message="titleError"
+                      @update:model-value="titleError = ''"
                       tabindex="0"
                       style="width: 400px"
                     />
@@ -764,14 +682,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="emails"
                       :label="t('reports.recipients') + ' *'"
-                      color="input-border"
-                      class="showLabelOnTop"
-                      :rules="[
-                        (val: any) =>
-                          /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-                            val,
-                          ) || 'Add valid emails!',
-                      ]"
+                      :error="!!recipientsError"
+                      :error-message="recipientsError"
+                      @update:model-value="recipientsError = ''"
                       tabindex="0"
                       style="width: 100%"
                       :placeholder="t('user.inviteByEmail')"
@@ -1058,6 +971,15 @@ const selectedReportFolderId = ref<string>(
 const isFetchingReport = ref(false);
 
 const cronError = ref("");
+const folderError = ref("");
+const dashboardError = ref("");
+const tabError = ref("");
+const timezoneError = ref("");
+const titleError = ref("");
+const recipientsError = ref("");
+const nameError = ref("");
+const intervalError = ref("");
+const periodError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -1521,20 +1443,38 @@ const saveReport = async () => {
 };
 
 const validateReportData = async (): Promise<boolean> => {
-  if (!formData.value.dashboards[0].folder) {
+  if (!formData.value.name) {
+    nameError.value = t('common.nameRequired');
     step.value = 1;
     return false;
   }
+  if (!isValidResourceName(formData.value.name)) {
+    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
+    step.value = 1;
+    return false;
+  }
+  nameError.value = '';
+
+  if (!formData.value.dashboards[0].folder) {
+    folderError.value = t('validation.required');
+    step.value = 1;
+    return false;
+  }
+  folderError.value = '';
 
   if (!formData.value.dashboards[0].dashboard) {
+    dashboardError.value = t('validation.required');
     step.value = 1;
     return false;
   }
+  dashboardError.value = '';
 
   if (!formData.value.dashboards[0].tabs) {
+    tabError.value = t('validation.required');
     step.value = 1;
     return false;
   }
+  tabError.value = '';
 
   if (formData.value.dashboards[0].timerange) {
     if (
@@ -1577,24 +1517,45 @@ const validateReportData = async (): Promise<boolean> => {
   }
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
+    if (formData.value.frequency.type === "custom") {
+      if (!frequency.value.custom.interval) {
+        intervalError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      intervalError.value = '';
+      if (!frequency.value.custom.period) {
+        periodError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      periodError.value = '';
+    }
     step.value = 2;
     return false;
   }
 
-  if (!formData.value.start || !formData.value.timezone) {
+  if (!scheduling.value.timezone) {
+    timezoneError.value = t('validation.required');
     step.value = 2;
     return false;
   }
+  timezoneError.value = '';
 
-  if (
-    !formData.value.title ||
-    !/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-      emails.value,
-    )
-  ) {
+  if (!formData.value.title) {
+    titleError.value = t('validation.required');
     step.value = 3;
     return false;
   }
+  titleError.value = '';
+
+  const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
+  if (!emailRegex.test(emails.value)) {
+    recipientsError.value = 'Add valid emails!';
+    step.value = 3;
+    return false;
+  }
+  recipientsError.value = '';
 
   return true;
 };

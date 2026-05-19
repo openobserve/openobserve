@@ -45,10 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.email"
             :label="t('user.email') + ' *'"
             class="showLabelOnTop tw:mt-2"
-            :rules="[
-              (val: any, rules: any) =>
-                rules.email(val) || 'Please enter a valid email address',
-            ]"
             maxlength="100"
             data-test="user-email-field"
           />
@@ -59,12 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.password"
               :label="t('user.password') + ' *'"
               class="showLabelOnTop"
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-password-field"
             >
               <template v-slot:append>
@@ -102,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('user.role') + ' *'"
             :options="roles"
             class="showLabelOnTop tw:mt-2"
-            :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
           />
           <OSelect
@@ -117,8 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filterdOption"
             class="showLabelOnTop tw:mt-2"
             multiple
-            use-input
-            @filter="filterFn"
             data-test="user-custom-role-field"
             :disable="filterdOption.length === 0"
           />
@@ -140,12 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-old-passoword-field"
             >
               <template v-slot:append>
@@ -163,12 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-new-password-field"
             >
               <template v-slot:append>
@@ -189,11 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop tw:mt-2"
-            :rules="[
-              (val: any) =>
-                /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
-                'Input must start with a letter and be alphanumeric _ or -',
-            ]"
             maxlength="100"
           />
 
@@ -461,6 +431,61 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const pwdMinLen = 8;
+
+      if (this.existingUser && !this.beingUpdated) {
+        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
+          toast({ message: 'Please enter a valid email address.', timeout: 3000 });
+          return;
+        }
+      }
+
+      if (!this.existingUser && !this.beingUpdated) {
+        if (!this.formData.password) {
+          toast({ message: 'Password is required.', timeout: 3000 });
+          return;
+        }
+        if (this.formData.password.length < pwdMinLen) {
+          toast({ message: 'Password must be at least 8 characters long.', timeout: 3000 });
+          return;
+        }
+      }
+
+      if (this.beingUpdated && this.formData.change_password) {
+        const needsOldPwd =
+          this.userRole === 'member' ||
+          this.store.state.userInfo.email === this.modelValue?.email;
+        if (needsOldPwd) {
+          if (!this.formData.old_password) {
+            toast({ message: 'Current password is required.', timeout: 3000 });
+            return;
+          }
+          if (this.formData.old_password.length < pwdMinLen) {
+            toast({ message: 'Password must be at least 8 characters long.', timeout: 3000 });
+            return;
+          }
+        }
+        if (!this.formData.new_password) {
+          toast({ message: 'New password is required.', timeout: 3000 });
+          return;
+        }
+        if (this.formData.new_password.length < pwdMinLen) {
+          toast({ message: 'New password must be at least 8 characters long.', timeout: 3000 });
+          return;
+        }
+      }
+
+      if (
+        !this.beingUpdated &&
+        this.userRole !== 'member' &&
+        this.formData.organization === 'other' &&
+        !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(this.formData.other_organization)
+      ) {
+        toast({ message: 'Organization name must start with a letter and be alphanumeric, _ or -.', timeout: 3000 });
+        return;
+      }
+
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",

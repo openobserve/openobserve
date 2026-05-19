@@ -1017,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="schema-update-settings-button"
                         variant="primary"
                         size="sm-action"
-                        type="submit"
+                        @click="onSubmit"
                       >
                         {{ t("logStream.updateSettings") }}
                       </OButton>

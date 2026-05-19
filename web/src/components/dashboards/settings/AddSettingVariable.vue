@@ -270,7 +270,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
-                      :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
                       class="tw:flex-[2] tw:min-w-0"
                       style="margin-top: 0 !important; padding-bottom: 0 !important;"

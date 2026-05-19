@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="llm-evaluation-save-btn"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="saveLlmEvaluationNode"
           >{{ t('alerts.save') }}</OButton>
         </div>
       </div>
