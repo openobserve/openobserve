@@ -104,7 +104,7 @@ export class PipelinesPage {
         // Scheduled Pipeline Dialog selectors
         this.scheduledPipelineTabs = page.locator('[data-test="scheduled-pipeline-tabs"]');
         this.scheduledPipelineSqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-        this.buildQuerySection = page.getByText('Build Query').first();
+        this.buildQuerySectionButton = page.getByText('Build Query').first();
         this.streamTypeLabel = page.getByLabel(/Stream Type/i);
         this.streamNameLabel = page.getByLabel(/Stream Name/i);
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
@@ -112,6 +112,11 @@ export class PipelinesPage {
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
         this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
+
+        // Pipeline field list selectors
+        this.pipelineFieldSearchInput = page.locator('[data-test="log-search-index-list-field-search-input"]');
+        this.pipelineFieldTable = page.locator('[data-test="log-search-index-list-fields-table"]');
+        this.pipelineFieldListWrapper = page.locator('.pipeline-field-list-wrapper');
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
         this.containsOption = page.getByText("Contains", { exact: true });
@@ -1430,6 +1435,102 @@ export class PipelinesPage {
     }
 
     /**
+     * Create a realtime pipeline with full stream params in source.
+     * Used to test duplicate realtime pipeline validation (Bug #6443).
+     * @param {string} pipelineName - Name for the pipeline
+     * @param {string} streamName - Source stream name
+     * @returns {Promise<{status: number, data: any}>}
+     */
+    async createRealtimePipeline(pipelineName, streamName) {
+        const orgId = process.env.ORGNAME || 'default';
+        const basicAuth = Buffer.from(
+            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+        ).toString('base64');
+        const headers = {
+            'Authorization': `Basic ${basicAuth}`,
+            'Content-Type': 'application/json',
+        };
+        const nodeId = `n${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const payload = {
+            name: pipelineName,
+            enabled: false,
+            source: {
+                source_type: 'realtime',
+                org_id: orgId,
+                stream_name: streamName,
+                stream_type: 'logs',
+            },
+            nodes: [
+                {
+                    id: `${nodeId}-in`,
+                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
+                    position: { x: 0, y: 0 },
+                    io_type: 'input',
+                },
+                {
+                    id: `${nodeId}-out`,
+                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
+                    position: { x: 0, y: 100 },
+                    io_type: 'output',
+                },
+            ],
+            edges: [{ id: `e${nodeId}`, source: `${nodeId}-in`, target: `${nodeId}-out` }],
+        };
+
+        testLogger.info('Creating realtime pipeline via API', { pipelineName, streamName });
+
+        try {
+            const baseUrl = process.env.ZO_BASE_URL;
+            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            testLogger.info('Realtime pipeline API response', { status: response.status, data });
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create realtime pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete a pipeline by ID via API.
+     * @param {string} pipelineId - Pipeline ID to delete
+     * @returns {Promise<{status: number, data: any}>}
+     */
+    async deletePipelineById(pipelineId) {
+        const orgId = process.env.ORGNAME || 'default';
+        const basicAuth = Buffer.from(
+            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+        ).toString('base64');
+        const headers = {
+            'Authorization': `Basic ${basicAuth}`,
+            'Content-Type': 'application/json',
+        };
+
+        testLogger.info('Deleting pipeline by ID', { pipelineId });
+
+        try {
+            const baseUrl = process.env.ZO_BASE_URL;
+            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines/${pipelineId}`, {
+                method: 'DELETE',
+                headers,
+            });
+            const data = response.status !== 204
+                ? await response.json()
+                : { code: 204, message: 'Pipeline deleted' };
+            testLogger.info('Delete pipeline response', { status: response.status, data });
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to delete pipeline', { pipelineId, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
      * Explore a stream and interact with log details, then navigate to pipeline
      * @param {string} streamName - Name of the stream to explore
      */
@@ -2109,13 +2210,67 @@ export class PipelinesPage {
     }
 
     /**
+     * Wait for Build Query content (stream type, field list) to be hidden
+     */
+    async expectBuildQuerySectionCollapsed() {
+        // Build Query content (stream type, stream name, field list) is hidden
+        await expect(this.pipelineFieldSearchInput).toBeHidden({ timeout: 8000 });
+        testLogger.info('Build Query section is collapsed');
+    }
+
+    async expectBuildQuerySectionVisible() {
+        // Build Query content (stream type, stream name, field list) is visible
+        await expect(this.pipelineFieldSearchInput).toBeVisible({ timeout: 8000 });
+        testLogger.info('Build Query section is visible');
+    }
+
+    /**
      * Expand Build Query section
      * Replaces: await page.getByText('Build Query').first().click()
      */
     async expandBuildQuerySection() {
-        await this.buildQuerySection.waitFor({ state: 'visible', timeout: 5000 });
-        await this.buildQuerySection.click();
-        testLogger.info('Build Query section expanded');
+        await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
+        // Check if already expanded by looking at the Stream Type field
+        // (always inside the Build Query content area when expanded)
+        const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
+        if (!isExpanded) {
+            // Click the keyboard_arrow_up icon inside the Build Query header
+            // to trigger the Vue toggle handler
+            await this.page.evaluate(() => {
+                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
+                for (const h of headers) {
+                    if (h.textContent && h.textContent.includes('Build Query')) {
+                        const icon = h.querySelector('.q-icon');
+                        if (icon) icon.click();
+                        break;
+                    }
+                }
+            });
+            testLogger.info('Build Query section expanded');
+        } else {
+            testLogger.info('Build Query section already expanded');
+        }
+    }
+
+    /**
+     * Collapse the Build Query section (for tests that verify collapse/expand)
+     */
+    async collapseBuildQuerySection() {
+        await this.buildQuerySectionButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isExpanded = await this.streamTypeLabel.isVisible().catch(() => false);
+        if (isExpanded) {
+            await this.page.evaluate(() => {
+                const headers = document.querySelectorAll('[class*="bg-gray-200"]');
+                for (const h of headers) {
+                    if (h.textContent && h.textContent.includes('Build Query')) {
+                        const icon = h.querySelector('.q-icon');
+                        if (icon) icon.click();
+                        break;
+                    }
+                }
+            });
+            testLogger.info('Build Query section collapsed');
+        }
     }
 
     /**
@@ -2126,11 +2281,7 @@ export class PipelinesPage {
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
         await this.streamTypeLabel.click();
-        // Wait for dropdown to open
-        await this.page.waitForFunction(() => {
-            const options = document.querySelectorAll('[role="option"]');
-            return options.length > 0;
-        }, { timeout: 3000 });
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: type, exact: true }).click();
         testLogger.info(`Stream type '${type}' selected`);
     }
@@ -2143,13 +2294,202 @@ export class PipelinesPage {
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
-        // Wait briefly for dropdown to open
-        await this.page.waitForTimeout(500);
-        await this.streamNameLabel.fill(streamName);
-        // Wait for options to filter
-        await this.page.waitForTimeout(1000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
+        // Clear existing value first so pressSequentially appends into an empty
+        // field (not after a previous stream name). fill('') on a QSelect input
+        // resets the filter; if the popup closes, pressSequentially reopens it
+        // via its internal focus step.
+        await this.streamNameLabel.fill('');
+        // Use pressSequentially with delay to simulate real typing, which properly
+        // triggers Quasar's autocomplete input events (unlike fill() which sets the
+        // value atomically and may not trigger Quasar's filtering in CI).
+        await this.streamNameLabel.pressSequentially(streamName, { delay: 35 });
+        // Wait for the matching option to appear after Quasar autocomplete filtering
+        await this.page.waitForFunction(
+            (name) => Array.from(document.querySelectorAll('[role="option"]')).some(el => el.textContent.trim() === name),
+            streamName,
+            { timeout: 10000 }
+        );
+        // Click via Playwright locator to dispatch full mouse events (mousedown + mouseup + click)
+        // which Quasar's q-item component needs to trigger selection.
+        const opt = this.page.getByRole('option', { name: streamName, exact: true });
+        await opt.click({ timeout: 5000 });
         testLogger.info(`Stream '${streamName}' selected`);
+    }
+
+    /**
+     * Verify the pipeline field list is scrollable.
+     * Bug #6558: Fields section was not scrollable in the Query node editor.
+     * Checks both the outer wrapper (overflow-y: auto) and the inner
+     * q-table virtual-scroll container.
+     * @returns {Promise<{scrollable: boolean, details: object}>}
+     */
+    async verifyPipelineFieldListScrollable() {
+        const wrapper = this.pipelineFieldListWrapper;
+        await wrapper.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Check the outer wrapper's overflow
+        const wrapperInfo = await wrapper.evaluate((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+                overflowY: style.overflowY,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            };
+        });
+
+        // Also check the inner q-table container for virtual-scroll
+        const tableScrollContainer = wrapper.locator('.q-table__middle');
+        let tableInfo = null;
+        if (await tableScrollContainer.isVisible().catch(() => false)) {
+            tableInfo = await tableScrollContainer.evaluate((el) => {
+                const style = window.getComputedStyle(el);
+                return {
+                    overflowY: style.overflowY,
+                    overflow: style.overflow,
+                    scrollHeight: el.scrollHeight,
+                    clientHeight: el.clientHeight,
+                };
+            });
+        }
+
+        // Scrollable if CSS allows overflow AND content actually overflows
+        const wrapperScrollable =
+            (wrapperInfo.overflowY === 'auto' || wrapperInfo.overflowY === 'scroll') &&
+            wrapperInfo.scrollHeight > wrapperInfo.clientHeight;
+        const tableScrollable =
+            tableInfo &&
+            (tableInfo.overflowY === 'auto' || tableInfo.overflowY === 'scroll') &&
+            tableInfo.scrollHeight > tableInfo.clientHeight;
+        const isScrollable = wrapperScrollable || tableScrollable;
+
+        testLogger.info('Pipeline field list scroll check', {
+            wrapperOverflowY: wrapperInfo.overflowY,
+            wrapperScrollHeight: wrapperInfo.scrollHeight,
+            wrapperClientHeight: wrapperInfo.clientHeight,
+            tableOverflowY: tableInfo?.overflowY,
+            tableScrollHeight: tableInfo?.scrollHeight,
+            tableClientHeight: tableInfo?.clientHeight,
+            wrapperScrollable,
+            tableScrollable,
+            isScrollable,
+        });
+
+        return {
+            scrollable: isScrollable,
+            details: { wrapper: wrapperInfo, table: tableInfo },
+        };
+    }
+
+    /**
+     * Search fields in the pipeline field list by typing in the search input.
+     * @param {string} searchText - Text to search for
+     */
+    async searchPipelineFieldList(searchText) {
+        const searchInput = this.pipelineFieldSearchInput;
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+        // Force click to bypass any overlaying Quasar portal menu
+        await searchInput.click({ force: true });
+        await searchInput.fill(searchText);
+        testLogger.info(`Field list searched for: "${searchText}"`);
+    }
+
+    /**
+     * Get the count of visible field rows in the pipeline field list q-table.
+     * @returns {Promise<number>}
+     */
+    async getPipelineFieldCount() {
+        const fieldTable = this.pipelineFieldTable;
+        await fieldTable.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Wait for at least one field label to appear.
+        await this.pipelineFieldTable.locator('.field_label').first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => {})
+            .catch(() => {});
+
+        // Get the total count by scrolling through virtual-scroll positions.
+        // Quasar q-table with virtual-scroll only renders the visible window
+        // (~21 rows). We scroll incrementally through the container and
+        // collect labels at each position to get the true total.
+        const count = await this.pipelineFieldTable.evaluate(async (el) => {
+            const container = el.querySelector('.q-table__middle, .q-virtual-scroll__container');
+            if (!container) {
+                return el.querySelectorAll('.field_label').length;
+            }
+
+            const allLabels = new Set();
+            const prevScrollTop = container.scrollTop;
+
+            // Wait for virtual-scroll to compute full dimensions after any
+            // filter/search change. scrollHeight reflects the total virtual
+            // content — if it's only ~1x clientHeight, there's nothing to
+            // scroll through yet (Quasar hasn't finished re-rendering).
+            for (let wait = 0; wait < 100; wait++) {
+                if (container.scrollHeight > container.clientHeight * 1.2) break;
+                await new Promise(r => requestAnimationFrame(r));
+            }
+
+            // Scroll through the container in half-viewport increments.
+            // Setting scrollTop alone may not trigger Quasar's virtual-scroll
+            // reconciliation in CI; dispatching a native scroll event helps.
+            const step = Math.max(Math.floor(container.clientHeight / 2), 50);
+
+            for (let pos = 0; pos <= container.scrollHeight; pos += step) {
+                container.scrollTop = pos;
+                container.dispatchEvent(new Event('scroll'));
+                await new Promise(r => requestAnimationFrame(r));
+                // Extra frame to let Quasar virtual-scroll re-render
+                await new Promise(r => requestAnimationFrame(r));
+                container.querySelectorAll('.field_label').forEach(lbl => {
+                    if (lbl.textContent) allLabels.add(lbl.textContent);
+                });
+            }
+
+            // Scroll to the very bottom to catch any remaining rows
+            container.scrollTop = container.scrollHeight;
+            container.dispatchEvent(new Event('scroll'));
+            await new Promise(r => requestAnimationFrame(r));
+            await new Promise(r => requestAnimationFrame(r));
+            container.querySelectorAll('.field_label').forEach(lbl => {
+                if (lbl.textContent) allLabels.add(lbl.textContent);
+            });
+
+            // Restore scroll position
+            container.scrollTop = Math.min(prevScrollTop, container.scrollHeight);
+
+            return allLabels.size;
+        });
+
+        if (count === 0) {
+            testLogger.info('Pipeline field count: 0 (no matching fields)');
+        } else {
+            testLogger.info(`Pipeline field count: ${count}`);
+        }
+        return count;
+    }
+
+    /**
+     * Clear the pipeline field list search input.
+     */
+    async clearPipelineFieldSearch() {
+        const searchInput = this.pipelineFieldSearchInput;
+        await searchInput.fill('');
+        // Wait for the virtual-scroll container's scrollHeight to expand after
+        // clearing the filter. In a virtual-scroll table the rendered label count
+        // is always ~viewport size, so we must wait for Quasar to recompute the
+        // full scroll dimensions before counting.
+        await this.page.waitForFunction(() => {
+            const container = document.querySelector('[data-test="log-search-index-list-fields-table"] .q-table__middle, [data-test="log-search-index-list-fields-table"] .q-virtual-scroll__container');
+            if (!container) return false;
+            // scrollHeight must be large enough to indicate the full list is loaded
+            // (more than 1.2x the clientHeight, meaning content overflows)
+            return container.scrollHeight > container.clientHeight * 1.2;
+        }, null, { timeout: 8000 }).catch(() => {
+            testLogger.info('Field list scrollHeight expansion wait timed out — continuing with current count');
+        });
+        // Extra animation frame to let Quasar finish re-rendering visible rows
+        await this.page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
+        testLogger.info('Field list search cleared');
     }
 
     /**
@@ -2174,7 +2514,7 @@ export class PipelinesPage {
         await this.page.waitForFunction(() => {
             const editor = document.querySelector('.monaco-editor');
             return editor !== null;
-        }, { timeout: 3000 });
+        }, null, { timeout: 3000 });
         // Additional small wait for query update to complete
         await this.page.waitForTimeout(500);
         testLogger.info('Watcher processing complete');
