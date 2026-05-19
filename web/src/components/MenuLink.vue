@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <OIcon :name="icon" size="sm" />
+        <OIcon :name="icon" size="md" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <component :is="iconComponent" class="o-icon tw:size-4" />
+        <component :is="iconComponent" class="o-icon tw:size-6" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <OIcon :name="icon" size="sm" />
+        <OIcon :name="icon" size="md" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <component :is="iconComponent" class="o-icon tw:size-4" />
+        <component :is="iconComponent" class="o-icon tw:size-6" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -424,9 +424,11 @@ export default defineComponent({
       list-style: none;
     }
 
-    .OIcon {
-      height: 1.3rem;
-      width: 1.3rem;
+    /* OIcon span itself — bump sidebar icons a notch larger than the default md */
+    :deep(.nav-menu-item-avatar > span),
+    :deep(.icon-wrapper > span) {
+      height: 1.5rem !important;
+      width: 1.5rem !important;
     }
 
     .nav-menu-item-label {
