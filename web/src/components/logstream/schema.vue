@@ -457,10 +457,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="q-mb-md" v-if="isDialogOpen">
-                    <q-card class="add-fields-card">
+                    <OCard class="add-fields-card">
                       <!-- Header Section -->
-                      <q-card-section
-                        class="q-pa-none"
+                      <OCardSection
+                        class="tw:p-0"
                         style="padding: 4px 16px 4px 16px"
                       >
                         <div class="tw:flex tw:justify-between tw:items-center">
@@ -475,10 +475,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                         </div>
-                      </q-card-section>
+                      </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
-                      <q-card-section
-                        class="q-pa-none"
+                      <OCardSection
+                        class="tw:p-0"
                         style="
                           flex: 1;
                           overflow-y: auto;
@@ -497,8 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @add="addSchemaField"
                           @remove="removeSchemaField"
                         />
-                      </q-card-section>
-                    </q-card>
+                      </OCardSection>
+                    </OCard>
                   </div>
 
                   <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -1191,6 +1191,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1238,6 +1240,8 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OCheckbox,
+    OCard,
+    OCardSection,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -2894,9 +2898,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-card__section--vert {
-  padding: 8px 16px;
-}
 .indexDetailsContainer {
   width: 100%;
 

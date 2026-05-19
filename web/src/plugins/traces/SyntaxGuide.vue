@@ -28,12 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="syntax-guide-menu"
       :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
     >
-      <q-card flat v-if="!sqlmode">
-        <q-card-section class="syntax-guide-title">
+      <OCard v-if="!sqlmode">
+        <OCardSection role="header" class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </q-card-section>
+        </OCardSection>
         <OSeparator />
-        <q-card-section class="q-pt-none answers">
+        <OCardSection class="tw:pt-0 answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
@@ -75,14 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat v-else>
-        <q-card-section class="syntax-guide-title">
+        </OCardSection>
+      </OCard>
+      <OCard v-else>
+        <OCardSection role="header" class="syntax-guide-title">
           <div class="label">Syntax Guide: SQL Mode</div>
-        </q-card-section>
+        </OCardSection>
         <OSeparator />
-        <q-card-section class="q-pt-none answers">
+        <OCardSection class="tw:pt-0 answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
+        </OCardSection>
+      </OCard>
     </q-menu>
   </OButton>
 </template>
@@ -145,9 +145,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
-  components: { OSeparator, OButton, OTooltip, OIcon },
+  components: { OSeparator, OButton, OTooltip, OIcon, OCard, OCardSection },
   props: {
     sqlmode: {
       type: Boolean,

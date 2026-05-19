@@ -32,14 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-      <q-card-section class="q-pt-none">
+      <OCardSection class="tw:pt-0">
         <OTabs v-model="activeTab" dense class="text-grey" align="justify">
           <OTab name="light" label="Light Mode" />
           <OTab name="dark" label="Dark Mode" />
         </OTabs>
-      </q-card-section>
+      </OCardSection>
 
-      <q-card-section class="q-pt-none scroll-content-predefined-themes">
+      <OCardSection class="tw:pt-0 scroll-content-predefined-themes">
         <OTabPanels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <OTabPanel name="light">
@@ -189,10 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
         </OTabPanels>
-      </q-card-section>
+      </OCardSection>
 
       <!-- Note at the bottom -->
-      <q-card-section class="q-pt-none q-pb-sm">
+      <OCardSection class="tw:pt-0 tw:pb-2">
         <OSeparator class="tw:mb-2" />
         <div
           class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sync across different browsers or devices.</span
           >
         </div>
-      </q-card-section>
+      </OCardSection>
 
     <!-- Color Picker Dialog -->
     <ODialog data-test="predefined-themes-color-picker-dialog"
@@ -223,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";

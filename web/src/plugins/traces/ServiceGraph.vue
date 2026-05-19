@@ -1,5 +1,5 @@
 <template>
-  <q-card flat class="tw:h-full tw:flex tw:flex-col">
+  <OCard class="tw:h-full tw:flex tw:flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
       <!-- Stream selector -->
@@ -151,12 +151,12 @@
         </div>
       </div>
     </div>
-    <q-card-section
+    <OCardSection
       class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
     >
       <!-- Graph Visualization -->
-      <q-card flat bordered class="graph-card tw:h-full">
-        <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
+      <OCard class="graph-card tw:h-full">
+        <OCardSection class="tw:p-0 tw:h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
@@ -233,10 +233,10 @@
               />
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-card-section>
-  </q-card>
+        </OCardSection>
+      </OCard>
+    </OCardSection>
+  </OCard>
 
   <!-- Enhanced Settings Dialog -->
   <ODialog data-test="service-graph-settings-dialog"
@@ -296,6 +296,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -310,6 +312,8 @@ export default defineComponent({
     OSelect,
     OInput,
     OIcon,
+    OCard,
+    OCardSection,
 },
   emits: ["view-traces"],
   setup(props, { emit }) {

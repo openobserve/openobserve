@@ -6,7 +6,7 @@
     @click:primary="applyFilter"
   >
     <div class="q-pa-md filter-container">
-      <q-card-section class="q-pa-none">
+      <OCardSection class="tw:p-0">
         <OSelect
           v-model="selectedOperator"
           :options="operators"
@@ -16,8 +16,8 @@
           :error-message="selectedOperatorError"
           @update:model-value="selectedOperatorError = ''"
         />
-      </q-card-section>
-      <q-card-section class="q-pa-none">
+      </OCardSection>
+      <OCardSection class="tw:p-0">
         <div class="text-bold q-pb-xs q-pt-sm">Values</div>
         <div class="filter-values-container">
           <div v-show="!fieldValues?.length">No values present</div>
@@ -37,7 +37,7 @@
             </q-list>
           </div>
         </div>
-      </q-card-section>
+      </OCardSection>
     </div>
   </ODialog>
 </template>
@@ -48,11 +48,12 @@ import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
-  components: { ODialog, OSelect, OCheckbox },
+  components: { ODialog, OSelect, OCheckbox, OCardSection },
   props: [
     "fieldName",
     "fieldValues",

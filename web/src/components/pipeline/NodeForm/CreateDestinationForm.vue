@@ -369,13 +369,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Connection Notes Card -->
-          <q-card
-            flat
-            bordered
-            class="connection-notes-card q-mb-lg q-mt-md"
+          <OCard
+            class="connection-notes-card tw:mb-6 tw:mt-4"
             :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'"
           >
-            <q-card-section>
+            <OCardSection role="body">
               <div class="row items-center q-mb-sm">
                 <OIcon
                   name="info"
@@ -407,8 +405,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <code class="q-ml-xs">{{ connectionNotes.example }}</code>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </OStep>
       </OStepper>
 
@@ -466,6 +464,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";

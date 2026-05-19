@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="options-container">
           <!-- Create New Org -->
-          <q-card flat bordered class="option-card q-mb-md">
-            <q-card-section>
+          <OCard class="option-card tw:mb-4">
+            <OCardSection role="body">
               <div class="text-h6">Create New Organization</div>
               <p class="text-grey-7">
                 Create a new organization with Azure Marketplace billing
@@ -88,17 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isProcessing"
                 :disabled="!newOrgName"
               >Create &amp; Link</OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
 
           <!-- Link to Existing Org (only show orgs without billing) -->
-          <q-card
+          <OCard
             v-if="eligibleOrganizations.length > 0"
-            flat
-            bordered
             class="option-card"
           >
-            <q-card-section>
+            <OCardSection role="body">
               <div class="text-h6">Link to Existing Organization</div>
               <p class="text-grey-7">
                 Link Azure billing to an existing organization
@@ -119,8 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isProcessing"
                 :disabled="!selectedOrg"
               >Link Azure Billing</OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
       </div>
 
@@ -169,6 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
@@ -192,7 +192,7 @@ type SetupState =
 export default defineComponent({
   name: "AzureMarketplaceSetup",
   components: { OButton, OSpinner, OInput, OSelect,
-    OIcon,
+    OIcon, OCard, OCardSection,
 },
   setup() {
     const store = useStore();
