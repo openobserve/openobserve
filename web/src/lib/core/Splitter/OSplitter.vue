@@ -15,7 +15,7 @@
       :class="[
         'o-splitter__before',
         'tw:overflow-hidden',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        horizontal ? 'tw:h-full' : 'tw:w-full'
       ]"
       :style="beforeStyle"
     >
@@ -33,11 +33,12 @@
         'tw:transition-colors',
         'hover:tw:bg-[var(--o2-border-input)]',
         'tw:absolute',
+        'tw:z-10',
         disable ? 'tw:cursor-not-allowed tw:opacity-50' : '',
         horizontal ? 'tw:w-[4px] tw:h-full tw:cursor-col-resize' : 'tw:h-[4px] tw:w-full tw:cursor-row-resize',
         separatorClass
       ]"
-      :style="separatorStyle"
+      :style="[separatorStyle, separatorPosition]"
       :tabindex="disable ? -1 : 0"
       @mousedown="!disable && onMouseDown($event)"
       @keydown="!disable && handleKeyDown($event)"
@@ -56,7 +57,7 @@
       :class="[
         'o-splitter__after',
         'tw:overflow-hidden',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        horizontal ? 'tw:h-full' : 'tw:w-full'
       ]"
       :style="afterStyle"
     >
@@ -96,7 +97,7 @@ const { value: currentValue, isResizing, onMouseDown } = useResizer({
   maxValue: maxValue.value,
   unit: props.unit,
   containerRef,
-  throttleMs: 50, // 60fps for smooth movement
+  throttleMs: 16, // 60fps for smooth movement
   invert: false, // For horizontal splitters, invert the direction
   onResize: (newValue: number) => {
     emit('update:modelValue', newValue)
@@ -114,45 +115,53 @@ const beforeStyle = computed(() => {
 const afterStyle = computed(() => {
   const remainingSize = props.unit === '%'
     ? `${100 - currentValue.value}%`
-    : `calc(100% - ${currentValue.value}px - 1px)` // subtract separator width
+    : `calc(100% - ${currentValue.value}px)`
 
   return props.horizontal
     ? { width: remainingSize }
     : { height: remainingSize }
 })
 
+// Separator absolute positioning
+const separatorPosition = computed(() => {
+  const position = `${currentValue.value}${props.unit}`
+  return props.horizontal
+    ? { left: position, top: '0' }
+    : { top: position, left: '0' }
+})
+
 // Keyboard navigation support
-// const handleKeyDown = (event: KeyboardEvent) => {
-//   if (props.disable) return
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (props.disable) return
 
-//   const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
-//   let newValue = currentValue.value
+  const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
+  let newValue = currentValue.value
 
-//   switch (event.key) {
-//     case 'ArrowUp':
-//     case 'ArrowLeft':
-//       newValue = Math.max(minValue.value, currentValue.value - step)
-//       break
-//     case 'ArrowDown':
-//     case 'ArrowRight':
-//       newValue = Math.min(maxValue.value, currentValue.value + step)
-//       break
-//     case 'Home':
-//       newValue = minValue.value
-//       break
-//     case 'End':
-//       newValue = maxValue.value
-//       break
-//     default:
-//       return
-//   }
+  switch (event.key) {
+    case 'ArrowUp':
+    case 'ArrowLeft':
+      newValue = Math.max(minValue.value, currentValue.value - step)
+      break
+    case 'ArrowDown':
+    case 'ArrowRight':
+      newValue = Math.min(maxValue.value, currentValue.value + step)
+      break
+    case 'Home':
+      newValue = minValue.value
+      break
+    case 'End':
+      newValue = maxValue.value
+      break
+    default:
+      return
+  }
 
-//   event.preventDefault()
-//   emit('update:modelValue', newValue)
-//   nextTick(() => {
-//     currentValue.value = newValue
-//   })
-// }
+  event.preventDefault()
+  emit('update:modelValue', newValue)
+  nextTick(() => {
+    currentValue.value = newValue
+  })
+}
 
 // Watch for external prop changes
 import { watch } from 'vue'
@@ -168,7 +177,6 @@ watch(() => props.modelValue, (newValue) => {
 
 .o-splitter__separator {
   flex-shrink: 0;
-  position: relative;
 }
 
 .o-splitter__separator:focus {

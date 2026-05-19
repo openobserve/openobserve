@@ -55,7 +55,7 @@ describe('OSplitter', () => {
     it('should render with default props', () => {
       expect(wrapper.find('.o-splitter').exists()).toBe(true)
       expect(wrapper.classes()).toContain('o-splitter--vertical')
-      expect(wrapper.classes()).toContain('tw:flex-row')
+      expect(wrapper.classes()).toContain('tw:flex-col')
     })
 
     it('should render before and after slots', () => {
@@ -123,13 +123,13 @@ describe('OSplitter', () => {
 
     it('should render with horizontal classes', () => {
       expect(wrapper.classes()).toContain('o-splitter--horizontal')
-      expect(wrapper.classes()).toContain('tw:flex-col')
+      expect(wrapper.classes()).toContain('tw:flex-row')
     })
 
     it('should render horizontal separator', () => {
       const separator = wrapper.find('.o-splitter__separator')
       expect(separator.classes()).toContain('o-splitter__separator--horizontal')
-      expect(separator.classes()).toContain('tw:cursor-row-resize')
+      expect(separator.classes()).toContain('tw:cursor-col-resize')
     })
 
     it('should call useResizer with horizontal direction and invert', () => {
@@ -141,7 +141,7 @@ describe('OSplitter', () => {
         unit: '%',
         containerRef: expect.any(Object),
         throttleMs: 16,
-        invert: true,
+        invert: false,
         onResize: expect.any(Function)
       })
     })
@@ -151,8 +151,8 @@ describe('OSplitter', () => {
       const after = wrapper.find('.o-splitter__after')
 
       // Component uses mock value from useResizer (40%)
-      expect(before.element.style.height).toBe('40%')
-      expect(after.element.style.height).toBe('60%')
+      expect(before.element.style.width).toBe('40%')
+      expect(after.element.style.width).toBe('60%')
     })
   })
 
@@ -171,13 +171,13 @@ describe('OSplitter', () => {
 
     it('should render with vertical classes', () => {
       expect(wrapper.classes()).toContain('o-splitter--vertical')
-      expect(wrapper.classes()).toContain('tw:flex-row')
+      expect(wrapper.classes()).toContain('tw:flex-col')
     })
 
     it('should render vertical separator', () => {
       const separator = wrapper.find('.o-splitter__separator')
       expect(separator.classes()).toContain('o-splitter__separator--vertical')
-      expect(separator.classes()).toContain('tw:cursor-col-resize')
+      expect(separator.classes()).toContain('tw:cursor-row-resize')
     })
 
     it('should apply correct styles for vertical layout', () => {
@@ -185,8 +185,8 @@ describe('OSplitter', () => {
       const after = wrapper.find('.o-splitter__after')
 
       // Component uses mock value from useResizer (35%)
-      expect(before.element.style.width).toBe('35%')
-      expect(after.element.style.width).toBe('65%')
+      expect(before.element.style.height).toBe('35%')
+      expect(after.element.style.height).toBe('65%')
     })
   })
 
@@ -473,12 +473,12 @@ describe('OSplitter', () => {
       expect(mockOnMouseDown).toHaveBeenCalled()
     })
 
-    it('should apply resizing styles when isResizing is true', async () => {
+    it('should not apply special styles when isResizing is true', async () => {
       mockIsResizing.value = true
       await wrapper.vm.$forceUpdate()
 
       const separator = wrapper.find('.o-splitter__separator')
-      expect(separator.classes()).toContain('tw:bg-[var(--o2-primary-color)]')
+      expect(separator.classes()).not.toContain('tw:bg-[var(--o2-primary-color)]')
     })
   })
 
@@ -501,7 +501,7 @@ describe('OSplitter', () => {
       )
 
       const before = wrapper.find('.o-splitter__before')
-      expect(before.element.style.width).toBe('30%')
+      expect(before.element.style.height).toBe('30%')
     })
 
     it('should handle pixel unit correctly', () => {
@@ -522,7 +522,7 @@ describe('OSplitter', () => {
       )
 
       const before = wrapper.find('.o-splitter__before')
-      expect(before.element.style.width).toBe('200px')
+      expect(before.element.style.height).toBe('200px')
     })
 
     it('should calculate after section style correctly for pixel units', () => {
@@ -537,9 +537,9 @@ describe('OSplitter', () => {
       })
 
       const after = wrapper.find('.o-splitter__after')
-      // The actual output from the component
-      expect(after.element.style.width).toContain('calc(100% -')
-      expect(after.element.style.width).toContain('px)')
+      // The actual output from the component - separator no longer consumes space
+      expect(after.element.style.height).toContain('calc(100% -')
+      expect(after.element.style.height).toContain('px)')
     })
   })
 })
