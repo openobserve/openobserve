@@ -350,6 +350,90 @@ class APICleanup {
     }
 
     /**
+     * Create a report via API (v2) in the default folder.
+     * Fetches the first available dashboard and uses it as the report source.
+     * @param {string} reportName - Unique name for the report
+     * @param {string} folderId - Folder ID to create the report in (defaults to "default")
+     * @returns {Promise<Object>} Result with { success, reportName, error }
+     */
+    async createReportViaApi(reportName, folderId = 'default') {
+        testLogger.info('Creating report via API', { reportName, folderId });
+
+        try {
+            // Step 1: Fetch dashboards from the default folder to get a dashboard ID
+            const dashboards = await this.fetchDashboardsInFolder(folderId);
+            if (dashboards.length === 0) {
+                testLogger.error('No dashboards found in folder, cannot create report', { folderId });
+                return { success: false, error: 'No dashboards available' };
+            }
+
+            const dashboard = dashboards[0];
+            testLogger.info('Using dashboard for report', { dashboardId: dashboard.dashboard_id, title: dashboard.title });
+
+            // Step 2: Build the report payload
+            const payload = {
+                name: reportName,
+                description: '',
+                dashboards: [{
+                    folder: folderId,
+                    dashboard: dashboard.dashboard_id,
+                    tabs: [dashboard.tabs?.[0]?.tab_id || 'default'],
+                    variables: [],
+                    timerange: {
+                        type: 'relative',
+                        period: '30m',
+                        from: 0,
+                        to: 0
+                    },
+                    report_type: 'pdf',
+                    email_attachment_type: 'standard'
+                }],
+                destinations: [{ email: this.email }],
+                enabled: true,
+                imagePreview: false,
+                title: `Test Report ${reportName}`,
+                message: '',
+                orgId: this.org,
+                start: Date.now(),
+                frequency: { interval: 1, type: 'once', cron: '' },
+                timezone: 'UTC',
+                timezoneOffset: 0,
+                lastTriggeredAt: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                owner: this.email,
+                lastEditedBy: this.email
+            };
+
+            // Step 3: POST to create the report
+            const response = await this._fetch(
+                `${this.baseUrl}/api/v2/${this.org}/reports?folder=${encodeURIComponent(folderId)}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                testLogger.error('Failed to create report via API', { reportName, status: response.status, body: errorBody });
+                return { success: false, error: `HTTP ${response.status}: ${errorBody}` };
+            }
+
+            const result = await response.json();
+            testLogger.info('Report created via API', { reportName, result });
+            return { success: true, reportName };
+        } catch (error) {
+            testLogger.error('Failed to create report via API', { reportName, error: error.message });
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Fetch all pipelines
      * @returns {Promise<Array>} Array of pipeline objects
      */
@@ -829,6 +913,108 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Reports cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all report folders (type=reports)
+     * @returns {Promise<Array>} Array of folder objects with folderId and name
+     */
+    async fetchReportFolders() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch report folders', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch report folders', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a report folder by ID
+     * @param {string} folderId - The folder ID to delete
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteReportFolder(folderId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports/${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const text = await response.text();
+
+            if (response.ok) {
+                return { code: 200, message: text };
+            }
+
+            try {
+                const jsonResult = JSON.parse(text);
+                return jsonResult;
+            } catch {
+                return { code: response.status, message: text };
+            }
+        } catch (error) {
+            testLogger.error('Failed to delete report folder', { folderId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up report folders matching specified name prefixes
+     * @param {Array<string>} namePrefixes - Array of folder name prefixes to match (e.g., ['test_folder_', 'test_special_'])
+     */
+    async cleanupReportFolders(namePrefixes = []) {
+        testLogger.info('Starting report folders cleanup', { prefixes: namePrefixes });
+
+        try {
+            const folders = await this.fetchReportFolders();
+            testLogger.info('Fetched report folders', { total: folders.length });
+
+            const matchingFolders = folders.filter(f =>
+                namePrefixes.some(prefix => f.name.startsWith(prefix))
+            );
+            testLogger.info('Found report folders matching prefixes', { count: matchingFolders.length });
+
+            if (matchingFolders.length === 0) {
+                testLogger.info('No report folders to clean up');
+                return;
+            }
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const folder of matchingFolders) {
+                const result = await this.deleteReportFolder(folder.folderId);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted report folder', { name: folder.name, folderId: folder.folderId });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete report folder', { name: folder.name, folderId: folder.folderId, result });
+                }
+            }
+
+            testLogger.info('Report folders cleanup completed', { deletedCount, failedCount });
+        } catch (error) {
+            testLogger.error('Report folders cleanup failed', { error: error.message });
         }
     }
 
