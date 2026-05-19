@@ -108,41 +108,62 @@ function onTickChange(newVal: CheckboxModelValue) {
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
     <div
-      class="tw:flex tw:items-center tw:gap-1 tw:min-h-7 tw:rounded tw:select-none"
-      :class="[
+      class="tw:flex tw:items-center tw:gap-1 tw:min-h-7 tw:px-1 tw:rounded tw:select-none tw:transition-colors tw:duration-100"
+      :class="
         !isLeaf
           ? 'tw:cursor-pointer tw:hover:bg-tree-node-hover-bg'
-          : 'tw:cursor-default',
-      ]"
+          : 'tw:cursor-default tw:hover:bg-tree-node-hover-bg'
+      "
       @click="toggleExpand"
     >
-      <!-- Expand / collapse triangle (parents only) -->
+      <!-- Expand / collapse arrow (parents only) -->
       <span
         v-if="!isLeaf"
-        class="tw:flex tw:items-center tw:justify-center tw:size-4 tw:shrink-0 tw:text-text-secondary tw:transition-transform tw:duration-150"
-        :class="isExpanded ? '' : 'tw:-rotate-90'"
+        class="tw:flex tw:items-center tw:justify-center tw:size-4 tw:shrink-0 tw:text-text-secondary tw:transition-transform tw:duration-200 tw:ease-in-out"
+        :class="isExpanded ? 'tw:rotate-0' : 'tw:-rotate-90'"
         aria-hidden="true"
       >
-        <span class="tw:text-[10px] tw:leading-none">▼</span>
+        <!-- Chevron-down SVG — crisp at all sizes -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          class="tw:size-3.5"
+        >
+          <path d="M7 10l5 5 5-5z" />
+        </svg>
       </span>
 
-      <!-- Tree connector for leaf nodes — draws └─ using CSS borders -->
+      <!-- Leaf connector — └ elbow anchored under the chevron center -->
+      <!--
+        The children <ul> has pl-5 (1.25rem = 20px) indentation, so the
+        connector span starts 20px to the RIGHT of the parent row.
+        The parent's chevron (size-4 = 16px) is centered at +8px from the
+        parent row start, so relative to the connector span start:
+          chevronCenterX = 8px - 20px = -12px = -0.75rem
+        Accounting for the 1.5px border center (subtract 0.75px):
+          left = calc(-0.75rem - 0.75px)
+        Arm width from that X to the right edge of the connector span (1rem):
+          width = 1rem - (-0.75rem - 0.75px) = calc(1.75rem + 0.75px)
+        The negative left overflows into the ul's padding area which is
+        NOT clipped by overflow:hidden (clips to padding box, not content box).
+      -->
       <span
         v-else
-        class="tw:flex tw:items-end tw:shrink-0 tw:self-stretch tw:opacity-40"
-        style="width: 1rem; min-height: 1.75rem;"
+        class="tw:relative tw:shrink-0 tw:self-stretch tw:opacity-35"
+        style="width: 1rem;"
         aria-hidden="true"
       >
-        <!-- Vertical segment (top half) + horizontal arm -->
         <span
           style="
-            display: block;
-            width: 0.5rem;
-            height: 50%;
+            position: absolute;
+            left: calc(-0.75rem - 0.75px);
+            top: 0;
+            width: calc(1.75rem + 0.75px);
+            height: calc(50% + 0.75px);
             border-left: 1.5px solid currentColor;
             border-bottom: 1.5px solid currentColor;
-            border-bottom-left-radius: 2px;
-            margin-bottom: 0.45rem;
+            border-bottom-left-radius: 3px;
           "
         />
       </span>
@@ -158,25 +179,30 @@ function onTickChange(newVal: CheckboxModelValue) {
 
       <!-- Label -->
       <span
-        class="tw:text-sm tw:text-text-primary tw:leading-none tw:truncate"
+        class="tw:text-sm tw:text-text-primary tw:leading-snug tw:truncate"
         :class="isDisabled ? 'tw:opacity-50' : ''"
       >
         {{ node.label }}
       </span>
     </div>
 
-    <!-- Children (recursive) ──────────────────────────────────────── -->
-    <ul
-      v-if="!isLeaf && isExpanded"
-      role="group"
-      class="tw:list-none tw:m-0 tw:p-0 tw:pl-4"
+    <!-- Children (recursive) — animated expand/collapse ──────────── -->
+    <div
+      v-if="!isLeaf"
+      class="tw:overflow-hidden tw:transition-[grid-template-rows] tw:duration-200 tw:ease-in-out tw:grid"
+      :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
-      <OTreeNode
-        v-for="child in node.children"
-        :key="child[ctx.nodeKey] as TreeNodeKey"
-        :node="child"
-        :depth="depth + 1"
-      />
-    </ul>
+      <ul
+        role="group"
+        class="tw:list-none tw:m-0 tw:p-0 tw:pl-5 tw:overflow-hidden tw:min-h-0"
+      >
+        <OTreeNode
+          v-for="child in node.children"
+          :key="child[ctx.nodeKey] as TreeNodeKey"
+          :node="child"
+          :depth="depth + 1"
+        />
+      </ul>
+    </div>
   </li>
 </template>
