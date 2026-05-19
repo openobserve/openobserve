@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("iam.basicUsers") }}
         </div>
-        <div class="full-width tw:flex tw:justify-end tw:gap-3">
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
           <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:h-[36px] tw:w-[200px]"
               :placeholder="t('user.search')"
             >
-              <template #prepend>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
           <div class="col-6" v-if="config.isCloud == 'true'">
@@ -69,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :global-filter="filterQuery"
           pagination="client"
           :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('iam.basicUsers')"
           sorting="client"
           selection="multiple"
           filter-mode="client"
@@ -111,13 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="edit" size="sm" />
             </OButton>
           </template>
-          <template
-            v-if="selectedUsers.length > 0"
-            #bottom
-          >
-            <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-              {{ selectedUsers.length }} selected
-            </span>
+          <template v-if="selectedUsers.length > 0" #bottom>
             <OButton
               data-test="users-list-delete-users-btn"
               variant="outline"

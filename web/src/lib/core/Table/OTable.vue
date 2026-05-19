@@ -51,6 +51,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
+  footerTitle: "",
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
@@ -571,6 +572,7 @@ defineExpose({
       :showing-to="pagination.showingTo.value"
       :is-first-page="pagination.isFirstPage.value"
       :is-last-page="pagination.isLastPage.value"
+      :title="props.footerTitle"
       @update:page-size="pagination.setPageSize"
       @first-page="pagination.firstPage"
       @prev-page="pagination.prevPage"

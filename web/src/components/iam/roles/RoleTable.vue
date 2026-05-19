@@ -63,6 +63,8 @@ const columns: OTableColumnDef[] = [
     :global-filter="globalFilter"
     pagination="client"
     :page-size="20"
+    :page-size-options="[20, 50, 100, 250, 500]"
+    :footer-title="t('iam.roles')"
     sorting="client"
     selection="multiple"
     row-key="role_name"
@@ -99,25 +101,24 @@ const columns: OTableColumnDef[] = [
       <NoData />
     </template>
 
-    <!-- Bottom: bulk action in pagination bar -->
-    <template
-      v-if="(selectedIds?.length ?? 0) > 0"
-      #bottom
-    >
-      <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-        {{ selectedIds?.length }} selected
-      </span>
-      <OButton
-        data-test="iam-roles-bulk-delete-btn"
-        variant="ghost"
-        size="sm"
-        @click="emit('bulk-delete')"
-      >
-        <template #icon-left>
-          <OIcon name="delete" size="sm" />
-        </template>
-        {{ t("common.delete") }}
-      </OButton>
+    <template #bottom>
+      <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md">
+        {{ data.length }} {{ t("iam.roles") }}
+      </div>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OButton
+          v-if="(selectedIds?.length ?? 0) > 0"
+          data-test="iam-roles-bulk-delete-btn"
+          variant="outline"
+          size="sm"
+          @click="emit('bulk-delete')"
+        >
+          <template #icon-left>
+            <OIcon name="delete" size="sm" />
+          </template>
+          {{ t("common.delete") }}
+        </OButton>
+      </div>
     </template>
   </OTable>
 </template>

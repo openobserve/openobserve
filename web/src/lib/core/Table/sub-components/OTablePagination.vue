@@ -2,9 +2,10 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { useSlots } from "vue";
+import { useSlots, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const { t } = useI18n();
 const slots = useSlots();
@@ -37,10 +38,14 @@ const emit = defineEmits<{
   "last-page": [];
 }>();
 
-function onPageSizeChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  emit("update:pageSize", Number(target.value));
-}
+const pageSizeModel = computed({
+  get: () => props.pageSize,
+  set: (val: number) => emit("update:pageSize", val),
+});
+
+const pageSizeSelectOptions = computed(() =>
+  props.pageSizeOptions.map((n) => ({ label: String(n), value: n }))
+);
 </script>
 
 <template>
@@ -51,52 +56,46 @@ function onPageSizeChange(event: Event) {
     <!-- Left: bulk actions slot or row count -->
     <div class="tw:flex tw:items-center tw:gap-2">
       <slot name="actions" />
-      <span v-if="!slots.actions" class="tw:text-text-secondary tw:text-xs">
-        {{ showingFrom }}-{{ showingTo }} of {{ totalCount.toLocaleString() }}
+      <span v-if="!slots.actions" class="tw:text-text-primary tw:text-xs" style="font-weight: 700;">
+        {{ totalCount.toLocaleString() }} {{ title }}
       </span>
     </div>
 
     <!-- Right: controls -->
     <div class="tw:flex tw:items-center tw:gap-3">
-      <div class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-secondary tw:text-xs">
-        <span>{{ t("search.recordsPerPage") }}</span>
-        <select
-          :value="pageSize"
-          class="tw:bg-transparent tw:border tw:border-border-default tw:rounded tw:px-1.5 tw:py-0.5 tw:text-xs tw:text-text-primary tw:cursor-pointer tw:hover:border-border-strong"
+      <span class="tw:text-text-primary tw:text-xs">
+        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
+      </span>
+      <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" />
+      <div class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-primary tw:text-xs">
+        <span class="tw:whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
+        <OSelect
+          v-model="pageSizeModel"
+          :options="pageSizeSelectOptions"
+          :searchable="false"
+          size="sm"
           data-test="o2-table-page-size-select"
-          @change="onPageSizeChange"
-        >
-          <option
-            v-for="opt in pageSizeOptions"
-            :key="opt"
-            :value="opt"
-          >
-            {{ opt }}
-          </option>
-        </select>
+        />
       </div>
 
       <div class="tw:flex tw:items-center tw:gap-1">
         <OButton
-          variant="ghost"
-          size="icon-circle-sm"
+          variant="outline"
+          size="icon"
           :disabled="isFirstPage"
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
-          <OIcon name="chevron_left" size="1.1rem" />
+          <OIcon name="chevron-left" size="sm" />
         </OButton>
-        <span class="tw:text-xs tw:text-text-secondary tw:min-w-[3rem] tw:text-center">
-          {{ currentPage }} / {{ totalPages }}
-        </span>
         <OButton
-          variant="ghost"
-          size="icon-circle-sm"
+          variant="outline"
+          size="icon"
           :disabled="isLastPage"
           data-test="o2-table-next-page-btn"
           @click="emit('next-page')"
         >
-          <OIcon name="chevron_right" size="1.1rem" />
+          <OIcon name="chevron-right" size="sm" />
         </OButton>
       </div>
     </div>
