@@ -68,18 +68,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <OForm
+          ref="formRef"
+          :key="formKey"
+          :default-values="{ name: regexPatternInputs.name, pattern: regexPatternInputs.pattern }"
           @submit="saveRegexPattern"
           class="tw:flex tw:flex-col tw:gap-4"
         >
           <div class="tw:flex tw:flex-col">
             <OFormInput
+              name="name"
               :readonly="isEdit"
               :disabled="isEdit"
               v-model="regexPatternInputs.name"
               :label="t('regex_patterns.name') + ' *'"
               data-test="add-regex-pattern-name-input"
-              :validators="[(val: string) => val === '' ? '* Name is required' : undefined]"
               placeholder="Eg. Internal Passwords"
+              :validators="[(val: string | number | undefined) => (!val || val === '') ? '* Name is required' : undefined]"
             />
             <OInput
               :readonly="isEdit"
@@ -139,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <OFormTextarea
+                  name="pattern"
                   data-test="add-regex-pattern-input"
                   v-model="regexPatternInputs.pattern"
                   class="regex-pattern-input"
@@ -151,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="width: 100%; resize: none"
                   placeholder="Eg. \d....\d "
                   :rows="5"
-                  :validators="[(val: string) => val === '' ? '* Pattern is required' : undefined]"
+                  :validators="[(val: string | undefined) => (!val || val === '') ? '* Pattern is required' : undefined]"
                 />
               </div>
             </div>
@@ -308,14 +313,10 @@ import {
   defineComponent,
   ref,
   watch,
-  nextTick,
-  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
@@ -360,7 +361,12 @@ export default defineComponent({
     ODrawer,
     OSpinner,
     OIcon,
-},
+    OForm,
+    OFormInput,
+    OInput,
+    OFormTextarea,
+    OTextarea,
+  },
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -389,6 +395,10 @@ export default defineComponent({
 
     const inputContext = ref("");
 
+    const formRef = ref<any>(null);
+
+    const formKey = ref(0);
+
     const regexPatternInputs: any = ref({
       name: "",
       pattern: "",
@@ -415,6 +425,7 @@ export default defineComponent({
           description: "",
         };
       }
+      formKey.value++;
       if (
         store.state.organizationData.regexPatternPrompt &&
         router.currentRoute.value.query.from == "logs"
@@ -480,6 +491,8 @@ export default defineComponent({
     };
 
     const saveRegexPattern = async () => {
+      const isValid = await formRef.value?.validate();
+      if (!isValid) return;
       isSaving.value = true;
       //payload for create and update regex pattern
       // we need to send the name , pattern , description
@@ -587,6 +600,8 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
+      formRef,
+      formKey,
     };
   },
 });
