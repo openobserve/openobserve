@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FilterCondition from './FilterCondition.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -25,6 +25,8 @@ const mockI18n = createI18n({
     },
   },
 });
+
+installQuasar();
 
 describe('FilterCondition.vue Branch Coverage', () => {
   const defaultProps = {
@@ -58,7 +60,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           depth: 0,
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -84,7 +86,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           label: 'OR',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -108,7 +110,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           label: 'AND',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -130,7 +132,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           label: 'AND',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -164,7 +166,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           },
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: aiEnabledStore,
           },
@@ -200,7 +202,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           },
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: aiDisabledStore,
           },
@@ -231,7 +233,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           },
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: aiEnabledStore,
           },
@@ -251,7 +253,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -280,7 +282,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -309,7 +311,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -336,7 +338,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -362,7 +364,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -382,7 +384,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -419,7 +421,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           },
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -437,7 +439,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
           isFirstInGroup: true, // First condition in group
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import FunctionIcon from '@/components/icons/FunctionIcon.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('FunctionIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -15,7 +17,7 @@ describe('FunctionIcon.vue', () => {
   const createWrapper = () => {
     return mount(FunctionIcon, {
       global: {
-        plugins: [Quasar]
+        plugins: []
       }
     });
   };

@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import GoogleWorkspace from "@/components/ingestion/security/GoogleWorkspace.vue";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -14,6 +14,8 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
+installQuasar();
+
 describe("GoogleWorkspace.vue", () => {
   let store: any;
   beforeEach(() => {
@@ -23,7 +25,7 @@ describe("GoogleWorkspace.vue", () => {
   const mountComponent = () => {
     return mount(GoogleWorkspace, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });

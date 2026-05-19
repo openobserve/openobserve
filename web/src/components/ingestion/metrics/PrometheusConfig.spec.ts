@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PrometheusConfig from "./PrometheusConfig.vue";
 
 // Mock dependencies
@@ -37,6 +37,8 @@ vi.mock("@/components/CopyContent.vue", () => ({
   }
 }));
 
+installQuasar();
+
 describe("PrometheusConfig.vue", () => {
   let store: any;
   let wrapper: any;
@@ -64,7 +66,7 @@ describe("PrometheusConfig.vue", () => {
     store = createMockStore();
     wrapper = mount(PrometheusConfig, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
@@ -218,7 +220,7 @@ describe("PrometheusConfig.vue", () => {
     it("should handle missing currOrgIdentifier prop", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         },
         props: {
@@ -231,7 +233,7 @@ describe("PrometheusConfig.vue", () => {
     it("should handle missing currUserEmail prop", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         },
         props: {
@@ -258,7 +260,7 @@ describe("PrometheusConfig.vue", () => {
       store.state.selectedOrganization.identifier = "different-org";
       const newWrapper = mount(PrometheusConfig, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });
@@ -334,7 +336,7 @@ describe("PrometheusConfig.vue", () => {
       store.state.selectedOrganization.identifier = "";
       const newWrapper = mount(PrometheusConfig, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });
@@ -360,7 +362,7 @@ describe("PrometheusConfig.vue", () => {
       });
       const newWrapper = mount(PrometheusConfig, {
         global: {
-          plugins: [storeWithNullOrg, Quasar],
+          plugins: [storeWithNullOrg],
           stubs: { CopyContent: true }
         }
       });
@@ -371,7 +373,7 @@ describe("PrometheusConfig.vue", () => {
     it("should maintain component stability with undefined props", () => {
       const wrapperWithoutProps = mount(PrometheusConfig, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FileItem from "@/components/actionScripts/FileItem.vue";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+
+installQuasar();
 
 describe("FileItem.vue", () => {
   let wrapper: VueWrapper;
@@ -24,7 +26,7 @@ describe("FileItem.vue", () => {
     return mount(FileItem, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           "OIcon": true,
         },

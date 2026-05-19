@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SyslogNg from './SyslogNg.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -77,6 +77,8 @@ const mockI18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe('SyslogNg.vue Comprehensive Coverage', () => {
   let mockStore: any;
 
@@ -97,7 +99,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -115,7 +117,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'custom@email.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -129,7 +131,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
     it('should handle missing props gracefully', () => {
       const wrapper = mount(SyslogNg, {
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -147,7 +149,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: '',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -167,7 +169,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -193,7 +195,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: customStore,
           },
@@ -218,7 +220,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: minimalStore,
           },
@@ -237,7 +239,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -258,7 +260,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -279,7 +281,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -302,7 +304,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -325,7 +327,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -353,7 +355,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: customStore,
           },
@@ -377,7 +379,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: specialStore,
           },
@@ -396,7 +398,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -414,7 +416,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -433,7 +435,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -452,7 +454,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -473,7 +475,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -492,7 +494,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -509,7 +511,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -530,7 +532,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -549,7 +551,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -569,7 +571,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -597,7 +599,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: incompleteStore,
           },
@@ -623,7 +625,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: minimalStateStore,
           },
@@ -649,7 +651,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: longOrgStore,
           },
@@ -673,7 +675,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: emptyOrgStore,
           },
@@ -692,7 +694,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -714,7 +716,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -737,7 +739,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'test@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -758,7 +760,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'user1@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -771,7 +773,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
           currUserEmail: 'user2@example.com',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },

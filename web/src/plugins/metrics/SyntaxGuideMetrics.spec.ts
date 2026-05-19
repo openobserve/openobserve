@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
@@ -32,6 +32,8 @@ const i18n = createI18n({
     }
   }
 });
+
+installQuasar({ plugins: [] });
 
 describe("SyntaxGuideMetrics.vue", () => {
   let wrapper: any;
@@ -55,12 +57,6 @@ describe("SyntaxGuideMetrics.vue", () => {
     return mount(SyntaxGuideMetrics, {
       global: {
         plugins: [
-          [
-            Quasar,
-            {
-              plugins: []
-            }
-          ],
           i18n,
           store
         ]
@@ -523,7 +519,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
       global: {
-        plugins: [[Quasar, { plugins: [] }], i18nLocal, store],
+        plugins: [i18nLocal, store],
       },
       props: propsData,
     });
@@ -610,7 +606,7 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
       global: {
-        plugins: [[Quasar, { plugins: [] }], i18nLocal, store],
+        plugins: [i18nLocal, store],
       },
       props: propsData,
     });
@@ -713,7 +709,7 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
     });
     return mount(SyntaxGuideMetrics, {
       global: {
-        plugins: [[Quasar, { plugins: [] }], i18nLocal, store],
+        plugins: [i18nLocal, store],
       },
       props: propsData,
     });
@@ -763,7 +759,7 @@ describe("SyntaxGuideMetrics — mode switching content swap", () => {
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
       global: {
-        plugins: [[Quasar, { plugins: [] }], i18nLocal, store],
+        plugins: [i18nLocal, store],
       },
       props: propsData,
     });

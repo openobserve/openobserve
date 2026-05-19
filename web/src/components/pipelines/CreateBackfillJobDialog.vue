@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         :class="[
           'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
-          $q.dark.isActive
+          store.state.theme === 'dark'
             ? 'tw:text-blue-400 tw:bg-blue-900/50'
             : 'tw:text-blue-600 tw:bg-blue-50'
         ]"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-subtitle2 tw:mb-1">
                     Chunk Period (minutes)
                   </div>
-                  <div :class="['text-caption', $q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['text-caption', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
                     Size of each processing chunk
                   </div>
                 </div>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-subtitle2 tw:mb-1">
                     Delay Between Chunks (seconds)
                   </div>
-                  <div :class="['text-caption', $q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['text-caption', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
                     Wait time between processing chunks
                   </div>
                 </div>
@@ -154,20 +154,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="formData.deleteBeforeBackfill"
                   :class="[
                     'tw:mt-3 tw:p-4 tw:rounded-lg tw:border',
-                    $q.dark.isActive
+                    store.state.theme === 'dark'
                       ? 'tw:bg-orange-900/20 tw:border-orange-700'
                       : 'tw:bg-orange-50 tw:border-orange-400'
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <OIcon name="warning" :color="$q.dark.isActive ? 'orange-4' : 'orange'" size="md" class="tw:mt-0.5" />
+                    <OIcon name="warning" :color="store.state.theme === 'dark' ? 'orange-4' : 'orange'" size="md" class="tw:mt-0.5" />
                     <div>
-                      <div :class="['tw:font-semibold tw:mb-2', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
-                      <div :class="['text-caption tw:mb-3', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
+                      <div :class="['text-caption tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
                         This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
                       </div>
-                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements (UTC):</div>
-                      <ul :class="['text-caption tw:ml-5 tw:space-y-1 tw:list-disc', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements (UTC):</div>
+                      <ul :class="['text-caption tw:ml-5 tw:space-y-1 tw:list-disc', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -184,12 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="estimatedInfo"
             :class="[
               'tw:p-3 tw:rounded-lg tw:border',
-              $q.dark.isActive
+              store.state.theme === 'dark'
                 ? 'tw:bg-blue-900/20 tw:border-blue-700'
                 : 'tw:bg-blue-50 tw:border-blue-200'
             ]"
           >
-            <div :class="$q.dark.isActive ? 'tw:text-blue-200' : 'tw:text-blue-800'">
+            <div :class="store.state.theme === 'dark' ? 'tw:text-blue-200' : 'tw:text-blue-800'">
               <div class="tw:flex tw:items-center tw:gap-2 tw:font-medium tw:mb-1">
                 <OIcon name="schedule" size="sm" />
                 <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>

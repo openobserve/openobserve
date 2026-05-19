@@ -43,6 +43,8 @@ const mockI18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe('CopyContent.vue Branch Coverage', () => {
   let mockCopyToClipboard: any;
   let mockNotify: any;
@@ -69,7 +71,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: 'Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -91,7 +93,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -118,7 +120,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -151,7 +153,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -183,7 +185,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: 'Display content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -202,7 +204,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: '', // Empty displayContent
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -221,7 +223,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           // displayContent not provided
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -256,7 +258,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Passcode: [PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: dynamicStore,
           },
@@ -283,7 +285,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL] and [PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -306,7 +308,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: 'Displayed User: [EMAIL], Auth: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -328,7 +330,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Simple content without any patterns',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },

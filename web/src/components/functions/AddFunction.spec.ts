@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import AddFunction from './AddFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -69,6 +69,8 @@ const mockI18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe('AddFunction.vue Branch Coverage', () => {
   const defaultProps = {
     modelValue: {
@@ -90,7 +92,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -127,7 +129,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -175,7 +177,7 @@ describe('AddFunction.vue Branch Coverage', () => {
           isUpdated: false, // Branch condition: create mode
         },
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -235,7 +237,7 @@ describe('AddFunction.vue Branch Coverage', () => {
           isUpdated: true, // Branch condition: update mode
         },
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -284,7 +286,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -313,7 +315,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -346,7 +348,7 @@ describe('AddFunction.vue Branch Coverage', () => {
           isUpdated: false,
         },
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -387,7 +389,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -431,7 +433,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -474,7 +476,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -504,7 +506,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -536,7 +538,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -567,7 +569,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -599,7 +601,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -633,7 +635,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -678,7 +680,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, nonFunctionRouter],
+          plugins: [mockI18n, nonFunctionRouter],
           provide: {
             store: aiEnabledStore,
           },
@@ -714,7 +716,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, functionRouter],
+          plugins: [mockI18n, functionRouter],
           provide: {
             store: mockStore, // isAiChatEnabled: false
           },
@@ -745,7 +747,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },
@@ -782,7 +784,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: {
             store: mockStore,
           },

@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
 
@@ -38,6 +38,8 @@ vi.mock("@/utils/dashboard/constants", () => ({
   SELECT_ALL_VALUE: "_o2_all_",
   CUSTOM_VALUE: "::_o2_custom"
 }));
+
+installQuasar();
 
 describe("VariableQueryValueSelector", () => {
   let wrapper: VueWrapper<any>;
@@ -76,7 +78,7 @@ describe("VariableQueryValueSelector", () => {
         ...props
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           QSelect: {
             template: `
@@ -1019,7 +1021,7 @@ describe("VariableQueryValueSelector", () => {
           loadOptions: null
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: ["QSelect", "QItem", "QItemSection", "QItemLabel", "QCheckbox", "QSeparator"]
         }
       });

@@ -4,7 +4,7 @@ import { nextTick } from "vue";
 import Group from "./Group.vue";
 import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock AddCondition component
 vi.mock("./AddCondition.vue", () => ({
@@ -64,10 +64,12 @@ const createWrapper = (props = {}) => {
       ...props
     },
     global: {
-      plugins: [i18n, Quasar],
+      plugins: [i18n],
     }
   });
 };
+
+installQuasar();
 
 describe("Group.vue", () => {
   beforeEach(() => {

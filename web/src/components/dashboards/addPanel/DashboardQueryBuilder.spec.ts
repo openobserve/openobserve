@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardQueryBuilder from "./DashboardQueryBuilder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -240,6 +240,8 @@ const i18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe("DashboardQueryBuilder", () => {
   let wrapper: any;
   const dashboardData = {
@@ -277,7 +279,7 @@ describe("DashboardQueryBuilder", () => {
         dashboardData,
       },
       global: {
-        plugins: [Quasar, i18n],
+        plugins: [i18n],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
         },

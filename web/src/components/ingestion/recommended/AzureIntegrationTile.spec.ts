@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -47,6 +47,8 @@ const createMockIntegration = (overrides = {}) => ({
   ...overrides,
 });
 
+installQuasar();
+
 describe('AzureIntegrationTile.vue', () => {
   let wrapper: VueWrapper;
 
@@ -64,7 +66,7 @@ describe('AzureIntegrationTile.vue', () => {
     return mount(AzureIntegrationTile, {
       props: { integration: createMockIntegration(integrationOverrides) },
       global: {
-        plugins: [Quasar, mockI18n, mockRouter],
+        plugins: [mockI18n, mockRouter],
         provide: { store: mockStore },
       },
     });

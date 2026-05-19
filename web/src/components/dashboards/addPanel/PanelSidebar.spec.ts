@@ -15,8 +15,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelSidebar from "./PanelSidebar.vue";
+
+installQuasar();
 
 describe("PanelSidebar", () => {
   let wrapper: VueWrapper<any>;
@@ -29,7 +31,7 @@ describe("PanelSidebar", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           "OIcon": {
             template: '<div class="OIcon" :class="$attrs.class" :data-test="$attrs[\'data-test\']" :name="name"><slot /></div>',
@@ -403,7 +405,7 @@ describe("PanelSidebar", () => {
           modelValue: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
             "OIcon": true,
             "q-btn": true,

@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ManagementIcon from '@/components/icons/ManagementIcon.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('ManagementIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('ManagementIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(ManagementIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(ManagementIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

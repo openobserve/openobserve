@@ -18,7 +18,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardSettings from "./DashboardSettings.vue";
 
 // Mock child components
@@ -85,6 +85,8 @@ vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
+installQuasar();
+
 describe("DashboardSettings.vue", () => {
   let wrapper: VueWrapper;
   let store: any;
@@ -142,7 +144,7 @@ describe("DashboardSettings.vue", () => {
         ...props,
       },
       global: {
-        plugins: [store, router, i18n, Quasar],
+        plugins: [store, router, i18n],
         stubs: {
           ODrawer: ODrawerStub,
         },
@@ -428,7 +430,7 @@ describe("DashboardSettings.vue", () => {
       // Override factory to pass no `open` prop
       wrapper = mount(DashboardSettings, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           stubs: { ODrawer: ODrawerStub },
           components: {
             GeneralSettings: mockGeneralSettings,

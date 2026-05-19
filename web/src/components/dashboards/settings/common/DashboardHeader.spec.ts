@@ -15,8 +15,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardHeader from "./DashboardHeader.vue";
+
+installQuasar();
 
 describe("DashboardHeader", () => {
   let wrapper: VueWrapper<any>;
@@ -25,7 +27,7 @@ describe("DashboardHeader", () => {
     return mount(DashboardHeader, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -190,7 +192,7 @@ describe("DashboardHeader", () => {
           right: '<button data-test="custom-button">Custom Button</button>'
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       
@@ -206,7 +208,7 @@ describe("DashboardHeader", () => {
           right: '<span data-test="span-1">Span 1</span><span data-test="span-2">Span 2</span>'
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       
@@ -243,7 +245,7 @@ describe("DashboardHeader", () => {
           right: complexSlotContent
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       

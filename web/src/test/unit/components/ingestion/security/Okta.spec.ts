@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Okta from "@/components/ingestion/security/Okta.vue";
 
 // Mock useIngestion composable
@@ -36,6 +36,8 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
+installQuasar();
+
 describe("Okta.vue", () => {
   let store: any;
 
@@ -52,7 +54,7 @@ describe("Okta.vue", () => {
   const mountComponent = () => {
     return mount(Okta, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',

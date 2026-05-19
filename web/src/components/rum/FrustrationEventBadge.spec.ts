@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FrustrationEventBadge from './FrustrationEventBadge.vue';
+
+installQuasar();
 
 describe('FrustrationEventBadge.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('FrustrationEventBadge.vue', () => {
     return mount(FrustrationEventBadge, {
       props: { frustrationTypes },
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };

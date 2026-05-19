@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import StepMiddle from '@/components/icons/dashboards/StepMiddle.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('StepMiddle.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('StepMiddle.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(StepMiddle, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(StepMiddle, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {
