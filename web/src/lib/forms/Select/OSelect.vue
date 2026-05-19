@@ -517,7 +517,7 @@ const virtualizer = useVirtualizer(
 
 // md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  sm: "tw:h-8 tw:text-sm",
+  sm: "tw:h-6 tw:text-sm",
   md: "tw:h-8 tw:text-sm",
 };
 
