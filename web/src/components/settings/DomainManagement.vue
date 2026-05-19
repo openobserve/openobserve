@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Specific users section -->
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
-              <div class="tw:flex tw:gap-x-2 tw:items-center">
+              <div class="tw:flex tw:gap-x-2 tw:items-end">
                 <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"

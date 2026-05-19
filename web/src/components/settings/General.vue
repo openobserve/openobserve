@@ -180,19 +180,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div
             v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="tw:flex tw:gap-3 tw:items-center"
+            class="tw:flex tw:gap-2 tw:items-center"
           >
             <OInput
               class="tw:w-[250px] tw:mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
-            <div class="btn-group tw:flex tw:h-[28px]">
+            <div class="tw:flex tw:gap-x-2">
               <OButton
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="tw:mr-2"
                 @click="editingText = !editingText"
                 icon-left="close"
               />
@@ -201,7 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="onSubmit.isLoading.value"
                 variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 type="submit"
                 @click="updateCustomText"
                 icon-left="check"
@@ -267,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
+          <div v-else class="tw:flex tw:items-center tw:gap-2">
             <OFile
               data-test="setting_ent_custom_logo_img_file_upload"
               v-model="filesLight"
@@ -276,18 +274,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              class="tw:mx-0 o2-file-input tw:w-[250px]"
+              class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="btn-group tw:flex tw:mt-3">
+            <div class="tw:flex tw:gap-x-2 tw:mt-3">
               <OButton
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="tw:mr-2"
                 @click="filesLight = null"
               icon-left="close"
             />
@@ -296,7 +293,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="onSubmit.isLoading.value"
                 variant="outline"
                 size="icon-xs-sq"
-                class="tw:mr-2"
                 type="submit"
                 @click="uploadImage(filesLight, 'light')"
                 icon-left="check"
@@ -341,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
+          <div v-else class="tw:flex tw:items-center tw:gap-2">
             <OFile
               data-test="setting_ent_custom_logo_dark_img_file_upload"
               v-model="filesDark"
@@ -350,18 +346,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              class="tw:mx-0 o2-file-input tw:w-[250px]"
+              class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="btn-group tw:flex tw:mt-3">
+            <div class="tw:flex tw:gap-x-2 tw:mt-3">
               <OButton
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="tw:mr-2"
                 @click="filesDark = null"
               icon-left="close"
             />
@@ -370,7 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="onSubmit.isLoading.value"
                 variant="outline"
                 size="icon-xs-sq"
-                class="tw:mr-2"
                 type="submit"
                 @click="uploadImage(filesDark, 'dark')"
                 icon-left="check"
