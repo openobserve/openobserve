@@ -52,6 +52,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   filterMode: "client",
   defaultColumns: true,
   footerTitle: "",
+  showHeader: true,
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
@@ -365,6 +366,7 @@ defineExpose({
       >
         <!-- ── Header ───────────────────────────────────────── -->
         <OTableHeader
+          v-if="props.showHeader"
           :header-groups="table.getHeaderGroups()"
           :table="table"
           :column-order="columnOrder"

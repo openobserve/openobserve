@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
       <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
       <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
+        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
           <OTable
             :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
