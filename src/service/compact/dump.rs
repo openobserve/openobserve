@@ -313,6 +313,11 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
     // generate the dump file
     let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    // Count how many of these rows were dumped while still at bloom_ver=0.
+    // A non-zero count here means those rows are now frozen at 0 inside the
+    // dump parquet and can only be recovered via the backfill CLI.
+    let dumped_at_zero = files.iter().filter(|f| f.bloom_ver == 0).count() as u64;
+    let dumped_with_bloom = files.len() as u64 - dumped_at_zero;
     let dump_file = match generate_dump(
         &job.org_id,
         job.stream_type,
@@ -341,6 +346,18 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         }
 
         infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
+
+        if dumped_at_zero > 0 {
+            config::metrics::BLOOM_DUMPED_FILES_TOTAL
+                .with_label_values(&[job.org_id.as_str(), job.stream_type.as_str(), "true"])
+                .inc_by(dumped_at_zero);
+        }
+        if dumped_with_bloom > 0 {
+            config::metrics::BLOOM_DUMPED_FILES_TOTAL
+                .with_label_values(&[job.org_id.as_str(), job.stream_type.as_str(), "false"])
+                .inc_by(dumped_with_bloom);
+        }
+
         log::info!(
             "[COMPACTOR::DUMP] successfully dumped {records} records to file {file_name}, took: {} ms",
             start.elapsed().as_millis(),
