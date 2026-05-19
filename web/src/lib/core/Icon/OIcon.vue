@@ -24,7 +24,7 @@ const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
 
 <template>
   <span
-    class="tw:inline-flex tw:shrink-0 tw:items-center tw:justify-center"
+    class="tw:inline-flex tw:shrink-0 tw:items-center tw:justify-center tw:align-middle"
     :class="sizeClasses[size]"
     v-bind="
       label
