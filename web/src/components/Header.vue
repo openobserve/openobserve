@@ -322,7 +322,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" size="md" class="header-icon tw:opacity-70" />
+        <component :is="slackIcon" class="header-icon tw:opacity-70 tw:size-5 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
