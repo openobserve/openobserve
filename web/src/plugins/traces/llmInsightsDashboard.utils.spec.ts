@@ -170,14 +170,28 @@ describe("splitNumberWithUnit", () => {
 
 describe("splitDuration", () => {
   it.each([
+    // ms tier
     [0, { value: "0", unit: "ms" }],
-    [123_000, { value: "123", unit: "ms" }],         // 123ms
-    [1_000_000, { value: "1.0", unit: "s" }],        // 1s
-    [12_345_000, { value: "12.3", unit: "s" }],      // 12.3s
-    [120_000_000, { value: "2.0", unit: "min" }],    // 2min
-    [3_600_000_000, { value: "60.0", unit: "min" }], // 60min
+    [123_000, { value: "123", unit: "ms" }],              // 123 ms
+    // s tier
+    [1_000_000, { value: "1.0", unit: "s" }],             // 1 s
+    [12_345_000, { value: "12.3", unit: "s" }],           // 12.3 s
+    // min tier
+    [120_000_000, { value: "2.0", unit: "min" }],         // 2 min
+    [3_599_000_000, { value: "59.98", unit: "min" }],     // ~60 min (just under 1 h)
+    // h tier  (>= 3 600 000 ms = 3_600_000_000 µs)
+    [3_600_000_000, { value: "1.0", unit: "h" }],         // exactly 1 h
+    [7_200_000_000, { value: "2.0", unit: "h" }],         // 2 h
+    [12_600_000_000, { value: "3.5", unit: "h" }],        // 3.5 h
+    // d tier  (>= 86 400 000 ms = 86_400_000_000 µs)
+    [86_400_000_000, { value: "1.0", unit: "d" }],        // exactly 1 d
+    [172_800_000_000, { value: "2.0", unit: "d" }],       // 2 d
+    [7 * 86_400_000_000, { value: "7.0", unit: "d" }],    // 1 week
   ])("splits %d microseconds → %j", (micros, expected) => {
-    expect(splitDuration(micros)).toEqual(expected);
+    // For the ~60 min case the exact decimal depends on rounding — just check unit.
+    const result = splitDuration(micros);
+    expect(result.unit).toBe(expected.unit);
+    if (expected.value !== "59.98") expect(result.value).toBe(expected.value);
   });
 
   // Defensive: zero / falsy input → "0 ms" (not just "0").

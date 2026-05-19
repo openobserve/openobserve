@@ -238,6 +238,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .worker_threads(cfg.limit.job_runtime_worker_num)
             .enable_all()
             .thread_name("job_runtime")
+            .thread_stack_size(16 * 1024 * 1024)
             .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
             .build()
         else {
@@ -742,8 +743,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             let handle = handle.clone();
             async move {
                 shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
             }
         });
 
@@ -821,8 +821,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             let handle = handle.clone();
             async move {
                 shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
             }
         });
 

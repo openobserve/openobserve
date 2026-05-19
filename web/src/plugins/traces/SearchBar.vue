@@ -81,6 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             v-if="
               config.showLLMUI !== 'false' &&
+              (hasLLMStreams || searchObj.meta.searchMode === 'sessions')
+            "
+            data-test="traces-search-mode-sessions-btn"
+            value="sessions"
+            size="sm"
+          >
+            <template #icon-left
+              ><MessagesSquare class="tw:size-3.5 tw:shrink-0"
+            /></template>
+            Sessions
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            v-if="
+              config.showLLMUI !== 'false' &&
               (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
             "
             data-test="traces-search-mode-llm-insights-btn"
@@ -94,12 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog' &&
-            searchObj.meta.searchMode !== 'llm-insights'
+            searchObj.meta.searchMode !== 'llm-insights' &&
+            searchObj.meta.searchMode !== 'sessions'
           "
         >
           <div
@@ -418,6 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
         searchObj.meta.searchMode !== 'llm-insights' &&
+        searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -472,7 +488,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles, MessagesSquare } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -506,6 +522,7 @@ export default defineComponent({
     Share2,
     BookOpen,
     Sparkles,
+    MessagesSquare,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
