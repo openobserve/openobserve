@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";

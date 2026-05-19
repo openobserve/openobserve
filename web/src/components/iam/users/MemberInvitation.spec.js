@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import { nextTick } from 'vue';
 
 // Mock services
@@ -92,7 +91,7 @@ describe("MemberInvitation Component", () => {
       },
       global: {
         plugins: [
-          [Quasar, { platform }],
+          [{ platform }],
           i18n
         ],
         provide: { 
@@ -133,7 +132,7 @@ describe("MemberInvitation Component", () => {
       },
       global: {
         plugins: [
-          [Quasar, { platform }],
+          [{ platform }],
           i18n
         ],
         provide: { 
@@ -348,7 +347,7 @@ describe("MemberInvitation Component", () => {
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "admin" },
         global: {
-          plugins: [[Quasar, { platform }], i18n],
+          plugins: [[{ platform }], i18n],
           provide: { store, platform }
         }
       });
@@ -498,7 +497,7 @@ describe("MemberInvitation Component", () => {
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "admin" },
         global: {
-          plugins: [[Quasar, { platform }], i18n],
+          plugins: [[{ platform }], i18n],
           provide: { store, platform }
         }
       });
@@ -519,7 +518,7 @@ describe("MemberInvitation Component", () => {
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "admin" },
         global: {
-          plugins: [[Quasar, { platform }], i18n],
+          plugins: [[{ platform }], i18n],
           provide: { store, platform }
         }
       });
@@ -539,7 +538,7 @@ describe("MemberInvitation Component", () => {
         const newWrapper = mount(MemberInvitation, {
           props: { currentrole: role },
           global: {
-            plugins: [[Quasar, { platform }], i18n],
+            plugins: [[{ platform }], i18n],
             provide: { store, platform }
           }
         });
@@ -553,7 +552,7 @@ describe("MemberInvitation Component", () => {
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "root" },
         global: {
-          plugins: [[Quasar, { platform }], i18n],
+          plugins: [[{ platform }], i18n],
           provide: { store, platform }
         }
       });

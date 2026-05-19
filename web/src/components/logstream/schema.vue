@@ -2731,7 +2731,6 @@ export default defineComponent({
       getSchema,
       onSubmit,
       updateSettingsForm,
-      format,
       showPartitionColumn,
       showFullTextSearchColumn,
       getImageURL,

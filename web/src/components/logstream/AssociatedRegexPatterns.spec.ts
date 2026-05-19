@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar, } from 'quasar';
 import AssociatedRegexPatterns, { PatternAssociation } from './AssociatedRegexPatterns.vue';
 import { installQuasar } from '@/test/unit/helpers';
 import regexPatternsService from '@/services/regex_pattern';
