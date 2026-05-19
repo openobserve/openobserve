@@ -167,6 +167,70 @@ impl BloomReader {
         self.by_field.keys().map(String::as_str)
     }
 
+    /// Underlying blob size (used by the partial-read path to know
+    /// where the body region ends and the footer begins).
+    pub fn blob_len(&self) -> u64 {
+        self.blob.len() as u64
+    }
+
+    /// Absolute byte ranges (in the original blob) for the SBBF body
+    /// of each `(field, file_id)` target. Unknown pairs are skipped —
+    /// they don't need body bytes because `check` will short-circuit
+    /// with `Ok(true)` (conservative keep).
+    ///
+    /// Returned ranges are not deduplicated or merged; the caller is
+    /// expected to feed them through a range-coalescing fetcher (e.g.
+    /// `infra::cache::storage::get_ranges`).
+    pub fn body_ranges_for<'a, I>(&self, targets: I) -> Vec<std::ops::Range<u64>>
+    where
+        I: IntoIterator<Item = (&'a str, u64)>,
+    {
+        targets
+            .into_iter()
+            .filter_map(|(field, file_id)| {
+                let section = self.by_field.get(field)?;
+                let idx = *section.by_file.get(&file_id)?;
+                let entry = &section.entries[idx];
+                let start = entry.body_offset;
+                let end = start.checked_add(entry.body_size as u64)?;
+                Some(start..end)
+            })
+            .collect()
+    }
+
+    /// Splice fetched body bytes into the underlying blob at `offset`.
+    ///
+    /// Intended for the partial-read fetch path: the pruner parses a
+    /// blob built from a suffix probe (footer + zero-filled body) to
+    /// obtain ranges via `body_ranges_for`, fetches those ranges, then
+    /// splices them back in before calling `check`.
+    ///
+    /// **Caller obligations:**
+    /// - The blob slice at `offset..offset + bytes.len()` is zeroed
+    ///   (i.e. has not been read yet). Splicing over an already-
+    ///   materialized region is a no-op only if the bytes match; if
+    ///   they don't, downstream `check` on that range will return
+    ///   stale results.
+    /// - No prior `check` call has triggered SBBF decoding for a
+    ///   `(field, file_id)` whose body overlaps this range. The lazy
+    ///   `OnceLock<Sbbf>` would memoize a decode of the zeroed bytes
+    ///   and refuse to re-read after the splice.
+    ///
+    /// Panics if `offset + bytes.len()` exceeds the blob length —
+    /// indicates a range/byte-stream mismatch upstream.
+    pub fn splice_body_bytes(&mut self, offset: u64, bytes: &[u8]) {
+        let start = offset as usize;
+        let end = start + bytes.len();
+        assert!(
+            end <= self.blob.len(),
+            "splice_body_bytes out of range: offset={} len={} blob_len={}",
+            offset,
+            bytes.len(),
+            self.blob.len()
+        );
+        self.blob[start..end].copy_from_slice(bytes);
+    }
+
     /// True iff the bloom for `(field, file_id)` *might* contain `value`.
     /// Returns `Ok(true)` when the file or field is unknown to this `.bf`
     /// — callers decide what to do with that (typically: keep the file
@@ -359,6 +423,85 @@ mod tests {
             fp < 500,
             "false positive count {fp} > 500 for 10k absent queries (FPR > 5%)"
         );
+    }
+
+    /// Simulates the partial-read fetch path used by `bloom_pruner`:
+    ///   1. Allocate a blob the size of the full `.bf`, with only the
+    ///      header (5 bytes) and the trailing footer region filled in;
+    ///      the body region is left zeroed.
+    ///   2. `BloomReader::parse` succeeds (it only validates header
+    ///      magic, tail magic, and footer payload).
+    ///   3. `body_ranges_for` returns the absolute byte ranges that
+    ///      `check` will demand for the targets we care about.
+    ///   4. Splice those ranges in.
+    ///   5. `check` returns the correct membership.
+    #[test]
+    fn test_partial_read_path_round_trip() {
+        use super::super::{MAGIC, VERSION};
+        let full = build_two_field_blob();
+        let total = full.len();
+
+        // Probe just the trailing 1 KB (typical pruner SUFFIX_PROBE).
+        // Footer for this tiny test blob is well under 1 KB.
+        let probe = 1024.min(total);
+        let suffix_start = total - probe;
+        let suffix = &full[suffix_start..];
+
+        // Build a partial blob: header + zeros + suffix.
+        let mut blob = vec![0u8; total];
+        blob[..4].copy_from_slice(MAGIC);
+        blob[4] = VERSION;
+        blob[suffix_start..].copy_from_slice(suffix);
+
+        let mut r = BloomReader::parse(blob).unwrap();
+        assert_eq!(r.field_count(), 2);
+        assert_eq!(r.blob_len(), total as u64);
+
+        // Compute body ranges for the targets the pruner will check.
+        // Some lie inside the suffix already (no fetch needed); others
+        // are still zero in the blob.
+        let targets = [("trace_id", 101u64), ("trace_id", 102u64), ("user_id", 101u64)];
+        let ranges = r.body_ranges_for(targets);
+        assert_eq!(ranges.len(), 3);
+
+        // Splice ranges that aren't already covered by the suffix.
+        for range in ranges {
+            if range.start < suffix_start as u64 {
+                let s = range.start as usize;
+                let e = range.end as usize;
+                r.splice_body_bytes(range.start, &full[s..e]);
+            }
+        }
+
+        // All present values pass.
+        assert!(r.check("trace_id", 101, b"abc").unwrap());
+        assert!(r.check("trace_id", 101, b"def").unwrap());
+        assert!(r.check("trace_id", 102, b"ghi").unwrap());
+        assert!(r.check("user_id", 101, b"u-1").unwrap());
+    }
+
+    #[test]
+    fn test_body_ranges_skips_unknown() {
+        let blob = build_two_field_blob();
+        let r = BloomReader::parse(blob).unwrap();
+
+        // Mix of known and unknown — unknown fall away silently.
+        let targets = [
+            ("trace_id", 101u64), // known
+            ("trace_id", 999u64), // unknown file_id
+            ("missing_field", 101u64), // unknown field
+        ];
+        let ranges = r.body_ranges_for(targets);
+        assert_eq!(ranges.len(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "splice_body_bytes out of range")]
+    fn test_splice_panics_on_overrun() {
+        let blob = build_two_field_blob();
+        let n = blob.len();
+        let mut r = BloomReader::parse(blob).unwrap();
+        r.splice_body_bytes(n as u64 - 1, &[0u8; 4]);
     }
 
     /// The bytes inside a `.bf` body for one (file, field) entry must be a

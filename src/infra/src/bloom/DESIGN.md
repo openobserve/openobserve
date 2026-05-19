@@ -42,7 +42,7 @@ For a 30-day, high-cardinality lookup the bloom layer brings the number of objec
 
 - **Full-text bloom** (Loki BBF 2.0 style): tantivy already does FTS; marginal value, large index size.
 - **Hierarchical / bucket-level summary blooms**: hour-level per-file is enough for current scale.
-- **Backfill of dumped data**: dumped rows preserve their `bloom_ver` at dump time; if it was 0, it stays 0. Operationally rare; CLI tool can be added later if needed.
+- **Backfill of dumped data**: dumped rows preserve their `bloom_ver` at dump time; if it was 0, it stays 0. A CLI tool to rebuild blooms for a specified time range is planned (see §13) but not in this PR.
 
 ---
 
@@ -82,7 +82,7 @@ For a 30-day, high-cardinality lookup the bloom layer brings the number of objec
 | Module | Crate | Role |
 |---|---|---|
 | `infra::bloom` | `infra` | `.bf` file **format** (writer/reader) and path conventions |
-| `service::compact::bloom_build` | `openobserve` | **Builder**: post-merge + periodic catchup; stamps `bloom_ver` |
+| `service::compact::bloom_build` | `openobserve` | **Builder**: post-merge only; stamps `bloom_ver` |
 | `service::search::bloom_pruner` + `bloom_predicate` | `openobserve` | **Reader**: extracts predicates, fetches `.bf`, prunes file list |
 
 ---
@@ -179,41 +179,28 @@ This is the core invariant: **`bloom_ver` is set once per file and never re-stam
 6. `storage::put` to `bloom_path(...{bloom_ver = now_us()})`.
 7. `infra::file_list::update_bloom_ver(contributing_ids, bloom_ver)`. Files that errored or had no terms stay at `bloom_ver = 0` so search doesn't pay a wasted `.bf` fetch on them.
 
-### 5.2 Trigger sites
+### 5.2 Trigger site
 
-The bloom build is fired from two places. Both call the same `build_for_bucket` so the invariant is enforced once.
+The bloom build is fired from exactly one place: inside `service::compact::merge::merge_by_stream`, after the per-prefix worker barrier completes. For every prefix visited during the job, call `build_for_bucket`. This fires whether or not merging actually happened, so a hour with one big file (no merge needed) is still bloom-built.
 
-#### A. After every per-(stream, hour) compaction round
+There is **no periodic catchup sweep**. An earlier design used a `run_catchup` job that scanned `file_list` for `bloom_ver = 0` rows and re-tried `build_for_bucket` for those (stream, date) pairs. That scan was removed because `bloom_ver = 0` is overloaded — see §5.3 — and the scan couldn't distinguish "waiting to be built" from "tried already, zero contribution" from "feature was off when this row was ingested". Coverage gaps caused by operator-side configuration changes (enabling `bloom_filter_enabled` after ingest, or adding a field to `bloom_filter_fields` for an already-settled stream) are out of scope for the auto-build path; they're handled by an out-of-band backfill CLI (see §13).
 
-Inside `service::compact::merge::merge_by_stream`, after the per-prefix worker barrier completes, iterate every visited prefix and call `build_for_bucket`. This fires whether or not merging actually happened, so a hour with one big file (no merge needed) is still bloom-built.
+### 5.3 `bloom_ver = 0` is overloaded
 
-#### B. Periodic catchup sweep
+A row with `bloom_ver = 0` can mean any of:
 
-`service::compact::bloom_build::run_catchup` runs alongside `run_merge` / `run_retention` in `src/job/compactor.rs`. Per tick:
+1. **Waiting to build** — file just landed, `merge_by_stream` hasn't reached its prefix yet.
+2. **Build failed** — `storage::put` or `update_bloom_ver` errored; status logged via `bloom_file_build_failed_total`.
+3. **No contribution** — `build_blooms_for_file` succeeded but produced no blooms (target field not in this file's schema, or `index_size = 0` so no `.ttv` exists).
+4. **Feature off at ingest** — `bloom_filter_enabled` was false or the stream didn't have `bloom_filter_fields` configured when the file landed.
 
-1. Iterate orgs and streams from cache.
-2. For each stream this node owns (consistent-hash gate), call `query_pending_bloom_dates` — distinct `date`s where any row has `bloom_ver = 0` AND newest `updated_at` predates the **settling window** (default `compact.interval × 4`, ≥ 60s).
-3. For each returned date, call `build_for_bucket`.
+Search treats all four the same: file falls through to the original tantivy path. The append-only invariant only protects rows that have a *non-zero* `bloom_ver` — there's no parallel guarantee that a zero will eventually become non-zero.
 
-Catches three real gaps the per-merge hook misses:
+### 5.4 Concurrency
 
-| Scenario | Per-merge hook | Catchup |
-|---|---|---|
-| Active hour, new files arriving | ✓ | (skipped, settling window) |
-| Hour with 1 file already, no merging | ✗ | ✓ |
-| Operator just enabled `bloom_filter_enabled` on settled stream | ✗ | ✓ |
-| Stream stopped ingesting long ago, old `bloom_ver=0` data | ✗ | ✓ |
+No explicit locking. The compactor scheduler already pins one worker per `(stream, partition_prefix)`, so two workers cannot bloom-build the same hour at the same time. The append-only invariant means rows already at non-zero `bloom_ver` aren't touched by any future build, so even if two builds did somehow overlap on the same bucket (e.g. process restart, lost lease), the worst case is two `.bf` files written at different `bloom_ver`s; the later UPDATE wins for whichever rows it covers.
 
-### 5.3 Concurrency
-
-No explicit locking. Two layers of natural exclusion:
-
-- **Per-merge hook**: the compactor scheduler already pins one worker per `(stream, partition_prefix)`, so two workers cannot bloom-build the same hour at the same time.
-- **Catchup**: distributed via the same consistent-hash gate the rest of the compactor uses; only the owner node sweeps a given stream. The settling window prevents catchup from racing the per-merge hook.
-
-If two builds did somehow overlap on the same bucket, the worst case is two `.bf` files written at different `bloom_ver`s; the later UPDATE wins for whichever rows it covers. The append-only invariant means rows already at non-zero `bloom_ver` aren't touched by either build.
-
-### 5.4 What dump sees
+### 5.5 What dump sees
 
 When `service::compact::dump` archives a hour's `file_list` rows into a parquet:
 
@@ -243,16 +230,18 @@ Skipped (search-side prune treats those files as "keep"):
 
 ### 6.2 Pruner
 
-`service::search::bloom_pruner::prune(files, predicates, org, stream_type, stream)`:
+`service::search::bloom_pruner::prune(files, predicates, trace_id, org, stream_type, stream)`:
 
 1. **Split**: files with `bloom_ver = 0` pass through untouched.
-2. **Group** remaining files by `(date, bloom_ver)` so each `.bf` is fetched only once.
-3. **Fetch**, bounded:
-   - `stream::buffer_unordered(BLOOM_PREFETCH_CONCURRENCY = 32)` — caps the in-flight GET burst (a 30-day query touches ~720 buckets).
-   - Cache-only first via `infra::cache::file_data::get_opts(remote=false)`. On miss → remote `get` + write-through `set` so subsequent prune calls touching the same `.bf` are cache hits.
-4. **Parse** each blob with `BloomReader::parse`.
-5. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates).
-6. Files with unknown field/file_id (schema drift) → conservatively keep.
+2. **Group** remaining files by `(date, bloom_ver)` so each `.bf` is fetched only once. For each group, compute the `(field, file_id)` targets the predicates will check.
+3. **Fetch per group**, bounded by `stream::buffer_unordered(BLOOM_PREFETCH_CONCURRENCY = 32)`:
+   - **Cache hit**: `file_data::get_opts(remote=false)` returns the full blob from memory or disk → `BloomReader::parse` over the whole thing.
+   - **Cache miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` request to the object store. `GetResult.meta.size` is the total file length (so no separate `head`), and the suffix bytes contain the footer plus the tail of the body. If the probe covered the whole file (small `.bf`), parse directly. Otherwise build a partial blob (header + zeros + suffix), parse the footer via `BloomReader::parse`, call `body_ranges_for(targets)` to learn which body bytes we still need, drop ranges already inside the suffix, `coalesce_ranges` adjacent ranges, fetch each remaining range via `cache_storage::get_range`, and splice with `BloomReader::splice_body_bytes`.
+   - **Cache fill** is delegated to `file_downloader::queue_download` so the synchronous prune path never blocks on a full-file GET. The next query touching the same `.bf` takes the cache-hit branch.
+4. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates).
+5. Files with unknown field/file_id (schema drift) → conservatively keep.
+
+Why the writer layout matters here: `BloomWriter::serialize` groups blooms by field, files-within-field contiguous (`writer.rs`). A single-field query (the canonical `trace_id = X`) therefore turns `body_ranges_for` into a contiguous run of ranges, which `coalesce_ranges` collapses into **one** GET regardless of how many files are in the bucket. The per-bucket worst case becomes 2 GETs (suffix + body), not `O(files)`.
 
 ### 6.3 Hook
 
@@ -307,7 +296,6 @@ ZO_BLOOM_FILTER_ENABLED = true
 When `false`:
 
 - Compactor never builds `.bf`.
-- Catchup sweep is a no-op.
 - Search side never enters the prune step.
 
 Per-stream opt-in is via the existing `StreamSettings`:
@@ -321,7 +309,8 @@ Internal tuning constants (not currently exposed as env vars):
 
 - Default FPP = `0.01` (≈ 1% false-positive rate; ~10 bits/element with SBBF)
 - `BLOOM_PREFETCH_CONCURRENCY = 32` (search-side parallel `.bf` fetches)
-- Catchup settling window = `compact.interval × 4` (min 60s)
+- `BLOOM_SUFFIX_PROBE_BYTES = 16 KB` (size of the suffix range probe on cache miss; should cover the footer for buckets up to ~150 indexed files at the typical 3-field config)
+- `BLOOM_RANGE_COALESCE_GAP = 16 KB` (merge two body ranges into one GET if they're within this many bytes of each other)
 
 ---
 
@@ -359,7 +348,7 @@ A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` fetches, b
 | `bloom_ver` on **dumped rows is frozen** at dump time | If frozen at 0, those rows fall back to tantivy. A backfill CLI tool can be added later if needed. |
 | Layer doesn't help **range / `LIKE` / `!=` / regex / OR-with-non-indexed** queries | These predicates are skipped by `bloom_predicate::extract` and the search path is unchanged for them. |
 | **Per-stream multi-row write**: `update_bloom_ver` fans out as one UPDATE per chunk of 900 ids (SQLite) or one `UPDATE ... = ANY($)` (Postgres). For very wide hours (>1000 files) the SQLite path runs multiple statements. | Acceptable; not on the hot read path. |
-| Compactor must finish a **bloom build before dump** for the same hour to see non-zero `bloom_ver`. | Settling-window-based ordering. Default `compact.interval × 4` (4 cycles) gives compaction + bloom build ample time. |
+| No automatic backfill if bloom build fails synchronously, or if the operator turns on `bloom_filter_enabled` / adds `bloom_filter_fields` after data has been ingested. | Rows stay at `bloom_ver = 0` indefinitely; search falls back to tantivy for them. A backfill CLI re-runs the build for a specified time range. |
 
 ---
 
@@ -386,21 +375,6 @@ date partition ages out.
 **Fix later:** if rate is non-trivial, retry the UPDATE before giving
 up, or pre-allocate `bloom_ver` and write the UPDATE first
 (makes it possible to roll back the `.bf` upload).
-
-#### Settling window vs. slow compaction
-
-`run_catchup` excludes buckets whose newest `updated_at` is within
-`compact.interval × 4` (default ≈ 40 s). If a real compaction round
-takes longer than that — e.g. backed-up queue, slow object store —
-catchup could fire on a bucket compactor was still about to touch.
-
-**Impact with append-only writes:** redundant work, not incorrectness.
-Catchup builds for the `bloom_ver = 0` rows it sees; compactor's
-later round sees no `bloom_ver = 0` rows and skips. The `.bf`
-catchup wrote is valid and referenced.
-
-**Fix later:** make the multiplier configurable; or have catchup look
-at compactor pending-job count and back off when it's high.
 
 #### Multi-`.bf`-per-hour growth on hot streams
 
@@ -438,53 +412,53 @@ Arc<BloomReader>>` next to the file_data cache. The cache key is
 unique per `.bf` and the reader is immutable, so eviction is a pure
 LRU concern.
 
-#### Hardcoded concurrency / FPP / settling window
+#### Hardcoded concurrency / FPP / probe sizing
 
-Three constants that should probably be env-configurable:
+Four constants that should probably be env-configurable:
 
 - `BLOOM_PREFETCH_CONCURRENCY = 32` (search prune)
 - `DEFAULT_FPP = 0.01` (build)
-- `compact.interval × 4` settling window (catchup)
+- `BLOOM_SUFFIX_PROBE_BYTES = 16 KB` (search-side cache-miss footer probe)
+- `BLOOM_RANGE_COALESCE_GAP = 16 KB` (range merging threshold)
 
-**Impact:** users can't tune without recompiling.
+**Impact:** users can't tune without recompiling. The two probe-related
+constants matter on the cache-miss path: if a `.bf` has a footer larger
+than 16 KB (≳ 150 indexed files × 3 fields in a single hour), the
+suffix probe fails to cover the footer and the bucket degrades to
+"keep all".
 
 **Fix later:** add `ZO_BLOOM_PREFETCH_CONCURRENCY`,
-`ZO_BLOOM_DEFAULT_FPP`, `ZO_BLOOM_SETTLING_WINDOW_SECS` env vars.
-
-#### `query_pending_bloom_dates` cost on huge `file_list`
-
-The distinct-date scan with `stream = ? AND bloom_ver = 0 AND
-updated_at < ?` runs once per stream per catchup tick. On Postgres
-this hits the partition for the relevant date and is fast; on SQLite
-it's a full-table scan filtered by index.
-
-**Impact:** linear in the size of `file_list` per stream. Fine for
-typical deployments, possibly slow for users with multi-million-row
-file_lists per stream.
-
-**Fix later:** add a covering index `(stream, bloom_ver, updated_at)`
-if profiling shows this query dominating; or have ingest write
-`bloom_ver = 0` rows to a sidecar "pending bloom" queue table that
-catchup reads instead.
+`ZO_BLOOM_DEFAULT_FPP`, `ZO_BLOOM_SUFFIX_PROBE_BYTES`,
+`ZO_BLOOM_RANGE_COALESCE_GAP` env vars.
 
 ### 12.3 Semantic / coverage gaps
 
 #### Frozen `bloom_ver` on dumped rows
 
-If a row is dumped while at `bloom_ver = 0` (catchup hadn't reached
-it yet, or dump retention is shorter than the settling window), its
-`bloom_ver` stays 0 forever. Search for those rows degrades to the
-original tantivy path.
+The synchronous build hook fires before `set_job_done`, so under
+normal operation the file_list row carries the correct `bloom_ver`
+by the time dump runs. The frozen-at-zero case still happens when:
 
-**Impact:** correctness preserved, perf benefit lost for that data.
+- Synchronous build had a partial or full failure (network, schema
+  drift, target field not present in the file) — row stays at
+  `bloom_ver = 0`, gets dumped at 0.
+- Operator turns on `bloom_filter_enabled`, or adds a field to
+  `bloom_filter_fields`, after the data has already been dumped.
+  The dumped rows are no longer in `file_list`, so even a
+  configuration-aware sweep can't reach them.
+
+Once frozen, search for those rows degrades to the original tantivy
+path. Correctness preserved, perf benefit lost for that data.
 
 **Fix later:** a backfill CLI that reads a dump parquet, builds
 blooms for its rows, writes a `.bf`, and rewrites the dump with
 updated `bloom_ver`s. Tractable but mechanically tricky (rewriting a
 dump means atomically swapping the parquet object).
 
-Alternative: have the dump path **wait for catchup** on a hour
-before dumping it, instead of relying on the global settling window.
+**Observability:** `bloom_dumped_files_total{bloom_ver_zero}` (added
+in this PR) counts every dumped row split by whether it was frozen
+at zero or not — lets the operator decide when to schedule a
+backfill.
 
 #### Predicate extraction limited to top-level AND
 
@@ -506,13 +480,16 @@ we see real queries that need it.
 #### No bloom-coverage metric
 
 We don't expose a "what fraction of file_list has `bloom_ver != 0`"
-gauge per stream. If catchup falls behind ingest, you'd find out by
-seeing low `bloom_prune_keep_ratio` improvement, not by seeing
-coverage directly.
+gauge per stream. The dump-time counter `bloom_dumped_files_total{
+bloom_ver_zero}` is the closest signal we have today, but it only
+covers data after it leaves the live file_list.
 
 **Fix later:** a periodic gauge `bloom_coverage_ratio{org,stream}`
 populated from a cheap `COUNT(*) FILTER (WHERE bloom_ver = 0) /
-COUNT(*)` aggregate. Could share the same scheduler tick as catchup.
+COUNT(*)` aggregate. Beware though: `bloom_ver = 0` aggregates the
+four sentinel cases listed in §5.3, including "no contribution"
+which can be a steady-state non-zero count even when everything is
+working. Interpreting the gauge would need to subtract those out.
 
 ### 12.5 Test gaps
 
@@ -544,7 +521,7 @@ Capabilities we **don't have yet** but might want, separate from the
 - **Per-stream `fpp`** via `StreamSettings` for users who want tighter FPR on hot streams (e.g. 0.001 for a billion-trace-id-per-day stream at the cost of ~1.4× more `.bf` bytes).
 - **Bloom on tokenized fields** (Loki BBF 2.0 style) — would handle full-text queries, but requires re-thinking term enumeration since FTS term dicts can be huge. Currently full-text goes through tantivy directly with no bloom prune.
 - **`Arc<BloomReader>` cross-query cache** — moved here from §12.2 since it's a *new capability* (the reader is `&self`-ready, but the cache itself is new code).
-- **Backfill CLI** for hours that were dumped at `bloom_ver = 0` — moved here from §12.3 since it's a new tool, not a fix to existing behavior.
+- **Backfill CLI** for hours where the live build path didn't cover everything — synchronous build failures, or operator-side config changes (`bloom_filter_enabled` flipped on, fields added to `bloom_filter_fields`) after data has been ingested. Required if you need bloom coverage on those rows; without it they stay at `bloom_ver = 0` and search degrades to tantivy for them.
 
 ---
 
@@ -557,19 +534,18 @@ Capabilities we **don't have yet** but might want, separate from the
 | `src/infra/src/bloom/writer.rs` | `BloomBuilder`, `FieldBloom`, `BloomWriter::serialize`, `WriteError` |
 | `src/infra/src/bloom/reader.rs` | `BloomReader::parse / check`, `ReadError` |
 | `src/infra/src/bloom/DESIGN.md` | This document |
-| `src/infra/src/file_list/mod.rs` | `FileList::update_bloom_ver`, `query_pending_bloom_dates` traits |
+| `src/infra/src/file_list/mod.rs` | `FileList::update_bloom_ver` trait |
 | `src/infra/src/file_list/{sqlite,postgres}.rs` | DB impls + DDL + migrations |
 | `src/service/tantivy/bloom_builder.rs` | `build_blooms_from_index` (term-dict iteration) |
-| `src/service/compact/bloom_build.rs` | `build_for_bucket`, `run_catchup` |
+| `src/service/compact/bloom_build.rs` | `build_for_bucket` |
 | `src/service/compact/merge.rs` | per-prefix bloom_build hook in `merge_by_stream` |
 | `src/service/search/bloom_predicate.rs` | predicate extraction |
 | `src/service/search/bloom_pruner.rs` | `prune` (fetch + evaluate) |
 | `src/service/search/grpc/storage.rs` | search-path hook before `tantivy_search` |
 | `src/service/file_list_dump.rs` | dump-parquet schema + tolerant `bloom_ver` reader |
-| `src/service/compact/dump.rs` | dump-parquet writer with `bloom_ver` column |
-| `src/job/compactor.rs` | `run_bloom_catchup` scheduler entry |
+| `src/service/compact/dump.rs` | dump-parquet writer with `bloom_ver` column, plus the `bloom_dumped_files_total` metric |
 | `src/proto/proto/cluster/common.proto` | gRPC `FileMeta.bloom_ver` (tag 7) |
-| `src/config/src/metrics.rs` | five Prometheus metrics |
+| `src/config/src/metrics.rs` | six Prometheus metrics |
 
 ---
 
@@ -577,6 +553,5 @@ Capabilities we **don't have yet** but might want, separate from the
 
 (none blocking; documented for future readers)
 
-- Should the catchup settling window be configurable per-stream rather than a global `compact.interval × 4`? Probably overkill until we see a real case where it matters.
 - Should `.bf` GC happen via a smarter scan (e.g., orphan detection) instead of the per-(stream, date) retention sweep? Only worth it if storage of orphans becomes a measurable problem.
 - Could the predicate extractor be extended to handle nested `And`? Marginal value; current top-level AND covers the canonical `WHERE trace_id = X AND service = Y` case.

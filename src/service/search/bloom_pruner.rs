@@ -23,8 +23,12 @@
 //!    latter pass through untouched.
 //! 2. Groups "has bloom" files by `(date, bloom_ver)` so that all files sharing a `.bf` are tested
 //!    with one fetch.
-//! 3. Fetches each `.bf` (memory → disk → remote, via the existing `infra::cache::file_data`
-//!    ladder).
+//! 3. For each group, **fetches only the bytes the query needs**. On a cache hit we read the full
+//!    blob from cache (same cost as a slice). On a cache miss we issue a single suffix-range
+//!    request that brings back the footer plus the trailing body region, then `get_range` the
+//!    remaining body slices for just the `(field, file_id)` pairs in the query. Filling the cache
+//!    with the full file is delegated to `file_downloader` so the synchronous path never blocks on
+//!    a full-file GET.
 //! 4. For each file, evaluates the predicates: a file is kept iff **every** predicate's bloom
 //!    returns *maybe* for **at least one** of its values (OR within a predicate, AND across
 //!    predicates).
@@ -32,11 +36,15 @@
 //! Any failure (fetch, parse, schema mismatch) **falls back to "keep
 //! all"** for the affected group — bloom is performance, not correctness.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
-use infra::bloom::{BloomReader, path::bloom_path};
+use infra::{
+    bloom::{BloomReader, MAGIC, VERSION, path::bloom_path},
+    cache::{file_data, storage as cache_storage},
+};
+use object_store::{GetOptions, GetRange};
 
 use super::bloom_predicate::BloomPredicate;
 
@@ -47,11 +55,30 @@ use super::bloom_predicate::BloomPredicate;
 /// that run in the same query.
 const BLOOM_PREFETCH_CONCURRENCY: usize = 32;
 
+/// Bytes pulled from the tail of a `.bf` on cache miss. Big enough to
+/// cover the footer payload for hour buckets up to ~150 indexed files
+/// (footer ≈ 24 B per file × 3 typical fields + per-field header ≈ 7.5
+/// KB at the high end). When the actual footer overflows this probe,
+/// `BloomReader::parse` rejects the partial blob and we fall back to a
+/// "keep all" decision for the group — cheaper than a re-fetch given
+/// that this is the FPR limit, not correctness.
+const BLOOM_SUFFIX_PROBE_BYTES: u64 = 16 * 1024;
+
+/// When fetching body slices, merge two ranges that are within this many
+/// bytes of each other into one GET. Same-field SBBFs are physically
+/// adjacent in the body (see writer layout), so a single-field query
+/// typically coalesces all ranges into one request.
+const BLOOM_RANGE_COALESCE_GAP: u64 = 16 * 1024;
+
 /// Prune `files` against `predicates`, returning the surviving subset.
 /// Files with `bloom_ver == 0` are always kept (no bloom info).
+///
+/// `trace_id` is threaded through to background cache-fill jobs so they
+/// log with the same trace identifier as the originating query.
 pub async fn prune(
     files: Vec<FileKey>,
     predicates: &[BloomPredicate],
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -88,76 +115,62 @@ pub async fn prune(
         groups.entry((date, f.meta.bloom_ver)).or_default().push(i);
     }
 
-    // 3. Fetch all .bf files in parallel (bounded by underlying cache / object_store concurrency;
-    //    typical bucket counts are << 1k).
-    //
-    // Resolve the account synchronously here so the per-bucket async
-    // closure doesn't need to capture `org_id` (which is a borrow and
-    // can't be moved into `async move` without an extra `.to_string()`
-    // per bucket).
-    let bf_paths: Vec<(Group, String, String)> = groups
-        .keys()
-        .map(|(date, ver)| {
-            let path = bloom_path(org_id, stream_type, stream_name, date, *ver);
+    // 3. Per-group fetch spec. Compute the (field, file_id) targets up
+    //    front so the async closure has everything it needs to do a
+    //    partial read.
+    struct GroupSpec {
+        group: Group,
+        account: String,
+        path: String,
+        targets: Vec<(String, u64)>,
+    }
+    let specs: Vec<GroupSpec> = groups
+        .into_iter()
+        .map(|((date, ver), idxs)| {
+            let path = bloom_path(org_id, stream_type, stream_name, &date, ver);
             let account = infra::storage::get_account(org_id, &path).unwrap_or_default();
-            ((date.clone(), *ver), account, path)
+            let mut targets: Vec<(String, u64)> =
+                Vec::with_capacity(idxs.len() * predicates.len());
+            for i in idxs {
+                let file_id = with_bloom[i].id as u64;
+                for pred in predicates {
+                    targets.push((pred.field.clone(), file_id));
+                }
+            }
+            GroupSpec {
+                group: (date, ver),
+                account,
+                path,
+                targets,
+            }
         })
         .collect();
 
-    // Bound concurrent fetches to BLOOM_PREFETCH_CONCURRENCY. After a
-    // remote miss, write-through into the file_data cache so subsequent
-    // prune calls touching the same .bf are cache hits.
-    let fetched: Vec<(Group, String, object_store::Result<bytes::Bytes>)> = stream::iter(bf_paths)
-        .map(|(group, account, path)| async move {
-            // Cache-only first; on miss, hit storage and write back.
-            let cached = infra::cache::file_data::get_opts(
-                &account,
-                &path,
-                object_store::GetOptions::default(),
-                false,
-            )
-            .await;
-            if let Ok(get_result) = cached {
-                let bytes = get_result
-                    .bytes()
-                    .await
-                    .map_err(|e| object_store::Error::Generic {
-                        store: "bloom",
-                        source: Box::new(e),
-                    });
-                return (group, path, bytes);
+    // 4. Fetch per group, bounded. Each closure does the cache probe +
+    //    suffix probe + per-target body fetch inline so the worst-case
+    //    fanout is still capped by BLOOM_PREFETCH_CONCURRENCY.
+    let trace_id = trace_id.to_string();
+    let fetched: Vec<(Group, String, Result<BloomReader, FetchError>)> = stream::iter(specs)
+        .map(|spec| {
+            let trace_id = trace_id.clone();
+            async move {
+                let res =
+                    fetch_bloom_reader(&trace_id, &spec.account, &spec.path, &spec.targets).await;
+                (spec.group, spec.path, res)
             }
-            // Miss → remote fetch.
-            let bytes = infra::cache::file_data::get(&account, &path, None).await;
-            if let Ok(b) = &bytes
-                && let Err(e) = infra::cache::file_data::set(&path, b.clone()).await
-            {
-                log::debug!("[bloom-prune] cache-fill for {path} failed: {e}");
-            }
-            (group, path, bytes)
         })
         .buffer_unordered(BLOOM_PREFETCH_CONCURRENCY)
         .collect()
         .await;
 
     let mut readers: HashMap<Group, BloomReader> = HashMap::new();
-    // (`OnceLock` interior init in `BloomReader::check` means we don't need
-    // mutable access on the lookup hot path — kept owned here only for
-    // collection convenience.)
-    for (group, path, bytes) in fetched {
-        let bytes = match bytes {
-            Ok(b) => b,
-            Err(e) => {
-                log::warn!("[bloom-prune] fetch {path} failed: {e}; keeping its files");
-                continue;
-            }
-        };
-        match BloomReader::parse(bytes.to_vec()) {
+    for (group, path, result) in fetched {
+        match result {
             Ok(r) => {
                 readers.insert(group, r);
             }
             Err(e) => {
-                log::warn!("[bloom-prune] parse {path} failed: {e:?}; keeping its files");
+                log::warn!("[bloom-prune] fetch {path} failed: {e}; keeping its files");
             }
         }
     }
@@ -221,6 +234,169 @@ pub async fn prune(
         }
     }
     kept
+}
+
+/// Errors observable by the per-group fetch helper. Folded into a
+/// `log::warn` + "keep all" in the prune loop — never surfaced to the
+/// query caller.
+#[derive(Debug, thiserror::Error)]
+enum FetchError {
+    #[error("object store: {0}")]
+    Store(#[from] object_store::Error),
+    #[error("bloom parse: {0:?}")]
+    Parse(infra::bloom::ReadError),
+}
+
+/// Fetch a `BloomReader` for one (stream, date, bloom_ver) bucket, using
+/// the minimum bytes the given `targets` require.
+///
+/// Path:
+/// 1. Cache probe for the full blob. If hit → parse full blob and return.
+///    (The cache already paid the cost; partial-read on a hit would be
+///    silly local IO.)
+/// 2. Cache miss → one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)` GET.
+///    Brings back the footer + tail of body, and `GetResult.meta.size`
+///    tells us the total file length (so no separate `head` request).
+/// 3. If the suffix covers the whole file (small `.bf`), parse it.
+/// 4. Otherwise: build a partial blob (header + zeros + suffix), parse
+///    the footer, compute body ranges for `targets`, drop ranges
+///    already inside the suffix, coalesce remaining ranges, fetch them
+///    via `get_range`, splice into the reader's blob.
+/// 5. Whether or not partial fetch ran, enqueue a background download
+///    of the full file. Subsequent queries take the cache-hit path.
+async fn fetch_bloom_reader(
+    trace_id: &str,
+    account: &str,
+    path: &str,
+    targets: &[(String, u64)],
+) -> Result<BloomReader, FetchError> {
+    // Stage A: cache-only probe for the whole blob.
+    if let Ok(get_result) =
+        file_data::get_opts(account, path, GetOptions::default(), /* remote */ false).await
+    {
+        let total = get_result.meta.size;
+        let bytes = get_result
+            .bytes()
+            .await
+            .map_err(|e| object_store::Error::Generic {
+                store: "bloom",
+                source: Box::new(e),
+            })?;
+        if bytes.len() as u64 == total {
+            return BloomReader::parse(bytes.to_vec()).map_err(FetchError::Parse);
+        }
+        // Length mismatch is unexpected on a cache hit; fall through to
+        // the cache-miss path rather than parsing a truncated blob.
+        log::debug!(
+            "[bloom-prune] cache hit size mismatch on {path}: got {} of {total}; refetching",
+            bytes.len()
+        );
+    }
+
+    // Stage B: cache miss. Suffix probe (footer + tail of body) — meta.size
+    // comes back in the GetResult, so no separate head request.
+    let opts = GetOptions {
+        range: Some(GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)),
+        ..Default::default()
+    };
+    let suffix_result = cache_storage::get_opts(account, &path.into(), opts).await?;
+    let total_size = suffix_result.meta.size as usize;
+    let suffix_bytes = suffix_result.bytes().await?;
+
+    // Schedule a background full-file download so future prune calls
+    // touching this `.bf` get a Stage A hit. Failure here is non-fatal —
+    // we already have what this query needs.
+    enqueue_full_download(trace_id, account, path, total_size as i64).await;
+
+    // Small `.bf` — suffix covers everything.
+    if suffix_bytes.len() >= total_size {
+        let mut blob = suffix_bytes.to_vec();
+        // GetRange::Suffix may technically over-deliver if the server
+        // returned more than requested; clamp defensively.
+        blob.truncate(total_size);
+        return BloomReader::parse(blob).map_err(FetchError::Parse);
+    }
+
+    // Build a partial blob: header + zeros + suffix tail.
+    let mut blob = vec![0u8; total_size];
+    blob[..MAGIC.len()].copy_from_slice(MAGIC);
+    blob[MAGIC.len()] = VERSION;
+    let suffix_start = total_size - suffix_bytes.len();
+    blob[suffix_start..].copy_from_slice(&suffix_bytes);
+    let mut reader = BloomReader::parse(blob).map_err(FetchError::Parse)?;
+
+    // Compute body ranges for our targets; drop ranges that are
+    // already inside the suffix tail (covered by the splice above).
+    let target_refs = targets.iter().map(|(f, id)| (f.as_str(), *id));
+    let mut needed: Vec<Range<u64>> = reader
+        .body_ranges_for(target_refs)
+        .into_iter()
+        .filter(|r| r.start < suffix_start as u64)
+        .collect();
+    if needed.is_empty() {
+        return Ok(reader);
+    }
+
+    // Coalesce adjacent ranges. Writer lays out same-field SBBFs
+    // contiguously, so a single-field query usually collapses into one
+    // GET — even for 100+ files in the bucket.
+    needed.sort_by_key(|r| r.start);
+    let merged = coalesce_ranges(needed, BLOOM_RANGE_COALESCE_GAP);
+
+    for r in &merged {
+        let bytes = cache_storage::get_range(account, &path.into(), r.clone()).await?;
+        reader.splice_body_bytes(r.start, &bytes);
+    }
+
+    Ok(reader)
+}
+
+/// Merge adjacent or near-adjacent ranges so we issue one GET instead of
+/// many. Caller must pre-sort by `start`.
+fn coalesce_ranges(ranges: Vec<Range<u64>>, max_gap: u64) -> Vec<Range<u64>> {
+    let mut out: Vec<Range<u64>> = Vec::with_capacity(ranges.len());
+    for r in ranges {
+        match out.last_mut() {
+            Some(last) if r.start <= last.end.saturating_add(max_gap) => {
+                last.end = last.end.max(r.end);
+            }
+            _ => out.push(r),
+        }
+    }
+    out
+}
+
+/// Best-effort enqueue of a full-blob download to fill the cache. Mirrors
+/// what `service::search::grpc::storage::cache_files` does for parquet —
+/// keeps the synchronous prune path off the slow path while still
+/// guaranteeing the next query hits the cache.
+async fn enqueue_full_download(trace_id: &str, account: &str, path: &str, size: i64) {
+    let cfg = config::get_config();
+    let cache_type = if cfg.disk_cache.enabled {
+        file_data::CacheType::Disk
+    } else if cfg.memory_cache.enabled {
+        file_data::CacheType::Memory
+    } else {
+        return;
+    };
+    // ts drives the priority-queue gate in file_downloader (recent files
+    // go on the priority queue). `.bf` files are tied to a specific
+    // hour, but we don't have that info handy here without re-parsing
+    // the path; use 0 → normal queue. This is best-effort cache fill,
+    // not a query-blocking task.
+    if let Err(e) = crate::job::queue_download(
+        trace_id.to_string(),
+        0, // no file_list row id for `.bf`
+        account.to_string(),
+        path.to_string(),
+        size,
+        0,
+        cache_type,
+    )
+    .await
+    {
+        log::debug!("[bloom-prune] enqueue full download for {path} failed: {e}");
+    }
 }
 
 #[cfg(test)]
@@ -313,14 +489,14 @@ mod tests {
             field: "trace_id".into(),
             values: vec!["x".into()],
         }];
-        let kept = prune(files.clone(), &preds, "o", StreamType::Logs, "s").await;
+        let kept = prune(files.clone(), &preds, "tid", "o", StreamType::Logs, "s").await;
         assert_eq!(kept.len(), files.len());
     }
 
     #[tokio::test]
     async fn test_no_predicates_keeps_everything() {
         let files = vec![fk("files/o/logs/s/2026/05/08/14/a.parquet", 123)];
-        let kept = prune(files.clone(), &[], "o", StreamType::Logs, "s").await;
+        let kept = prune(files.clone(), &[], "tid", "o", StreamType::Logs, "s").await;
         assert_eq!(kept.len(), 1);
     }
 
@@ -332,7 +508,15 @@ mod tests {
             field: "trace_id".into(),
             values: vec!["x".into()],
         }];
-        let kept = prune(files.clone(), &preds, "o", StreamType::Logs, "missing").await;
+        let kept = prune(
+            files.clone(),
+            &preds,
+            "tid",
+            "o",
+            StreamType::Logs,
+            "missing",
+        )
+        .await;
         assert_eq!(kept.len(), 1);
     }
 
@@ -345,7 +529,23 @@ mod tests {
             field: "trace_id".into(),
             values: vec!["x".into()],
         }];
-        let kept = prune(files, &preds, "o", StreamType::Logs, "s").await;
+        let kept = prune(files, &preds, "tid", "o", StreamType::Logs, "s").await;
         assert_eq!(kept.len(), 1);
+    }
+
+    #[test]
+    fn test_coalesce_ranges_merges_within_gap() {
+        let ranges = vec![10..20, 25..40, 100..120, 130..140];
+        let merged = coalesce_ranges(ranges, 16);
+        // [10..20, 25..40] merge (gap 5); [100..120, 130..140] merge (gap 10);
+        // [40..100] gap 60 > 16, stays split.
+        assert_eq!(merged, vec![10..40, 100..140]);
+    }
+
+    #[test]
+    fn test_coalesce_ranges_keeps_distant_ranges() {
+        let ranges = vec![0..10, 1000..1100];
+        let merged = coalesce_ranges(ranges, 16);
+        assert_eq!(merged, vec![0..10, 1000..1100]);
     }
 }

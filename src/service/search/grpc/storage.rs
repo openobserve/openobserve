@@ -128,6 +128,7 @@ pub async fn search(
                     files = super::super::bloom_pruner::prune(
                         files,
                         &preds,
+                        trace_id,
                         org_id,
                         *stream_type,
                         stream_name,
