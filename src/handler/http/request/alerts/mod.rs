@@ -1053,7 +1053,7 @@ pub async fn enable_alert_bulk(
                 user_id,
                 "alerts",
                 "PUT",
-                Some(&_folder_id),
+                _folder_id.as_deref(),
                 false,
                 true,
                 false,
