@@ -183,6 +183,7 @@ function handleClick() {
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
+      isTreeColumn && treeMeta && (treeMeta.parentId !== null) && !treeMeta.hasChildren ? 'o2-tree-leaf' : '',
     ]"
     :style="[
       cellStyle,
@@ -212,7 +213,7 @@ function handleClick() {
         >
           <OIcon
             :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'"
-            size="xs"
+            size="sm"
           />
         </button>
         <span
@@ -352,10 +353,17 @@ function handleClick() {
   position: absolute;
   left: var(--o2-tree-parent-x);
   top: 50%;
-  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x));
+  /* Parent-row child (has its own chevron): stop the stub 9px before the
+     chevron center so the line doesn't run into the icon. */
+  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x) - 9px);
   height: 1.5px;
   background-color: var(--q-primary, #6366f1);
   opacity: 0.55;
   z-index: 1;
+}
+/* Leaf children (no chevron, endpoint marker dot instead): run the stub all
+   the way to the dot's centre so the line visually touches it. */
+.o2-tree-child.o2-tree-leaf::after {
+  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x));
 }
 </style>
