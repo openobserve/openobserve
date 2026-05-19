@@ -26,15 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter
         class="full-height"
         v-model="splitterModel"
+        :horizontal="true"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <div
-<<<<<<< HEAD
             class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
-=======
-            class="tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
->>>>>>> 275f2ad5bb (fix: updated horizontal and vertical syles)
           >
             <search-bar
               data-test="logs-search-bar"
@@ -57,11 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-<<<<<<< HEAD
             class="tw:flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection tw:w-full"
-=======
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
->>>>>>> 275f2ad5bb (fix: updated horizontal and vertical syles)
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -71,12 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-<<<<<<< HEAD
               class="full-height tw:w-full logs-splitter-smooth"
-=======
-              class="full-height"
-              :horizontal="true"
->>>>>>> 275f2ad5bb (fix: updated horizontal and vertical syles)
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
