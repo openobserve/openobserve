@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
-    style="min-height: inherit"
+    style="min-height: inherit; height: 100%; overflow: hidden;"
   >
-    <div :style="{ marginTop: 0 }" class="app-table-container" style="height: calc(100vh - var(--navbar-height) - 15px)">
+    <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:h-full">
       <div class="card-container tw:mb-[0.625rem]">
         <div class="q-px-md q-py-sm">
           <div
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:h-[calc(100vh-218px)]">
+      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         :data="apiLimitsRows"
         :columns="generateColumns()"
@@ -147,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
       >
         <template #empty />
+        <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
           <q-td v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
             <div
@@ -176,9 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="md" />
       </div>
       <div
-        class="card-container tw:pb-[0.625rem]"
+        class="card-container tw:pb-[0.625rem] tw:flex-1 tw:min-h-0"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
-        style="height: calc(100vh - 220px)"
       >
         <query-editor
           data-test="json-view-roles-editor"
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:h-[calc(100vh-218px)]">
+       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <OTable
           :data="rolesLimitRows"
           :columns="roleLimitsColumns"
@@ -209,14 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:expanded-ids="handleExpandedChange"
         >
           <template #empty />
+          <template #bottom />
           <template #cell-role_name="{ row }">
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              @click="triggerExpand(row)"
-            >
-              <OIcon :name="expandedRow != row.uuid ? 'chevron-right' : 'expand-more'" size="sm" />
-            </OButton>
             {{ row.role_name }}
           </template>
           <template #expansion="{ row }">
@@ -259,9 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="md" />
       </div>
       <div
-        class="card-container"
+        class="card-container tw:flex-1 tw:min-h-0"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
-        style="height: calc(100vh - 220px)"
       >
         <query-editor
           data-test="json-view-roles-editor"
@@ -1416,12 +1409,13 @@ export default defineComponent({
     };
     const handleExpandedChange = (ids: string[]) => {
       const newId = ids?.[0] ?? null;
-      if (newId !== expandedRow.value) {
-        expandedRow.value = newId;
-        if (newId) {
-          const row = rolesLimitRows.value.find((r: any) => r.uuid === newId);
-          if (row) triggerExpand(row);
-        }
+      if (newId === expandedRow.value) return;
+      if (newId) {
+        const row = rolesLimitRows.value.find((r: any) => r.uuid === newId);
+        if (row) triggerExpand(row);
+      } else {
+        expandedRow.value = null;
+        openedRole.value = null;
       }
     };
     const handleOrgSelect = async (val: any) => {
