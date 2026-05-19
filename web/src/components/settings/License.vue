@@ -472,7 +472,6 @@ export default defineComponent({
     OCardSection,
 },
   setup() {
-    const $q = useQuasar();
     const { t } = useI18n();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
