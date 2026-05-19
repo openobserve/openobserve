@@ -16,13 +16,10 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import DashboardSankeyChartBuilder from "@/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock the composables
 const mockDashboardPanelData = {

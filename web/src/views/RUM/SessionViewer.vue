@@ -116,7 +116,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
 
 const defaultEvent = {
@@ -607,7 +607,7 @@ function formatTimeDifference(start_time: number, end_time: number) {
 }
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {

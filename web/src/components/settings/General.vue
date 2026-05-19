@@ -432,7 +432,6 @@ import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -463,7 +462,7 @@ export default defineComponent({
 },
   setup() {
     const { t } = useI18n();
-    const q = useQuasar();
+
     const store = useStore();
     const router: any = useRouter();
     const scrapeIntervalError = ref("");
@@ -912,8 +911,8 @@ export default defineComponent({
       // Update theme mode in store
       store.dispatch("appTheme", mode);
 
-      // Update Quasar's dark mode - this is critical for proper theme application
-      q.dark.set(mode === "dark");
+      // Update dark mode — this is critical for proper theme application
+      document.documentElement.classList.toggle("dark", mode === "dark");
 
       // Persist theme preference to localStorage
       localStorage.setItem("theme", mode);

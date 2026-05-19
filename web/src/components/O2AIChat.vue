@@ -1450,6 +1450,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -5010,22 +5011,6 @@ export default defineComponent({
       }
     });
 
-    const copyToClipboard = async (text: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        toast({
-          message: "Code copied to clipboard",
-          position: "top-center",
-          timeout: 1000,
-        });
-      } catch (err) {
-        console.error("Failed to copy text: ", err);
-        toast({
-          message: "Failed to copy code",
-          position: "top-center",
-        });
-      }
-    };
 
     // Filter markdown headers - convert # and ## to smaller formatting
     // This should only process actual markdown headers, not code block comments

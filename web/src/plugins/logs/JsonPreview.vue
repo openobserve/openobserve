@@ -267,6 +267,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
@@ -859,23 +860,15 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        navigator.clipboard
-          .writeText(selectedText.value)
-          .then(() => {
+        copyToClipboard(selectedText.value, {
+          successMessage: "Text copied to clipboard",
+          errorMessage: "Failed to copy text",
+          timeout: 1500,
+        }).then((success) => {
+          if (success) {
             showMenu.value = false;
-            toast({
-              message: "Text copied to clipboard",
-              position: "bottom-center",
-              timeout: 1500,
-            });
-          })
-          .catch(() => {
-            toast({
-              message: "Failed to copy text",
-              position: "bottom-center",
-              timeout: 1500,
-            });
-          });
+          }
+        });
       }
     };
 

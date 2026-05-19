@@ -524,6 +524,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
@@ -542,11 +543,14 @@ const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
-  navigator.clipboard.writeText(pattern);
-  copiedPattern.value = pattern;
-  setTimeout(() => {
-    copiedPattern.value = null;
-  }, 1500);
+  copyToClipboard(pattern, { silent: true }).then((success) => {
+    if (success) {
+      copiedPattern.value = pattern;
+      setTimeout(() => {
+        copiedPattern.value = null;
+      }, 1500);
+    }
+  });
 }
 
 const patternExamples = [

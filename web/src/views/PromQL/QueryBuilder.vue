@@ -97,6 +97,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 
 // State
@@ -126,11 +127,8 @@ const generatedQuery = computed(() => {
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
-    navigator.clipboard.writeText(generatedQuery.value);
-    toast({
-      variant: "success",
-      message: "Query copied to clipboard!",
-      position: "top-center",
+    copyToClipboard(generatedQuery.value, {
+      successMessage: "Query copied to clipboard!",
     });
   }
 };

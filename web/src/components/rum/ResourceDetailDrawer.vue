@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { date } from "quasar";
+import { formatToHuman } from "@/utils/date";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
@@ -215,10 +215,7 @@ const closeDrawer = () => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(
-    Math.floor(timestamp / 1000),
-    "MMM DD, YYYY HH:mm:ss.SSS Z",
-  );
+  return formatToHuman(timestamp);
 };
 
 const formatDuration = (duration: number) => {

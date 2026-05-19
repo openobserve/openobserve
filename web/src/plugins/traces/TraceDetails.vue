@@ -836,7 +836,7 @@ import {
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -2392,12 +2392,10 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      toast({
-        variant: "success",
-        message: "Trace ID copied to clipboard",
+      copyToClipboard(spanList.value[0]["trace_id"], {
+        successMessage: "Trace ID copied to clipboard",
         timeout: 2000,
       });
-      copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
     const sessionId = computed<string>(() =>
@@ -2406,10 +2404,8 @@ export default defineComponent({
 
     const copySessionId = () => {
       if (!sessionId.value) return;
-      copyToClipboard(sessionId.value);
-      toast({
-        variant: "success",
-        message: "Session ID copied to clipboard",
+      copyToClipboard(sessionId.value, {
+        successMessage: "Session ID copied to clipboard",
         timeout: 2000,
       });
     };

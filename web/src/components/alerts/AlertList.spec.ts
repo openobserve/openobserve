@@ -17,8 +17,6 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
-
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -61,7 +59,7 @@ import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
 // Ensure Quasar plugin
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

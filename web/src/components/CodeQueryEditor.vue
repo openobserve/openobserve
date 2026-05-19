@@ -70,7 +70,7 @@ const loadMonaco = async () => {
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
-import { debounce } from "quasar";
+import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";

@@ -225,6 +225,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 interface Props {
   modelValue: boolean;
@@ -241,6 +242,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+
+const { confirm } = useConfirmDialog();
 
 const show = computed({
   get: () => props.modelValue,
@@ -291,15 +294,14 @@ const canCancelJob = computed(() => {
   return job.value && ["running", "pending"].includes(job.value.status);
 });
 
-const confirmCancelJob = () => {
-  $q.dialog({
+const confirmCancelJob = async () => {
+  const ok = await confirm({
     title: "Cancel Backfill Job",
     message: "Are you sure you want to cancel this backfill job?",
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    await cancelJob();
   });
+  if (ok) {
+    await cancelJob();
+  }
 };
 
 const cancelJob = async () => {

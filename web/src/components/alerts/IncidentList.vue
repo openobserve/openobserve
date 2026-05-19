@@ -176,7 +176,7 @@ import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue"
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
 import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -402,7 +402,7 @@ export default defineComponent({
     };
 
     const formatTimestamp = (timestamp: number) => {
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      return formatToReadable(timestamp);
     };
 
     const formatDimensions = (dimensions: Record<string, string>) => {

@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="anomalySql"
-                    @click="copyToClipboard(anomalySql, 'SQL')"
+                    @click="copyToClipboard(anomalySql, { successMessage: 'SQL Copied Successfully!', timeout: 3000 })"
                     variant="ghost-muted"
                     size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
@@ -431,11 +431,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="
                       copyToClipboard(
                         alertDetails.conditions,
-                        alertDetails.type === 'sql'
-                          ? t('alerts.alertDetails.sqlQuery')
-                          : alertDetails.type === 'promql'
-                            ? t('alerts.alertDetails.promqlQuery')
-                            : t('alerts.alertDetails.conditions'),
+                        {
+                          successMessage: (alertDetails.type === 'sql'
+                            ? t('alerts.alertDetails.sqlQuery')
+                            : alertDetails.type === 'promql'
+                              ? t('alerts.alertDetails.promqlQuery')
+                              : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
+                          timeout: 3000
+                        },
                       )
                     "
                     variant="ghost-muted"
@@ -502,7 +505,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatToTimeCompact, formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -517,6 +520,7 @@ import type { Ref } from "vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 // Composables
 const { t } = useI18n();
@@ -768,12 +772,12 @@ const formatTimestamp = (timestamp: number) => {
     const days = Math.floor(diff / 86400000000);
     return `${days}d ago`;
   }
-  return date.formatDate(timestamp / 1000, "MMM DD, HH:mm");
+  return formatToTimeCompact(timestamp);
 };
 
 const formatTimestampFull = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm:ss");
+  return formatTimestamp(timestamp, "MMM DD, YYYY HH:mm:ss");
 };
 
 // Main Functions
@@ -842,25 +846,6 @@ const updateDateTime = (value: any) => {
       isLoadingHistory.value = false;
     });
   }
-};
-
-const copyToClipboard = (text: string, type: string) => {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => {
-      toast({
-        variant: "success",
-        message: `${type} Copied Successfully!`,
-        timeout: 3000,
-      });
-    })
-    .catch(() => {
-      toast({
-        variant: "error",
-        message: "Error while copy content.",
-        timeout: 3000,
-      });
-    });
 };
 
 // Watchers

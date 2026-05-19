@@ -425,7 +425,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import { debounce } from "quasar";
+import { debounce } from "lodash-es";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";

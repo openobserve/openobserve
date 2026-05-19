@@ -203,7 +203,7 @@ import { useI18n } from "vue-i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import type { TemplateData, Template } from "@/ts/interfaces/index";
@@ -419,13 +419,10 @@ const saveTemplate = () => {
   }
 };
 const copyTemplateBody = (text: any) => {
-  copyToClipboard(JSON.parse(JSON.stringify(text))).then(() =>
-    toast({
-      variant: "success",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    }),
-  );
+  copyToClipboard(JSON.parse(JSON.stringify(text)), {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 </script>
 <style lang="scss" scoped>

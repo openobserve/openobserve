@@ -489,7 +489,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { date, debounce } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
@@ -511,7 +511,7 @@ import {
 } from "../../utils/commons.ts";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
-import { filter, forIn } from "lodash-es";
+import { debounce, filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -944,7 +944,7 @@ export default defineComponent({
       identifier: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       description: folderInfo ? board.dashboard.description : board.description,
       owner: folderInfo ? board.dashboard.owner : board.owner,
-      created: date.formatDate(
+      created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
         "YYYY-MM-DDTHH:mm:ssZ",
       ),

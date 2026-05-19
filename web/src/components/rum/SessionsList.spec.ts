@@ -46,7 +46,7 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.quasar.Loading],
+  plugins: [quasar.quasar.Loading],
 });
 
 // Mock zincutils

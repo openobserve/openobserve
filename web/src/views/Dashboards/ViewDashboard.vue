@@ -204,12 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left
                 ><OIcon
                   :name="
-                    quasar.fullscreen.isActive
-                      ? 'fullscreen-exit'
-                      : 'fullscreen'
+                    isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
               /></template>
-              <OTooltip :content="quasar.fullscreen.isActive ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
+              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
@@ -350,7 +348,7 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import useNotifications from "@/composables/useNotifications";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
@@ -412,7 +410,6 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const quasar = useQuasar();
     const currentDashboardData = reactive({
       data: {},
     });
@@ -1659,24 +1656,10 @@ export default defineComponent({
     const isFullscreen = ref(false);
 
     const toggleFullscreen = () => {
-      if (!quasar.fullscreen.isActive) {
-        quasar.fullscreen
-          .request()
-          .then(() => {
-            isFullscreen.value = true;
-          })
-          .catch(() => {
-            isFullscreen.value = false;
-          });
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
       } else {
-        quasar.fullscreen
-          .exit()
-          .then(() => {
-            isFullscreen.value = false;
-          })
-          .catch(() => {
-            isFullscreen.value = true;
-          });
+        document.exitFullscreen();
       }
     };
 

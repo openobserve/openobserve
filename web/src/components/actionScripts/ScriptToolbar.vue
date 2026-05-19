@@ -88,10 +88,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toggleFullscreen } from "@/utils/dom";
 
 const { t } = useI18n();
-
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -140,7 +139,7 @@ const actionName = computed({
 });
 
 const handleFullScreen = () => {
-  q.fullscreen.toggle();
+  toggleFullscreen();
 };
 
 const redirectToScripts = () => {

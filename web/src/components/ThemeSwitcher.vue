@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -35,7 +34,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const darkMode = ref(false);
 
     onMounted(() => {
@@ -86,7 +84,6 @@ export default defineComponent({
       }
       // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
       document.documentElement.classList.toggle('dark', theme === 'dark');
-      $q.dark.set(theme == "dark");
       store.dispatch("appTheme", theme);
     };
 

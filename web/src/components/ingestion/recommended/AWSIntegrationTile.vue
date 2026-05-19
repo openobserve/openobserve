@@ -166,7 +166,7 @@ import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useQuasar } from "quasar";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
@@ -179,7 +179,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const router = useRouter();
     const showTemplateDialog = ref(false);
     const showComponentContent = ref(false);
@@ -481,64 +481,58 @@ export default defineComponent({
 
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
-          q.dialog({
+          const ok = await confirm({
             title: "Dashboard Already Exists",
             message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
-            cancel: {
-              label: "Cancel",
-              flat: true,
-            },
-            ok: {
-              label: "Replace",
-              flat: true,
-            },
-            persistent: true,
-          }).onOk(async () => {
-            // User chose to replace
-            const loadingNotif = toast({
-              type: "ongoing",
-              message: "Replacing dashboard...",
-              timeout: 0,
-              variant: "loading",
+            confirmLabel: "Replace",
+            cancelLabel: "Cancel",
+          });
+          if (!ok) return;
+
+          // User chose to replace
+          const loadingNotif = toast({
+            type: "ongoing",
+            message: "Replacing dashboard...",
+            timeout: 0,
+            variant: "loading",
+          });
+
+          try {
+            await importDashboard(
+              dashboardJson,
+              folderId,
+              orgId,
+              existingDashboardId,
+            );
+
+            loadingNotif();
+            toast({
+              variant: "success",
+              message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
+              timeout: 5000,
+              actions: [
+                {
+                  label: "View Dashboard",
+                  handler: () =>
+                    router.push(`/dashboards?org_identifier=${orgId}`),
+                },
+              ],
             });
 
-            try {
-              await importDashboard(
-                dashboardJson,
-                folderId,
-                orgId,
-                existingDashboardId,
-              );
-
-              loadingNotif();
-              toast({
-                variant: "success",
-                message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
-                timeout: 5000,
-                actions: [
-                  {
-                    label: "View Dashboard",
-                    handler: () =>
-                      router.push(`/dashboards?org_identifier=${orgId}`),
-                  },
-                ],
-              });
-
-              // Track analytics
-              segment.track("AWS Dashboard Replaced", {
-                service: props.integration.name,
-                integration_id: props.integration.id,
-              });
-            } catch (error) {
-              loadingNotif();
-              console.error("Error replacing dashboard:", error);
-              toast({
-                variant: "error",
-                message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
-                timeout: 5000,
-              });
-            }
-          });
+            // Track analytics
+            segment.track("AWS Dashboard Replaced", {
+              service: props.integration.name,
+              integration_id: props.integration.id,
+            });
+          } catch (error) {
+            loadingNotif();
+            console.error("Error replacing dashboard:", error);
+            toast({
+              variant: "error",
+              message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+              timeout: 5000,
+            });
+          }
           return;
         }
 

@@ -25,9 +25,8 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { debounce, useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -199,7 +198,6 @@ export interface AlertFormEmit {
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
   const { t } = useI18n();
-  const q = useQuasar();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
@@ -869,7 +867,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const validateInputs = (input: any, notify: boolean = true) => {
     const validationContext: ValidationContext = {
-      q,
       store,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
@@ -882,7 +879,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const validateSqlQuery = async () => {
     const validationContext: ValidationContext = {
-      q,
       store,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
@@ -1380,7 +1376,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
-      q,
       store,
       props,
       emit,
@@ -1398,7 +1393,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       prepareAndSaveAlertUtil(data, saveContext);
 
     const jsonValidationContext: JsonValidationContext = {
-      q,
       store,
       streams,
       getStreams,
@@ -2684,7 +2678,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   return {
     // Dependencies
     t,
-    q,
     store,
     router,
     track,

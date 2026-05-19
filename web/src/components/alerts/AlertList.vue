@@ -696,8 +696,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { date, debounce } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
+import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -713,6 +714,7 @@ import {
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
 import { getFoldersListByType } from "@/utils/commons";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1702,7 +1704,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
+      return formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
     }
 
     const addAlert = () => {
@@ -2385,25 +2387,6 @@ export default defineComponent({
         query: { ...router.currentRoute.value.query, tab: newVal },
       });
     });
-
-    const copyToClipboard = (text: string, type: string) => {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          toast({
-            variant: "success",
-            message: `${type} Copied Successfully!`,
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "error",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-    };
 
     const openMenu = (event: Event, row: any) => {
       event.stopPropagation();

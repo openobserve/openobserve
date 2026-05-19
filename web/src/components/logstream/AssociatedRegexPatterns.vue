@@ -559,7 +559,7 @@ import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, w
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
-import { debounce } from 'quasar';
+import { debounce } from "lodash-es";
 import store from '@/test/unit/helpers/store';
 import { useToast } from '@/lib/feedback/Toast/useToast';
 import { useI18n } from 'vue-i18n';

@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
-import { Quasar, Dialog } from "quasar";
+import { Quasar, } from "quasar";
 import BuildQueryPage from "./BuildQueryPage.vue";
 
 // Mock vuex store
@@ -243,7 +243,7 @@ function createWrapper(props = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n, [Quasar, { plugins: { Dialog } }]],
+      plugins: [i18n, [Quasar, { plugins: {} }]],
       provide: {
         store: mockStore,
         dashboardPanelDataPageKey: "build",

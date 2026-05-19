@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { copyToClipboard as qCopyToClipboard } from "quasar";
+import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";

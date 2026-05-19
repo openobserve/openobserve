@@ -16,14 +16,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import AlertSettings from "./AlertSettings.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock router
 const mockRouter = {

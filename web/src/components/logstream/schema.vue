@@ -1155,7 +1155,8 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { date, format } from "quasar";
+import { useQuasar } from "quasar";
+import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import "../../styles/schema.scss";
@@ -1249,6 +1250,7 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
+    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -1671,12 +1673,12 @@ export default defineComponent({
       indexData.value.stats.original_doc_time_min =
         streamResponse.stats.doc_time_min;
 
-      indexData.value.stats.doc_time_max = date.formatDate(
-        parseInt(streamResponse.stats.doc_time_max) / 1000,
+      indexData.value.stats.doc_time_max = formatTimestamp(
+        parseInt(streamResponse.stats.doc_time_max),
         "YYYY-MM-DDTHH:mm:ss:SS",
       );
-      indexData.value.stats.doc_time_min = date.formatDate(
-        parseInt(streamResponse.stats.doc_time_min) / 1000,
+      indexData.value.stats.doc_time_min = formatTimestamp(
+        parseInt(streamResponse.stats.doc_time_min),
         "YYYY-MM-DDTHH:mm:ss:SS",
       );
 
@@ -2504,7 +2506,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "DD-MM-YYYY");
+      return formatDateUtil(formattedDate, "DD-MM-YYYY");
     }
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object

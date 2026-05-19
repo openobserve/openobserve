@@ -127,7 +127,6 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import { date, format } from "quasar";
     import streamService from "../../services/stream";
     import segment from "../../services/segment_analytics";
     import {

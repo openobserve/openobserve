@@ -399,7 +399,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -657,13 +657,10 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log)).then(() =>
-        toast({
-          variant: "success",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(JSON.stringify(log), {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     const addFieldToTable = (value: string) => {

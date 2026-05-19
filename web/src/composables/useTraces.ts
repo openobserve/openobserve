@@ -21,15 +21,13 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
-
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -315,21 +313,11 @@ const useTraces = () => {
       shareURL += "?" + queryString;
     }
 
-    copyToClipboard(shareURL)
-      .then(() => {
-        toast({
-          variant: "success",
-          message: "Link Copied Successfully!",
-          timeout: 5000,
-        });
-      })
-      .catch(() => {
-        toast({
-          variant: "error",
-          message: "Error while copy link.",
-          timeout: 5000,
-        });
-      });
+    copyToClipboard(shareURL, {
+      successMessage: "Link Copied Successfully!",
+      errorMessage: "Error while copy link.",
+      timeout: 5000,
+    });
   };
 
   // Function to build query details for navigation

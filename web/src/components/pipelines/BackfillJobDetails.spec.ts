@@ -17,23 +17,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Dialog] });
+installQuasar();
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-      dialog: vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() })),
-      dark: { isActive: false },
-    })),
-  };
-});
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: vi.fn(() => ({
+    confirm: vi.fn().mockResolvedValue(false),
+  })),
+}));
 
 vi.mock("../../services/backfill", () => ({
   default: {
@@ -590,14 +583,12 @@ describe("BackfillJobDetails – estimatedCompletion computed", () => {
 describe("BackfillJobDetails – confirmCancelJob", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("calls $q.dialog when confirmCancelJob is invoked", async () => {
-    const mockDialog = vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() }));
+  it("should call confirm dialog when confirmCancelJob is invoked", async () => {
+    const mockConfirm = vi.fn().mockResolvedValue(false);
     vi.mocked(
-      (await import("quasar")).useQuasar
+      (await import("@/composables/useConfirmDialog")).useConfirmDialog
     ).mockReturnValue({
-      notify: vi.fn(),
-      dialog: mockDialog,
-      dark: { isActive: false },
+      confirm: mockConfirm,
     } as any);
 
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
@@ -606,6 +597,9 @@ describe("BackfillJobDetails – confirmCancelJob", () => {
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
     await (wrapper.vm as any).confirmCancelJob();
-    expect(mockDialog).toHaveBeenCalled();
+    expect(mockConfirm).toHaveBeenCalledWith({
+      title: "Cancel Backfill Job",
+      message: "Are you sure you want to cancel this backfill job?",
+    });
   });
 });

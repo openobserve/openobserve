@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
-import { Dialog } from "quasar";
 import TemplateList from "./TemplateList.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
@@ -28,9 +27,7 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("Alert List", async () => {
   let wrapper: any;

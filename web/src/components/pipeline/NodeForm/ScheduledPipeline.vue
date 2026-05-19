@@ -1144,7 +1144,8 @@ import {
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { copyToClipboard, useQuasar } from "quasar";
+import { toggleFullscreen } from "@/utils/dom";
+import { copyToClipboard } from "@/utils/clipboard";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
@@ -1321,7 +1322,7 @@ const delayCondition = ref(props.delay);
 const stream_type = ref(props.streamType || "logs");
 const collapseFields = ref(false);
 
-const q = useQuasar();
+
 
 const store = useStore();
 
@@ -2519,17 +2520,23 @@ const runQuery = async () => {
 const isFullscreen = ref(false);
 
 const handleFullScreen = () => {
-  q.fullscreen.toggle();
+  toggleFullscreen();
   isFullscreen.value = !isFullscreen.value;
 };
 
-watch(
-  () => q.fullscreen.isActive,
-  (val) => {
-    isFullscreen.value = val;
-    emits("update:fullscreen", val);
-  },
-);
+const updateFullscreenStatus = () => {
+  const active = !!document.fullscreenElement;
+  isFullscreen.value = active;
+  emits("update:fullscreen", active);
+};
+
+onMounted(() => {
+  document.addEventListener("fullscreenchange", updateFullscreenStatus);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("fullscreenchange", updateFullscreenStatus);
+});
 
 const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
@@ -2542,13 +2549,10 @@ const expandLog = (index: any) => {
 };
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData).then(() =>
-    toast({
-      variant: "success",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    }),
-  );
+  copyToClipboard(copyData, {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 
 const updateDelay = (val: any) => {

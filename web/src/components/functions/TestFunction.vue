@@ -300,7 +300,6 @@ import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
-import { event } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";

@@ -15,14 +15,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock child components with proper props exposure
 vi.mock("./PreviewAlert.vue", () => ({

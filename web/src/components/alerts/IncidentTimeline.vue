@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { date } from "quasar";
+import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -615,7 +615,7 @@ const formatRelativeTime = (timestamp: number): string => {
   const days = Math.floor(diff / 86400000);
   if (diff < 604800000) return `${days} day${days === 1 ? '' : 's'} ago`;
 
-  return date.formatDate(timestamp / 1000, "MMM D, YYYY");
+  return formatToDateOnly(timestamp);
 };
 
 watch(() => props.visible, async (visible) => {

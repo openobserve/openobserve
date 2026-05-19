@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatDuration } from "@/utils/zincutils";

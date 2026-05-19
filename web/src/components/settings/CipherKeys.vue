@@ -130,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import NoData from "@/components/shared/grid/NoData.vue";

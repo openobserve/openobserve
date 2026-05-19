@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Quasar } from "quasar";
+import { Quasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -125,7 +125,7 @@ describe("TestFunction Component", () => {
 
     // Install Quasar
     installQuasar({
-      plugins: [Dialog],
+      plugins: [],
       components,
       config: {
         notify: {},

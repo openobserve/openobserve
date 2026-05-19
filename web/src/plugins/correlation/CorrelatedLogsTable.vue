@@ -252,7 +252,8 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date, copyToClipboard } from "quasar";
+import { formatDate } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
@@ -754,7 +755,7 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -811,13 +812,10 @@ const handleRowClick = (row: any) => {
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData).then(() =>
-    toast({
-      variant: "success",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    })
-  );
+  copyToClipboard(copyData, {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 
 const handleSendToAiChat = (value: any) => {

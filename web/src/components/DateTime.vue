@@ -279,7 +279,7 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { date } from "quasar";
+import { subtractRelativeTime } from "@/utils/date";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -749,7 +749,7 @@ export default defineComponent({
 
         const endTimeStamp = new Date();
 
-        const startTimeStamp = date.subtractFromDate(
+        const startTimeStamp = subtractRelativeTime(
           endTimeStamp,
           subtractObject,
         );
