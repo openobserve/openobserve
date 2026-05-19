@@ -166,7 +166,42 @@ export const convertTimelineData = (props: any) => {
 export const convertTraceServiceMapData = (
   data: any,
   treeDepth: number = 3,
+  enableMultiRootHandling: boolean = false,
 ) => {
+  // Handle multiple root nodes properly for ECharts tree when enabled
+  let treeData = data;
+  let layoutConfig: any = {};
+
+  if (enableMultiRootHandling && Array.isArray(data) && data.length > 1) {
+    // Multiple root services - create a virtual root that doesn't affect layout
+    treeData = [{
+      name: "",
+      children: data,
+      symbol: 'none', // Completely hide the symbol
+      symbolSize: 1, // Minimal size to avoid layout calculation issues
+      label: {
+        show: false, // Hide the label
+      },
+      lineStyle: {
+        opacity: 0, // Hide connecting lines from virtual root
+        width: 0, // No line width
+      },
+      itemStyle: {
+        opacity: 0, // Make completely transparent
+      },
+    }];
+
+    // Use orthogonal layout for better multi-root visualization
+    layoutConfig = {
+      layout: 'orthogonal',
+      orient: 'LR', // Left to right layout
+      left: '5%',
+      right: '5%',
+      top: '5%',
+      bottom: '5%',
+    };
+  }
+
   const options = {
     tooltip: {
       show: false,
@@ -174,11 +209,12 @@ export const convertTraceServiceMapData = (
     series: [
       {
         type: "tree",
-        data: data,
+        data: treeData,
         symbolSize: 30,
         initialTreeDepth: treeDepth,
         roam: true,
         expandAndCollapse: false,
+        ...layoutConfig, // Apply layout config for multiple roots
         label: {
           position: "bottom",
           verticalAlign: "bottom",
