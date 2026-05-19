@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton variant="ghost" size="icon-circle-sm" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="header-icon" />
+    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="md" class="header-icon" />
     <OTooltip side="top" align="center" :content="tooltipText" />
   </OButton>
 </template>

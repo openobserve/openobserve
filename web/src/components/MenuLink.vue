@@ -173,8 +173,14 @@ export default defineComponent({
     };
 
     // Phase 5: Accessibility - compute active state
+    // Home (link === '/') needs special handling because every path starts with '/'
+    // — match by route name "home" exactly. Other links use prefix-match on path.
     const isActive = computed(() => {
-      return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
+      const route = router.currentRoute.value;
+      if (props.link === '/') {
+        return route.name === 'home' || route.path === '/' || route.path === '';
+      }
+      return route.path.indexOf(props.link) === 0;
     });
 
     // Phase 5: Accessibility - compute ARIA label with fallback
