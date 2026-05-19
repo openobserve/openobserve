@@ -15,7 +15,8 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Quasar, QBtn, QInput, QSelect } from 'quasar';
+import { QBtn, QInput, QSelect } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import StreamFieldInputs from './StreamFieldInputs.vue';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
@@ -73,6 +74,8 @@ const defaultProps = {
   }
 };
 
+installQuasar();
+
 describe('StreamFieldInputs', () => {
   let wrapper: any;
 
@@ -80,7 +83,7 @@ describe('StreamFieldInputs', () => {
     wrapper = mount(StreamFieldInputs, {
       props: defaultProps,
       global: {
-        plugins: [Quasar, i18n, store],
+        plugins: [i18n, store],
         components: {
           QBtn,
           QInput,

@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import RightJoinLineSvg from '@/components/icons/RightJoinLineSvg.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('RightJoinLineSvg.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('RightJoinLineSvg.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(RightJoinLineSvg, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(RightJoinLineSvg, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

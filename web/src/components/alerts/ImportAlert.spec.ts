@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { ref } from "vue";
 import ImportAlert from "./ImportAlert.vue";
 
@@ -68,6 +68,8 @@ vi.mock("axios", () => ({
   }
 }));
 
+installQuasar();
+
 describe("ImportAlert Component - Comprehensive Function Tests", () => {
   let wrapper: any;
   let mockStore: any;
@@ -114,7 +116,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         alerts: [],
       },
       global: {
-        plugins: [Quasar, mockStore, mockI18n],
+        plugins: [mockStore, mockI18n],
         stubs: {
           QueryEditor: { template: '<div></div>' },
           AppTabs: { template: '<div></div>' },

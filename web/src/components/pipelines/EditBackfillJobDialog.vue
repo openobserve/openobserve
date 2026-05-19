@@ -147,9 +147,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import { useQuasar } from "quasar";
-
-const $q = useQuasar();
 
 interface Props {
   modelValue: boolean;

@@ -1853,7 +1853,6 @@ export default defineComponent({
       initialTimezone,
       timeString,
       searchType,
-      quasar,
       openScheduledReports,
       showScheduledReportsDialog,
       isLoadingReports,

@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ServiceMapIcon from '@/components/icons/ServiceMapIcon.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('ServiceMapIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('ServiceMapIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(ServiceMapIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(ServiceMapIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

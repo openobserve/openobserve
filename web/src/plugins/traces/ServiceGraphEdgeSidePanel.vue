@@ -238,7 +238,6 @@ import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useQuasar } from "quasar";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
@@ -271,7 +270,6 @@ export default defineComponent({
   },
   emits: ['close'],
   setup(props, { emit }) {
-    const $q = useQuasar();
     const store = useStore();
 
     const trendChartRef = ref<HTMLElement | null>(null);
@@ -427,7 +425,7 @@ export default defineComponent({
 
     /** Shared base: timestamps, colors, grid, tooltip base, legend, xAxis */
     const getSharedBase = (points: any[]) => {
-      const isDark = $q.dark.isActive;
+      const isDark = store.state.theme === 'dark';
       const textColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)';
       const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
       const tooltipBg = isDark ? 'rgba(22,22,26,0.92)' : 'rgba(255,255,255,0.96)';
@@ -737,7 +735,7 @@ export default defineComponent({
 
     // Re-render when dark mode toggles
     watch(
-      () => $q.dark.isActive,
+      () => store.state.theme === 'dark',
       async () => {
         if (!trendLoading.value && trendDataPoints.value.length) {
           await nextTick();

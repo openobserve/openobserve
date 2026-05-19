@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -265,6 +265,8 @@ const mockMetricStreams = [
   { stream_name: "disk_io", stream_type: "metrics", filters: { service: "api" } },
 ];
 
+installQuasar({ plugins: {} });
+
 describe("TelemetryCorrelationDashboard.vue", () => {
   let wrapper: any;
 
@@ -291,7 +293,6 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       },
       global: {
         plugins: [
-          [Quasar, { plugins: {  } }],
           i18n,
           store,
         ],

@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, VueWrapper } from '@vue/test-utils'
 import { installQuasar } from '@/test/unit/helpers'
-import { Quasar } from 'quasar'
 import store from '@/test/unit/helpers/store'
 import OtelConfig from './OtelConfig.vue'
 
@@ -84,7 +83,7 @@ describe('OtelConfig.vue', () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [
-          [Quasar, {}],
+          [{}],
           [store]
         ],
         provide: {

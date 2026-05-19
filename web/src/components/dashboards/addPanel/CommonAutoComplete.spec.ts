@@ -15,7 +15,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 // Mock store
 const mockStore = {
@@ -78,7 +77,7 @@ describe("CommonAutoComplete", () => {
       props: { ...defaultProps, ...props },
       slots,
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           store: mockStore,
         },

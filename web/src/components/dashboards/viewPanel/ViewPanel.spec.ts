@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ViewPanel from "./ViewPanel.vue";
 
 // Mock vue-router
@@ -185,6 +185,8 @@ vi.mock("lodash-es", () => ({
   isEqual: vi.fn((a, b) => JSON.stringify(a) === JSON.stringify(b)),
 }));
 
+installQuasar();
+
 describe("ViewPanel", () => {
   let wrapper: VueWrapper<any>;
   let mockGetDashboard: any;
@@ -210,7 +212,7 @@ describe("ViewPanel", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
         },

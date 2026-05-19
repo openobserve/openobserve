@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Nodes from "../../components/settings/Nodes.vue";
 import store from "./helpers/store";
 import { createI18n } from "vue-i18n";
@@ -60,6 +60,8 @@ const i18n = createI18n({
     }
   }
 });
+
+installQuasar({ plugins: [] });
 
 describe("Nodes.vue", () => {
   let wrapper: any;
@@ -187,7 +189,7 @@ describe("Nodes.vue", () => {
 
     wrapper = mount(Nodes, {
       global: {
-        plugins: [store, i18n, [Quasar, { plugins: [] }]],
+        plugins: [store, i18n],
         mocks: {
           $q
         },

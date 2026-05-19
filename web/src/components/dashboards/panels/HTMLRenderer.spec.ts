@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
 
@@ -53,6 +53,8 @@ const getAfterSanitizeAttributesHook = () => {
   return hookCall ? hookCall[1] : undefined;
 };
 
+installQuasar();
+
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -60,7 +62,7 @@ describe("HTMLRenderer", () => {
     return mount(HTMLRenderer, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -255,7 +257,7 @@ describe("HTMLRenderer", () => {
       // Create wrapper with dark theme store from the start
       wrapper = mount(HTMLRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -281,7 +283,7 @@ describe("HTMLRenderer", () => {
       
       wrapper = mount(HTMLRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }

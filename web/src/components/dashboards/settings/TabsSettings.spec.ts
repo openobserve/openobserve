@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabsSettings from "./TabsSettings.vue";
 
 // Mock external dependencies
@@ -90,6 +90,8 @@ const mockDraggable = {
   props: ["modelValue", "options"],
 };
 
+installQuasar();
+
 describe("TabsSettings", () => {
   let wrapper: VueWrapper<any>;
 
@@ -106,7 +108,7 @@ describe("TabsSettings", () => {
     return mount(TabsSettings, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
         components: {
           DashboardHeader: mockDashboardHeader,
           AddTab: mockAddTab,

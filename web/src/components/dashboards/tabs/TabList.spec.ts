@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabList from "./TabList.vue";
 
 // Mock vue-router
@@ -39,6 +39,8 @@ vi.mock("./AddTab.vue", () => ({
     emits: ["refresh", "update:open"],
   },
 }));
+
+installQuasar();
 
 describe("TabList", () => {
   let wrapper: VueWrapper<any>;
@@ -74,7 +76,7 @@ describe("TabList", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           selectedTabId: selectedTabIdRef,
         },
@@ -444,7 +446,7 @@ describe("TabList", () => {
           dashboardData: mockDashboardData,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           provide: {
             selectedTabId: customSelectedTabIdRef,
           },

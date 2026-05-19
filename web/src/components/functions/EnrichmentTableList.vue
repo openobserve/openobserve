@@ -323,6 +323,7 @@ import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
+import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -374,6 +375,7 @@ export default defineComponent({
     const filterQuery = ref("");
     const loading = ref(false);
     const { track } = useReo();
+    const { toast } = useToast();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
       { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },

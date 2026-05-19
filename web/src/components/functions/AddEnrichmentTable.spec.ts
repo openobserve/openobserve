@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import AddEnrichmentTable from './AddEnrichmentTable.vue';
 
 // Mock dependencies
@@ -32,6 +32,8 @@ vi.mock('quasar', async () => {
     useQuasar: () => mockQuasar,
   };
 });
+
+installQuasar({});
 
 describe('AddEnrichmentTable.vue', () => {
   let wrapper: any;
@@ -88,7 +90,7 @@ describe('AddEnrichmentTable.vue', () => {
         ...propsData,
       },
       global: {
-        plugins: [store, i18n, [Quasar, {}]],
+        plugins: [store, i18n, ],
         stubs: {
           'q-form': {
             template: '<form @submit.prevent="$attrs.onSubmit && $attrs.onSubmit()"><slot /></form>',

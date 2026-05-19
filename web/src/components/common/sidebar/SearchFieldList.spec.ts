@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import {
-  Quasar,
   QTable,
   QBtn,
   QInput,
@@ -12,6 +11,7 @@ import {
   QItem,
   QIcon,
 } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
@@ -135,6 +135,8 @@ const mockRouter = createRouter({
   routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
 });
 
+installQuasar();
+
 describe("FieldList.vue Comprehensive Coverage", () => {
   let wrapper: VueWrapper;
   let mockStreamService: any;
@@ -216,7 +218,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     return mount(FieldList, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar, mockI18n, mockRouter],
+        plugins: [mockI18n, mockRouter],
         provide: {
           store: mockStore,
         },
@@ -857,7 +859,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           timeStamp: { startTime: "2023-01-01", endTime: "2023-01-02" },
         },
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: { store: mockDarkStore },
         },
       });
@@ -880,7 +882,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           timeStamp: { startTime: "2023-01-01", endTime: "2023-01-02" },
         },
         global: {
-          plugins: [Quasar, mockI18n, mockRouter],
+          plugins: [mockI18n, mockRouter],
           provide: { store: mockLightStore },
         },
       });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import SanitizedHtmlRenderer from '@/components/SanitizedHtmlRenderer.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock DOMPurify
 vi.mock('dompurify', () => {
@@ -15,6 +15,8 @@ vi.mock('dompurify', () => {
 
 import DOMPurify from 'dompurify';
 const mockSanitize = DOMPurify.sanitize as any;
+
+installQuasar();
 
 describe('SanitizedHtmlRenderer.vue', () => {
   let wrapper: VueWrapper;
@@ -34,7 +36,7 @@ describe('SanitizedHtmlRenderer.vue', () => {
     return mount(SanitizedHtmlRenderer, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar]
+        plugins: []
       }
     });
   };
