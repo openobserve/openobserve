@@ -15,56 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page" v-if="isMetaOrg">
-    <OTable
-      data-test="running-queries-table"
-      :data="rows"
-      :columns="columns"
-      row-key="row_id"
-      pagination="client"
-      selection="multiple"
-      v-model:selected-ids="selectedIds"
-      @row-click="getAllUserQueries"
-      style="width: 100%"
-    >
-      <template #empty>
-        <div v-if="!loadingState" class="text-center full-width full-height">
-          <NoData />
-        </div>
-        <div v-else class="text-center full-width full-height q-mt-lg">
-          <OSpinner size="md" />
-        </div>
-      </template>
-      <template #cell-actions="{ row }">
-        <OButton
-          variant="ghost-destructive"
-          size="icon-sm"
-          :title="t('queries.cancelQuery')"
-          data-test="cancelQuery-btn"
-          @click.stop="confirmDeleteAction({ row })"
-          icon-left="close"
-        />
-      </template>
-      <template #cell-duration="{ row }">
-        {{ durationFormatter(row.duration) }}
-      </template>
-      <template #cell-queryRange="{ row }">
-        {{ durationFormatter(row.queryRange) }}
-      </template>
+  <OTable
+    v-if="isMetaOrg"
+    data-test="running-queries-table"
+    :data="rows"
+    :columns="columns"
+    row-key="row_id"
+    pagination="client"
+    selection="multiple"
+    v-model:selected-ids="selectedIds"
+    @row-click="getAllUserQueries"
+    style="width: 100%"
+    :show-global-filter="false"
+  >
+    <template #empty>
+      <div v-if="!loadingState" class="text-center full-width full-height">
+        <NoData />
+      </div>
+      <div v-else class="text-center full-width full-height q-mt-lg">
+        <OSpinner size="md" />
+      </div>
+    </template>
+    <template #cell-actions="{ row }">
+      <OButton
+        variant="ghost-destructive"
+        size="icon-sm"
+        :title="t('queries.cancelQuery')"
+        data-test="cancelQuery-btn"
+        @click.stop="confirmDeleteAction({ row })"
+        icon-left="close"
+      />
+    </template>
+    <template #cell-duration="{ row }">
+      {{ durationFormatter(row.duration) }}
+    </template>
+    <template #cell-queryRange="{ row }">
+      {{ durationFormatter(row.queryRange) }}
+    </template>
 
-      <template #bottom>
-        <OButton
-          data-test="qm-multiple-cancel-query-btn"
-          variant="outline-destructive"
-          size="sm-action"
-          :disabled="selectedRow.length === 0"
-          @click="handleMultiQueryCancel"
-        >
-          {{ t('queries.cancelQuery') }}
-        </OButton>
-      </template>
-    </OTable>
-  </div>
+    <template #bottom>
+      <OButton
+        data-test="qm-multiple-cancel-query-btn"
+        variant="outline-destructive"
+        size="sm-action"
+        :disabled="selectedRow.length === 0"
+        @click="handleMultiQueryCancel"
+      >
+        {{ t('queries.cancelQuery') }}
+      </OButton>
+    </template>
+  </OTable>
 </template>
 
 <script lang="ts">
@@ -119,13 +119,13 @@ export default defineComponent({
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     const columns = ref<OTableColumnDef[]>([
-      { id: "#", header: "#", accessorKey: "#", meta: { align: "left" } },
-      { id: "user_id", header: t("user.email"), accessorKey: "user_id", sortable: true, meta: { align: "left" } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", sortable: true, meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
+      { id: "user_id", header: t("user.email"), accessorKey: "user_id", sortable: true, meta: { align: "left" , autoWidth: true } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", sortable: true, meta: { align: "left"  } },
       { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
       { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", cell: " ", sortable: true, meta: { align: "left" } },
       { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "actions", header: t("common.actions"), isAction: true, meta: { align: "center" } },
+      { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center" } },
     ]);
 
     const selectedIds = computed({

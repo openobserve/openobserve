@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="running-queries-page" v-if="isMetaOrg">
+  <template v-if="isMetaOrg">
     <OTable
       data-test="running-queries-table"
       :data="rows"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
-  </div>
+  </template>
 </template>
 
 <script lang="ts">
@@ -133,13 +133,13 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size:67, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
         accessorKey: "user_id",
         sortable: true,
-        meta: { align: "left" },
+        meta: { align: "left" , autoWidth: true },
       },
       {
         id: "org_id",
@@ -202,6 +202,7 @@ export default defineComponent({
         header: t("common.actions"),
         isAction: true,
         pinned: "right",
+        size: 100,
         meta: { align: "center" },
       },
     ];
