@@ -266,7 +266,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect },
+  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect , OInput, OCheckbox, OTooltip, OTextarea },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
