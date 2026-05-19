@@ -294,7 +294,11 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-      <ODropdown side="bottom" align="end">
+      <ODropdown
+        side="bottom"
+        align="end"
+        @update:open="(open) => { if (!open) showLanguageSubmenu = false; }"
+      >
         <template #trigger>
           <OButton
             variant="ghost"
@@ -324,26 +328,65 @@ size="xs" class="warning" />{{
           </div>
           <ODropdownSeparator />
 
-          <!-- Language selector — flattened group (Workaround A) -->
-          <ODropdownGroup :label="t('menu.language')">
-            <ODropdownItem
-              v-for="lang in langList"
-              :key="lang.code"
-              :data-test="`language-dropdown-item-${lang.code}`"
-              @select="changeLanguage(lang)"
+          <!-- Language selector — nested sub-dropdown (click to open) -->
+          <div
+            data-test="header-language-submenu-trigger"
+            class="header-language-item"
+            @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
+          >
+            <OIcon size="xs" name="language" class="padding-none" />
+            <span class="header-language-label">{{ t("menu.language") }}</span>
+            <span class="header-language-current">
+              <img
+                v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
+                :src="selectedLanguage.icon.slice(4)"
+                :alt="selectedLanguage.label"
+                class="header-language-flag"
+              />
+              <OIcon
+                v-else-if="selectedLanguage.icon"
+                size="xs"
+                :name="selectedLanguage.icon"
+                class="padding-none"
+              />
+              <span>{{ selectedLanguage.label }}</span>
+            </span>
+            <OIcon size="xs" name="chevron-right" />
+
+            <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+            <div
+              v-if="showLanguageSubmenu"
+              class="language-submenu"
+              data-test="language-dropdown-item"
+              @click.stop
             >
-              <template #icon-left>
-                <OIcon size="xs" :name="lang.icon" class="padding-none" />
-              </template>
-              {{ lang.label }}
-              <template
-                v-if="selectedLanguage.code === lang.code"
-                #icon-right
+              <button
+                v-for="lang in langList"
+                :key="lang.code"
+                type="button"
+                :data-test="`language-dropdown-item-${lang.code}`"
+                class="language-submenu-item"
+                :class="{
+                  'is-selected': selectedLanguage.code === lang.code,
+                }"
+                @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
-                <OIcon size="xs" name="check" />
-              </template>
-            </ODropdownItem>
-          </ODropdownGroup>
+                <img
+                  v-if="lang.icon && lang.icon.startsWith('img:')"
+                  :src="lang.icon.slice(4)"
+                  :alt="lang.label"
+                  class="header-language-flag"
+                />
+                <OIcon v-else size="xs" :name="lang.icon" />
+                <span class="tw:flex-1">{{ lang.label }}</span>
+                <OIcon
+                  v-if="selectedLanguage.code === lang.code"
+                  size="xs"
+                  name="check"
+                />
+              </button>
+            </div>
+          </div>
           <ODropdownSeparator />
 
           <!-- Theme management -->
@@ -498,6 +541,9 @@ export default defineComponent({
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
 
+    // Language sub-menu state (nested submenu pattern matching original UX)
+    const showLanguageSubmenu = ref(false);
+
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
       const isEnterprise = props.config.isEnterprise === "true";
@@ -611,6 +657,7 @@ export default defineComponent({
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
+      showLanguageSubmenu,
       updateOrganization,
       goToHome,
       goToAbout,
@@ -636,6 +683,101 @@ export default defineComponent({
   width: auto;
   max-width: none;
   white-space: nowrap;
+}
+
+/* Language sub-menu trigger row inside the user-profile dropdown */
+.header-language-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.header-language-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.header-language-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.header-language-flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* The nested popover */
+.language-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 4px;
+  min-width: 200px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 9999;
+
+  body.body--dark & {
+    background-color: #1f2937;
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.language-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  &.is-selected {
+    font-weight: 600;
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
 }
 
 .logo-container {
