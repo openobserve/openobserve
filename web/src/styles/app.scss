@@ -1388,18 +1388,6 @@ body {
   }
 }
 
-/* ============================================================================
-   Select Dropdown Options Hover
-   Adds hover background color and text color to q-select dropdown menu options
-   ============================================================================ */
-
-.q-menu .q-item {
-  &:hover {
-    background-color: var(--o2-tab-bg) !important;
-    color: var(--o2-primary-btn-bg) !important;
-  }
-}
-
 // Exception: Disable hover for saved views dropdown menu
 // Disable table row hover
 .saved-views-dropdown-menu .q-tr:hover,
@@ -1859,16 +1847,6 @@ body {
 //////////////////// Field List /////////////////////
 .default-index-menu {
   width: 100%;
-
-  .q-menu {
-    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-    transform: translateY(0.5rem);
-    border-radius: 0px;
-
-    .q-virtual-scroll__content {
-      padding: 0.5rem;
-    }
-  }
 
   .q-field {
     &__control {

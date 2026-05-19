@@ -4452,8 +4452,7 @@ export class LogsPage {
      */
     async isTooltipVisible(timeout = 3000) {
         try {
-            // TODO(data-test): OTooltip (reka-ui TooltipContent) has no data-test; add one in web/src/lib/overlay/Tooltip/OTooltip.vue to remove role="tooltip" fallback.
-            await this.page.locator('[role="tooltip"]').first().waitFor({
+            await this.page.locator('[data-test="o-tooltip-content"]').first().waitFor({
                 state: 'visible',
                 timeout
             });
@@ -4475,8 +4474,7 @@ export class LogsPage {
      */
     async getTooltipText(timeout = 3000) {
         try {
-            // TODO(data-test): OTooltip (reka-ui TooltipContent) has no data-test; add one in web/src/lib/overlay/Tooltip/OTooltip.vue to remove role="tooltip" fallback.
-            return await this.page.locator('[role="tooltip"]').first().textContent({ timeout });
+            return await this.page.locator('[data-test="o-tooltip-content"]').first().textContent({ timeout });
         } catch {
             return null;
         }
@@ -6731,8 +6729,7 @@ export class LogsPage {
      * Get tooltip element
      */
     async getTooltip() {
-        // TODO(data-test): OTooltip / ODropdown overlays need data-test attributes; using role="tooltip" fallback for now.
-        return this.page.locator('[role="tooltip"]').first();
+        return this.page.locator('[data-test="o-tooltip-content"]').first();
     }
 
     /**

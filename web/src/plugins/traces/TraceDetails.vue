@@ -3402,26 +3402,6 @@ body.body--dark {
   border-radius: 0.5rem;
 }
 
-/* TODO(quasar-menu-migration): These rules style the popup of the <q-select>
-   in the trace search controls above. They will need to be re-targeted at the
-   ODropdown content wrapper class once that <q-select> migrates to OSelect. */
-.q-menu .q-item.q-item--active {
-  background-color: rgba(25, 118, 210, 0.2) !important;
-  font-weight: 600 !important;
-}
-
-.q-dark .q-menu .q-item.q-item--active {
-  background-color: rgba(144, 202, 249, 0.2) !important;
-}
-
-.q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(25, 118, 210, 0.1) !important;
-}
-
-.q-dark .q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(144, 202, 249, 0.1) !important;
-}
-
 .trace-back-btn {
   border: 0.09375rem solid;
   border-radius: 50%;

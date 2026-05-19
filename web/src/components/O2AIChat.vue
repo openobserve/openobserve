@@ -171,25 +171,23 @@
 
       <!-- History Panel -->
       <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
-        <q-list separator>
-          <q-item
+        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+          <li
             v-for="chat in chatHistory"
             :key="chat.id"
-            clickable
-            v-ripple
+            :data-test="`o2-ai-chat-history-item-${chat.id}`"
+            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
             @click="loadChat(chat.id)"
           >
-            <q-item-section>
-              <q-item-label>{{ chat.title }}</q-item-label>
-              <q-item-label caption>
-                {{ new Date(chat.timestamp).toLocaleString() }}
-              </q-item-label>
-              <q-item-label caption>
-                Model: {{ chat.model }}
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
+            <span class="tw:text-sm">{{ chat.title }}</span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+              {{ new Date(chat.timestamp).toLocaleString() }}
+            </span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+              Model: {{ chat.model }}
+            </span>
+          </li>
+        </ul>
       </ODrawer>
 
       <!-- Edit Title Dialog -->

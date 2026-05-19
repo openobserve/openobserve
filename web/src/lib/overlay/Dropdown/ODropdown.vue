@@ -43,29 +43,34 @@ function handleOpenChange(v: boolean) {
 
 /**
  * Prevent Reka UI from closing the dropdown when a pointer-down occurs inside
- * a Quasar body-portaled element (e.g. q-select menu, q-btn-dropdown).
- * Reka's DismissableLayer considers those clicks "outside" because Quasar
- * renders .q-menu nodes directly to <body>, not inside DropdownMenuContent.
+ * another portaled overlay nested in this dropdown's content (e.g. an OSelect
+ * listbox or another ODropdown). Reka's DismissableLayer considers those
+ * clicks "outside" because portaled content is rendered directly to <body>,
+ * not inside DropdownMenuContent.
  */
+function isInsideNestedPortal(target: Element | null): boolean {
+  return !!target?.closest("[data-reka-popper-content-wrapper]");
+}
+
 function handlePointerDownOutside(event: Event) {
   const target = (event as CustomEvent<{ originalEvent: PointerEvent }>).detail
     ?.originalEvent?.target as Element | null;
-  if (target?.closest('.q-menu')) {
+  if (isInsideNestedPortal(target)) {
     event.preventDefault();
   }
 }
 
 /**
- * When the Quasar q-select popup opens, focus moves into the .q-menu node
- * which lives outside DropdownMenuContent in the DOM. Reka UI fires
+ * When a nested popup opens (e.g. OSelect listbox), focus moves into a node
+ * that lives outside DropdownMenuContent in the DOM. Reka UI fires
  * focus-outside and tries to return focus to the trigger, which causes the
- * browser to land on whatever is behind the dropdown (e.g. the search input).
- * Prevent default so focus stays inside the Quasar popup as intended.
+ * browser to land on whatever is behind the dropdown. Prevent default so
+ * focus stays inside the nested popup as intended.
  */
 function handleFocusOutside(event: Event) {
   const target = (event as CustomEvent<{ originalEvent: FocusEvent }>).detail
     ?.originalEvent?.target as Element | null;
-  if (target?.closest('.q-menu')) {
+  if (isInsideNestedPortal(target)) {
     event.preventDefault();
   }
 }

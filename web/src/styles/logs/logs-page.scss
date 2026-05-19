@@ -603,16 +603,6 @@
 .logs-index-menu {
   width: 100%;
 
-  .q-menu {
-    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-    transform: translateY(0.5rem);
-    border-radius: 0px;
-
-    .q-virtual-scroll__content {
-      padding: 0.5rem;
-    }
-  }
-
   .q-field {
     &__control {
       height: 35px;

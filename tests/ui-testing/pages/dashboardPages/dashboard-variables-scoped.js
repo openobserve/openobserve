@@ -1104,7 +1104,7 @@ export default class DashboardVariablesScoped {
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
     const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
-    const tooltip = this.page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: new RegExp(expectedText, 'i') });
+    const tooltip = this.page.locator('[data-test="o-tooltip-content"]').filter({ hasText: new RegExp(expectedText, 'i') });
     await expect(tooltip).toBeVisible({ timeout: 5000 });
   }
 
