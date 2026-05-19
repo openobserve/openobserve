@@ -111,11 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTable
         ref="qTableRef"
         data-test="model-pricing-list-table"
-        :data="filteredModels"
+        :data="displayRows"
         :columns="columns"
         row-key="id"
         :selected-ids="selectedIds"
-        :selection="hasSelectableModels ? 'multiple' : 'none'"
+        selection="multiple"
         pagination="client"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
@@ -123,9 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        expansion="multiple"
-        :expanded-ids="[...expandedParents]"
-        :get-sub-rows="getSubRows"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
         <template #cell-name="{ row }">
@@ -135,8 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="row.children?.length > 0"
                 :name="
                   expandedParents.has(row.id)
-                    ? 'keyboard_arrow_down'
-                    : 'keyboard_arrow_right'
+                    ? 'expand-more'
+                    : 'chevron-right'
                 "
                 size="xs"
                 class="cursor-pointer tree-expand-icon"
@@ -561,8 +558,6 @@ function onTabChange() {
   selectedIds.value = [];
 }
 
-const hasSelectableModels = computed(() => models.value.length > 0);
-
 /** Flat list of all models (parents + children) for ID-based lookups. */
 const allModels = computed(() => {
   const result: any[] = [];
@@ -671,16 +666,19 @@ function toggleExpand(id: string) {
   expandedParents.value = next;
 }
 
-function getSubRows(row: any): any[] {
-  if (row.children?.length > 0 && expandedParents.value.has(row.id)) {
-    return row.children.map((child: any) => ({
-      ...child,
-      __type: 'child',
-      _parentName: row.name,
-    }));
+/** Flat list for OTable — injects child rows under expanded parents. */
+const displayRows = computed(() => {
+  const rows: any[] = [];
+  for (const m of filteredModels.value) {
+    rows.push(m);
+    if (expandedParents.value.has(m.id) && m.children?.length) {
+      for (const child of m.children) {
+        rows.push({ ...child, __type: 'child', _parentName: m.name });
+      }
+    }
   }
-  return [];
-}
+  return rows;
+});
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
