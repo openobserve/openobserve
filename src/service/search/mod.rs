@@ -93,11 +93,8 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::{
-            rewriter::index::use_inverted_index,
-            visitor::histogram_interval::{
-                convert_histogram_interval_to_seconds, generate_histogram_interval,
-            },
+        sql::visitor::histogram_interval::{
+            convert_histogram_interval_to_seconds, generate_histogram_interval,
         },
     },
 };
@@ -1058,23 +1055,15 @@ pub async fn search_partition(
     }
 
     log::debug!(
-        "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
-        total_secs,
-        part_num,
-        step,
-        min_step,
+        "[trace_id {trace_id}] total_secs: {total_secs}, partition_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {}",
         is_histogram || enable_align_histogram
     );
-    // Create a partition generator
+    // create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
         cfg.limit.search_mini_partition_duration_secs,
         is_histogram || enable_align_histogram,
     );
-
-    if cfg.common.align_partitions_for_index && use_inverted_index(&sql) {
-        step *= step_factor;
-    }
 
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
