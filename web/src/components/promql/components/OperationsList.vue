@@ -27,18 +27,25 @@
                   </template>
                   <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
-                  :no-wrap="true"
-                  :data-test="`promql-operation-${index}`"
-                >
-                  {{ computedLabel(element) }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu class="q-pa-md">
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip"
+                      class="tw:!text-[12px]"
+                      :no-wrap="true"
+                      :data-test="`promql-operation-${index}`"
+                    >
+                      {{ computedLabel(element) }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
+                    class="operations-list-dropdown tw:p-4"
+                    :data-test="`promql-operation-${index}-menu`"
+                  >
                     <div style="width: 350px">
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
@@ -91,8 +98,8 @@
                         </OSelect>
                       </template>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -146,7 +153,8 @@
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
                 :key="op.id"
-                class="tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                :data-test="`promql-operation-option-${op.id}`"
+                class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
                 @click="addOperation(op); showOperationSelector = false"
               >
                 <div class="tw:font-medium">{{ op.name }}</div>
@@ -169,7 +177,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -198,6 +206,9 @@ const availableLabels = computed(
 
 // State for filtered labels in the select
 const filteredLabels = ref<string[]>([]);
+
+// Search query for filtering operations in the operation selector dialog
+const searchQuery = ref("");
 
 const categories = computed(() => promQueryModeller.getCategories());
 
@@ -351,7 +362,7 @@ defineExpose({
   }
 }
 
-.q-menu {
+.operations-list-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;

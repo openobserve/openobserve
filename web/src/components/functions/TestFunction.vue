@@ -19,14 +19,13 @@
               name="info-outline"
               class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
               size="sm"
-            >
+             />
               <OTooltip
                 side="right"
                 align="center"
                 :side-offset="10"
                 :content="sqlQueryErrorMsg"
               />
-            </OIcon>
           </template>
           <template #right>
             <OButton
@@ -172,14 +171,13 @@
             name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
             size="sm"
-          >
+           />
             <OTooltip
               side="right"
               align="center"
               :side-offset="10"
               :content="eventsErrorMsg"
             />
-          </OIcon>
         </template>
         <template #right>
            <!-- o2 ai context add button in the test function -->
@@ -231,14 +229,13 @@
             name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
             size="sm"
-          >
+           />
             <OTooltip
               side="right"
               align="center"
               :side-offset="10"
               :content="outputEventsErrorMsg"
             />
-          </OIcon>
         </template>
       </FullViewContainer>
 

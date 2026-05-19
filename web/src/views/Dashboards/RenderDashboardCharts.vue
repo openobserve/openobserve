@@ -324,6 +324,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");

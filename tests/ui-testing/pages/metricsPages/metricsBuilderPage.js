@@ -165,7 +165,8 @@ export class MetricsBuilderPage {
             return false;
         }
 
-        // Click to focus and open dropdown
+        // Click to focus and open dropdown — FieldList stream picker is OSelect
+        // (Reka Listbox) post-migration; fall back to .q-menu for legacy q-select.
         await input.click();
         await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
@@ -174,7 +175,7 @@ export class MetricsBuilderPage {
         await input.fill(metricName);
         await this.page.waitForTimeout(1000);
 
-        // Select from dropdown options
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
         const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
@@ -223,7 +224,8 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Open label filter menu at index
+     * Open label filter menu at index. LabelFilterEditor chip menu is now an
+     * ODropdown — falls back to legacy .q-menu until source exposes a data-test.
      * @param {number} index - 0-based index
      */
     async openLabelFilterMenu(index) {
@@ -233,7 +235,9 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Select a label name from the label filter dropdown
+     * Select a label name from the label filter dropdown. Inside the migrated
+     * ODropdown, the label picker is an OSelect (Reka Listbox). Falls back to
+     * legacy .q-menu .q-item for q-select until OSelect forwards a data-test.
      * @param {string} labelName
      */
     async selectLabel(labelName) {
@@ -248,7 +252,7 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: labelName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
@@ -267,7 +271,7 @@ export class MetricsBuilderPage {
         await operatorDropdown.click();
         await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select from dropdown options
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: operator }).first();
         if (await option.isVisible({ timeout: 3000 })) {
             await option.click();
@@ -293,7 +297,7 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: value }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
@@ -354,7 +358,7 @@ export class MetricsBuilderPage {
         // Select value
         await this.selectValue(value);
 
-        // Close menu by pressing Escape
+        // Close menu by pressing Escape — LabelFilterEditor chip menu = ODropdown post-migration
         await this.page.keyboard.press('Escape');
         await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
@@ -474,7 +478,7 @@ export class MetricsBuilderPage {
      * @param {string} value
      */
     async setOperationParam(operationIndex, paramIndex, value) {
-        // Open operation menu
+        // Open operation menu — OperationsList chip menu is ODropdown post-migration
         const opBtn = this.page.locator(`[data-test="promql-operation-${operationIndex}"]`);
         await opBtn.click();
         await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
@@ -537,13 +541,17 @@ export class MetricsBuilderPage {
         const qtSelect = this.page.locator(this.queryTypeSelect);
         if (await qtSelect.isVisible({ timeout: 3000 })) {
             await qtSelect.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            // OSelect forwards its parent data-test (`${parentDataTest}-popover`)
+            const popover = this.page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
+            await popover.waitFor({ state: 'visible', timeout: 5000 });
 
             const label = queryType === 'range' ? 'Range' : 'Instant';
-            const option = this.page.locator(`.q-menu .q-item:has-text("${label}")`).first();
+            const option = this.page
+                .locator('[data-test="dashboard-promql-builder-query-type-option"]', { hasText: label })
+                .first();
             if (await option.isVisible({ timeout: 3000 })) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -678,6 +686,9 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
+        // OSelect (Reka Listbox role=option) post-migration; q-select (.q-menu .q-item) pre.
+        const rekaCount = await this.page.locator('').count();
+        if (rekaCount > 0) return true;
         const menu = this.page.locator('.q-menu:visible').filter({ has: this.page.locator('.q-item') });
         const count = await menu.first().locator('.q-item').count();
         return count > 0;
@@ -706,6 +717,7 @@ export class MetricsBuilderPage {
         if (!await selector.isVisible({ timeout: 5000 })) return false;
 
         await selector.click();
+        // MetricSelector uses OSelect (Reka Listbox) — fall back to .q-menu legacy
         await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
@@ -715,7 +727,7 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
@@ -995,6 +1007,7 @@ export class MetricsBuilderPage {
         const folderDropdown = this.page.locator('[data-test="index-dropdown-stream_type"]');
         if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
             await folderDropdown.click();
+            // SelectFolderDropDown is OSelect (Reka Listbox); fall back to legacy .q-menu.
             await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
             const option = this.page.locator('.q-menu .q-item').filter({ hasText: folderName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -1014,6 +1027,7 @@ export class MetricsBuilderPage {
         const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
         if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
             await dashDropdown.click();
+            // SelectDashboardDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
             await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
             // Type to filter
@@ -1062,6 +1076,7 @@ export class MetricsBuilderPage {
 
         // Now click the tab dropdown normally
         await tabDropdown.click();
+        // SelectTabDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
         await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
         if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {

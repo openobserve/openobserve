@@ -69,13 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="17px"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
+           />
             <OTooltip
               side="right"
               align="center"
               :content="t('alerts.correlation.fingerprintGroupsTooltip')"
             />
-          </OIcon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
@@ -107,13 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="17px"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
+           />
             <OTooltip
               side="right"
               align="center"
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
-          </OIcon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}

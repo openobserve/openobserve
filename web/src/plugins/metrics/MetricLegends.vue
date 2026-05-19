@@ -1,34 +1,35 @@
 <template>
-  <OButton
-    data-cy="metric-legends-button"
-    variant="ghost"
-    size="sm-action"
-    class="metric-legends-button"
-  >
-    <OIcon name="category" size="sm" class="q-mr-sm" />
-    <span>{{ t("search.legendLabel") }}</span>
-
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <OCard>
-        <OCardSection role="header" class="metric-legends-title">
-          <div class="label">{{ t("search.legendLabel") }}</div>
-        </OCardSection>
-        <OSeparator />
-        <OCardSection class="tw:pt-0 legends">
-          <div class="legend-grid">
-            <div
-              class="legend-item"
-              v-for="(icon, metric) in metricsIconMapping"
-              :key="metric"
-            >
-              <OIcon :name="icon" size="sm" class="q-mr-sm" />
-              <span>{{ metric }}</span>
-            </div>
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        data-cy="metric-legends-button"
+        variant="ghost"
+        size="sm-action"
+        class="metric-legends-button"
+      >
+        <OIcon name="category" size="sm" class="q-mr-sm" />
+        <span>{{ t("search.legendLabel") }}</span>
+      </OButton>
+    </template>
+    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+      <div class="metric-legends-title">
+        <div class="label">{{ t("search.legendLabel") }}</div>
+      </div>
+      <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+      <div class="legends">
+        <div class="legend-grid">
+          <div
+            class="legend-item"
+            v-for="(icon, metric) in metricsIconMapping"
+            :key="metric"
+          >
+            <OIcon :name="icon" size="sm" class="q-mr-sm" />
+            <span>{{ metric }}</span>
           </div>
-        </OCardSection>
-      </OCard>
-    </q-menu>
-  </OButton>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
@@ -39,13 +40,11 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default defineComponent({
   name: "MetricLegends",
-  components: { OSeparator, OButton, OCard, OCardSection,
-    OIcon,
-},
+  components: { OButton, OIcon, ODropdown },
   setup() {
     const { t } = useI18n();
     const store = useStore();

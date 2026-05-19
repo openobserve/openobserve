@@ -116,14 +116,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               class="q-ml-xs cursor-pointer"
               :data-test="`iam-external-user-warning-icon-${row.email}`"
-            >
+             />
               <OTooltip side="right">
                 <div style="font-size: 12px; line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                   <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
               </OTooltip>
-            </OIcon>
           </div>
         </template>
         <template #empty>

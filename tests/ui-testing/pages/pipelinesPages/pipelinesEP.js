@@ -31,6 +31,8 @@ export class PipelinesEP {
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
+        // Stream picker is OSelect (Reka Listbox) post-migration; legacy q-select
+        // uses .q-menu.scroll. Match both so the helper works during the migration.
         this.quasarMenuScroll = '.q-menu.scroll';
         this.quasarMenuItem = '.q-menu .q-item';
         this.quasarVirtualScrollContent = '.q-menu.scroll .q-virtual-scroll__content';

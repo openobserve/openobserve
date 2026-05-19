@@ -15,25 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
-    data-cy="syntax-guide-button"
-    variant="outline"
-    size="icon-sm"
-    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-  >
-    <OIcon name="help" size="sm" />
-    <OTooltip :content="t('search.syntaxGuideLabel')" />
-    <q-menu
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        data-cy="syntax-guide-button"
+        variant="outline"
+        size="icon-sm"
+        :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+      >
+        <OIcon name="help" size="sm" />
+        <OTooltip :content="t('search.syntaxGuideLabel')" />
+      </OButton>
+    </template>
+    <div
       data-test="syntax-guide-menu"
       class="syntax-guide-menu"
       :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
     >
-      <OCard v-if="!sqlmode">
-        <OCardSection role="header" class="syntax-guide-title">
+      <div v-if="!sqlmode">
+        <div class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </OCardSection>
-        <OSeparator />
-        <OCardSection class="tw:pt-0 answers">
+        </div>
+        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
@@ -75,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </OCardSection>
-      </OCard>
-      <OCard v-else>
-        <OCardSection role="header" class="syntax-guide-title">
+        </div>
+      </div>
+      <div v-else>
+        <div class="syntax-guide-title">
           <div class="label">Syntax Guide: SQL Mode</div>
-        </OCardSection>
-        <OSeparator />
-        <OCardSection class="tw:pt-0 answers">
+        </div>
+        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
@@ -131,10 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </OCardSection>
-      </OCard>
-    </q-menu>
-  </OButton>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
@@ -144,12 +148,11 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
-  components: { OSeparator, OButton, OTooltip, OIcon, OCard, OCardSection },
+  components: { OButton, OTooltip, OIcon, ODropdown },
   props: {
     sqlmode: {
       type: Boolean,

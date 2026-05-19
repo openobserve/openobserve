@@ -40,33 +40,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
-          <div class="tw:flex tw:flex-col tw:h-[calc(100vh-110px)]">
-            <div class="tw:flex-1 tw:overflow-y-auto">
-              <div>
-                <OCollapsible
-                  v-if="
-                    regionRows.length > 0 &&
-                    store.state.zoConfig.super_cluster_enabled
-                  "
-                  variant="sidebar"
-                  :model-value="sectionOpen.region"
-                  @update:model-value="(v) => (sectionOpen.region = v)"
-                  :label="t('nodes.region')"
-                >
-                  <div class="tw:p-0">
-                    <OInput
-                      data-test="nodes-region-filter-search-input"
-                      v-model="filterRegionQuery"
-                      clearable
-                      :debounce="1"
-                      :placeholder="t('nodes.searchRegion')"
-                      class="full-width filter-input"
-                    >
-                      <template #prepend>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                    </OInput>
-                    <OTable
+          <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
+            <div class="tw:flex tw:flex-col">
+              <OCollapsible
+                v-if="
+                  regionRows.length > 0 &&
+                  store.state.zoConfig.super_cluster_enabled
+                "
+                variant="sidebar"
+                :model-value="sectionOpen.region"
+                @update:model-value="(v) => (sectionOpen.region = v)"
+                :label="t('nodes.region')"
+              >
+                <div class="tw:p-0">
+                  <OInput
+                    data-test="nodes-region-filter-search-input"
+                    v-model="filterRegionQuery"
+                    clearable
+                    :debounce="1"
+                    :placeholder="t('nodes.searchRegion')"
+                    class="full-width filter-input"
+                  >
+                    <template #prepend>
+                      <OIcon name="search" size="sm" />
+                    </template>
+                  </OInput>
+                  <OTable
                       data-test="nodes-region-table"
                       :data="visibleRegionRows"
                       :columns="filterOTableColumns"
@@ -405,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </OCollapsible>
-              </div>
+
             </div>
             <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0">
               <OButton

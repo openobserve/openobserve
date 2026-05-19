@@ -429,8 +429,7 @@ export default defineComponent({
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 0.1875rem;
       }
     }

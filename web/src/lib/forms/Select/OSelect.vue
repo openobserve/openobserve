@@ -832,6 +832,7 @@ const fieldWidthClass = computed(() => {
             align="start"
             :trap-focus="false"
             :disable-outside-pointer-events="false"
+            :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
               'tw:max-h-72 tw:overflow-hidden',
@@ -984,6 +985,7 @@ const fieldWidthClass = computed(() => {
                       v-else
                       :value="toRekaString(filteredOptions[vRow.index].value)"
                       :disabled="filteredOptions[vRow.index].disabled"
+                      :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
                       :class="[
                         'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
                         'tw:ps-3 tw:pe-3 tw:text-sm',
@@ -1161,6 +1163,7 @@ const fieldWidthClass = computed(() => {
         <SelectContent
           position="popper"
           :side-offset="4"
+          :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
             'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
             'tw:max-h-60 tw:overflow-hidden',

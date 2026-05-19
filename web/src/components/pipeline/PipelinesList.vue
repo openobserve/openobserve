@@ -107,50 +107,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
 
             <!-- Overflow menu at narrow widths — after New Pipeline -->
-            <OButton
-              v-if="shouldCollapseToolbar"
-              class="q-ml-sm"
-              variant="outline"
-              size="sm-action"
-              data-test="pipeline-list-overflow-menu-btn"
-              icon-left="menu"
-            >
-              <q-menu>
-                <q-list>
-                  <q-item
-                    clickable
-                    v-close-popup
-                    @click="goToPipelineHistory"
-                    data-test="pipeline-list-menu-history-btn"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ t("pipeline.history") }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                  <q-item
-                    v-if="config.isEnterprise == 'true'"
-                    clickable
-                    v-close-popup
-                    @click="goToBackfillJobs"
-                    data-test="pipeline-list-menu-backfill-btn"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ t("pipeline.backfill") }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                  <q-item
-                    clickable
-                    v-close-popup
-                    @click="routeToImportPipeline"
-                    data-test="pipeline-list-menu-import-btn"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ t("pipeline.import") }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </OButton>
+            <ODropdown v-if="shouldCollapseToolbar">
+              <template #trigger>
+                <OButton
+                  class="q-ml-sm"
+                  variant="outline"
+                  size="sm-action"
+                  data-test="pipeline-list-overflow-menu-btn"
+                  icon-left="menu"
+                />
+              </template>
+              <ODropdownItem
+                data-test="pipeline-list-menu-history-btn"
+                @select="goToPipelineHistory"
+              >
+                {{ t("pipeline.history") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="config.isEnterprise == 'true'"
+                data-test="pipeline-list-menu-backfill-btn"
+                @select="goToBackfillJobs"
+              >
+                {{ t("pipeline.backfill") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="pipeline-list-menu-import-btn"
+                @select="routeToImportPipeline"
+              >
+                {{ t("pipeline.import") }}
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </div>
       </div>
@@ -214,88 +200,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     /></template>
                   </OTooltip>
                 </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  @click.stop
-                  :data-test="`pipeline-list-${row.name}-more-options`"
-                  icon-left="more-vert"
-                >
-                  <q-menu>
-                    <q-list style="min-width: 100px">
-                      <q-item
-                        class="flex items-center"
-                        clickable
-                        v-close-popup
-                        @click="exportPipeline(row)"
-                      >
-                        <q-item-section dense avatar>
-                          <OIcon size="sm" name="download" />
-                        </q-item-section>
-                        <q-item-section>{{
-                          t("pipeline.export")
-                        }}</q-item-section>
-                      </q-item>
-                      <OSeparator
-                        v-if="
-                          row.source.source_type === 'scheduled' &&
-                          config.isEnterprise == 'true'
-                        "
-                      />
-                      <q-item
-                        v-if="
-                          row.source.source_type === 'scheduled' &&
-                          config.isEnterprise == 'true'
-                        "
-                        class="flex items-center"
-                        clickable
-                        v-close-popup
-                        @click="openBackfillDialog(row)"
-                      >
-                        <q-item-section dense avatar>
-                          <OIcon size="sm" name="refresh" />
-                        </q-item-section>
-                        <q-item-section>Create Backfill</q-item-section>
-                      </q-item>
-                      <OSeparator />
-                      <q-item
-                        class="flex items-center"
-                        clickable
-                        v-close-popup
-                        @click="openDeleteDialog(row)"
-                      >
-                        <q-item-section dense avatar>
-                          <OIcon name="delete" size="sm" />
-                        </q-item-section>
-                        <q-item-section>{{
-                          t("pipeline.delete")
-                        }}</q-item-section>
-                      </q-item>
-                      <OSeparator v-if="row.last_error" />
-                      <q-item
-                        v-if="row.last_error"
-                        class="flex items-center"
-                        clickable
-                        v-close-popup
-                        @click="showErrorDialog(row)"
-                      >
-                        <q-item-section dense avatar>
-                          <OIcon size="sm" name="error" />
-                        </q-item-section>
-                        <q-item-section>
-                          <div>View Error</div>
-                          <div class="text-caption text-grey">
-                            {{
-                              new Date(
-                                row.last_error.last_error_timestamp / 1000,
-                              ).toLocaleString()
-                            }}
-                          </div>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </q-menu>
-                </OButton>
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      @click.stop
+                      :data-test="`pipeline-list-${row.name}-more-options`"
+                      icon-left="more-vert"
+                    />
+                  </template>
+                  <ODropdownItem
+                    :data-test="`pipeline-list-${row.name}-export-action`"
+                    @select="exportPipeline(row)"
+                  >
+                    <template #icon-left>
+                      <OIcon size="sm" name="download" />
+                    </template>
+                    {{ t("pipeline.export") }}
+                  </ODropdownItem>
+                  <ODropdownSeparator
+                    v-if="
+                      row.source.source_type === 'scheduled' &&
+                      config.isEnterprise == 'true'
+                    "
+                  />
+                  <ODropdownItem
+                    v-if="
+                      row.source.source_type === 'scheduled' &&
+                      config.isEnterprise == 'true'
+                    "
+                    :data-test="`pipeline-list-${row.name}-backfill-action`"
+                    @select="openBackfillDialog(row)"
+                  >
+                    <template #icon-left>
+                      <OIcon size="sm" name="refresh" />
+                    </template>
+                    Create Backfill
+                  </ODropdownItem>
+                  <ODropdownSeparator />
+                  <ODropdownItem
+                    :data-test="`pipeline-list-${row.name}-delete-action`"
+                    variant="destructive"
+                    @select="openDeleteDialog(row)"
+                  >
+                    <template #icon-left>
+                      <OIcon name="delete" size="sm" />
+                    </template>
+                    {{ t("pipeline.delete") }}
+                  </ODropdownItem>
+                  <ODropdownSeparator v-if="row.last_error" />
+                  <ODropdownItem
+                    v-if="row.last_error"
+                    :data-test="`pipeline-list-${row.name}-view-error-action`"
+                    @select="showErrorDialog(row)"
+                  >
+                    <template #icon-left>
+                      <OIcon size="sm" name="error" />
+                    </template>
+                    <div class="tw:flex tw:flex-col">
+                      <div>View Error</div>
+                      <div class="text-caption text-grey">
+                        {{
+                          new Date(
+                            row.last_error.last_error_timestamp / 1000,
+                          ).toLocaleString()
+                        }}
+                      </div>
+                    </div>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
@@ -513,6 +487,9 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import PipelineView from "./PipelineView.vue";

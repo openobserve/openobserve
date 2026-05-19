@@ -479,8 +479,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     if (!includeMenuItem) {
-      // Try finding any visible menu item
-      const anyMenuItem = page.locator('.q-menu:visible .q-item').first();
+      // Post-migration the action is on an ODropdown rendered via JsonPreview;
+      // its include item carries data-test="log-details-include-field-btn".
+      const anyMenuItem = page.locator('[data-test="log-details-include-field-btn"]').first();
       if (await anyMenuItem.isVisible({ timeout: 1000 }).catch(() => false)) {
         includeMenuItem = anyMenuItem;
         testLogger.info('✓ Using first visible menu item');

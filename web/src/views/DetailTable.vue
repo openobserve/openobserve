@@ -47,30 +47,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
-            <q-list
-              separator
+            <ul
               style="height: calc(100vh - 220px); width: 70vw"
-              class="q-px-none q-py-none"
+              class="detail-list q-px-none q-py-none tw:flex tw:flex-col tw:divide-y tw:divide-border"
             >
-              <q-item class="list-head">
-                <q-item-section class="text-bold col-3">
+              <li class="detail-item list-head tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                <div class="detail-section text-bold col-3 tw:break-all">
                   {{ t("search.sourceName") }}
-                </q-item-section>
-                <q-item-section class="text-bold col-9">
+                </div>
+                <div class="detail-section text-bold col-9 tw:break-all">
                   {{ t("search.sourceValue") }}
-                </q-item-section>
-              </q-item>
+                </div>
+              </li>
 
-              <q-item
+              <li
                 v-for="(key, value) in rowData"
                 :key="value"
-                class="list-item"
+                class="detail-item list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
               >
-                <q-item-section class="col-3">{{ value }}</q-item-section>
-                <q-item-section class="col-9">{{ key }}</q-item-section>
-              </q-item>
-              <q-item></q-item>
-            </q-list>
+                <div class="detail-section col-3 tw:break-all">{{ value }}</div>
+                <div class="detail-section col-9 tw:break-all">{{ key }}</div>
+              </li>
+              <li class="detail-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"></li>
+            </ul>
           </div>
         </OCardSection>
       </OTabPanel>
@@ -133,10 +132,10 @@ export default defineComponent({
 .searchdetaildialog {
   width: 74vw;
 }
-.q-item__section {
+.detail-section {
   word-break: break-all;
 }
-.indexDetailsContainer .q-list .q-item {
+.indexDetailsContainer .detail-list .detail-item {
   height: auto;
 }
 </style>

@@ -861,54 +861,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'tw:bg-green-500': st === 'metrics',
                         }" /></span
                   ></span>
-                  <span
+                  <ODropdown
                     v-if="card.values.length > 5"
-                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-grey-4'
-                        : 'tw:text-grey-6'
-                    "
-                    >+{{ card.values.length - 5 }}
-                    <q-menu anchor="bottom left" self="top left">
-                      <div
-                        class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                    v-model:open="dimCardMoreMenuOpen[idx]"
+                    side="bottom"
+                    align="start"
+                  >
+                    <template #trigger>
+                      <span
+                        class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
                         :class="
-                          store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''
+                          store.state.theme === 'dark'
+                            ? 'tw:text-grey-4'
+                            : 'tw:text-grey-6'
                         "
+                        >+{{ card.values.length - 5 }}</span
                       >
-                        <span
-                          v-for="val in card.values.slice(5)"
-                          :key="val"
-                          class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? card.theme.pillDark
-                              : card.theme.pillLight
-                          "
-                          :title="val"
-                          v-close-popup
-                          @click.stop="openInsightDialogByIdx(val, idx)"
-                          ><span class="tw:truncate">{{ val }}</span
+                    </template>
+                    <div
+                      class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                      :class="
+                        store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''
+                      "
+                    >
+                      <span
+                        v-for="val in card.values.slice(5)"
+                        :key="val"
+                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? card.theme.pillDark
+                            : card.theme.pillLight
+                        "
+                        :title="val"
+                        @click.stop="openInsightDialogByIdx(val, idx); dimCardMoreMenuOpen[idx] = false"
+                        ><span class="tw:truncate">{{ val }}</span
+                        ><span
+                          v-if="card.dim"
+                          class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
                           ><span
-                            v-if="card.dim"
-                            class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
-                            ><span
-                              v-for="st in getValueStreamTypes(
-                                card.dim.group_id,
-                                val,
-                              )"
-                              :key="st"
-                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
-                              :class="{
-                                'tw:bg-blue-500': st === 'logs',
-                                'tw:bg-orange-500': st === 'traces',
-                                'tw:bg-green-500': st === 'metrics',
-                              }" /></span
-                        ></span>
-                      </div>
-                    </q-menu>
-                  </span>
+                            v-for="st in getValueStreamTypes(
+                              card.dim.group_id,
+                              val,
+                            )"
+                            :key="st"
+                            class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                            :class="{
+                              'tw:bg-blue-500': st === 'logs',
+                              'tw:bg-orange-500': st === 'traces',
+                              'tw:bg-green-500': st === 'metrics',
+                            }" /></span
+                      ></span>
+                    </div>
+                  </ODropdown>
                 </div>
               </div>
             </template>
@@ -1537,6 +1542,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1580,6 +1586,7 @@ const { t } = useI18n();
 
 const loading = ref(true);
 const saving = ref(false);
+const dimCardMoreMenuOpen = ref<Record<number, boolean>>({});
 const activeStreamId = ref<string>("");
 const activeStreamType = ref<string>("");
 const selectedStreamType = ref<string>("");

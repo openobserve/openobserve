@@ -86,8 +86,7 @@ function handleInteractOutside(e: Event) {
   ).detail?.originalEvent;
   const target = originalEvent?.target as Element | null;
   if (
-    target?.closest("[data-reka-popper-content-wrapper]") || // reka-ui portals (ODropdown, OSelect, …)
-    target?.closest(".q-menu") // Quasar portals (q-select, q-btn-dropdown, …)
+    target?.closest("[data-reka-popper-content-wrapper]") // reka-ui portals (ODropdown, OSelect, …)
   ) {
     e.preventDefault();
     return;
@@ -231,15 +230,12 @@ function handleOpenAutoFocus(event: Event) {
 // Same workaround as ODrawer — see the comment block there for full rationale.
 // Intercepts both focusin and focusout on document.body so FocusScope's
 // document-level handlers never fire when focus moves to/from a portaled
-// Quasar element (q-menu, q-select dropdown, etc.).
+// reka-ui element (ODropdown, OSelect listbox, etc.).
 watchEffect((cleanup) => {
   if (!internalOpen.value) return;
 
   function isPortalElement(el: Element | null): boolean {
-    return !!(
-      el?.closest("[data-reka-popper-content-wrapper]") ||
-      el?.closest(".q-menu")
-    );
+    return !!el?.closest("[data-reka-popper-content-wrapper]");
   }
 
   const handleFocusIn = (e: FocusEvent) => {

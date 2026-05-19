@@ -35,12 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <OIcon name="info" size="sm">
+              <OIcon name="info" size="sm" />
                 <OTooltip
                   content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
                   side="top"
                 />
-              </OIcon>
             </div>
           </div>
           <div class="flex q-ml-auto items-center">

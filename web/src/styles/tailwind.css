@@ -18,9 +18,7 @@
  * Force pointer-events back to auto for all known portal wrappers so they
  * remain fully interactive while a modal is open.
  */
-[data-reka-popper-content-wrapper],
-.q-menu,
-.q-select__dropdown-icon {
+[data-reka-popper-content-wrapper] {
   pointer-events: auto !important;
 }
 
@@ -43,12 +41,6 @@
     line-height: 2rem;
     letter-spacing: 0.0125em;
     margin: revert;
-  }
-  .q-menu .q-item .q-item__label{
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    width: auto;
   }
 }
 

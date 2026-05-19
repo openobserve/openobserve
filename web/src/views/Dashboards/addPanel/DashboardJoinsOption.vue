@@ -10,32 +10,36 @@
           class="join-item"
         >
           <OButtonGroup class="axis-field" radius="sm">
-            <OButton
-              variant="primary"
-              size="chip-12"
-              :data-test="`dashboard-join-item-${index}`"
-              icon-right="arrow-drop-down"
-            >
-              <div class="join-btn-content">
-                <LeftJoinTypeSvg
-                  v-if="joinObj?.joinType === 'left'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <InnerJoinTypeSvg
-                  v-else-if="joinObj?.joinType === 'inner'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <RightJoinTypeSvg
-                  v-else-if="joinObj?.joinType === 'right'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <span class="join-stream-label">{{ joinObj?.stream }}</span>
-              </div>
-              <q-menu
-                class="q-pa-md"
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-join-item-${index}`"
+                  icon-right="arrow-drop-down"
+                >
+                  <div class="join-btn-content">
+                    <LeftJoinTypeSvg
+                      v-if="joinObj?.joinType === 'left'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <InnerJoinTypeSvg
+                      v-else-if="joinObj?.joinType === 'inner'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <RightJoinTypeSvg
+                      v-else-if="joinObj?.joinType === 'right'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <span class="join-stream-label">{{ joinObj?.stream }}</span>
+                  </div>
+                </OButton>
+              </template>
+              <div
+                class="tw:p-4"
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp
@@ -44,8 +48,8 @@
                   :joinIndex="index"
                   :mainStream="mainStreamName"
                 />
-              </q-menu>
-          </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
@@ -77,6 +81,7 @@
 import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -143,6 +148,7 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     AddJoinPopUp,
     OTooltip,
     LeftJoinTypeSvg,

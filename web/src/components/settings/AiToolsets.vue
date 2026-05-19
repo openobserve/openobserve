@@ -122,6 +122,8 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 const KIND_VARIANTS: Record<string, string> = {
   mcp: "primary",

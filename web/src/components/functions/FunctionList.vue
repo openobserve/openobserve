@@ -153,18 +153,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="transformedPipelineList.length > 0"
         class="pipeline-list-container"
       >
-        <q-list class="scrollable-list">
-          <q-item
+        <ul class="scrollable-list tw:flex tw:flex-col">
+          <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
-            clickable
             @click="onPipelineSelect(pipeline)"
+            class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+            :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
-            <q-item-section>
-              {{ index + 1 }}. {{ pipeline.label }}
-            </q-item-section>
-          </q-item>
-        </q-list>
+            <span class="tw:text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+          </li>
+        </ul>
       </div>
       <div v-else>
         <div class="text-h6 text-center">
@@ -725,6 +724,12 @@ export default defineComponent({
 }
 .dialog-heading {
   border-bottom: 1px solid $border-color;
+}
+
+.scrollable-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 .scrollable-list::-webkit-scrollbar {

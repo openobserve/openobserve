@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :name="tab.name"
           :label="tab.label"
           :icon="tab.icon"
+          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
           class="tw:min-h-[3rem]"
         />
       </OTabs>
@@ -156,14 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
                 >
-                  <q-list v-if="filteredDimensions.length > 0">
-                    <q-item
+                  <ul v-if="filteredDimensions.length > 0" class="tw:flex tw:flex-col">
+                    <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      dense
-                      class="dimension-list-item tw:border-none!"
+                      class="dimension-list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:border-none!"
                     >
-                      <q-item-section side>
+                      <div class="tw:flex tw:items-center tw:shrink-0">
                         <OCheckbox
                           :model-value="
                             selectedDimensions.includes(dimension.value)
@@ -172,9 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label
+                      </div>
+                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <span
                           class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
                         >
                           {{ dimension.label }}
@@ -186,10 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             max-width="300px"
                             :content="dimension.label"
                           />
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
+                        </span>
+                      </div>
+                    </li>
+                  </ul>
 
                   <!-- No results message -->
                   <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">

@@ -34,9 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
               <OTooltip :content="xAxisHint" />
-            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -96,18 +95,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-x-item-${itemX?.alias}`"
-                >
-                  {{ xLabel[index] }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-x-item-${itemX?.alias}`"
+                    >
+                      {{ xLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
                   >
                     <div
                       style="padding: 3px 16px 16px 16px"
@@ -142,8 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -197,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <OIcon name="info-outline" size="sm" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs" />
               <OTooltip side="top" align="center">
                 <template #content>
                   <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -213,7 +216,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
                 </template>
               </OTooltip>
-            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -275,18 +277,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-b-item-${itemB?.alias}`"
-                >
-                  {{ bLabel[index] }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-b-item-${itemB?.alias}`"
+                    >
+                      {{ bLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
                   >
                     <div
                       style="padding: 3px 16px 16px 16px"
@@ -321,8 +327,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -358,9 +364,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="yAxisHint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -419,18 +424,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="drag-indicator" size="13px" />
               </template>
             </OButton>
-            <OButton
-              variant="primary"
-              size="chip-12"
-              :data-test="`dashboard-y-item-${itemY?.alias}`"
-            >
-              {{ yLabel[index] }}
-              <template #icon-right
-                ><OIcon name="arrow-drop-down" size="sm"
-              /></template>
-              <q-menu
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-y-item-${itemY?.alias}`"
+                >
+                  {{ yLabel[index] }}
+                  <template #icon-right
+                    ><OIcon name="arrow-drop-down" size="sm"
+                  /></template>
+                </OButton>
+              </template>
+              <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup"
+                class="field-function-menu-popup dashboard-query-builder-dropdown"
               >
                 <div
                   style="padding: 3px 16px 16px 16px"
@@ -469,8 +478,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </q-menu>
-            </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
@@ -508,9 +517,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <OIcon name="info-outline" size="sm" class="q-ml-xs">
+          <OIcon name="info-outline" size="sm" class="q-ml-xs" />
             <OTooltip :content="zAxisHint" />
-          </OIcon>
         </div>
         <span class="layout-separator">:</span>
         <div
@@ -569,18 +577,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="drag-indicator" size="13px" />
                 </template>
               </OButton>
-              <OButton
-                variant="primary"
-                size="chip-12"
-                :data-test="`dashboard-z-item-${itemZ?.alias}`"
-              >
-                {{ zLabel[index] }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
-                /></template>
-                <q-menu
+              <ODropdown>
+                <template #trigger>
+                  <OButton
+                    variant="primary"
+                    size="chip-12"
+                    :data-test="`dashboard-z-item-${itemZ?.alias}`"
+                  >
+                    {{ zLabel[index] }}
+                    <template #icon-right
+                      ><OIcon name="arrow-drop-down" size="sm"
+                    /></template>
+                  </OButton>
+                </template>
+                <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown"
                 >
                   <div
                     style="padding: 3px 16px 16px 16px"
@@ -615,8 +627,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                </q-menu>
-              </OButton>
+                </div>
+              </ODropdown>
               <OButton
                 variant="outline"
                 size="icon-chip"
@@ -716,6 +728,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
@@ -723,6 +736,7 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
@@ -1519,12 +1533,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
+.dashboard-query-builder-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
@@ -1674,32 +1688,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-
-.q-item {
-  // color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
   }
 }
 

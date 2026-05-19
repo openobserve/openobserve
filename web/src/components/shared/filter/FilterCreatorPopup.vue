@@ -21,21 +21,21 @@
         <div class="text-bold q-pb-xs q-pt-sm">Values</div>
         <div class="filter-values-container">
           <div v-show="!fieldValues?.length">No values present</div>
-          <div v-for="value in fieldValues" :key="value">
-            <q-list dense>
-              <q-item tag="label">
-                <q-item-section avatar>
-                  <OCheckbox
-                    v-model="selectedValues"
-                    :value="value"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="ellipsis">{{ value }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
+          <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+            <li v-for="value in fieldValues" :key="value">
+              <label
+                :data-test="`filter-creator-popup-value-${value}`"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+              >
+                <OCheckbox
+                  v-model="selectedValues"
+                  :value="value"
+                  class="tw:shrink-0"
+                />
+                <span class="tw:text-sm tw:flex-1 tw:min-w-0 ellipsis">{{ value }}</span>
+              </label>
+            </li>
+          </ul>
         </div>
       </OCardSection>
     </div>
@@ -106,15 +106,5 @@ export default defineComponent({
 .filter-values-container {
   max-height: 150px;
   overflow: auto;
-}
-</style>
-<style lang="scss">
-.filter-values-container {
-  .q-item {
-    padding-left: 2px !important;
-  }
-  .q-focus-helper {
-    background: transparent !important;
-  }
 }
 </style>

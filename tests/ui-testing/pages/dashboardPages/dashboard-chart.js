@@ -81,20 +81,21 @@ export default class ChartTypeSelector {
         await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
 
-        // Log all available options in dropdown for debugging
-        const allOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents();
+        // Log all available options in dropdown for debugging (OSelect popover + options share parent data-test).
+        const allOptions = await this.page
+          .locator('[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]')
+          .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
         await streamInput.press("Control+a");
         await streamInput.fill(streamName);
 
         // Wait for dropdown options to filter
-        await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
+        await this.page.locator('[data-test="index-dropdown-stream-popover"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
-          .getByRole("option", { name: streamName, exact: true })
-          .locator("div")
-          .nth(2);
+          .locator('[data-test="index-dropdown-stream-option"]', { hasText: streamName })
+          .first();
 
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
         await streamOption.click();
@@ -102,7 +103,10 @@ export default class ChartTypeSelector {
       } catch (error) {
         if (attempt === maxRetries) {
           // Final attempt: log full diagnostic info
-          const finalOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents().catch(() => []);
+          const finalOptions = await this.page
+            .locator('[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]')
+            .allTextContents()
+            .catch(() => []);
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
@@ -260,11 +264,13 @@ export default class ChartTypeSelector {
     await dropdown.waitFor({ state: "visible", timeout: 10000 });
     await dropdown.click();
 
-    await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 5000 });
+    await this.page.locator('[data-test="dashboard-function-dropdown-popover"]').waitFor({ state: "visible", timeout: 5000 });
     await this.page.keyboard.type(functionName);
 
-    // Use case-insensitive contains match - filtering by typing already narrows options
-    const option = this.page.getByRole("option", { name: new RegExp(functionName, 'i') }).first();
+    // Use case-insensitive contains match — OSelect forwards parent data-test to options.
+    const option = this.page
+      .locator('[data-test="dashboard-function-dropdown-option"]', { hasText: new RegExp(functionName, 'i') })
+      .first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
   }

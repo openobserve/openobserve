@@ -17,53 +17,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="height: 100%">
     <div class="q-pa-none" style="width: 100px">
-      <q-list separator style="display: flex; flex-wrap: wrap">
-        <q-item
+      <ul class="chart-selection-list tw:flex tw:flex-wrap">
+        <li
+          v-for="(item, index) in ChartsArray"
+          :key="index"
           :class="[
-            'q-pa-none',
+            'dashboard-chart-border',
             selectedChartType === item.id
               ? store.state.theme === 'dark'
                 ? 'bg-grey-5'
                 : 'bg-grey-3'
               : '',
+            isChartDisabled(item)
+              ? 'tw:opacity-50 tw:cursor-not-allowed tw:pointer-events-none'
+              : 'tw:cursor-pointer',
           ]"
-          class="dashboard-chart-border"
-          v-for="(item, index) in ChartsArray"
-          :disable="
-            (promqlMode &&
-              item.id != 'line' &&
-              item.id != 'area' &&
-              item.id != 'bar' &&
-              item.id != 'scatter' &&
-              item.id != 'area-stacked' &&
-              item.id != 'metric' &&
-              item.id != 'gauge' &&
-              item.id != 'pie' &&
-              item.id != 'donut' &&
-              item.id != 'table' &&
-              item.id != 'heatmap' &&
-              item.id != 'h-bar' &&
-              item.id != 'stacked' &&
-              item.id != 'h-stacked' &&
-              item.id != 'geomap' &&
-              item.id != 'maps' &&
-              item.id != 'html' &&
-              item.id != 'markdown' &&
-              item.id != 'custom_chart') ||
-            (allowedchartstype &&
-              allowedchartstype.length > 0 &&
-              !allowedchartstype.includes(item.id))
-          "
-          :key="index"
-          clickable
-          v-ripple="true"
-          @click="$emit('update:selectedChartType', item.id)"
+          @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           style="width: 50px"
           data-test="dashboard-addpanel-chart-selection-item"
         >
-          <q-item-section
+          <div
             :data-test="`selected-chart-${item.id}-item`"
-            class=""
+            class="tw:flex tw:flex-col tw:items-center tw:relative"
           >
             <img
               :src="item.image.replace('img:', '')"
@@ -72,20 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <!-- <q-item-label
-              class="q-pa-none q-mx-auto"
-              style="text-align: center; font-size: 8px;"
-              caption
-              >{{ item.title }}</q-item-label
-            > -->
             <OTooltip
               style="text-align: center"
               :content="item.title"
               data-test="dashboard-addpanel-chart-selection-tooltip"
             />
-          </q-item-section>
-        </q-item>
-      </q-list>
+          </div>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
@@ -104,7 +73,7 @@ export default defineComponent({
   props: ["selectedChartType", "allowedchartstype"],
   emits: ["update:selectedChartType"],
 
-  setup() {
+  setup(props) {
     const store = useStore();
     const { t } = useI18n();
     // array of charts
@@ -219,16 +188,60 @@ export default defineComponent({
     const { promqlMode, dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
+    const promqlAllowedCharts = new Set([
+      "line",
+      "area",
+      "bar",
+      "scatter",
+      "area-stacked",
+      "metric",
+      "gauge",
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "h-bar",
+      "stacked",
+      "h-stacked",
+      "geomap",
+      "maps",
+      "html",
+      "markdown",
+      "custom_chart",
+    ]);
+
+    const isChartDisabled = (item: any) => {
+      if (promqlMode.value && !promqlAllowedCharts.has(item.id)) {
+        return true;
+      }
+      if (
+        props.allowedchartstype &&
+        props.allowedchartstype.length > 0 &&
+        !props.allowedchartstype.includes(item.id)
+      ) {
+        return true;
+      }
+      return false;
+    };
+
     return {
       t,
       ChartsArray: chartsArray,
       promqlMode,
       dashboardPanelData,
       store,
+      isChartDisabled,
     };
   },
   components: { OIcon , OTooltip },
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.chart-selection-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+</style>

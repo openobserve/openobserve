@@ -68,45 +68,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tab.name
               }}</span>
               <div class="hover-actions">
-              <OButton
-                  v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  style="cursor: pointer; justify-self: end; height: 0.5rem"
-                  data-test="dashboard-more-icon"
+              <ODropdown
+                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
               >
-                  <OIcon name="more-vert" size="sm" />
-                  <q-menu>
-                  <q-list dense>
-                      <q-item
-                      v-close-popup
-                      clickable
-                      @click.stop="editFolder(tab.folderId)"
-                      data-test="dashboard-edit-folder-icon"
-                      >
-                      <q-item-section avatar>
-                          <OIcon name="edit" size="xs" />
-                      </q-item-section>
-                      <q-item-section>
-                          <q-item-label>{{ t('common.edit') }}</q-item-label>
-                      </q-item-section>
-                      </q-item>
-                      <q-item
-                      v-close-popup
-                      clickable
-                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                      data-test="dashboard-delete-folder-icon"
-                      >
-                      <q-item-section avatar>
-                          <OIcon name="delete" size="xs" />
-                      </q-item-section>
-                      <q-item-section>
-                          <q-item-label>{{ t('common.delete') }}</q-item-label>
-                      </q-item-section>
-                      </q-item>
-                  </q-list>
-                  </q-menu>
-              </OButton>
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    style="cursor: pointer; justify-self: end; height: 0.5rem"
+                    data-test="dashboard-more-icon"
+                  >
+                    <OIcon name="more-vert" size="sm" />
+                  </OButton>
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-edit-folder-icon"
+                  @select="editFolder(tab.folderId)"
+                >
+                  <template #icon-left>
+                    <OIcon name="edit" size="xs" />
+                  </template>
+                  {{ t('common.edit') }}
+                </ODropdownItem>
+                <ODropdownItem
+                  variant="destructive"
+                  data-test="dashboard-delete-folder-icon"
+                  @select="showDeleteFolderDialogFn(tab.folderId)"
+                >
+                  <template #icon-left>
+                    <OIcon name="delete" size="xs" />
+                  </template>
+                  {{ t('common.delete') }}
+                </ODropdownItem>
+              </ODropdown>
               </div>
           </div>
           </OTab>
@@ -137,6 +131,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   // @ts-nocheck
   import {
     computed,
@@ -201,6 +197,8 @@ export default defineComponent({
       OTab,
       OButton,
       OInput,
+      ODropdown,
+      ODropdownItem,
     },
     props: {
       type: {

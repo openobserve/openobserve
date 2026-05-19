@@ -41,14 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
+                 />
                   <OTooltip
                     side="right"
                     align="center"
                     :max-width="'300px'"
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
-                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
@@ -80,14 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
+                 />
                   <OTooltip
                     side="right"
                     align="center"
                     :max-width="'300px'"
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
-                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}

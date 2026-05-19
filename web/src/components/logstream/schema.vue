@@ -411,13 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="q-mr-xs"
                           size="sm"
                           style="color: #f5a623; cursor: pointer"
-                        >
-                          <OTooltip side="right">
-                            Other fields show only the schema fields that
-                            existed before the stream was configured to use a
-                            user-defined schema.
-                          </OTooltip>
-                        </OIcon>
+                        />
+                        <OTooltip
+                          side="right"
+                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                        />
                       </div>
                     </div>
 
@@ -534,12 +532,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text">
                             {{ row.name }}
-                            <q-tooltip
+                            <OTooltip
                               v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </q-tooltip>
+                              :content="row.name"
+                            />
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -550,9 +546,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :alt="t('logStream.envQuickModeMsg')"
                               class="tw:w-[20px] tw:h-[20px]"
                             />
-                            <q-tooltip class="tw:text-[12px] tw:w-[200px]">
-                              {{ t("logStream.envQuickModeMsg") }}
-                            </q-tooltip>
+                            <OTooltip
+                              :content="t('logStream.envQuickModeMsg')"
+                              max-width="200px"
+                            />
                           </span>
                         </div>
                       </template>
@@ -576,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template #cell-index_type="{ row }">
-                        <q-select
+                        <OSelect
                           v-if="
                             !(
                               row.name ==
@@ -585,87 +582,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                           :model-value="computedIndexType({ row }).value"
-                          :options="streamIndexType"
-                          option-label="label"
-                          option-value="value"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
-                          bg-color="input-bg"
+                          :options="indexTypeOptionsForRow(row)"
+                          label-key="label"
+                          value-key="value"
                           class="mini-select"
-                          input-class="mini-select"
-                          :option-disable="
-                            (_option) => disableOptions(row, _option)
-                          "
                           multiple
-                          :max-values="2"
-                          map-options
-                          emit-value
-                          autoclose
-                          borderless
-                          dense
-                          input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
+                          clearable
+                          :data-test="`schema-field-${row.name}-index-type-select`"
                           style="width: 190px"
                           @update:model-value="
-                            (val) => updateIndexType({ row }, val)
+                            (val) =>
+                              updateIndexType({ row }, enforceMaxIndexTypes(val))
                           "
                         >
-                          <template v-slot:append>
-                            <OIcon
-                              v-if="row.index_type && row.index_type.length > 0"
-                              name="cancel"
-                              size="14px"
-                              style="
-                                cursor: pointer;
-                                display: flex;
-                                align-items: center;
-                                font-weight: bold;
-                                margin-top: 8px;
-                              "
-                              @click.stop="updateIndexType({ row }, [])"
-                            />
-                          </template>
-                          <template v-slot:option="scope">
-                            <q-item
-                              style="
-                                margin: 0px !important;
-                                border-radius: 0px !important;
-                              "
-                              v-bind="scope.itemProps"
-                              :disable="disableOptions(row, scope.opt)"
-                            >
-                              <q-item-section>
-                                <q-item-label>
-                                  {{ scope.opt.label }}
-                                </q-item-label>
-                              </q-item-section>
-                              <q-tooltip
-                                class="tw:text-[12px] tw:w-[200px]"
-                                v-if="
-                                  checkIfOptionPresentInDefaultEnv(
-                                    row.name,
-                                    scope.opt,
-                                  ) == true
-                                "
-                              >
-                                This is a predefined environment setting and
-                                cannot be changed.
-                              </q-tooltip>
-                            </q-item>
-                          </template>
-                          <q-tooltip
+                          <OTooltip
                             v-if="row.index_type && row.index_type.length > 0"
-                            class="tw:text-[12px]"
-                          >
-                            {{
+                            :content="
                               streamIndexType
                                 .filter((opt) =>
                                   row.index_type.includes(opt.value),
                                 )
                                 .map((opt) => opt.label)
-                                .join(", ")
-                            }}
-                          </q-tooltip>
-                        </q-select>
+                                .join(', ')
+                            "
+                          />
+                        </OSelect>
                       </template>
                       <template #cell-patterns="{ row }">
                         <template
@@ -699,190 +640,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:w-full tw:h-[calc(100vh-307px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4"
                   >
-                    <!-- Configuration Settings Card -->
-                    <div
-                      :class="[
-                        'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
-                        store.state.theme === 'dark'
-                          ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700'
-                          : 'tw:border-gray-200',
-                      ]"
-                    >
-                      <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
-                        <!-- Data Retention -->
-                        <div v-if="showDataRetention" class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Data Retention (days)
-                          </label>
-                          <OInput
-                            data-test="stream-details-data-retention-input"
-                            v-model="dataRetentionDays"
-                            type="number"
-                            min="1"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            v-if="
-                              dataRetentionDays > 0 && dataRetentionDays != ''
-                            "
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global retention is
-                            {{ store.state.zoConfig.data_retention_days }} days
-                          </small>
-                          <!-- Error Message -->
-                          <div class="tw:text-red-500 tw:text-sm">
-                            <span
-                              v-if="
-                                dataRetentionDays <= 0 ||
-                                dataRetentionDays == ''
-                              "
-                            >
-                              Retention period must be at least 1 day
-                            </span>
-                          </div>
-                        </div>
-
-                        <!-- Max Query Range -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Max Query Range (hours)
-                          </label>
-                          <OInput
-                            data-test="stream-details-max-query-range-input"
-                            v-model="maxQueryRange"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Maximum time range allowed for queries. Set 0 for
-                            unlimited range.
-                          </small>
-                        </div>
-
-                        <!-- Flatten Level -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            {{ t("logStream.flattenLevel") }}
-                          </label>
-                          <OInput
-                            data-test="stream-details-flatten-level-input"
-                            v-model="flattenLevel"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global is
-                            {{ store.state.zoConfig.ingest_flatten_level || 3 }}
-                          </small>
-                        </div>
-
-                        <!-- Toggles -->
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600'
-                              : 'tw:border-gray-200',
-                          ]"
-                        >
-                          <span
-                            :class="[
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Use Stream Stats for Partitioning
-                          </span>
-                          <OSwitch
-                            data-test="log-stream-use_approx-toggle-btn"
-                            v-model="approxPartition"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
-
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Store Original Data</span>
-                          <OSwitch
-                            v-if="showStoreOriginalDataToggle"
-                            data-test="log-stream-store-original-data-toggle-btn"
-                            v-model="storeOriginalData"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
-
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Enable Distinct Values</span>
-                          <OSwitch
-                            data-test="log-stream-enabled-distinct-values-toggle-btn"
-                            v-model="enableDistinctFields"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
+                    <div class="tw:flex tw:justify-between tw:items-center">
+                      <div class="text-h6">Add Field(s)</div>
+                      <div>
+                        <OButton
+                          data-test="add-stream-cancel-btn"
+                          variant="ghost"
+                          size="icon-sm"
+                          @click="closeDialog"
+                          icon-left="close"
+                        />
                       </div>
+                    </div>
+                    <!-- Main Content (Scrollable if necessary) -->
+                    <div
+                      style="flex: 1; overflow-y: auto; padding: 0px 16px 0px 16px; margin-bottom: 2px;"
+                    >
+                      <StreamFieldsInputs
+                        :fields="newSchemaFields"
+                        :showHeader="false"
+                        :visibleInputs="{
+                          name: true,
+                          data_type: true,
+                          index_type: false,
+                        }"
+                        @add="addSchemaField"
+                        @remove="removeSchemaField"
+                      />
                     </div>
                   </div>
                 </div>
 
+              <!-- Note: Drawer max-height to be dynamically calculated with JS -->
+              <div
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-theme-table'
+                    : 'light-theme-table'
+                "
+                style="margin-bottom: 10px"
+              >
+                <OTable
+                  data-test="schema-log-stream-field-mapping-table"
+                  :data="filteredSchemaData"
+                  :columns="columns"
+                  row-key="name"
+                  selection="multiple"
+                  :selected-ids="selectedSchemaIds"
+                  @update:selected-ids="handleSchemaSelectedIdsUpdate"
+                  @selection-change="handleSchemaSelectionChange"
+                  pagination="client"
+                  :page-size="selectedPerPage"
+                  :page-size-options="perPageOptionsList"
+                  :show-global-filter="false"
+                  dense
+                  class="o2-schema-table"
+                  :style="{
+                    height: `${indexData.defaultFts ? 'calc(100vh - 403px)' : 'calc(100vh - 370px)'}`,
+                    width: '100%'
+                  }"
+                >
+                  <template #cell-name="{ row }">
+                    <div class="tw:flex tw:items-center">
+                      <span class="field-name-text">
+                        {{ row.name }}
+                        <OTooltip v-if="row.name.length > 30" :content="row.name" />
+                      </span>
+                      <span v-if="isEnvQuickModeField(row.name)" class="tw:flex tw:items-center tw:ml-1">
+                        <img
+                          :src="quickModeIcon"
+                          :alt="t('logStream.envQuickModeMsg')"
+                          class="tw:w-[20px] tw:h-[20px]"
+                        />
+                        <OTooltip :content="t('logStream.envQuickModeMsg')" max-width="200px" />
+                      </span>
+                    </div>
+                  </template>
+                  <template #cell-settings="{ row }">
+                    <template v-if="row.isUserDefined">
+                      <OIcon name="person" size="xs" />
+                      <OIcon name="schema" size="xs" />
+                    </template>
+                  </template>
+                  <template #cell-type="{ row }">
+                    <span
+                      class="field-type-badge"
+                      :class="{
+                        'badge-int64': row.type === 'Int64',
+                        'badge-float64': row.type === 'Float64',
+                        'badge-utf8': row.type === 'Utf8',
+                        'badge-bool': row.type === 'Boolean'
+                      }"
+                    >
+                      {{ row.type }}
+                    </span>
+                  </template>
+                  <template #cell-index_type="{ row }">
+                    <OSelect
+                      v-if="
+                        !(
+                          row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          row.name == allFieldsName
+                        )
+                      "
+                      :model-value="computedIndexType({ row }).value"
+                      :options="indexTypeOptionsForRow(row)"
+                      label-key="label"
+                      value-key="value"
+                      class="mini-select"
+                      multiple
+                      clearable
+                      :data-test="`schema-field-${row.name}-index-type-select`"
+                      style="width: 190px;"
+                      @update:model-value="val => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                    >
+                      <OTooltip
+                        v-if="row.index_type && row.index_type.length > 0"
+                        :content="streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
+                      />
+                    </OSelect>
+                  </template>
+                  <template #cell-patterns="{ row }">
+                    <template v-if="config.isEnterprise == 'true' && !(row.name == store.state.zoConfig.timestamp_column) && (row.type == 'Utf8' || row.type == 'utf8')">
+                      <span class="tw:text-[#5960B2] tw:cursor-pointer" @click="openPatternAssociationDialog(row.name)">
+                        {{ patternAssociations[row.name]?.length ? `View ${patternAssociations[row.name]?.length} Patterns` : 'Add Pattern' }}
+                        <OIcon name="arrow-forward" size="xs" />
+                      </span>
+                    </template>
+                  </template>
+                </OTable>
+              </div>
+
                 <!-- red button tab -->
-                <div v-else-if="activeMainTab == 'redButton'">
+                <div v-if="activeMainTab == 'redButton'">
                   <div
                     class="mapping-warning-msg q-mt-sm"
                     style="width: fit-content"
@@ -972,6 +863,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
+              </div>
+            </div>
 
                 <!-- floating footer for the table -->
                 <div
@@ -1094,8 +987,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
-    </div>
     <div v-else class="q-pa-md">
       <h5>Wait while loading...</h5>
     </div>
@@ -1155,7 +1046,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { date, format } from "quasar";
+import { date, format, useQuasar } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import "../../styles/schema.scss";
@@ -1253,6 +1144,7 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
+    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -2717,36 +2609,46 @@ export default defineComponent({
       }
       return false;
     };
-    //this is used to upate the model value of the index_type
-    const updateIndexType = (props, value) => {
-      props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
-      markFormDirty(props.row.name, "fts");
-    };
-    //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because
-    //we don't give access to the user to change the value of the env set by the env
-    //and if it is empty then we will return empty array
-    //if the value is not empty then we will remove the value if it is set by the env
-    const filterValueBasedOnEnv = (props, value) => {
-      if (value.length == 0) {
-        return [];
-      }
-      let filteredValue = value;
-      if (
-        store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 &&
-        value.includes("fullTextSearchKey")
-      ) {
-        filteredValue = value.filter((item) => item !== "fullTextSearchKey");
-      }
-      if (
-        store.state.zoConfig.default_secondary_index_fields.indexOf(
-          props.row.name,
-        ) > -1 &&
-        value.includes("secondaryIndexKey")
-      ) {
-        filteredValue = value.filter((item) => item !== "secondaryIndexKey");
-      }
-      return filteredValue;
-    };
+  //this is used to upate the model value of the index_type
+  const updateIndexType = (props, value) => {
+    props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
+    markFormDirty(props.row.name, 'fts');
+  };
+
+  // Builds the per-row options array for the index-type OSelect, with the
+  // `disabled` flag computed via disableOptions() for that row.
+  const indexTypeOptionsForRow = (row: any) => {
+    return streamIndexType.map((opt: any) => ({
+      ...opt,
+      disabled: disableOptions(row, opt),
+    }));
+  };
+
+  // OSelect doesn't have a max-values prop; enforce it client-side instead.
+  // Trims the selection to the last 2 values picked (matches old q-select
+  // :max-values="2" behaviour: silently caps at 2).
+  const MAX_INDEX_TYPES = 2;
+  const enforceMaxIndexTypes = (value: any) => {
+    if (!Array.isArray(value)) return value;
+    return value.length > MAX_INDEX_TYPES ? value.slice(-MAX_INDEX_TYPES) : value;
+  };
+  //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because 
+  //we don't give access to the user to change the value of the env set by the env
+  //and if it is empty then we will return empty array 
+  //if the value is not empty then we will remove the value if it is set by the env
+  const filterValueBasedOnEnv = (props, value) => {
+    if(value.length == 0){
+      return [];
+    }
+    let filteredValue = value;
+    if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 && value.includes("fullTextSearchKey")) {
+      filteredValue = value.filter(item => item !== "fullTextSearchKey");
+    }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 && value.includes("secondaryIndexKey")) {
+      filteredValue = value.filter(item => item !== "secondaryIndexKey");
+    }
+    return filteredValue;
+  };
 
     // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
     const isEnvQuickModeField = (fieldName: string) => {
@@ -2807,6 +2709,8 @@ export default defineComponent({
       markFormDirty,
       formDirtyFlag,
       streamIndexType,
+      indexTypeOptionsForRow,
+      enforceMaxIndexTypes,
       disableOptions,
       loadingState,
       filterFieldFn,
@@ -2945,47 +2849,6 @@ export default defineComponent({
     }
   }
 
-  .q-list {
-    border-radius: 0 0 0.5rem 0.5rem;
-
-    .q-item {
-      height: 2.5rem;
-      padding: 0;
-
-      &__section {
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-
-        &:not(:first-child) {
-          border-left: 1px solid $input-field-border-color;
-          align-items: flex-start;
-          min-width: 29%;
-        }
-      }
-
-      &.list-head {
-        border: 1px solid $input-field-border-color;
-        border-radius: 0.5rem 0.5rem 0 0;
-        border-bottom: none;
-      }
-
-      &.list-item {
-        border-right: 1px solid $input-field-border-color;
-        border-left: 1px solid $input-field-border-color;
-
-        &,
-        &--side {
-          font-weight: 600;
-        }
-
-        &:last-of-type {
-          border-bottom: 1px solid $input-field-border-color;
-          border-radius: 0 0 0.5rem 0.5rem;
-        }
-      }
-    }
-  }
-
   .data-retention-input {
     border: 1px solid $input-field-border-color;
     border-radius: 0.2rem;
@@ -3005,41 +2868,6 @@ export default defineComponent({
   color: #865300;
 }
 
-.q-item {
-  padding: 3px 8px;
-  margin: 0 8px;
-  border-radius: 6px;
-
-  /* Overriding default height */
-  min-height: 30px;
-
-  &.q-router-link--active {
-    background-color: $primary;
-    color: white;
-
-    &::before {
-      content: " ";
-
-      position: absolute;
-      top: 0;
-      background-color: inherit;
-    }
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-}
-
-.q-item__section--avatar {
-  margin: 0;
-  padding: 0;
-  min-width: 40px;
-}
 .single-line-tab {
   display: inline-flex;
 }

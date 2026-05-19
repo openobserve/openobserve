@@ -389,7 +389,7 @@ test.describe("dashboard share URL button testcases", () => {
     testLogger.info("Selected variable value:", { selectedValue });
 
     // Wait for dropdown to close and selection to apply
-    await safeWaitForHidden(page, ".q-menu", { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Get current URL to verify variable parameter
@@ -651,7 +651,7 @@ test.describe("dashboard share URL button testcases", () => {
     await page.locator(SELECTORS.ROLE_OPTION).first().click();
 
     // Wait for dropdown to close and selection to apply
-    await safeWaitForHidden(page, ".q-menu", { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Get current URL

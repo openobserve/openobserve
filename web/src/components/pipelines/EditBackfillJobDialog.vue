@@ -62,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Chunk Period (minutes)
-                  <OIcon name="info-outline" size="sm">
+                  <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
-                  </OIcon>
                 </div>
                 <OInput
                   v-model="formData.chunkPeriodMinutes"
@@ -81,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Delay Between Chunks (seconds)
-                  <OIcon name="info-outline" size="sm">
+                  <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
-                  </OIcon>
                 </div>
                 <OInput
                   v-model="formData.delayBetweenChunks"

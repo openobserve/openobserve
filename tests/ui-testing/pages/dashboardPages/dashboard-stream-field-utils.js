@@ -53,7 +53,7 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
   // Wait for dropdown options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: isVariable ? 8000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -71,9 +71,11 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
   // Multi-strategy selection
   let selected = false;
 
-  // Strategy 1: Exact match by role
+  // Strategy 1: Exact match — OSelect forwards parent data-test to ListboxItems (`*-option`).
   try {
-    const option = page.getByRole("option", { name: streamNameOrVar, exact: true });
+    const option = page
+      .locator('[data-test$="-option"]', { hasText: streamNameOrVar })
+      .first();
     await option.waitFor({ state: "visible", timeout: 5000 });
     await option.click();
     selected = true;
@@ -82,7 +84,10 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
     if (isVariable && !selected) {
       try {
         // Variables are displayed as "$varName (variable)" in the dropdown
-        const option = page.locator('[role="option"]').filter({ hasText: streamNameOrVar }).filter({ hasText: "(variable)" }).first();
+        const option = page
+          .locator('[data-test$="-option"]', { hasText: streamNameOrVar })
+          .filter({ hasText: "(variable)" })
+          .first();
         await option.waitFor({ state: "visible", timeout: 3000 });
         await option.click();
         selected = true;
@@ -91,10 +96,12 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
       }
     }
 
-    // Strategy 3: Partial match
+    // Strategy 3: Partial match (lower-case contains)
     if (!selected) {
       try {
-        const option = page.getByRole("option", { name: streamNameOrVar, exact: false }).first();
+        const option = page
+          .locator('[data-test$="-option"]', { hasText: streamNameOrVar })
+          .first();
         await option.waitFor({ state: "visible", timeout: 5000 });
         await option.click();
         selected = true;
@@ -108,7 +115,7 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
         } catch {
           // Strategy 5: JS direct click
           const clicked = await page.evaluate((name) => {
-            const options = document.querySelectorAll('[role="option"]');
+            const options = document.querySelectorAll('[data-test$="-option"]');
             for (const opt of options) {
               if (opt.textContent.trim().includes(name)) {
                 opt.click();
@@ -147,7 +154,7 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
   // Wait for dropdown options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: isVariable ? 5000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -165,12 +172,11 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
   // Multi-strategy selection
   let selected = false;
 
-  // Strategy 1: Exact match
+  // Strategy 1: Exact match — OSelect forwards parent data-test to ListboxItems (`*-option`).
   try {
-    const option = page.getByRole("option", {
-      name: fieldNameOrVar,
-      exact: true,
-    });
+    const option = page
+      .locator('[data-test$="-option"]', { hasText: fieldNameOrVar })
+      .first();
     await option.waitFor({ state: "visible", timeout: 3000 });
     await option.click();
     selected = true;
@@ -178,7 +184,7 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
     // Strategy 2: Partial match (useful for variable options that may have "(variable)" label)
     try {
       const option = page
-        .getByRole("option", { name: fieldNameOrVar, exact: false })
+        .locator('[data-test$="-option"]', { hasText: fieldNameOrVar })
         .first();
       await option.waitFor({ state: "visible", timeout: 3000 });
       await option.click();
@@ -186,14 +192,14 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
     } catch {
       // Strategy 3: Click first available option
       try {
-        const firstOption = page.locator('[role="option"]').first();
+        const firstOption = page.locator('[data-test$="-option"]').first();
         await firstOption.waitFor({ state: "visible", timeout: 3000 });
         await firstOption.click();
         selected = true;
       } catch {
         // Strategy 4: JS direct click
         const clicked = await page.evaluate((name) => {
-          const options = document.querySelectorAll('[role="option"]');
+          const options = document.querySelectorAll('[data-test$="-option"]');
           for (const opt of options) {
             if (opt.textContent.trim().includes(name)) {
               opt.click();
@@ -236,7 +242,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
   // Wait for options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: 10000, polling: 100 }
     )
     .then(() => true)
@@ -248,7 +254,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
   if (hasOptions) {
     // Use page.evaluate for reliable DOM inspection (avoids Playwright visibility heuristics)
     const result = await page.evaluate((varName) => {
-      const options = document.querySelectorAll('[role="option"]');
+      const options = document.querySelectorAll('[data-test$="-option"]');
       for (const opt of options) {
         const rect = opt.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -268,7 +274,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
     await dropdown.fill("");
     await page.waitForTimeout(500);
     const retryResult = await page.evaluate((varName) => {
-      const options = document.querySelectorAll('[role="option"]');
+      const options = document.querySelectorAll('[data-test$="-option"]');
       for (const opt of options) {
         const rect = opt.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -302,7 +308,7 @@ export async function verifyFieldDropdownEmptyOrVariablesOnly(page) {
   await page.waitForTimeout(1000);
 
   // Check option count - should be 0 or only variable options (containing "$")
-  const optionCount = await page.locator('[role="option"]').count();
+  const optionCount = await page.locator('[data-test$="-option"]').count();
 
   if (optionCount === 0) {
     await page.keyboard.press("Escape");
@@ -312,7 +318,7 @@ export async function verifyFieldDropdownEmptyOrVariablesOnly(page) {
 
   // Check if all options are variable references
   const allVariables = await page.evaluate(() => {
-    const options = document.querySelectorAll('[role="option"]');
+    const options = document.querySelectorAll('[data-test$="-option"]');
     return Array.from(options).every((opt) =>
       opt.textContent.trim().startsWith("$")
     );
@@ -336,12 +342,12 @@ export async function getDropdownOptions(page, dropdownSelector) {
   await dropdown.click();
 
   await page.waitForFunction(
-    () => document.querySelectorAll('[role="option"]').length > 0,
+    () => document.querySelectorAll('[data-test$="-option"]').length > 0,
     { timeout: 10000, polling: 100 }
   ).catch(() => {});
 
   const options = await page.evaluate(() => {
-    const opts = document.querySelectorAll('[role="option"]');
+    const opts = document.querySelectorAll('[data-test$="-option"]');
     return Array.from(opts).map((o) => o.textContent.trim());
   });
 

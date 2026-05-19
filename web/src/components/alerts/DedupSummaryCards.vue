@@ -33,9 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="alerts-with-dedup-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Using Deduplication
-          <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="dedup-info-tooltip" content="Alerts with deduplication configured" />
-          </OIcon>
         </div>
       </OCardSection>
     </OCard>
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="suppression-rate-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Suppression Rate (24h)
-          <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="suppression-info-tooltip">
               <template #content>
                 {{ summary.suppressions_total }} suppressed /
@@ -68,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTooltip>
-          </OIcon>
         </div>
       </OCardSection>
     </OCard>
@@ -82,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="pending-batches-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Pending Batches
-          <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="pending-batches-info-tooltip" content="Alerts waiting to be grouped together" />
-          </OIcon>
         </div>
       </OCardSection>
     </OCard>

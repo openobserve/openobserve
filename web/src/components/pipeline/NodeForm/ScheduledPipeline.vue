@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -240,7 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                       </div>
                       <div class="flex justify-start items-center">
                         <div
@@ -371,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -383,7 +382,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                       </div>
                       <div
                         style="width: calc(100% - 190px)"
@@ -543,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -552,7 +550,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -592,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right">
                             <template #content>
                               <span
@@ -621,7 +618,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
@@ -637,12 +633,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? 'tw:text-orange-500'
                                 : 'tw:text-orange-500'
                             "
-                          >
+                           />
                             <OTooltip
                               side="right"
                               content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
                             />
-                          </OIcon>
                         </template>
                       </div>
                       <div style="max-height: 50px" class="q-mb-sm">
@@ -746,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -758,7 +753,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -842,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'text-grey-5'
                               : 'text-grey-7'
                           "
-                        >
+                         />
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -854,7 +848,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
-                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div

@@ -221,9 +221,9 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="log-search-index-list-select-stream"]')
       .click({ force: true });
+    // OSelect forwards parent data-test to ListboxItems (`*-option`).
     await this.page
-      .locator("div.q-item")
-      .getByText(`${stream}`)
+      .locator('[data-test="log-search-index-list-select-stream-option"]', { hasText: stream })
       .first()
       .click();
   }

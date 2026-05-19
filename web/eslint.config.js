@@ -89,6 +89,31 @@ export default [
       // Enforced rules
       "vue/no-restricted-html-elements": [
         "error",
+        {
+          element: "q-menu",
+          message:
+            'Use <ODropdown> from "@/lib/overlay/Dropdown/ODropdown.vue" instead of <q-menu>. See web/bannerImplementation/quasar-menu-migration.md.',
+        },
+        {
+          element: "q-list",
+          message:
+            'Drop <q-list> inside <ODropdown> (not needed), or replace standalone <q-list> with a native <ul> / <div> + Tailwind. See web/bannerImplementation/quasar-list-components-migration.md.',
+        },
+        {
+          element: "q-item",
+          message:
+            'Use <ODropdownItem> from "@/lib/overlay/Dropdown/ODropdownItem.vue" (inside <ODropdown>), or a native <li> / <div> + Tailwind (display rows). See web/bannerImplementation/quasar-list-components-migration.md.',
+        },
+        {
+          element: "q-item-section",
+          message:
+            'Use <ODropdownItem>\'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class="tw:flex ..."> (display). See web/bannerImplementation/quasar-list-components-migration.md.',
+        },
+        {
+          element: "q-item-label",
+          message:
+            'Use plain text / <span class="tw:text-sm">, <span class="tw:block tw:text-xs tw:text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>. See web/bannerImplementation/quasar-list-components-migration.md.',
+        },
         // {
         //   element: "q-btn",
         //   message:

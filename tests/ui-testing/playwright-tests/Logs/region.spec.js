@@ -81,22 +81,17 @@ test.describe("Region testcases", () => {
     
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.locator('[data-test="logs-search-bar-region-btn"]').click();
-    
 
-    await page.waitForSelector('.q-item__label');
+
+    const regionMenu = page.locator('[data-test="logs-search-bar-region-menu"]');
+    await regionMenu.waitFor({ state: 'visible' });
 
     // Click on the radio button
-    const radioButton = await page.locator('.q-item__label:has-text("us-east-1")');
+    const radioButton = regionMenu.getByText('us-east-1').first();
     await radioButton.click();
-    
+
     // Verify if the radio button is selected (true)
-    const isChecked = await page.$eval('.q-item__label:has-text("us-east-1")', node => {
-        const parentElement = node.parentElement;
-        if (parentElement && parentElement.querySelector('input')) {
-            return parentElement.querySelector('input').checked;
-        }
-        return false;
-    });
+    const isChecked = await regionMenu.locator('input[type="checkbox"]').first().isChecked().catch(() => false);
     testLogger.debug('Radio button state checked', { isChecked });
 
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();

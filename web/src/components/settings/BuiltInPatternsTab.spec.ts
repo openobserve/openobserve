@@ -237,7 +237,7 @@ describe("BuiltInPatternsTab", () => {
     it("should display all patterns after successful load", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const items = wrapper.findAll(".q-item");
+      const items = wrapper.findAll('[data-test^="pattern-item-"]');
       expect(items.length).toBeGreaterThanOrEqual(mockPatterns.length);
     });
 

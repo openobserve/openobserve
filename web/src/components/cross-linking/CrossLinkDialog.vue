@@ -87,11 +87,9 @@
                 data-test="cross-link-field-input"
               >
                 <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="tw:text-xs" style="color: var(--o2-text-muted)">
-                      {{ t("crossLinks.noMatchingFields") }}
-                    </q-item-section>
-                  </q-item>
+                  <div class="tw:px-3 tw:py-2 tw:text-xs tw:text-muted-foreground">
+                    {{ t("crossLinks.noMatchingFields") }}
+                  </div>
                 </template>
               </OSelect>
               <OInput

@@ -27,11 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.meta.showTransformEditor"
           size="sm"
           :disabled="!searchObj.data.transformType"
-        >
-          <template #tooltip>
-            <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
-          </template>
-        </OSwitch>
+        />
+        <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -51,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
-        <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+        <div data-test="logs-search-saved-function-list" class="tw:py-0">
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
@@ -83,36 +80,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div v-if="filteredTransformOptions.length">
-            <q-item
-              class="tw:border-b saved-view-item"
-              clickable
-              v-for="(item, i) in filteredTransformOptions"
-              :key="'transform-' + item?.name"
-              @click="selectTransform(item, true)"
-            >
-              <q-item-section>
-                <q-item-label>{{ item.name }}</q-item-label>
-              </q-item-section>
-            </q-item>
+            <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+              <li
+                v-for="(item, i) in filteredTransformOptions"
+                :key="'transform-' + item?.name"
+                :data-test="`logs-search-saved-transform-item-${item?.name}`"
+                class="tw:border-b saved-view-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                @click="selectTransform(item, true)"
+              >
+                <span class="tw:text-sm tw:flex-1 tw:min-w-0">{{ item.name }}</span>
+              </li>
+            </ul>
           </div>
           <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span
                   v-if="searchObj.data.transformType === 'function'"
-                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.savedFunctionNotFound") }}</span
                 >
-                <q-item-label
+                <span
                   v-if="searchObj.data.transformType === 'action'"
-                  >{{ t("search.actionsNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.actionsNotFound") }}</span
                 >
-                <q-item-label v-if="!searchObj.data.transformType">{{
+                <span v-if="!searchObj.data.transformType" class="tw:text-sm">{{
                   t("search.selectTransformType")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
+                }}</span>
+              </div>
+            </div>
           </div>
-        </q-list>
+        </div>
       </ODropdown>
     </div>
     <OButton

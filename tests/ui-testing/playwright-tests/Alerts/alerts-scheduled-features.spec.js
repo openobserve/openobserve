@@ -527,12 +527,19 @@ test.describe("Scheduled Alert Features", () => {
         const rowVisible = await alertIfRow.isVisible({ timeout: 5000 }).catch(() => false);
 
         if (rowVisible) {
-            // Set threshold operator (2nd .alert-v3-select — 1st is the function dropdown)
-            const thresholdOperator = alertIfRow.locator('.alert-v3-select').nth(1);
+            // Set threshold operator — QueryConfig.vue operator dropdown is OSelect post-migration.
+            // Prefer the named OSelect; fall back to `.alert-v3-select` for back-compat.
+            const thresholdOperator = alertIfRow
+                .locator('[data-test="alert-trigger-operator-select"], [data-test="alert-condition-operator-select"]')
+                .first();
             if (await thresholdOperator.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await thresholdOperator.click();
                 await page.waitForTimeout(500);
-                await page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+                await page
+                    .locator('[data-test="alert-trigger-operator-select-option"], [data-test="alert-condition-operator-select-option"]')
+                    .filter({ hasText: /^>=$/ })
+                    .first()
+                    .click();
                 await page.waitForTimeout(300);
                 testLogger.info('Set threshold operator to >=');
             }
@@ -659,14 +666,15 @@ test.describe("Scheduled Alert Features", () => {
         await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addGroupByBtn.click();
         await page.waitForTimeout(800);
-        // Select first available group-by field
-        const groupBySelect = groupBySection.locator('.q-select').first();
+        // Select first available group-by field — QueryConfig.vue uses OSelect
+        // post-migration with a per-index data-test.
+        const groupBySelect = groupBySection.locator('[data-test^="alert-group-by-select-"]').first();
         await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
         await groupBySelect.click();
         await page.waitForTimeout(500);
-        const groupByMenu = page.locator('.q-menu:visible');
-        await expect(groupByMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await groupByMenu.locator('.q-item').first().click();
+        const groupByOption = page.locator('[data-test^="alert-group-by-select-"][data-test$="-option"]').first();
+        await expect(groupByOption).toBeVisible({ timeout: 5000 });
+        await groupByOption.click();
         await page.waitForTimeout(500);
         testLogger.info('Added group-by field');
 

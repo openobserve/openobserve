@@ -77,11 +77,12 @@ export class TracesPage {
     this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
     // Metrics dashboard container
     this.tracesMetricsDashboard = '.traces-metrics-dashboard';
-    // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors") — scope inside the drawer
-    this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"] [role="tablist"]';
-    this.rateTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Rate")';
-    this.latencyTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Duration")';
-    this.errorsTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Errors")';
+    // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+    // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
+    this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
+    this.rateTab = '[data-test="traces-analysis-dashboard-volume-tab"]';
+    this.latencyTab = '[data-test="traces-analysis-dashboard-duration-tab"]';
+    this.errorsTab = '[data-test="traces-analysis-dashboard-error-tab"]';
     // Analysis dashboard states — scope inside the drawer
     this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
     this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
@@ -208,7 +209,7 @@ export class TracesPage {
   async selectTraceStream(streamName = 'default') {
     const streamSelectLocator = this.page.locator(this.streamSelect);
 
-    // Click the q-select to open the dropdown menu
+    // Click the dropdown — OSelect (Reka Listbox) post-migration, q-select pre.
     await streamSelectLocator.click();
     await this.page.locator('.q-menu').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
@@ -219,8 +220,10 @@ export class TracesPage {
     // Wait for filter to apply
     await this.page.waitForTimeout(300);
 
-    // Click the matching option by role (Quasar renders q-select options with role="option")
-    const option = this.page.getByRole('option', { name: streamName }).first();
+    // Click the matching option (OSelect forwards parent data-test to ListboxItem (`*-option`)).
+    const option = this.page
+      .locator('[data-test$="-option"]', { hasText: streamName })
+      .first();
     await option.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -1845,10 +1848,13 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async isTabActive(tabLabel) {
-    // Scope inside the ODrawer slug — the old `.analysis-dashboard-card` class
-    // is no longer present on any template element post-ODrawer migration.
-    const activeTab = this.page.locator(`${this.analysisDashboardDrawer} [role="tab"][data-state="active"]`)
-      .filter({ hasText: new RegExp(tabLabel, 'i') });
+    // Each OTab carries data-test="traces-analysis-dashboard-${name}-tab"; map
+    // the labels used by callers (Rate/Latency/Errors) to internal names
+    // (volume/duration/error) and rely on data-state for active.
+    const labelToName = { rate: 'volume', latency: 'duration', errors: 'error' };
+    const name = labelToName[tabLabel.toLowerCase()] || tabLabel.toLowerCase();
+    const activeTab = this.page
+      .locator(`${this.analysisDashboardDrawer} [data-test="traces-analysis-dashboard-${name}-tab"][data-state="active"]`);
     return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
   }
 
@@ -1857,7 +1863,9 @@ export class TracesPage {
    * @returns {Promise<number>}
    */
   async getVisibleTabCount() {
-    return await this.page.locator(`${this.analysisDashboardDrawer} [role="tab"]`).count();
+    return await this.page
+      .locator(`${this.analysisDashboardDrawer} [data-test^="traces-analysis-dashboard-"][data-test$="-tab"]`)
+      .count();
   }
 
   // --- Percentile Refresh (Latency tab only) ---

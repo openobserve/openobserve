@@ -167,7 +167,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option1.waitFor({ state: "visible", timeout: 5000 });
     const value1 = await option1.textContent();
     await option1.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Go to Tab2 and set different value
     await page.locator(getTabSelector("Tab2")).click();
@@ -188,7 +188,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option2.waitFor({ state: "visible", timeout: 5000 });
     const value2 = await option2.textContent();
     await option2.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Verify values are different
     expect(value1.trim()).not.toBe(value2.trim());
@@ -364,7 +364,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option1.waitFor({ state: "visible", timeout: 5000 });
     const originalValue = await option1.textContent();
     await option1.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Switch to Tab2
     await page.locator(getTabSelector("Tab2")).click();
@@ -400,7 +400,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const option2 = page.locator(SELECTORS.ROLE_OPTION).nth(1);
     await option2.waitFor({ state: "visible", timeout: 5000 });
     await option2.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Switch to Tab2 and verify value hasn't changed
     await page.locator(getTabSelector("Tab2")).click();
@@ -503,7 +503,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const globalOption = page.locator(SELECTORS.ROLE_OPTION).first();
     await globalOption.waitFor({ state: "visible", timeout: 5000 });
     await globalOption.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
 
     // Monitor API call for dependent tab variable
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 10000 });
@@ -579,7 +579,7 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option.waitFor({ state: "visible", timeout: 5000 });
     const selectedValue = await option.textContent();
     await option.click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Get current URL
     const currentURL = page.url();

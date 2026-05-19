@@ -17,40 +17,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div :class="isCompact ? 'tw:flex tw:items-center' : 'q-pl-sm float-left'">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <OButton
+    <ODropdown
       v-if="isCompact"
-      data-test="logs-search-bar-refresh-interval-btn"
-      size="icon-toolbar"
-      variant="outline"
-      :active="isAnimating"
+      v-model:open="btnRefreshInterval"
+      side="bottom"
+      align="start"
     >
-      <OIcon
-        name="update"
-        :class="isAnimating ? 'rotating-icon' : ''"
-        size="sm"
-      />
-      <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
-
-      <!-- Dropdown menu for interval selection -->
-      <q-menu content-style="z-index: 10001">
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-refresh-interval-btn"
+          size="icon-toolbar"
+          variant="outline"
+          :active="isAnimating"
+        >
+          <OIcon
+            name="update"
+            :class="isAnimating ? 'rotating-icon' : ''"
+            size="sm"
+          />
+          <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
+        </OButton>
+      </template>
+      <div class="tw:w-[300px] tw:p-2">
         <div class="row">
-          <div
-            class="col col-12 q-pa-sm"
-            style="text-align: center; width: 300px"
-          >
+          <div class="col col-12 q-pa-sm" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
               size="sm"
               :block="true"
-              v-close-popup="true"
-              @click="onItemClick({ label: t('common.off'), value: 0 })"
+              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
             >
               {{ t("common.off") }}
             </OButton>
           </div>
         </div>
-        <OSeparator />
+        <q-separator />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
           <div
             v-for="(item, j) in items"
@@ -62,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
               :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
               size="sm"
-              @click="onItemClick(item)"
-              v-close-popup="true"
+              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
               :disabled="item.disabled"
             >
               <OTooltip
@@ -77,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </q-menu>
-    </OButton>
+      </div>
+    </ODropdown>
 
     <!-- Full mode: Dropdown with label -->
     <ODropdown

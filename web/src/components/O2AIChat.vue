@@ -23,117 +23,111 @@
               <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
             </div>
 
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="chat-title-dropdown"
-              @click="loadHistory"
-            >
-              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
-                <span
-                  class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
+            <ODropdown @update:open="(v) => v && loadHistory()">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  class="chat-title-dropdown"
                 >
-                  {{ displayedTitle || "New Chat" }}
-                  <OTooltip
-                    v-if="displayedTitle && displayedTitle.length > 25"
-                    :sideOffset="8"
-                    side="bottom"
-                    align="center"
-                    :content="displayedTitle"
-                  />
-                </span>
-                <OIcon
-                  name="arrow-drop-down"
-                  size="md"
-                  class="tw:flex-shrink-0"
-                />
-              </div>
-              <q-menu>
-                <!-- History menu with search -->
-                <div class="history-menu-container">
-                  <div class="search-history-bar-sticky">
-                    <OInput
-                      v-model="historySearchTerm"
-                      placeholder="Search chat history"
-                      class="tw:mt-1"
+                  <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                    <span
+                      class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
                     >
-                      <template #prepend>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                    </OInput>
+                      {{ displayedTitle || "New Chat" }}
+                      <OTooltip
+                        v-if="displayedTitle && displayedTitle.length > 25"
+                        :sideOffset="8"
+                        side="bottom"
+                        align="center"
+                        :content="displayedTitle"
+                      />
+                    </span>
+                    <OIcon
+                      name="arrow-drop-down"
+                      size="md"
+                      class="tw:flex-shrink-0"
+                    />
                   </div>
-                  <div class="history-list-container">
-                    <q-list
-                      style="
-                        min-width: 200px;
-                        width: 300px;
-                        max-width: 300px;
-                        border: 1px solid var(--color-separator);
-                      "
-                      padding
-                    >
-                      <q-item
-                        v-for="chat in filteredChatHistory"
-                        :key="chat.id"
-                        clickable
-                        v-ripple
-                        v-close-popup
-                        @click="loadChat(chat.id)"
-                        dense
-                        class="history-item"
-                      >
-                        <q-item-section>
-                          <div
-                            class="tw:flex tw:items-center tw:justify-between tw:w-full"
-                          >
-                            <div class="tw:flex-1 tw:overflow-hidden">
-                              <div class="tw:text-[13px] tw:truncate">
-                                {{ chat.title }}
-                              </div>
-                              <div class="tw:text-[11px] tw:text-gray-500">
-                                {{ formatTime(chat.timestamp) }}
-                              </div>
-                            </div>
-                            <OButton
-                              variant="ghost"
-                              size="icon-xs-circle"
-                              class="delete-history-btn"
-                              @click.stop="deleteChat(chat.id)"
-                            >
-                              <OIcon name="delete" size="sm" />
-                              <OTooltip content="Delete chat" />
-                            </OButton>
-                          </div>
-                        </q-item-section>
-                      </q-item>
-                      <q-item v-if="filteredChatHistory.length === 0">
-                        <q-item-section class="text-center text-grey">
-                          No matching chats found
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </div>
-
-                  <!-- Clear all conversations button -->
-                  <div
-                    v-if="filteredChatHistory.length > 0"
-                    class="clear-all-container"
+                </OButton>
+              </template>
+              <!-- History menu with search -->
+              <div class="history-menu-container">
+                <div class="search-history-bar-sticky">
+                  <OInput
+                    v-model="historySearchTerm"
+                    placeholder="Search chat history"
+                    class="tw:mt-1"
                   >
-                    <OSeparator />
-                    <OButton
-                      variant="ghost"
-                      class="clear-all-btn"
-                      @click.stop="clearAllConversations"
+                    <template #prepend>
+                      <OIcon name="search" size="sm" />
+                    </template>
+                  </OInput>
+                </div>
+                <div
+                  class="history-list-container"
+                  style="
+                    min-width: 200px;
+                    width: 300px;
+                    max-width: 300px;
+                    border: 1px solid var(--q-separator-color);
+                  "
+                >
+                  <ODropdownItem
+                    v-for="chat in filteredChatHistory"
+                    :key="chat.id"
+                    class="history-item"
+                    @select="loadChat(chat.id)"
+                  >
+                    <div
+                      class="tw:flex tw:items-center tw:justify-between tw:w-full"
                     >
-                      <template #icon-left>
-                        <OIcon name="delete-sweep" size="sm" />
-                      </template>
-                      Clear all conversations
-                    </OButton>
+                      <div class="tw:flex-1 tw:overflow-hidden">
+                        <div class="tw:text-[13px] tw:truncate">
+                          {{ chat.title }}
+                        </div>
+                        <div class="tw:text-[11px] tw:text-gray-500">
+                          {{ formatTime(chat.timestamp) }}
+                        </div>
+                      </div>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-circle"
+                        class="delete-history-btn"
+                        @click.stop="deleteChat(chat.id)"
+                      >
+                        <OIcon name="delete" size="sm" />
+                        <OTooltip content="Delete chat" />
+                      </OButton>
+                    </div>
+                  </ODropdownItem>
+                  <div
+                    v-if="filteredChatHistory.length === 0"
+                    class="text-center text-grey tw:p-2"
+                  >
+                    No matching chats found
                   </div>
                 </div>
-              </q-menu>
-            </OButton>
+
+                <!-- Clear all conversations button -->
+                <div
+                  v-if="filteredChatHistory.length > 0"
+                  class="clear-all-container"
+                >
+                  <ODropdownSeparator />
+                  <OButton
+                    variant="ghost"
+                    class="clear-all-btn"
+                    @click.stop="clearAllConversations"
+                  >
+                    <template #icon-left>
+                      <OIcon name="delete-sweep" size="sm" />
+                    </template>
+                    Clear all conversations
+                  </OButton>
+                </div>
+              </div>
+            </ODropdown>
           </div>
 
           <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
@@ -177,29 +171,24 @@
       <OSeparator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <ODrawer
-        data-test="o2-ai-chat-history-drawer"
-        v-model:open="showHistory"
-        size="sm"
-        title="Chat History"
-      >
-        <q-list separator>
-          <q-item
+      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
+        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+          <li
             v-for="chat in chatHistory"
             :key="chat.id"
-            clickable
-            v-ripple
+            :data-test="`o2-ai-chat-history-item-${chat.id}`"
+            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
             @click="loadChat(chat.id)"
           >
-            <q-item-section>
-              <q-item-label>{{ chat.title }}</q-item-label>
-              <q-item-label caption>
-                {{ new Date(chat.timestamp).toLocaleString() }}
-              </q-item-label>
-              <q-item-label caption> Model: {{ chat.model }} </q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
+            <span class="tw:text-sm">{{ chat.title }}</span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+              {{ new Date(chat.timestamp).toLocaleString() }}
+            </span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+              Model: {{ chat.model }}
+            </span>
+          </li>
+        </ul>
       </ODrawer>
 
       <!-- Edit Title Dialog -->
@@ -444,9 +433,8 @@
                         @click.stop="
                           handleNavigationAction(block.navigationAction)
                         "
-                      >
+                       />
                         <OTooltip :content="block.navigationAction.label" />
-                      </OIcon>
                       <OIcon
                         v-if="
                           hasToolCallDetails(block) &&
@@ -1446,6 +1434,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -1493,6 +1483,8 @@ export default defineComponent({
     RichTextInput,
     O2AIConfirmDialog,
     ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     ODrawer,
     ODialog,
     OSpinner,

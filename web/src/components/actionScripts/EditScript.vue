@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? 'text-grey-5'
                                 : 'text-grey-7'
                             "
-                          >
+                           />
                             <OTooltip side="right" align="center">
                               <template #content>
                                 <span style="font-size: 14px">
@@ -271,7 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </span>
                               </template>
                             </OTooltip>
-                          </OIcon>
                         </div>
 
                         <OInput
@@ -347,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'text-grey-5'
                             : 'text-grey-7'
                         "
-                      >
+                       />
                         <OTooltip side="right" align="center">
                           <template #content>
                             <span style="font-size: 14px">
@@ -356,7 +355,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                           </template>
                         </OTooltip>
-                      </OIcon>
                     </div>
                     <OSelect
                       data-test="add-action-script-service-account-select"
@@ -1138,14 +1136,6 @@ onMounted(async () => {
   await getServiceAccounts();
 });
 </script>
-
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>
 
 <style scoped lang="scss">
 .lookup-table-file-uploader {

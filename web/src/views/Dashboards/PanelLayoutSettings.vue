@@ -53,9 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info-outline"
             class="cursor-pointer tw:shrink-0"
             size="xs"
-          >
+           />
             <OTooltip content="1 unit = 30px" />
-          </OIcon>
         </div>
 
      

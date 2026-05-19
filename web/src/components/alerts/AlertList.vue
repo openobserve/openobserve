@@ -327,109 +327,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="content-copy" size="sm" />
                     </OButton>
-                    <span>
-                      <OButton
-                        variant="ghost"
-                        size="icon-circle-sm"
-                        @click.stop="openMenu($event, row)"
-                        :data-test="`alert-list-${row.name}-more-options`"
+                    <ODropdown>
+                      <template #trigger>
+                        <OButton
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          @click.stop="openMenu($event, row)"
+                          :data-test="`alert-list-${row.name}-more-options`"
+                        >
+                          <OIcon name="more-vert" size="sm" />
+                        </OButton>
+                      </template>
+                      <ODropdownItem @select="moveAlertToAnotherFolder(row)">
+                        <template #icon-left>
+                          <OIcon name="drive-file-move" size="sm" />
+                        </template>
+                        Move
+                      </ODropdownItem>
+                      <ODropdownSeparator />
+                      <ODropdownItem
+                        variant="destructive"
+                        @select="showDeleteDialogFn({ row })"
                       >
-                        <OIcon name="more-vert" size="sm" />
-                        <q-menu>
-                          <q-list style="min-width: 100px">
-                          <q-item
-                            class="flex items-center"
-                            clickable
-                            v-close-popup
-                            @click="moveAlertToAnotherFolder(row)"
-                          >
-                            <q-item-section dense avatar>
-                              <OIcon name="drive-file-move" size="sm" />
-                            </q-item-section>
-                            <q-item-section>Move</q-item-section>
-                          </q-item>
-                          <OSeparator />
-                          <q-item
-                            class="flex items-center justify-center"
-                            clickable
-                            v-close-popup
-                            @click="showDeleteDialogFn({ row })"
-                          >
-                            <q-item-section dense avatar>
-                              <OIcon name="delete" size="sm" />
-                            </q-item-section>
-                            <q-item-section>{{
-                              t("alerts.delete")
-                            }}</q-item-section>
-                          </q-item>
-                          <OSeparator />
-                          <q-item
-                            class="flex items-center justify-center"
-                            clickable
-                            v-close-popup
-                            @click="exportAlert(row)"
-                          >
-                            <q-item-section dense avatar>
-                              <OIcon size="sm" name="download" />
-                            </q-item-section>
-                            <q-item-section>Export</q-item-section>
-                          </q-item>
-                          <OSeparator />
-                          <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
-                          <template v-if="row.type === 'anomaly'">
-                            <q-item
-                              class="flex items-center justify-center"
-                              clickable
-                              v-close-popup
-                              :data-test="`alert-list-${row.name}-trigger-detection`"
-                              @click="triggerAlert(row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon
-                                  size="16px"
-                                  :name="symOutlinedSoundSampler"
-                                />
-                              </q-item-section>
-                              <q-item-section
-                                >Trigger Detection</q-item-section
-                              >
-                            </q-item>
-                            <q-item
-                              class="flex items-center justify-center"
-                              clickable
-                              v-close-popup
-                              :data-test="`alert-list-${row.name}-retrain-anomaly`"
-                              @click="retrainAnomaly(row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon size="sm" name="replay" />
-                              </q-item-section>
-                              <q-item-section>Re-train</q-item-section>
-                            </q-item>
+                        <template #icon-left>
+                          <OIcon name="delete" size="sm" />
+                        </template>
+                        {{ t("alerts.delete") }}
+                      </ODropdownItem>
+                      <ODropdownSeparator />
+                      <ODropdownItem @select="exportAlert(row)">
+                        <template #icon-left>
+                          <OIcon size="sm" name="download" />
+                        </template>
+                        Export
+                      </ODropdownItem>
+                      <ODropdownSeparator />
+                      <!-- Anomaly Detection: Trigger Detection + Re-train -->
+                      <template v-if="row.type === 'anomaly'">
+                        <ODropdownItem
+                          :data-test="`alert-list-${row.name}-trigger-detection`"
+                          @select="triggerAlert(row)"
+                        >
+                          <template #icon-left>
+                            <OIcon size="16px" :name="symOutlinedSoundSampler" />
                           </template>
-                          <!-- Regular alerts: existing Trigger Alert item -->
-                          <q-item
-                            v-else
-                            class="flex items-center justify-center"
-                            clickable
-                            v-close-popup
-                            :data-test="`alert-list-${row.name}-trigger-alert`"
-                            @click="triggerAlert(row)"
-                          >
-                            <q-item-section dense avatar>
-                              <OIcon
-                                size="16px"
-                                :name="symOutlinedSoundSampler"
-                              />
-                            </q-item-section>
-                            <q-item-section>{{
-                              t("alerts.triggerAlert")
-                            }}</q-item-section>
-                          </q-item>
-                        </q-list>
-                      </q-menu>
-                      </OButton>
-                    </span>
+                          Trigger Detection
+                        </ODropdownItem>
+                        <ODropdownItem
+                          :data-test="`alert-list-${row.name}-retrain-anomaly`"
+                          @select="retrainAnomaly(row)"
+                        >
+                          <template #icon-left>
+                            <OIcon size="sm" name="replay" />
+                          </template>
+                          Re-train
+                        </ODropdownItem>
+                      </template>
+                      <!-- Regular alerts: existing Trigger Alert item -->
+                      <ODropdownItem
+                        v-else
+                        :data-test="`alert-list-${row.name}-trigger-alert`"
+                        @select="triggerAlert(row)"
+                      >
+                        <template #icon-left>
+                          <OIcon size="16px" :name="symOutlinedSoundSampler" />
+                        </template>
+                        {{ t("alerts.triggerAlert") }}
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
 
@@ -732,6 +697,9 @@ import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
+import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -768,6 +736,9 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     OSpinner,
     OBadge,
     OSelect,
@@ -845,9 +816,9 @@ export default defineComponent({
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
 
-    const triggerExpand = (props: any) => {
+    const triggerExpand = (row: any) => {
       // Open drawer instead of inline expansion
-      const alert = props.row;
+      const alert = row;
 
       // LAZY CONVERSION: Convert conditions on-demand only when expanding
       // This improves performance by avoiding conversion of all alerts on list load

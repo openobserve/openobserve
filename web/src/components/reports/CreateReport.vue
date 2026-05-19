@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="info-outline"
                 class="cursor-pointer q-ml-sm"
                 size="sm"
-              >
+               />
                 <OTooltip
                   side="right"
                   align="center"
@@ -138,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #content>Note: Cached reports are stored for quick access to
                   dashboards; sharing is disabled for these reports.</template>
                 </OTooltip>
-              </OIcon>
             </div>
 
             <OStepper
@@ -359,23 +358,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="min-width: 200px"
                           >
                             <template v-slot:option="scope">
-                              <q-item
-                                v-bind="scope.itemProps"
-                                :disable="scope.opt.disable"
+                              <div
+                                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                                :class="{ 'tw:opacity-50 tw:pointer-events-none': scope.opt.disable }"
+                                @click="scope.toggleOption(scope.opt)"
                               >
-                                <q-item-section>
-                                  <q-item-label>{{
+                                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                                  <span class="tw:text-sm">{{
                                     scope.opt.label
-                                  }}</q-item-label>
-                                  <q-item-label
+                                  }}</span>
+                                  <span
                                     v-if="scope.opt.disable"
-                                    caption
-                                    class="text-negative"
+                                    class="tw:block tw:text-xs tw:text-muted-foreground text-negative"
                                   >
                                     Not supported for PDF
-                                  </q-item-label>
-                                </q-item-section>
-                              </q-item>
+                                  </span>
+                                </div>
+                              </div>
                             </template>
                           </OSelect>
                         </div>
@@ -543,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? 'text-grey-5'
                                 : 'text-grey-7'
                             "
-                          >
+                           />
                             <OTooltip side="right" align="center">
                               <template #content><span style="font-size: 14px">
                                 Pattern: * * * * * * means every second.
@@ -561,7 +560,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 respectively.</span
                               ></template>
                             </OTooltip>
-                          </OIcon>
                         </div>
                         <OInput
                           v-model="frequency.cron"
@@ -630,14 +628,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="info-outline"
                         class="cursor-pointer q-ml-sm"
                         size="sm"
-                      >
+                       />
                         <OTooltip side="right" align="center">
                           <template #content>"Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
                           In "Schedule Later" you can customize the date, time,
                           and timezone.</template>
                         </OTooltip>
-                      </OIcon>
                     </div>
 
                     <div
@@ -829,13 +826,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="info-outline"
                       class="cursor-pointer q-ml-sm"
                       size="sm"
-                    >
+                     />
                       <OTooltip max-width="320px">
                         <template #content>Captures a PNG screenshot of the dashboard and embeds it
                         inline in the email body alongside the PDF attachment
                         for a quick visual preview.</template>
                       </OTooltip>
-                    </OIcon>
                   </div>
                 </div>
                 <div class="tw:flex tw:gap-2 tw:mt-4">
@@ -1839,10 +1835,3 @@ const openCancelDialog = () => {
 };
 </script>
 
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>

@@ -3401,23 +3401,6 @@ body.body--dark {
   border-radius: 0.5rem;
 }
 
-.q-menu .q-item.q-item--active {
-  background-color: rgba(25, 118, 210, 0.2) !important;
-  font-weight: 600 !important;
-}
-
-.q-dark .q-menu .q-item.q-item--active {
-  background-color: rgba(144, 202, 249, 0.2) !important;
-}
-
-.q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(25, 118, 210, 0.1) !important;
-}
-
-.q-dark .q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(144, 202, 249, 0.1) !important;
-}
-
 .trace-back-btn {
   border: 0.09375rem solid;
   border-radius: 50%;
