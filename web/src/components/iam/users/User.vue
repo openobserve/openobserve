@@ -521,7 +521,7 @@ export default defineComponent({
           .finally(() => resolve(true));
       });
     };
-    const getCustomRoles = async () => {
+    const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
       try {
         const res = await getCustomRolesApi(
@@ -529,7 +529,7 @@ export default defineComponent({
         );
         customRoles.value = Array.isArray(res.data) ? res.data : [];
       } catch (err: any) {
-        if (err?.response?.status !== 403) {
+        if (!options.silent && err?.response?.status !== 403) {
           $q.notify({
             color: "negative",
             message:
@@ -568,6 +568,12 @@ export default defineComponent({
 
     let hydrateGeneration = 0;
 
+    const clearLoading = (targets: any[]) => {
+      for (const u of targets) {
+        u.custom_roles_loading = false;
+      }
+    };
+
     // Inverts OFGA per-role memberships into per-user role lists.
     // Cost: O(R) HTTP calls where R is the number of custom roles,
     // independent of the user count.
@@ -575,24 +581,30 @@ export default defineComponent({
       const myGen = ++hydrateGeneration;
       const orgId = store.state.selectedOrganization.identifier;
       const targets = usersState.users.filter(
-        (u: any) => u.rawEmail && u.status !== "pending",
+        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
       );
       if (targets.length === 0) return;
 
       const byEmail = new Map<string, any>();
       for (const u of targets) {
-        byEmail.set(u.rawEmail.toLowerCase(), u);
+        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
       }
-
-      if (!Array.isArray(customRoles.value) || customRoles.value.length === 0) {
-        await getCustomRoles();
-        if (myGen !== hydrateGeneration) return;
-      }
-      const roleNames: string[] = Array.isArray(customRoles.value)
-        ? (customRoles.value as string[])
-        : [];
 
       try {
+        // Always fetch a fresh role list scoped to this hydration run so we
+        // don't race with concurrent picker loads mutating the shared ref.
+        // Silent mode: hydration is a background operation; surface fetch
+        // errors via the per-row loading state, not a toast.
+        let roleNames: string[] = [];
+        try {
+          const res = await getCustomRolesApi(orgId);
+          roleNames = Array.isArray(res.data) ? res.data : [];
+        } catch {
+          roleNames = [];
+        }
+        if (myGen !== hydrateGeneration) return;
+        if (roleNames.length === 0) return;
+
         const results = await Promise.all(
           roleNames.map((role) =>
             getRoleUsers(role, orgId)
@@ -605,15 +617,17 @@ export default defineComponent({
         for (const { role, emails } of results) {
           for (const email of emails) {
             const row = byEmail.get(String(email).toLowerCase());
-            if (row) row.custom_roles.push(role);
+            if (!row) continue;
+            const next = Array.isArray(row.custom_roles)
+              ? row.custom_roles
+              : [];
+            if (next.indexOf(role) === -1) {
+              row.custom_roles = [...next, role];
+            }
           }
         }
       } finally {
-        if (myGen === hydrateGeneration) {
-          for (const u of targets) {
-            u.custom_roles_loading = false;
-          }
-        }
+        clearLoading(targets);
       }
     };
 
@@ -674,7 +688,9 @@ export default defineComponent({
             // Lazy-load custom roles per user in the background so the
             // table renders immediately. Concurrency-capped to avoid
             // saturating the browser/network with many users.
-            void hydrateCustomRoles();
+            hydrateCustomRoles().catch((err) => {
+              console.warn("custom-role hydration failed:", err);
+            });
           })
           .catch(() => {
             dismiss();
