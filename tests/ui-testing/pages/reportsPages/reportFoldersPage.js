@@ -50,9 +50,13 @@ export class ReportFoldersPage {
       `${process.env["ZO_BASE_URL"]}/web/reports?org_identifier=${process.env["ORGNAME"]}`,
       { waitUntil: 'domcontentloaded' }
     );
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+      console.warn('navigateToReports: networkidle timed out, continuing');
+    });
     await expect(this.page.locator(this.pageTitle)).toContainText('Reports');
-    await this.page.locator(this.folderTabsContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    await this.page.locator(this.folderTabsContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+      console.warn('navigateToReports: folderTabsContainer not visible, continuing');
+    });
   }
 
   async clickAddFolder() {
