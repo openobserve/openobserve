@@ -22,13 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="backfill-job-details-dialog"
   >
 
-    <div v-if="loading" class="flex tw:justify-center tw:p-4">
+    <div v-if="loading" class="tw:flex tw:justify-center tw:p-4">
       <OSpinner size="lg" />
     </div>
 
     <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
           <!-- Status and Actions -->
-          <div class="flex tw:items-center tw:justify-between">
+          <div class="tw:flex tw:items-center tw:justify-between">
             <OBadge
               :variant="getStatusColor(job.status, job.deletion_status)"
               class="text-lg tw:p-2"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-grid tw-grid-cols-2 tw-gap-4">
               <div>
                 <div class="tw:text-xs tw:text-gray-400">Job ID</div>
-                <div class="tw-font-mono text-sm">{{ job.job_id }}</div>
+                <div class="tw-font-mono tw:text-sm">{{ job.job_id }}</div>
               </div>
               <div>
                 <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <div class="tw:text-xs tw:text-gray-400">Time Range</div>
-                <div class="text-sm">{{ formatTimestamp(job.start_time) }} - {{ formatTimestamp(job.end_time) }}</div>
+                <div class="tw:text-sm">{{ formatTimestamp(job.start_time) }} - {{ formatTimestamp(job.end_time) }}</div>
               </div>
               <div>
                 <div class="tw:text-xs tw:text-gray-400">Created</div>
-                <div class="text-sm">{{ formatTimestampFull(job.created_at) }}</div>
+                <div class="tw:text-sm">{{ formatTimestampFull(job.created_at) }}</div>
               </div>
             </div>
           </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-space-y-3">
             <div class="tw:text-base tw:font-medium tw-font-semibold">Progress</div>
             <OCard class="tw:border tw:border-card-border q-pa-md">
-              <div class="flex tw:items-center tw:justify-between tw:mb-2">
+              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="tw:text-xl tw:font-semibold">{{ job.progress_percent }}%</div>
               </div>
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
               />
 
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
+              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw:text-sm">
                 <div>
                   <div class="tw:text-xs tw:text-gray-400">Phase</div>
                   <div>{{ getCurrentPhase }}</div>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
             <div class="tw:text-base tw:font-medium tw-font-semibold">Deletion Details</div>
             <OCard class="tw:border tw:border-card-border q-pa-md">
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
+              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw:text-sm">
                 <div>
                   <div class="tw:text-xs tw:text-gray-400">Status</div>
                   <div>
@@ -119,14 +119,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
                   <div class="tw:text-xs tw:text-gray-400">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
-                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono text-xs">
+                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono tw:text-xs">
                     {{ jobId }}
                   </div>
                 </div>
               </div>
               <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed" class="tw-mt-3">
                 <div class="tw:text-xs tw:text-gray-400">Error</div>
-                <div class="text-sm tw:text-red-500">{{ job.deletion_status.failed }}</div>
+                <div class="tw:text-sm tw:text-red-500">{{ job.deletion_status.failed }}</div>
               </div>
             </OCard>
           </div>
@@ -135,11 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="job.error" class="tw-space-y-3">
             <div class="tw:text-base tw:font-medium tw-font-semibold">Error Details</div>
             <OCard class="tw:border tw-border-red-200 q-pa-md tw-bg-red-50">
-              <div class="flex tw:items-start">
+              <div class="tw:flex tw:items-start">
                 <OIcon name="error" size="md" class="tw:mr-2 tw-mt-1" />
                 <div class="tw-flex-1">
                   <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error Message</div>
-                  <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
+                  <div class="tw:text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
                     {{ job.error }}
                   </div>
                 </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-    <div v-else class="flex flex-column tw:items-center tw:justify-center tw:p-4">
+    <div v-else class="tw:flex flex-column tw:items-center tw:justify-center tw:p-4">
       <OIcon name="error-outline" style="width: 64px; height: 64px;" />
       <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">Job not found</div>
     </div>

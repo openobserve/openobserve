@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
       style="flex-shrink: 0"
     >
-      <div class="flex tw:items-center tw:h-[60px]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           no-caps
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
-                  class="flex tw:items-center tw:p-2 el-border el-border-radius"
+                  class="tw:flex tw:items-center tw:p-2 el-border el-border-radius"
                   data-test="destination-type-readonly"
                 >
                   <OIcon
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="formData.type === 'email' && !getFormattedTemplates.length"
-            class="flex tw:items-center tw:w-full tw:mb-3"
+            class="tw:flex tw:items-center tw:w-full tw:mb-3"
           >
             <div class="tw:text-sm tw:font-medium tw:mr-2">
               It looks like you haven't created any Email Templates yet.
@@ -445,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
+      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (isPrebuiltDestination ||
               (isUpdatingDestination && formData.destination_type !== 'custom'))
           "
-          class="flex tw:items-center tw:gap-2"
+          class="tw:flex tw:items-center tw:gap-2"
         >
           <OButton
             data-test="destination-preview-button"
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else></div>
 
         <!-- Right side: Cancel and Save buttons -->
-        <div class="flex tw:items-center tw:gap-2">
+        <div class="tw:flex tw:items-center tw:gap-2">
           <OButton
             data-test="add-destination-cancel-btn"
             v-close-popup="true"

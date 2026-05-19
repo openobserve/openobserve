@@ -14,7 +14,7 @@
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="tw:mb-3 flex tw:items-start tw:w-full tw:flex"
+      class="tw:mb-3 tw:flex tw:items-start tw:w-full tw:flex"
       style="gap: 15px"
     >
       <OSelect

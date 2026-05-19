@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Check every row -->
-            <div class="alert-condition-row tw:!items-start">
+            <div class="alert-condition-row tw:!tw:items-start">
               <span class="condition-label" style="line-height: 28px;">
                 Check every *
                 <OTooltip content="How often to check this alert condition" :delay="300" side="top" />
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isRealTime === 'false'" class="alert-condition-rows tw:mt-2 tw:px-1">
 
             <!-- Check every -->
-            <div class="alert-condition-row tw:!items-start">
+            <div class="alert-condition-row tw:!tw:items-start">
               <span class="condition-label sql-promql-label" style="line-height: 28px;">
                 Check every *
                 <OTooltip content="How often to check this alert condition" :delay="300" side="top" />

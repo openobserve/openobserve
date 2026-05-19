@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 50px);"
   >
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
         <div class="tw:flex tw:flex-col">
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton

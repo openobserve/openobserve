@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-show="tab === 'table'"
-        class="col-auto flex tw:justify-end align-center tw:pr-3"
+        class="col-auto tw:flex tw:justify-end align-center tw:pr-3"
       >
         <OSwitch
           data-test="log-detail-wrap-values-toggle-btn"

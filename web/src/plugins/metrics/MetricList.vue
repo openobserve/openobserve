@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #trigger>
                     <div
-                      class="flex content-center tw:truncate"
+                      class="tw:flex content-center tw:truncate"
                       :title="row.name"
                     >
                       <div class="field_label tw:truncate">
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <ul>
                             <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 tw:pr-0">
                               <div
-                                class="flex tw:flex wrap tw:justify-between"
+                                class="tw:flex tw:flex wrap tw:justify-between"
                                 style="width: calc(100% - 46px)"
                                 :class="
                                   store.state.theme === 'dark'
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                               </div>
                               <div
-                                class="flex tw:flex"
+                                class="tw:flex tw:flex"
                                 :class="
                                   store.state.theme === 'dark'
                                     ? 'text-white'

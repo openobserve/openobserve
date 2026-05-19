@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="overflow-hidden tw:h-full">
+  <div data-test="traces-search-result" class="tw:overflow-hidden tw:h-full">
     <div
       class="card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
     >

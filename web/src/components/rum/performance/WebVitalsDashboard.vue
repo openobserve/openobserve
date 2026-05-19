@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div
-        class="tw:font-bold tw:ml-3 tw:px-2 rounded tw:mt-2 tw:py-1 learn-web-vitals-link flex tw:items-center"
+        class="tw:font-bold tw:ml-3 tw:px-2 tw:rounded tw:mt-2 tw:py-1 learn-web-vitals-link tw:flex tw:items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <OIcon
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <OSpinner size="md" class="tw:mx-auto tw:block" />

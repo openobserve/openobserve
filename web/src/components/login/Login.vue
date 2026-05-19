@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="card-container tw:w-[100vw] tw:h-[100vh]">
     <div style="max-width: 400px; padding-top: 100px" class="tw:mx-auto tw:p-3">
       <div
-        class="flex tw:justify-center tw:text-center"
+        class="tw:flex tw:justify-center tw:text-center"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 cursor-pointer tw:mr-2 tw:w-full"
+          class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:w-full"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="tw:w-full flex tw:justify-center">
+        <span class="tw:w-full tw:flex tw:justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="flex tw:justify-center tw:mb-4" v-else>
+      <div class="tw:flex tw:justify-center tw:mb-4" v-else>
         <img
           class="appLogo"
           style="height: auto"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="autoRedirectDexLogin">
         <p>
           Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer tw:underline">click here</a>.
+          <a href="#" @click="loginWithSSo" class="tw:cursor-pointer tw:underline">click here</a>.
         </p>
       </div>
 
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Login
         </div>
 
-        <div v-if="showSSO" class="flex tw:justify-center">
+        <div v-if="showSSO" class="tw:flex tw:justify-center">
           <OButton
             data-test="sso-login-btn"
             variant="primary"
@@ -100,10 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="loginWithSSo"
           >
             <div
-              class="flex tw:items-center tw:justify-center tw:w-full tw:text-center relative"
+              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
             >
               <img
-                class="absolute"
+                class="tw:absolute"
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
           <a
-            class="cursor-pointer login-internal-link tw:py-3"
+            class="tw:cursor-pointer login-internal-link tw:py-3"
             style="text-decoration: underline"
             @click="loginAsInternalUser = !loginAsInternalUser"
             >Login as internal user</a

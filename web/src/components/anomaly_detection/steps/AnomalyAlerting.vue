@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="step-content tw:px-3 tw:py-4">
       <!-- Enable Notifications toggle -->
-      <div class="flex tw:items-start alert-settings-row">
+      <div class="tw:flex tw:items-start alert-settings-row">
         <div
-          class="tw:font-semibold flex tw:items-center"
+          class="tw:font-semibold tw:flex tw:items-center"
           style="width: 190px; height: 36px"
         >
           {{ t('alerts.anomaly.notifications') }}
           <OIcon
             name="info"
             size="sm"
-            class="tw:ml-1 cursor-pointer"
+            class="tw:ml-1 tw:cursor-pointer"
             :class="
               store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
             "
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Destination picker (shown when alert_enabled) -->
       <div
         v-if="config.alert_enabled"
-        class="flex tw:items-start alert-settings-row"
+        class="tw:flex tw:items-start alert-settings-row"
       >
         <div
-          class="tw:font-semibold flex tw:items-center"
+          class="tw:font-semibold tw:flex tw:items-center"
           style="width: 190px; height: 36px"
         >
           {{ t("alerts.destination") }}

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("cipherKey.header") }}
             </div>
-            <div class="col-auto flex">
+            <div class="col-auto tw:flex">
               <OInput
                 v-model="filterQuery"
                 class="tw:ml-auto no-border o2-search-input"

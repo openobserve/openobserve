@@ -73,7 +73,7 @@
               </div>
             </div>
           </div>
-          <div class="flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
+          <div class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
             <div class="tw:text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>

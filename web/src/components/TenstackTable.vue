@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               // Flex only for virtual-scroll mode (logs/traces) for drag-reorder + alignment
               // Non-virtual (dashboard) uses table-layout:auto — no flex so browser auto-sizes columns
-              useVirtualScroll ? 'tw:flex items-center' : '',
+              useVirtualScroll ? 'tw:flex tw:items-center' : '',
               enableColumnReorder && table.getState().columnOrder.length
                 ? 'tw:cursor-move!'
                 : '',
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="!header.isPlaceholder"
                   :data-test="`o2-table-th-sort-${header.id}`"
-                  :class="['tw:text-left', 'cursor-pointer tw:gap-1']"
+                  :class="['tw:text-left', 'tw:cursor-pointer tw:gap-1']"
                   @click="
                     handleHeaderSortClick(
                       $event,
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
-                    class="tw:m-0 close-icon cursor-pointer"
+                    class="tw:m-0 close-icon tw:cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-white'

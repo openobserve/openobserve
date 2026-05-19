@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
     >
-      <div class="flex tw:items-center tw:h-[60px]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           no-caps
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel')"
         >

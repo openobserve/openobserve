@@ -11,7 +11,7 @@
       <OIcon name="content-copy" size="sm" />
       <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
-    <div class="tw:pb-1 flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
+    <div class="tw:pb-1 tw:flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>

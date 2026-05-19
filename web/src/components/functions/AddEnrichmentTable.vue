@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             compilationErr
           }}</pre>
 
-          <div class="flex tw:justify-start tw:mt-3 tw:gap-2">
+          <div class="tw:flex tw:justify-start tw:mt-3 tw:gap-2">
             <OButton
               variant="outline"
               size="sm-action"

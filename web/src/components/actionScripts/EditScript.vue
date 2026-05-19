@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             data-test="add-action-script-back-btn"
-            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
             title="Go Back"
             @click="router.back()"
           >
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   data-test="add-action-script-file-input"
-                  class="flex tw:items-center"
+                  class="tw:flex tw:items-center"
                 >
                   <OFile
                     v-if="
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-if="frequency.type === 'once'"
-                    class="flex tw:justify-start tw:items-center tw:mt-3"
+                    class="tw:flex tw:justify-start tw:items-center tw:mt-3"
                     data-test="add-action-script-frequency-info"
                   >
                     <OIcon name="event" size="sm" class="tw:mr-2" />
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <template v-if="frequency.type === 'repeat'">
-                    <div class="flex">
+                    <div class="tw:flex">
                       <div
                         data-test="add-action-script-cron-input"
                         class="tw:mr-2"
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="add-action-script-cron-info"
                             name="info"
                             size="sm"
-                            class="tw:ml-1 cursor-pointer"
+                            class="tw:ml-1 tw:cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
                                 ? 'tw:text-gray-400'
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :readonly="isEditingActionScript"
                         />
                       </div>
-                      <div class="flex">
+                      <div class="tw:flex">
                         <OSelect
                           data-test="add-action-script-timezone-select"
                           v-model="formData.timezone"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :done="step > 3"
                 class="tw:mt-3"
               >
-                <div class="flex tw:items-center">
+                <div class="tw:flex tw:items-center">
                   <div class="service-account-selector">
                     <div
                       data-test="add-action-script-service-account-title"
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="info"
                         size="sm"
-                        class="tw:ml-1 cursor-pointer"
+                        class="tw:ml-1 tw:cursor-pointer"
                         :class="
                           store.state.theme === 'dark'
                             ? 'tw:text-gray-400'

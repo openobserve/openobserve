@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full tw:p-0" >
     <div
-      class="flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
+      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
       <div class="tw:mr-3">
         <div
           data-test="iam-roles-selection-show-toggle"
-          class="flex tw:items-center"
+          class="tw:flex tw:items-center"
         >
           <span
             data-test="iam-roles-selection-show-text"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search Roles"
         >
           <template #icon-left>
-            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
+            <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" />
           </template>
         </OInput>
       </div>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
             :model-value="row.isInGroup"
-            class="filter-check-box cursor-pointer"
+            class="filter-check-box tw:cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
         </template>

@@ -3,11 +3,11 @@
    class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
   >
     <div v-if="!showSearchResults" class="tw:h-full">
-       <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
-        <div class="flex tw:items-center tw:py-2 tw:pl-3">
+       <div class="tw:flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:items-center tw:py-2 tw:pl-3">
           <div
             data-test="search-scheduler-back-btn"
-            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -23,7 +23,7 @@
             {{ t('search_scheduler_job.title') }}
           </div>
         </div>
-        <div class="flex tw:items-center tw:py-2 tw:pr-3">
+        <div class="tw:flex tw:items-center tw:py-2 tw:pr-3">
           <div>
             <OButton
               variant="primary"
@@ -188,7 +188,7 @@
               </div>
               <div class="tw:py-3" v-else>
                 <div
-                  class="tw:text-left tw:px-2 tw:mb-2 expanded-content flex tw:flex-col"
+                  class="tw:text-left tw:px-2 tw:mb-2 expanded-content tw:flex tw:flex-col"
                 >
                   <query-editor
                     style="height: 130px"

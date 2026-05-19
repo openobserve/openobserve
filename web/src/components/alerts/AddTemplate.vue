@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
     >
-      <div class="flex tw:items-center tw:h-[60px]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)]"
+            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)]"
           >
             <OButton
               v-close-popup
@@ -165,11 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="flex tw:justify-between tw:items-center">
+              <div class="tw:flex tw:justify-between tw:items-center">
                 <div class="tw:pb-1">{{ template.name }}</div>
                 <OIcon
                   data-test="add-template-sample-template-copy-btn"
-                  class="cursor-pointer"
+                  class="tw:cursor-pointer"
                   name="content-copy"
                   size="xs"
                   @click="copyTemplateBody(template.body)"

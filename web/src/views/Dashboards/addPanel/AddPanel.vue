@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header Section -->
     <div class="tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1">
       <div
-        class="flex tw:items-center tw:p-2 card-container"
-        :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+        class="tw:flex tw:items-center tw:justify-between tw:p-2 card-container"
+        :class="!store.state.isAiChatEnabled ? 'tw:justify-between' : ''"
       >
         <div
-          class="flex tw:items-center"
+          class="tw:flex tw:items-center"
           :class="!store.state.isAiChatEnabled ? 'tw:mr-3' : 'tw:mr-2'"
         >
           <span class="q-table__title">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="flex tw:gap-2">
+        <div class="tw:flex tw:gap-2">
           <OButton
             variant="outline"
             size="sm"

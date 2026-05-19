@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header bar -->
     <div class="card-container tw:mb-[0.625rem]">
       <div
-        class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px] tw:items-center"
+        class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px] tw:items-center"
       >
         <div
           class="q-table__title tw:font-[600]"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("evalTemplate.header") }}
         </div>
 
-        <div class="flex tw:ml-auto tw:ps-2 tw:items-center">
+        <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
           <!-- Search input -->
           <OInput
             data-test="eval-template-list-search-input"

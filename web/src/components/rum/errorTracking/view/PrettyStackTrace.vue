@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header tw:px-3 tw:py-2 cursor-pointer"
+            class="frame-header tw:px-3 tw:py-2 tw:cursor-pointer"
             @click="toggleFrame(traceIndex, 0)"
           >
             <div class="frame-header-content">
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Show more button - only visible when frames are tw:hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button tw:px-3 tw:py-2 cursor-pointer"
+            class="show-more-button tw:px-3 tw:py-2 tw:cursor-pointer"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header tw:px-3 tw:py-1 cursor-pointer"
+                class="collapsed-frame-header tw:px-3 tw:py-1 tw:cursor-pointer"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >

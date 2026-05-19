@@ -44,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters mode -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="flex tw:items-start alert-settings-row"
+          class="tw:flex tw:items-start alert-settings-row"
         >
           <div
-            class="tw:font-semibold flex tw:items-center"
+            class="tw:font-semibold tw:flex tw:items-center"
             style="width: 178px; min-height: 36px"
           >
             {{ t("alerts.anomaly.filters") }}
@@ -117,10 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div
           v-if="config.query_mode === 'custom_sql'"
-          class="flex tw:items-start alert-settings-row"
+          class="tw:flex tw:items-start alert-settings-row"
         >
           <div
-            class="tw:font-semibold flex tw:items-center"
+            class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; height: 36px"
           >
             SQL <span class="tw:text-red-500 tw:ml-1">*</span>
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
@@ -283,16 +283,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="flex tw:items-start alert-settings-row">
+        <div v-else class="tw:flex tw:items-start alert-settings-row">
           <div
-            class="tw:font-semibold flex tw:items-center"
+            class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; height: 36px"
           >
             Detection Resolution <span class="tw:text-red-500 tw:ml-1">*</span>
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 cursor-pointer"
+              class="tw:ml-1 tw:cursor-pointer"
               :class="
                 store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
               "
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
@@ -525,16 +525,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="flex tw:items-start alert-settings-row">
+        <div class="tw:flex tw:items-start alert-settings-row">
           <div
-            class="tw:font-semibold flex tw:items-center"
+            class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; padding-top: 4px"
           >
             {{ t("alerts.sensitivity") }}
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 cursor-pointer"
+              class="tw:ml-1 tw:cursor-pointer"
               :class="
                 store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
               "

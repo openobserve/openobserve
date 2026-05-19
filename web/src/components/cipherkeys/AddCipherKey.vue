@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit;">
     <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
-      <div class="flex tw:items-center tw:py-2">
+      <div class="tw:flex tw:items-center tw:py-2">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
       <div class="tw:flex">
-        <div class="tw:w-1/3 o2-input flex tw:mx-3 tw:mt-3">
+        <div class="tw:w-1/3 o2-input tw:flex tw:mx-3 tw:mt-3">
           <OInput
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
+            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton

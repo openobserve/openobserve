@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
                 style="display: inline-block; width: 33.14px; height: auto"
-                class="flex tw:justify-center tw:items-center tw:ml-1"
+                class="tw:flex tw:justify-center tw:items-center tw:ml-1"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="flex tw:justify-center tw:items-center cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
           title="Go Back"
           @click="showForm = false"

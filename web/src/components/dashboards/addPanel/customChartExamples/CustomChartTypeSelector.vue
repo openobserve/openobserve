@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex tw:justify-center tw:items-center"
+            class="tw:flex tw:justify-center tw:items-center"
             style="height: 100%"
           >
             <div class="tw:text-center">

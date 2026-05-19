@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-start!">
       <div
-        class="float-right tw:flex tw:flex-col flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
+        class="float-right tw:flex tw:flex-col tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
       >
         <!-- View Mode Toggle Group -->
         <OToggleGroup
@@ -726,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time float-left" style="order: 2">
-          <div class="flex">
+          <div class="tw:flex">
             <OButtonGroup
               class="tw:p-0 tw:mr-1 element-box-shadow el-border"
               v-if="
@@ -1546,7 +1546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="tw:text-left tw:mb-1">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="tw:ml-1 cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="tw:ml-1 tw:cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
                 <span style="font-size: 14px">{{

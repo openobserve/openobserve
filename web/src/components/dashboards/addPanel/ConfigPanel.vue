@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 showTimePicker ||
                 (panelTimeRange !== null && panelTimeRange !== undefined)
               "
-              class="flex tw:items-center tw:flex-nowrap panel-time-picker-container"
+              class="tw:flex tw:items-center tw:flex-nowrap panel-time-picker-container"
             >
               <div class="panel-time-picker-btn">
                 <DateTimePickerDashboard
@@ -1613,7 +1613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.time_shift"
           :key="index"
         >
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"

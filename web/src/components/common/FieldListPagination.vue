@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="restart-alt"
           size="sm"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="cursor-pointer reset-icon"
+          class="tw:cursor-pointer reset-icon"
           @click="$emit('reset-fields')"
         />
         <OTooltip

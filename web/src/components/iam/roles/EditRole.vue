@@ -68,18 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="card-container tw:flex tw:flex-col tw:h-full"
         >
           <div
-            class="flex tw:justify-between tw:items-center tw:flex-shrink-0"
+            class="tw:flex tw:justify-between tw:items-center tw:flex-shrink-0"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class=" flex tw:items-start tw:px-3 tw:py-2 tw:justify-start"
+              class=" tw:flex tw:items-start tw:px-3 tw:py-2 tw:justify-start"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="flex tw:items-center tw:mr-3"
+                class="tw:flex tw:items-center tw:mr-3"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -163,12 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
-              <div class="flex tw:items-center tw:justify-between">
+              <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:mb-3 tw:font-bold">
                   {{ selectedPermissionsHash.size }} Permission
                 </div>
                 <div
-                  class="flex tw:items-center cursor-pointer"
+                  class="tw:flex tw:items-center tw:cursor-pointer"
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tw:ml-1"> Help </span>
                 </div>
               </div>
-              <div class="flex tw:flex-nowrap">
+              <div class="tw:flex tw:flex-nowrap">
                 <div
                   :style="
                     isHelpOpen
@@ -195,10 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="tw:p-2">
-                  <div class="flex tw:justify-between tw:items-center tw:px-2">
+                  <div class="tw:flex tw:justify-between tw:items-center tw:px-2">
                     <div style="font-size: 16px">Quick Reference</div>
                     <OIcon
-                      class="cursor-pointer"
+                      class="tw:cursor-pointer"
                       name="close"
                       size="xs"
                       :title="t('common.close')"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
+        class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">

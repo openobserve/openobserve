@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
           <div
-            class="tw:text-right tw:p-[0.375rem] flex align-center tw:justify-between"
+            class="tw:text-right tw:p-[0.375rem] tw:flex align-center tw:justify-between"
           >
             <syntax-guide />
-            <div class="flex align-center tw:justify-end metrics-date-time">
+            <div class="tw:flex align-center tw:justify-end metrics-date-time">
               <date-time
                 auto-apply
                 :default-type="sessionState.data.datetime.valueType"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="card-container tw:h-full">
               <template v-if="isLoading.length">
                 <div
-                  class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:h-full"
+                  class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-full"
                 >
                   <div>
                     <OSpinner
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
                   <template #cell-frustration_count="{ row }">

@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('common.search')"
           >
             <template #icon-left>
-              <OIcon name="search" size="sm" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="tw:cursor-pointer" />
             </template>
           </OInput>
           <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">

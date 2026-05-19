@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
-          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;

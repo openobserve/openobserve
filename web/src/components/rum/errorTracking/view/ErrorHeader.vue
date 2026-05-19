@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="tw:pt-2 tw:pb-1 flex tw:justify-start">
+      <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
         <div
           data-test="back-button"
-          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           data-test="error-id"
           :title="error.error_id"
-          class="tw:pl-1 cursor-pointer"
+          class="tw:pl-1 tw:cursor-pointer"
           >{{ error.error_id }}
           <OIcon
             size="xs"

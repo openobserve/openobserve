@@ -25,7 +25,7 @@
       <div class="tw:flex tw:justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
-            <div class="date-time-table relative column">
+            <div class="date-time-table tw:relative column">
               <div
                 class="relative-row tw:px-3 tw:py-2"
                 v-for="(period, periodIndex) in relativePeriods"

@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
               >
                 <div>
-                  <div class="flex tw:justify-start">
+                  <div class="tw:flex tw:justify-start">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- schema settings tab -->
                 <div v-if="activeMainTab == 'schemaSettings'">
                   <div
-                    class="flex tw:justify-between tw:items-center"
+                    class="tw:flex tw:justify-between tw:items-center"
                     data-test="schema-log-stream-mapping-title-text"
                   >
                     <div
@@ -373,8 +373,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </div>
                   </div>
-                  <div class="flex tw:justify-between tw:items-center tw:w-full">
-                    <div class="flex tw:items-center">
+                  <div class="tw:flex tw:justify-between tw:items-center tw:w-full">
+                    <div class="tw:flex tw:items-center">
                       <div class="app-tabs-container">
                         <OToggleGroup
                           v-if="isSchemaUDSEnabled"
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <div class="flex tw:items-center tw:gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <OInput
                         data-test="schema-field-search-input"
                         v-model="filterField"
@@ -834,7 +834,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="tw:mt-2">
                     <div class="tw:text-center tw:mt-2 tw:flex tw:items-center">
-                      <div class="flex tw:items-center">
+                      <div class="tw:flex tw:items-center">
                         <span class="tw:font-bold"> Select Date</span>
                         <date-time
                           class="tw:mx-2"
@@ -919,7 +919,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- LLM Evaluation tab footer -->
                   <div
                     v-if="activeMainTab === 'llmEvaluation'"
-                    class="flex tw:items-center tw:justify-end tw:gap-2"
+                    class="tw:flex tw:items-center tw:justify-end tw:gap-2"
                   >
                     <OButton
                       v-close-popup="true"
@@ -943,9 +943,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-else-if="indexData.schema.length > 0"
-                    class="flex tw:items-center tw:justify-between"
+                    class="tw:flex tw:items-center tw:justify-between"
                   >
-                    <div class="flex tw:items-center tw:gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <span
                         v-if="activeMainTab == 'schemaSettings'"
                         class="tw:px-2 tw:py-2"
@@ -966,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="updateDefinedSchemaFields"
                       >
                         <span
-                          class="flex tw:items-center tw:justify-start tw:gap-1 tw:mr-1"
+                          class="tw:flex tw:items-center tw:justify-start tw:gap-1 tw:mr-1"
                         >
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
@@ -1003,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("logStream.delete") }}
                       </OButton>
                     </div>
-                    <div class="flex tw:justify-end tw:gap-2">
+                    <div class="tw:flex tw:justify-end tw:gap-2">
                       <OButton
                         data-test="schema-cancel-button"
                         variant="outline"

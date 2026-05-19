@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="tw:p-0 flex flex-col">
+  <div data-test="alert-list-page" class="tw:p-0 tw:flex tw:flex-col">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
+          class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div
             class="q-table__title tw:font-[600]"
@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logStream.header") }}
           </div>
-          <div class="flex tw:items-start">
-            <div class="flex tw:justify-between tw:items-end">
+          <div class="tw:flex tw:items-start">
+            <div class="tw:flex tw:justify-between tw:items-end">
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="() => { deleteStream(); confirmDelete = false; }"
     >
-      <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+      <p class="tw:text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
       >
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBatchDelete = false"
       @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
     >
-      <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+      <p class="tw:text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
       >

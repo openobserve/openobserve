@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </DashboardHeader>
-    <div class="table-header flex tw:justify-between tw:font-bold">
+    <div class="table-header tw:flex tw:justify-between tw:font-bold">
       <div class="header-content">
         <div class="spacer"></div>
         <div class="name-column" data-test="dashboard-tab-settings-name">

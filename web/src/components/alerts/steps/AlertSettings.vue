@@ -31,20 +31,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
+          <div class="tw:flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
             <div
-              class="tw:font-semibold flex tw:items-center"
+              class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="flex tw:items-center tw:mr-2" style="width: fit-content">
+              <div class="tw:flex tw:items-center tw:mr-2" style="width: fit-content">
                 <div
                   style="width: 87px; margin-left: 0 !important"
                   class="silence-notification-input"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -89,10 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="flex tw:items-start tw:pb-4 tw:mb-4">
+          <div class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
             <div
               style="width: 190px; height: 28px"
-              class="flex tw:items-center tw:font-semibold"
+              class="tw:flex tw:items-center tw:font-semibold"
             >
               <span>{{ t("alerts.destination") }} *</span>
             </div>
@@ -145,13 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              class="tw:font-semibold flex tw:items-center"
+              class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.periodTooltip')"
                   side="right"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="periodFieldRef"
-                class="flex tw:items-center tw:mr-2"
+                class="tw:flex tw:items-center tw:mr-2"
                 style="width: fit-content"
               >
                 <div
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -202,13 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              class="tw:font-semibold flex tw:items-center"
+              class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="silenceFieldRef"
-                class="flex tw:items-center tw:mr-2"
+                class="tw:flex tw:items-center tw:mr-2"
                 style="width: fit-content"
               >
                 <div style="width: 87px; margin-left: 0 !important">
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -260,20 +260,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              class="tw:font-semibold flex tw:items-center"
+              class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.destinationsTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="flex tw:items-center">
+              <div class="tw:flex tw:items-center">
                 <OSelect
                   ref="destinationsFieldRef"
                   v-model="localDestinations"
@@ -324,13 +324,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="flex tw:items-start alert-settings-row">
+        <div class="tw:flex tw:items-start alert-settings-row">
           <div
-            class="tw:font-semibold flex tw:items-center"
+            class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; height: 28px"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 cursor-pointer" />
+            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
               <OTooltip
                 :content="t('alerts.alertSettings.createsIncidentTooltip')"
                 side="right"

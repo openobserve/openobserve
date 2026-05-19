@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OStepper>
 
       <!-- Form buttons -->
-      <div class="flex tw:justify-start tw:mb-3">
+      <div class="tw:flex tw:justify-start tw:mb-3">
         <div v-if="step === 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step1-cancel-btn"

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div>
         <div v-if="!createNewStream" class="tw:px-3">
-          <div class="flex tw:justify-start tw:items-center" style="padding-top: 0px">
+          <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
             <div
               data-test="input-node-stream-type-select"
               class="alert-stream-type o2-input tw:mr-2 tw:w-full"

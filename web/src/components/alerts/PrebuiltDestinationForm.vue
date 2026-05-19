@@ -242,7 +242,7 @@ limitations under the License.
 
     <!-- Test and Preview Actions -->
     <div v-if="!hideActions" class="tw:w-full tw:py-3">
-      <div class="flex tw:items-center tw:gap-2">
+      <div class="tw:flex tw:items-center tw:gap-2">
         <OButton
           data-test="destination-preview-button"
           variant="outline"

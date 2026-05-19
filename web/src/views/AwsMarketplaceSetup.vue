@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="aws-marketplace-setup">
-    <div class="flex relative-position tw-px-3 tw-pt-2">
+    <div class="tw:flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
         loading="lazy"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pending Activation State -->
       <div v-else-if="state === 'pending_activation'" class="tw:text-center">
         <h5 class="tw:mb-4">Waiting for AWS Confirmation</h5>
-        <div class="flex tw:justify-center">
+        <div class="tw:flex tw:justify-center">
           <OSpinner size="xl" />
         </div>
         <p class="tw:text-gray-400 tw:mt-4">

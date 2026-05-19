@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="close"
               size="sm"
               @click.stop="clearFile"
-              class="cursor-pointer"
+              class="tw:cursor-pointer"
             />
           </template>
         </OFile>

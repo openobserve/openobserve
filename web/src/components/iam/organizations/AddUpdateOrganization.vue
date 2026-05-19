@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
+          <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
             <OButton
               variant="secondary"
               size="md"

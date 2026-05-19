@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="player-container full-height tw:p-2">
     <div
       v-if="isLoading"
-      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
+      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
     >
       <div>
         <OSpinner
@@ -33,23 +33,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       ref="playerContainerRef"
-      class="flex tw:items-center tw:justify-center tw:h-[calc(100vh-12.375rem)]"
+      class="tw:flex tw:items-center tw:justify-center tw:h-[calc(100vh-12.375rem)]"
     >
       <div
         ref="playerRef"
         id="player"
-        class="player flex tw:items-center cursor-pointer"
+        class="player tw:flex tw:items-center tw:cursor-pointer"
         @click="togglePlay"
       />
     </div>
     <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
       <div
         ref="playbackBarRef"
-        class="playback_bar tw:mt-2 tw:mb-3 relative-position cursor-pointer"
+        class="playback_bar tw:mt-2 tw:mb-3 relative-position tw:cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime bg-primary absolute"
+          class="progressTime bg-primary tw:absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime bg-primary absolute"
+          class="progressTime bg-primary tw:absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
-          class="progressTime absolute cursor-pointer"
+          class="progressTime tw:absolute tw:cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
             width:
@@ -91,13 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls flex tw:justify-between tw:items-center">
-        <div class="flex tw:items-center">
+      <div class="controls tw:flex tw:justify-between tw:items-center">
+        <div class="tw:flex tw:items-center">
           <div>
             <OIcon
               name="replay-10"
               size="md"
-              class="tw:mr-2 cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -107,23 +107,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="tw:ml-2 cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="flex tw:ml-4 tw:items-center">
+          <div class="tw:flex tw:ml-4 tw:items-center">
             <div>{{ playerState.time }}</div>
             <div class="tw:px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
-        <div class="flex tw:items-center">
+        <div class="tw:flex tw:items-center">
           <OSwitch
             class="tw:mr-3"
             v-model="playerState.skipInactivity"

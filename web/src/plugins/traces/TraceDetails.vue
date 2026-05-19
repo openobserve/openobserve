@@ -473,7 +473,7 @@ size="sm"
                           height: `${spanPositionList.length * spanDimensions.height + 28}px`,
                           cursor: 'col-resize',
                         }"
-                        class="absolute resize"
+                        class="tw:absolute resize"
                         @mousedown="startResize"
                       />
                       <trace-tree
@@ -758,7 +758,7 @@ size="sm"
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex column tw:items-center tw:justify-center"
+      class="tw:flex column tw:items-center tw:justify-center"
       :style="{ height: '100%' }"
     >
       <OSpinner

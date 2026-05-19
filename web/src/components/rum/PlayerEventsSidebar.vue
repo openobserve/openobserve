@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
+        class="tw:flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
       >
         <div class="tw:pr-1 tw:w-[60%]">
           <OInput
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mt-1 tw:px-2 event-container tw:py-2 cursor-pointer tw:rounded"
+            class="tw:mt-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >

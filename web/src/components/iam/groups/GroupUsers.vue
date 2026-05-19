@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
+      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
     >
       <div data-test="iam-users-selection-show-toggle" class="tw:mr-3">
-        <div class="flex tw:items-center">
+        <div class="tw:flex tw:items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search User"
         >
           <template #icon-left>
-            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon"/>
+            <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon"/>
           </template>
         </OInput>
       </div>
@@ -103,18 +103,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
             size="sm"
             :model-value="row.isInGroup"
-            class="filter-check-box cursor-pointer"
+            class="filter-check-box tw:cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
         </template>
         <template #cell-email="{ row }">
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <span>{{ row.email }}</span>
             <OIcon
               v-if="shouldShowWarning(row)"
               name="info"
               size="sm"
-              class="tw:ml-1 cursor-pointer"
+              class="tw:ml-1 tw:cursor-pointer"
               :data-test="`iam-external-user-warning-icon-${row.email}`"
              />
               <OTooltip side="right">

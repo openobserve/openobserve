@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="pipeline-history-page" class="tw:p-0 flex">
+  <div data-test="pipeline-history-page" class="tw:p-0 tw:flex">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
+          class="tw:flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
         >
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <OButton
               variant="ghost"
               size="icon-xs-sq"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
             </div>
           </div>
-          <div class="flex tw:ml-auto tw:items-center">
+          <div class="tw:flex tw:ml-auto tw:items-center">
             <div class="tw:mr-2">
               <DateTime
                 ref="dateTimeRef"

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
         <OSpinner size="md" class="tw:mx-auto tw:block" />

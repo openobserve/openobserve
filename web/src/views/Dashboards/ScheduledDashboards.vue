@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('reports.search')"
         >
           <template #icon-left>
-            <OIcon name="search" size="sm" class="cursor-pointer" />
+            <OIcon name="search" size="sm" class="tw:cursor-pointer" />
           </template>
         </OInput>
 
@@ -69,27 +69,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:px-3"
     >
       <template #cell-name="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
       </template>
 
       <template #cell-tab="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
       </template>
 
       <template #cell-time_range="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
       </template>
 
       <template #cell-frequency="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
       </template>
 
       <template #cell-last_triggered_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.last_triggered_at }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.last_triggered_at }}</span>
       </template>
 
       <template #cell-created_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.created_at }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.created_at }}</span>
       </template>
 
       <template #empty>

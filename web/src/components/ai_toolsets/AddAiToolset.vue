@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <!-- Header -->
     <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
-      <div class="flex tw:items-center tw:py-2">
+      <div class="tw:flex tw:items-center tw:py-2">
         <div
-          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           :title="t('common.goBack')"
           @click="$emit('cancel:hideform')"
         >
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <OIcon
                   :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="cursor-pointer"
+                  class="tw:cursor-pointer"
                   @click="header.visible = !header.visible"
                 />
               </template>
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <OIcon
                   :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="cursor-pointer"
+                  class="tw:cursor-pointer"
                   @click="env.visible = !env.visible"
                 />
               </template>

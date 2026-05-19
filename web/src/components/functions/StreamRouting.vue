@@ -1,11 +1,11 @@
 <template>
   <div data-test="add-stream-routing-section" class="bg-white full-height">
-    <div class="tw:py-2 tw:px-3 flex tw:justify-between tw:items-center">
+    <div class="tw:py-2 tw:px-3 tw:flex tw:justify-between tw:items-center">
       <div class="stream-routing-title">Stream Routing</div>
       <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
-        class="cursor-pointer"
+        class="tw:cursor-pointer"
         size="md"
         @click="emits('cancel:hideform')"
       />
@@ -31,7 +31,7 @@
           @update:model-value="nameError = ''"
         />
       </div>
-      <div class="flex tw:justify-start tw:items-center" style="padding-top: 0px">
+      <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
         <div
           data-test="add-alert-stream-type-select"
           class="alert-stream-type o2-input tw:mr-2"
@@ -82,7 +82,7 @@
       />
 
       <div
-        class="flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
+        class="tw:flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       >
         <OButton

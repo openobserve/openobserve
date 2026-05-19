@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:pt-3 tw:pb-2 showLabelOnTop"
         />
 
-        <div class="flex tw:justify-center tw:mt-4 tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"

@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!header.isPlaceholder"
               :class="[
                 'tw:text-left',
-                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
+                header.column.getCanSort() ? 'tw:cursor-pointer select-none' : '',
               ]"
               @click="
                 getSortingHandler(
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                   name="close"
-                  class="tw:m-0 close-icon cursor-pointer"
+                  class="tw:m-0 close-icon tw:cursor-pointer"
                   :class="
                     store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
                   "

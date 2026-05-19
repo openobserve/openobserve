@@ -32,7 +32,7 @@
               <OIcon
                 name="info"
                 size="sm"
-                class="cursor-pointer field-info-icon"
+                class="tw:cursor-pointer field-info-icon"
                />
                 <OTooltip side="top" max-width="250px">
                   <template #content>
@@ -63,7 +63,7 @@
                 <OIcon
                   name="info"
                   size="sm"
-                  class="cursor-pointer"
+                  class="tw:cursor-pointer"
                  />
                   <OTooltip side="top" max-width="250px">
                     <template #content>
@@ -95,7 +95,7 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <OIcon name="info" size="sm" class="cursor-pointer" />
+                <OIcon name="info" size="sm" class="tw:cursor-pointer" />
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       <b>Query Type - </b><br />

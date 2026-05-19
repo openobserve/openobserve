@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
       </OButton>
-      <div class="flex tw:items-center app-tabs-container">
+      <div class="tw:flex tw:items-center app-tabs-container">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"

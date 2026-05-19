@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="tw:flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection tw:w-full"
+            class="tw:flex scroll relative-position thirdlevel full-height tw:overflow-hidden logsPageMainSection tw:w-full"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -370,7 +370,7 @@ size="md" />
         class="search-history-empty"
       >
         <div
-          class="search-history-empty__content tw:text-center tw:p-3 flex flex-center"
+          class="search-history-empty__content tw:text-center tw:p-3 tw:flex flex-center"
         >
           <div>
             <div>
@@ -382,7 +382,7 @@ size="md" />
               Search history is not enabled.
             </div>
             <div
-              class="search-history-empty__info tw:mt-2 flex tw:items-center tw:justify-center"
+              class="search-history-empty__info tw:mt-2 tw:flex tw:items-center tw:justify-center"
             >
               <OIcon name="info" class="tw:mr-1"
 size="md" />

@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="formData.deleteBeforeBackfill"
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
-                  <div class="flex tw:items-start">
+                  <div class="tw:flex tw:items-start">
                     <OIcon name="warning" size="sm" class="tw:mr-2 tw-mt-0.5" />
                     <div class="tw:text-xs text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>

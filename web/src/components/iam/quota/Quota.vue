@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("quota.header") }}
           </div>
-          <div class="flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
-            <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
+            <div class="tw:flex tw:items-center">
               <OSelect
                 :loading="isOrgLoading"
                 :model-value="selectedOrganization?.value"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class="flex tw:items-center" v-if="selectedOrganization">
+            <div class="tw:flex tw:items-center" v-if="selectedOrganization">
               <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
             <div
               v-if="selectedOrganization && activeType == 'table'"
-              class="flex tw:items-center"
+              class="tw:flex tw:items-center"
             >
               <OInput
                 data-test="pipeline-list-search-input"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <template #icon-left>
-                  <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
               </OInput>
               <OSelect
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="flex tw:items-center float-right tw:ml-auto"
+              class="tw:flex tw:items-center float-right tw:ml-auto"
             >
               <div class="app-tabs-container tw:h-[36px] tw:w-fit tw:mr-3">
                 <app-tabs
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           loading &&
           !apiLimitsRows.length
         "
-        class="flex tw:justify-center tw:items-center"
+        class="tw:flex tw:justify-center tw:items-center"
       >
         <OSpinner size="md" />
       </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex tw:justify-end w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="flex tw:justify-end w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2"
         v-if="editTable && activeType == 'json'"
       >
         <OButton

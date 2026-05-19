@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:h-[calc(100vh-var(--navbar-height)-10px)] tw:overflow-hidden tw:pt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
-        class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
+        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
           <OSpinner

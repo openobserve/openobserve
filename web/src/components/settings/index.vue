@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1 tw:overflow-hidden">
           <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
-            <div class="flex tw:h-[calc(100vh-50px)]">
+            <div class="tw:flex tw:h-[calc(100vh-50px)]">
               <div class="tw:w-full" v-if="showManagementTabs">
                 <OTabs
                   class="management-tabs"

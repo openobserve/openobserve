@@ -17,19 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="tw:p-0 flex flex-col"
+    class="tw:p-0 tw:flex tw:flex-col"
   >
     <!-- Header bar -->
     <div class="tw:w-full tw:px-[0.625rem] tw:pt-1">
       <div class="card-container">
         <div
-          class="flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
+          class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
         >
           <div class="q-table__title tw:font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
           </div>
 
-          <div class="flex tw:ml-auto tw:ps-2 tw:items-center">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Scheduled / Cached tabs -->
             <div class="app-tabs-container tw:mr-2">
               <app-tabs
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="reportsStateLoadingMap[row.report_id]"
                     data-test="report-list-toggle-report-state-loader"
                     style="display: inline-block; width: 33.14px; height: auto"
-                    class="flex tw:justify-center tw:items-center"
+                    class="tw:flex tw:justify-center tw:items-center"
                   >
                     <OSpinner size="xs" />
                   </div>

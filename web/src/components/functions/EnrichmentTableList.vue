@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
-          <div class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
+          <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
             <div class="q-table__title tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-if="!row.urlJobs || row.urlJobs.length === 0">File</span>
                   <template v-else>
                     <span
-                      class="cursor-pointer"
+                      class="tw:cursor-pointer"
                       @click="showUrlJobsDialog(row)"
                       :class="{'text-primary': row.urlJobs.length > 1}"
                     >
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="warning"
                         size="sm"
-                        class="cursor-pointer"
+                        class="tw:cursor-pointer"
                         @click="showUrlJobsDialog(row)"
                        />
                       <OTooltip>

@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
               <!-- Search Input -->
-              <div class="flex folder-item tw:py-1 tw:w-full tw:px-2">
+              <div class="tw:flex folder-item tw:py-1 tw:w-full tw:px-2">
                 <OInput
                   v-model="folderSearchQuery"
                   data-test="folder-search"

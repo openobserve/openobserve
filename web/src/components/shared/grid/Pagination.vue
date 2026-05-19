@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="flex tw:items-center">
+      <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
         <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
         <span class="q-table__bottom-item">

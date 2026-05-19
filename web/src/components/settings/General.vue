@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 180px"
             >
               <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="cursor-pointer" />
+                <OIcon name="info" size="sm" class="tw:cursor-pointer" />
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
               </template>
             </OInput>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <span>&nbsp;</span>
 
-          <div class="flex tw:justify-start">
+          <div class="tw:flex tw:justify-start">
             <OButton
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-else class="flex tw:items-center">
+          <div v-else class="tw:flex tw:items-center">
             <span class="tw:w-[190px] tw:text-center tw:truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||

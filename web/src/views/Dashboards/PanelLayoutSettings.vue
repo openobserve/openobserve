@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
           <OIcon
             name="info-outline"
-            class="cursor-pointer tw:shrink-0"
+            class="tw:cursor-pointer tw:shrink-0"
             size="xs"
            />
             <OTooltip content="1 unit = 30px" />
