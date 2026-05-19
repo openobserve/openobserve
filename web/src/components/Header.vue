@@ -205,21 +205,111 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="tw:flex tw:items-center">
-        <OSelect
-          :options="selectOptions"
-          :model-value="userClickedOrg?.identifier"
-          label-key="displayLabel"
-          value-key="identifier"
-          searchable
-          search-placeholder="Search Organization"
-          size="sm"
-          class="tw:min-w-[200px] tw:max-w-[250px]"
-          data-test="navbar-organizations-select"
-          @update:model-value="handleOrgSelect"
+      <div data-test="navbar-organizations-select" class="q-mx-sm row">
+        <ODropdown
+          v-model:open="orgMenuOpen"
+          side="bottom"
+          align="center"
+          class="tw:p-0"
         >
-          <template #empty>No organizations found</template>
-        </OSelect>
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="sm"
+              style="max-width: 250px"
+              class="tw:text-ellipsis tw:overflow-hidden"
+            >
+              <div class="row items-center no-wrap full-width">
+                <div class="col tw:truncate">
+                  {{ userClickedOrg?.label || "" }}
+                </div>
+                <OIcon name="arrow-drop-down" size="sm" class="q-ml-xs" />
+              </div>
+            </OButton>
+          </template>
+
+          <!-- Organization table with search functionality -->
+          <div data-test="organization-menu-list" class="tw:p-0">
+            <OTable
+              data-test="organization-menu-table"
+              :data="filteredOrganizations"
+              row-key="identifier"
+              :columns="[
+                {
+                  id: 'label',
+                  header: 'Organization',
+                  accessorKey: 'label',
+                  meta: { align: 'left' },
+                },
+              ]"
+              :show-header="false"
+              :show-global-filter="false"
+              pagination="client"
+              :page-size="rowsPerPage"
+              :page-size-options="[]"
+              class="org-table"
+              style="width: 470px; min-height: 420px; height: 420px"
+              @row-click="(row) => handleOrgSelection(row)"
+            >
+              <!-- Search input for filtering organizations -->
+              <template #top>
+                <div class="full-width">
+                  <OInput
+                    data-test="organization-search-input"
+                    v-model="searchQuery"
+                    clearable
+                    :debounce="1"
+                    autofocus
+                    placeholder="Search Organization"
+                  >
+                    <template #icon-left>
+                      <OIcon name="search" size="sm" />
+                    </template>
+                  </OInput>
+                </div>
+              </template>
+
+              <!-- Organization list item -->
+              <template #cell-label="{ row, value }">
+                <div
+                  class="org-menu-item"
+                  data-test="organization-menu-item-label-item-label"
+                  :class="{
+                    'org-menu-item--active':
+                      row.identifier === userClickedOrg?.identifier,
+                  }"
+                >
+                  {{
+                    row.label.length > 30
+                      ? row.label.substring(0, 30) +
+                        "... | " +
+                        row.identifier
+                      : row.label + " | " + row.identifier
+                  }}
+                  <OTooltip
+                    v-if="row.label.length > 30"
+                    side="bottom"
+                    align="start"
+                    :content="row.label"
+                  />
+                </div>
+              </template>
+
+              <!-- No data message -->
+              <template #empty>
+                <div
+                  data-test="organization-menu-no-data"
+                  class="text-center q-pa-sm tw:w-full tw:flex tw:justify-center"
+                >
+                  No organizations found
+                </div>
+              </template>
+
+              <!-- Custom pagination: suppress left-side total count -->
+              <template #bottom></template>
+            </OTable>
+          </div>
+        </ODropdown>
       </div>
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
@@ -431,8 +521,9 @@ import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -448,8 +539,9 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    OSelect,
+    OInput,
     ODropdown,
+    OTable,
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
@@ -623,26 +715,26 @@ export default defineComponent({
       emit("update:isHovered", false);
     };
 
-    // Options for OSelect with combined label for display and search
-    const selectOptions = computed(() =>
-      props.organizations.map((org: any) => ({
-        ...org,
-        displayLabel:
-          org.label?.length > 30
-            ? org.label.substring(0, 30) + "... | " + org.identifier
-            : org.label + " | " + org.identifier,
-      })),
-    );
+    // Internal search state for the org table
+    const searchQuery = ref("");
+    const rowsPerPage = 10;
+    const orgMenuOpen = ref(false);
 
-    // Handle organization selection from OSelect dropdown
-    const handleOrgSelect = (identifier: string) => {
-      const org = props.organizations.find(
-        (o: any) => o.identifier === identifier,
+    const filteredOrganizations = computed(() => {
+      if (!searchQuery.value) return props.organizations;
+      const q = searchQuery.value.toLowerCase();
+      return props.organizations.filter(
+        (org: any) =>
+          org.label?.toLowerCase().includes(q) ||
+          org.identifier?.toLowerCase().includes(q),
       );
-      if (org) {
-        emit("update:selectedOrg", org);
-        emit("updateOrganization");
-      }
+    });
+
+    // Handle organization selection from the table
+    const handleOrgSelection = (org: any) => {
+      orgMenuOpen.value = false;
+      emit("update:selectedOrg", org);
+      emit("updateOrganization");
     };
 
     // Open enterprise upgrade dialog
@@ -670,8 +762,11 @@ export default defineComponent({
       signout,
       handleMouseEnter,
       handleMouseLeave,
-      selectOptions,
-      handleOrgSelect,
+      searchQuery,
+      rowsPerPage,
+      orgMenuOpen,
+      filteredOrganizations,
+      handleOrgSelection,
       openEnterpriseDialog,
     };
   },
