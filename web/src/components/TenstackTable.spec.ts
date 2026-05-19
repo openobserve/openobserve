@@ -1163,6 +1163,54 @@ describe("TenstackTable", () => {
       const [, rowIndex] = wrapper.emitted("click:dataRow")![0] as any[];
       expect(rowIndex).toBe(1);
     });
+
+    it("should emit click:dataRow with the correct sorted row data in virtual scroll mode with server-side sorting", async () => {
+      // This tests the bug where virtual scroll emits original unsorted data instead of sorted data
+      const sortableCols = [
+        { id: "name", accessorKey: "name", header: "NAME", size: 200, meta: { sortable: true } },
+        { id: "spans", accessorKey: "spans", header: "SPANS", size: 100, meta: { sortable: true } },
+      ];
+
+      // Original rows in default order
+      const originalRows = [
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+        { _timestamp: 3000, name: "gamma", spans: 20 },
+      ];
+
+      // When sorted by spans desc, the order should be: gamma(20), alpha(10), beta(5)
+      const sortedRows = [
+        { _timestamp: 3000, name: "gamma", spans: 20 },  // First after sorting
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+      ];
+
+      wrapper = mountTable({
+        columns: sortableCols,
+        rows: sortedRows,  // Pass the server-sorted rows
+        sortBy: "spans",   // Indicate we're sorted by spans
+        sortOrder: "desc", // Descending order
+        sortFieldMap: {},  // No field mapping needed
+        useVirtualScroll: true, // Use virtual scroll (default but explicit)
+      });
+
+      // Click on the first virtual row (should be gamma with 20 spans)
+      const firstVirtualRow = wrapper.find('[data-test="o2-table-detail-3000"]');
+      expect(firstVirtualRow.exists()).toBe(true);
+      await firstVirtualRow.trigger("click");
+
+      // Should emit the correct sorted row data, not the original row at index 0
+      expect(wrapper.emitted("click:dataRow")).toBeTruthy();
+      const [emittedRow] = wrapper.emitted("click:dataRow")![0] as any[];
+
+      // Should emit gamma (first in sorted order), not alpha (first in original order)
+      expect(emittedRow).toMatchObject({
+        _timestamp: 3000,
+        name: "gamma",
+        spans: 20
+      });
+      expect(emittedRow.name).not.toBe("alpha"); // Should NOT be the original first row
+    });
   });
 
   // ── rowClass prop ─────────────────────────────────────────────────────────
