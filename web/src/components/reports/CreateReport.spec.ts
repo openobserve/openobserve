@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -150,7 +149,7 @@ function mountComponent(routeQuery: Record<string, string> = {}) {
 
   const wrapper = mount(CreateReport, {
     global: {
-      plugins: [[Quasar, { platform }], i18n],
+      plugins: [[{ platform }], i18n],
       provide: { store, platform },
       stubs: {
         DateTime: { template: '<div data-test="datetime-stub" />' },

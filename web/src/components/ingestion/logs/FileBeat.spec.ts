@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FileBeat from "./FileBeat.vue";
 
 // Mock dependencies
@@ -37,6 +37,8 @@ vi.mock("@/components/CopyContent.vue", () => ({
   }
 }));
 
+installQuasar();
+
 describe("FileBeat.vue", () => {
   let store: any;
   let wrapper: any;
@@ -64,7 +66,7 @@ describe("FileBeat.vue", () => {
     store = createMockStore();
     wrapper = mount(FileBeat, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
@@ -222,7 +224,7 @@ describe("FileBeat.vue", () => {
     it("should handle missing currOrgIdentifier prop", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         },
         props: {
@@ -235,7 +237,7 @@ describe("FileBeat.vue", () => {
     it("should handle missing currUserEmail prop", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         },
         props: {
@@ -262,7 +264,7 @@ describe("FileBeat.vue", () => {
       store.state.selectedOrganization.identifier = "different-org";
       const newWrapper = mount(FileBeat, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });
@@ -308,7 +310,7 @@ describe("FileBeat.vue", () => {
       store.state.selectedOrganization.identifier = "";
       const newWrapper = mount(FileBeat, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });
@@ -334,7 +336,7 @@ describe("FileBeat.vue", () => {
       });
       const newWrapper = mount(FileBeat, {
         global: {
-          plugins: [storeWithNullOrg, Quasar],
+          plugins: [storeWithNullOrg],
           stubs: { CopyContent: true }
         }
       });
@@ -345,7 +347,7 @@ describe("FileBeat.vue", () => {
     it("should maintain component stability with undefined props", () => {
       const wrapperWithoutProps = mount(FileBeat, {
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: { CopyContent: true }
         }
       });

@@ -4,7 +4,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppSessions from "./AppSessions.vue";
 
 // Mock the composables
@@ -136,6 +136,8 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
   },
 }));
 
+installQuasar();
+
 describe("AppSessions.vue", () => {
   let wrapper: VueWrapper<any>;
   let store: any;
@@ -198,7 +200,7 @@ describe("AppSessions.vue", () => {
         isSessionReplayEnabled: true,
       },
       global: {
-        plugins: [store, router, i18n, Quasar],
+        plugins: [store, router, i18n],
         stubs: {
                     QBtn: {
             template:
@@ -644,7 +646,7 @@ describe("AppSessions.vue", () => {
           isSessionReplayEnabled: true,
         },
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           stubs: {
             QBtn: { template: "<button><slot /></button>" },
             QSplitter: {
@@ -785,7 +787,7 @@ describe("AppSessions.vue", () => {
     it("should default isSessionReplayEnabled to false", async () => {
       const newWrapper = mount(AppSessions, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           stubs: {
                         QBtn: { template: "<button><slot /></button>" },
             QSeparator: { template: "<hr />" },

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 import AppErrors from "./AppErrors.vue";
 
@@ -160,6 +160,8 @@ const MockFieldList = {
   emits: ["event-emitted"],
 };
 
+installQuasar({});
+
 describe("AppErrors.vue", () => {
   let wrapper: any;
   let store: any;
@@ -229,7 +231,7 @@ describe("AppErrors.vue", () => {
 
     return mount(AppErrors, {
       global: {
-        plugins: [store, router, i18n, [Quasar, {}]],
+        plugins: [store, router, i18n, ],
         stubs: {
           "query-editor": MockQueryEditor,
           "app-table": MockAppTable,

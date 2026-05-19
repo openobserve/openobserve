@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
     <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-      <OIcon name="error-outline" size="64px" />
+      <OIcon name="error-outline" style="width: 64px; height: 64px;" />
       <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
     </div>
   </ODrawer>

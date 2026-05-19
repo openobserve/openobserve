@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
+    class="left-drawer navbar-links tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
     <menu-link

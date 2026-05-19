@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 
 // Mock composables
@@ -37,6 +37,8 @@ const i18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe("DashboardJoinsOption", () => {
   let wrapper: any;
   let store: any;
@@ -53,7 +55,7 @@ describe("DashboardJoinsOption", () => {
 
     wrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -232,7 +234,7 @@ describe("DashboardJoinsOption", () => {
 
     const newWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -247,7 +249,7 @@ describe("DashboardJoinsOption", () => {
 
     const sqlWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -263,7 +265,7 @@ describe("DashboardJoinsOption", () => {
 
     const undefinedWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -281,7 +283,7 @@ describe("DashboardJoinsOption", () => {
 
     const defaultWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },

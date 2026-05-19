@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 
 // Mock external dependencies
@@ -63,6 +63,8 @@ vi.mock("marked", () => ({
   }),
 }));
 
+installQuasar();
+
 describe("MarkdownRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -70,7 +72,7 @@ describe("MarkdownRenderer", () => {
     return mount(MarkdownRenderer, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -281,7 +283,7 @@ describe("MarkdownRenderer", () => {
       // Create wrapper with dark theme store from the start
       wrapper = mount(MarkdownRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -307,7 +309,7 @@ describe("MarkdownRenderer", () => {
       
       wrapper = mount(MarkdownRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -326,7 +328,7 @@ describe("MarkdownRenderer", () => {
           markdownContent: "# Initial content"
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }

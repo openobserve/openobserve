@@ -15,124 +15,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg" style="min-height: 95vh;">
-    <div class="flex justify-between items-center full-width">
-      <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
-        {{ t("queries.runningQueries") }}
-      </div>
-      <div class="tw:flex-1" />
-      <div class="flex items-start">
+  <div
+    v-if="isMetaOrg"
+    class="running-queries-page tw:rounded-md q-pa-none"
+    style="min-height: inherit; height: calc(100vh - var(--navbar-height));"
+  >
+    <div>
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          data-test="running-queries-filter-container"
-          class="flex items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+          style="position: sticky; top: 0; z-index: 1000;"
         >
-          <OToggleGroup
-            :model-value="selectedQueryTypeTab"
-            @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
-            data-test="running-queries-query-type-tabs"
-            class="q-mr-sm"
+          <div class="tw:flex tw:items-center tw:gap-3">
+            <div class="q-table__title tw:font-[600]" data-test="log-stream-title-text">
+              {{ t("queries.runningQueries") }}
+            </div>
+            <span class="tw:text-xs tw:opacity-60">
+              Last Data Refresh Time: {{ lastRefreshed }}
+            </span>
+          </div>
+          <div
+            data-test="running-queries-filter-container"
+            class="tw:flex tw:items-center tw:gap-3"
           >
-            <OToggleGroupItem
-              v-for="visual in runningQueryTypes"
-              :key="visual.value"
-              :value="visual.value"
-              size="sm"
+            <OToggleGroup
+              :model-value="selectedQueryTypeTab"
+              @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
+              data-test="running-queries-query-type-tabs"
             >
-              {{ visual.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <div class=" o2-select-input o2-input">
-          <OSelect
-            v-model="selectedSearchField"
-            :options="searchFieldOptions"
-            labelKey="label"
-            valueKey="value"
-            class="q-pa-none tw:w-[140px] q-mr-sm"
-            data-test="running-queries-search-fields-select"
-            @update:model-value="filterQuery = ''"
-          />
+              <OToggleGroupItem
+                v-for="visual in runningQueryTypes"
+                :key="visual.value"
+                :value="visual.value"
+                size="sm"
+              >
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="o2-select-input o2-input">
+              <OSelect
+                v-model="selectedSearchField"
+                :options="searchFieldOptions"
+                labelKey="label"
+                valueKey="value"
+                class="q-pa-none tw:w-[140px]"
+                data-test="running-queries-search-fields-select"
+                @update:model-value="filterQuery = ''"
+              />
+            </div>
+            <OInput
+              v-if="selectedSearchField == 'all'"
+              v-model="filterQuery"
+              class="tw:h-[36px] tw:w-[200px]"
+              :placeholder="t('queries.search')"
+              data-test="running-queries-search-input"
+            >
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
+              </template>
+            </OInput>
+            <div v-else class="o2-select-input o2-input">
+              <OSelect
+                v-model="filterQuery"
+                :label="filterQuery ? '' : 'Select option'"
+                :options="otherFieldOptions"
+                labelKey="label"
+                valueKey="value"
+                class="no-border search-input"
+                data-test="running-queries-search-input"
+              />
+            </div>
+            <OButton
+              data-test="running-queries-refresh-btn"
+              variant="primary"
+              size="sm"
+              @click="refreshData"
+            >
+              {{ t(`queries.refreshQuery`) }}
+            </OButton>
           </div>
- 
-          <OInput
-            v-if="selectedSearchField == 'all'"
-            v-model="filterQuery"
-            class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-            :placeholder="t('queries.search')"
-            data-test="running-queries-search-input"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
-            </template>
-          </OInput>
-          <div v-else class=" o2-select-input o2-input ">
-            <OSelect
-            v-model="filterQuery"
-            :label="filterQuery ? '' : 'Select option'"
-            :options="otherFieldOptions"
-            labelKey="label"
-            valueKey="value"
-            class="no-border search-input"
-            data-test="running-queries-search-input"
-          />
-          </div>
-          <OButton
-            data-test="running-queries-refresh-btn"
-            variant="outline"
-            size="sm-action"
-            class="q-ml-sm"
-            @click="refreshData"
-          >
-            {{ t(`queries.refreshQuery`) }}
-          </OButton>
         </div>
       </div>
     </div>
-    <div class="label-container tw:flex tw:justify-end q-py-sm tw:h-[54px]">
-      <div v-if="selectedQueryTypeTab === 'all'">
-        <OToggleGroup
-          :model-value="selectedSearchType"
-          @update:model-value="onChangeSearchType($event as string)"
-          class="q-mr-md q-mr-lg"
-          data-test="running-queries-search-type-tabs"
-        >
-          <OToggleGroupItem
-            v-for="visual in searchTypes"
-            :key="visual"
-            :value="visual"
-            size="sm"
-          >
-            {{ searchTypeLabels[visual] ?? visual }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-      </div>
-      <label class="q-my-sm text-bold"
-        >Last Data Refresh Time: {{ lastRefreshed }}</label
-      >
-    </div>
 
-    <div
-      v-show="selectedQueryTypeTab === 'all'"
-      data-test="running-queries-all-queries-list"
-    >
-      <RunningQueriesList
-        :rows="rowsQuery"
-        v-model:selectedRows="selectedRow['all']"
-        @delete:query="confirmDeleteAction"
-        @delete:queries="handleMultiQueryCancel"
-        @show:schema="listSchema"
-      />
-    </div>
-    <div
-      v-show="selectedQueryTypeTab === 'summary'"
-      data-test="running-queries-summary-list"
-    >
-      <SummaryList
-        :rows="summaryRows"
-        v-model:selectedRows="selectedRow['summary']"
-        @filter:queries="filterUserQueries"
-        @delete:queries="handleMultiQueryCancel"
-      />
+    <div>
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+          <div
+            v-if="selectedQueryTypeTab === 'all'"
+            class="tw:flex tw:justify-end tw:items-center tw:px-4 tw:py-2 tw:border-b-[1px]"
+          >
+            <OToggleGroup
+              :model-value="selectedSearchType"
+              @update:model-value="onChangeSearchType($event as string)"
+              data-test="running-queries-search-type-tabs"
+            >
+              <OToggleGroupItem
+                v-for="visual in searchTypes"
+                :key="visual"
+                :value="visual"
+                size="sm"
+              >
+                {{ searchTypeLabels[visual] ?? visual }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
+
+          <div
+            v-show="selectedQueryTypeTab === 'all'"
+            data-test="running-queries-all-queries-list"
+          >
+            <RunningQueriesList
+              :rows="rowsQuery"
+              v-model:selectedRows="selectedRow['all']"
+              @delete:query="confirmDeleteAction"
+              @delete:queries="handleMultiQueryCancel"
+              @show:schema="listSchema"
+            />
+          </div>
+          <div
+            v-show="selectedQueryTypeTab === 'summary'"
+            data-test="running-queries-summary-list"
+          >
+            <SummaryList
+              :rows="summaryRows"
+              v-model:selectedRows="selectedRow['summary']"
+              @filter:queries="filterUserQueries"
+              @delete:queries="handleMultiQueryCancel"
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
     <confirm-dialog

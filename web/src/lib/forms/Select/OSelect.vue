@@ -48,6 +48,9 @@ type NormalizedOption = {
   disabled: boolean;
   header: boolean;
   icon?: string;
+  /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
+   *  Used when the icon isn't a string name in the OIcon registry. */
+  iconComponent?: any;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -150,6 +153,10 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   if (!isPrimitiveSelectValue(rawValue)) return null;
 
   const rawIcon = props.iconKey ? option[props.iconKey] : undefined;
+  // Auto-pick up `iconComponent` on the option (raw Vue component / inlined SVG).
+  // Lets consumers like ConfigPanel pass `iconComponent: markRaw(MyIcon)` per option
+  // when the icon isn't a string in the OIcon registry.
+  const rawIconComponent = option["iconComponent"];
   return {
     label:
       rawLabel === undefined || rawLabel === null
@@ -159,6 +166,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
+    iconComponent: rawIconComponent ?? undefined,
   };
 }
 
@@ -1047,8 +1055,15 @@ const fieldWidthClass = computed(() => {
                         </span>
                       </template>
 
+                      <!-- Per-option icon: prefer a raw Vue component (iconComponent),
+                           fall back to a string name (icon) resolved via OIcon registry. -->
+                      <component
+                        v-if="filteredOptions[vRow.index].iconComponent"
+                        :is="filteredOptions[vRow.index].iconComponent"
+                        class="tw:shrink-0 tw:size-4"
+                      />
                       <OIcon
-                        v-if="filteredOptions[vRow.index].icon"
+                        v-else-if="filteredOptions[vRow.index].icon"
                         :name="filteredOptions[vRow.index].icon"
                         size="xs"
                         class="tw:shrink-0"

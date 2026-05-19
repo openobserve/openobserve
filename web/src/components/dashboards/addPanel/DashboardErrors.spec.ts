@@ -15,7 +15,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 // Using Quasar directly instead of helper due to import path issues
-import { Quasar } from "quasar";
 import DashboardErrors from "./DashboardErrors.vue";
 import { ref } from "vue";
 
@@ -52,7 +51,7 @@ describe("DashboardErrors", () => {
       attachTo: "#app",
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           "q-separator": {
             template: "<hr class='q-separator' />",

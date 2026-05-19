@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import { ref, reactive } from "vue";
 
@@ -69,7 +68,7 @@ describe("BackGroundColorConfig", () => {
     return mount(BackGroundColorConfig, {
       attachTo: "#app",
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
           ...provide,

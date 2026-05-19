@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 
@@ -167,6 +167,8 @@ vi.mock("../addPanel/CommonAutoComplete.vue", () => ({
   }
 }));
 
+installQuasar();
+
 describe("AddSettingVariable", () => {
   let wrapper: VueWrapper<any>;
 
@@ -183,7 +185,7 @@ describe("AddSettingVariable", () => {
 
     wrapper = mount(AddSettingVariable, {
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
       props: defaultProps
     });
@@ -553,7 +555,7 @@ describe("AddSettingVariable", () => {
     beforeEach(async () => {
       const editWrapper = mount(AddSettingVariable, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
         props: {
           variableName: "existingVar",

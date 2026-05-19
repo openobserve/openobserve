@@ -16,7 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar, QSelect, QBtn, QTooltip } from "quasar";
+import { QSelect, QBtn, QTooltip } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -34,6 +35,8 @@ const i18n = createI18n({
     en: mockTranslations,
   },
 });
+
+installQuasar({ components: { QSelect, QBtn, QTooltip } });
 
 describe("DimensionFiltersBar.vue", () => {
   let wrapper: any;
@@ -63,16 +66,6 @@ describe("DimensionFiltersBar.vue", () => {
       },
       global: {
         plugins: [
-          [
-            Quasar,
-            {
-              components: {
-                QSelect,
-                QBtn,
-                QTooltip,
-              },
-            },
-          ],
           i18n,
           store,
         ],

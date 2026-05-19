@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import EqualIcon from '@/components/icons/EqualIcon.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('EqualIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('EqualIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(EqualIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(EqualIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

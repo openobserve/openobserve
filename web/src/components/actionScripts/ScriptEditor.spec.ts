@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ScriptEditor from '@/components/actionScripts/ScriptEditor.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('axios');
@@ -10,6 +10,8 @@ vi.mock('vue-i18n', () => ({
     t: (key: string) => key
   })
 }));
+
+installQuasar();
 
 describe('ScriptEditor.vue', () => {
   let wrapper: VueWrapper;
@@ -35,7 +37,7 @@ describe('ScriptEditor.vue', () => {
     return mount(ScriptEditor, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           'FullViewContainer': {
             template: '<div><slot name="left"></slot><slot></slot></div>',

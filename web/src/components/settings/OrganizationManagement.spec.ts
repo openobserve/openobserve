@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
 import store from "../../test/unit/helpers/store";
@@ -154,6 +154,8 @@ const ODialogStub = {
   `,
 };
 
+installQuasar({ plugins: [] });
+
 describe("OrganizationManagement.vue", () => {
   let wrapper: any;
   let mockQuasarNotify: any;
@@ -222,12 +224,6 @@ describe("OrganizationManagement.vue", () => {
     return mount(OrganizationManagement, {
       global: {
         plugins: [
-          [
-            Quasar,
-            {
-              plugins: []
-            }
-          ],
           i18n,
           store,
           router

@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-ml-auto no-border o2-search-input"
                         :placeholder="t('search.searchField')"
                       >
-                        <template #prepend>
+                        <template #icon-left>
                           <OIcon
                             class="o2-search-input-icon"
                             :class="
@@ -576,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template #cell-index_type="{ row }">
-                        <q-select
+                        <OSelect
                           v-if="
                             !(
                               row.name ==
@@ -585,87 +585,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                           :model-value="computedIndexType({ row }).value"
-                          :options="streamIndexType"
-                          option-label="label"
-                          option-value="value"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
-                          bg-color="input-bg"
+                          :options="indexTypeOptionsForRow(row)"
+                          label-key="label"
+                          value-key="value"
                           class="mini-select"
-                          input-class="mini-select"
-                          :option-disable="
-                            (_option) => disableOptions(row, _option)
-                          "
                           multiple
-                          :max-values="2"
-                          map-options
-                          emit-value
-                          autoclose
-                          borderless
-                          dense
-                          input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
-                          style="width: 190px"
-                          @update:model-value="
-                            (val) => updateIndexType({ row }, val)
-                          "
+                          clearable
+                          :data-test="`schema-field-${row.name}-index-type-select`"
+                          style="width: 190px;"
+                          @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
                         >
-                          <template v-slot:append>
-                            <OIcon
-                              v-if="row.index_type && row.index_type.length > 0"
-                              name="cancel"
-                              size="14px"
-                              style="
-                                cursor: pointer;
-                                display: flex;
-                                align-items: center;
-                                font-weight: bold;
-                                margin-top: 8px;
-                              "
-                              @click.stop="updateIndexType({ row }, [])"
-                            />
-                          </template>
-                          <template v-slot:option="scope">
-                            <q-item
-                              style="
-                                margin: 0px !important;
-                                border-radius: 0px !important;
-                              "
-                              v-bind="scope.itemProps"
-                              :disable="disableOptions(row, scope.opt)"
-                            >
-                              <q-item-section>
-                                <q-item-label>
-                                  {{ scope.opt.label }}
-                                </q-item-label>
-                              </q-item-section>
-                              <q-tooltip
-                                class="tw:text-[12px] tw:w-[200px]"
-                                v-if="
-                                  checkIfOptionPresentInDefaultEnv(
-                                    row.name,
-                                    scope.opt,
-                                  ) == true
-                                "
-                              >
-                                This is a predefined environment setting and
-                                cannot be changed.
-                              </q-tooltip>
-                            </q-item>
-                          </template>
-                          <q-tooltip
+                          <OTooltip
                             v-if="row.index_type && row.index_type.length > 0"
-                            class="tw:text-[12px]"
-                          >
-                            {{
-                              streamIndexType
-                                .filter((opt) =>
-                                  row.index_type.includes(opt.value),
-                                )
-                                .map((opt) => opt.label)
-                                .join(", ")
-                            }}
-                          </q-tooltip>
-                        </q-select>
+                            :content="streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
+                          />
+                        </OSelect>
                       </template>
                       <template #cell-patterns="{ row }">
                         <template
@@ -1155,7 +1089,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
@@ -1250,7 +1183,6 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -2720,6 +2652,24 @@ export default defineComponent({
       props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
       markFormDirty(props.row.name, "fts");
     };
+
+    // Builds the per-row options array for the index-type OSelect, with the
+    // `disabled` flag computed via disableOptions() for that row.
+    const indexTypeOptionsForRow = (row: any) => {
+      return streamIndexType.map((opt: any) => ({
+        ...opt,
+        disabled: disableOptions(row, opt),
+      }));
+    };
+
+    // OSelect doesn't have a max-values prop; enforce it client-side instead.
+    // Trims the selection to the last 2 values picked (matches old q-select
+    // :max-values="2" behaviour: silently caps at 2).
+    const MAX_INDEX_TYPES = 2;
+    const enforceMaxIndexTypes = (value: any) => {
+      if (!Array.isArray(value)) return value;
+      return value.length > MAX_INDEX_TYPES ? value.slice(-MAX_INDEX_TYPES) : value;
+    };
     //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because
     //we don't give access to the user to change the value of the env set by the env
     //and if it is empty then we will return empty array
@@ -2779,7 +2729,6 @@ export default defineComponent({
       getSchema,
       onSubmit,
       updateSettingsForm,
-      format,
       showPartitionColumn,
       showFullTextSearchColumn,
       getImageURL,
@@ -2872,6 +2821,8 @@ export default defineComponent({
       computedIndexType,
       checkIfOptionPresentInDefaultEnv,
       updateIndexType,
+      indexTypeOptionsForRow,
+      enforceMaxIndexTypes,
       isEnvQuickModeField,
       quickModeIcon,
       getConfigIcon,

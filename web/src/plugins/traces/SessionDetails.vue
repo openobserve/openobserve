@@ -597,7 +597,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, computed, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { formatDate } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import {
   useSessions,
@@ -608,6 +609,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -617,10 +619,9 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
-const $q = useQuasar();
+
 const { fetchSession, fetchTurnDetail } = useSessions();
 const { searchObj } = useTraces();
-
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
@@ -845,14 +846,12 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text).then(() => {
-    $q.notify({ message: "Copied", position: "top", timeout: 1000 });
-  });
+  copyToClipboard(text, { successMessage: "Copied", timeout: 1000 });
 }
 
 function formatTimestamp(micros: number): string {
   if (!micros) return "—";
-  return date.formatDate(Math.floor(micros / 1000), "YYYY-MM-DD HH:mm:ss");
+  return formatDate(Math.floor(micros / 1000), "YYYY-MM-DD HH:mm:ss");
 }
 
 function shortId(id: string): string {

@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Quasar } from "quasar";
 import { nextTick, ref } from "vue";
 
 // Mock userService
@@ -258,7 +257,7 @@ describe("AddUser Component", () => {
     mount(AddUser, {
       props: { ...defaultProps, ...overrides },
       global: {
-        plugins: [[Quasar, { platform }], i18n, router],
+        plugins: [[{ platform }], i18n, router],
         provide: { store, platform },
         stubs: {
           ODrawer: ODrawerStub,

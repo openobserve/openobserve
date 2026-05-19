@@ -66,13 +66,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         :default-columns="false"
         class="feature-comparison-table"
-      />
+      >
+        <template #cell-opensource="{ row }">
+          <span v-if="row.values.opensource === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.opensource === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.opensource }}</span>
+        </template>
+        <template #cell-enterprise="{ row }">
+          <span v-if="row.values.enterprise === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.enterprise === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.enterprise }}</span>
+        </template>
+        <template #cell-cloud="{ row }">
+          <span v-if="row.values.cloud === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.cloud === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.cloud }}</span>
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, h } from "vue";
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -104,16 +120,6 @@ interface FeatureData {
 const store = useStore();
 const { t } = useI18n();
 
-const renderFeatureCell = (value: boolean | string) => {
-  if (value === true) {
-    return h("span", { class: "status-icon status-available" }, "✅");
-  }
-  if (value === false) {
-    return h("span", { class: "status-icon status-unavailable" }, "❌");
-  }
-  return h("span", { class: "status-text" }, String(value));
-};
-
 const buildType = store.state.zoConfig.build_type;
 
 const columns: OTableColumnDef[] = [
@@ -130,7 +136,6 @@ const columns: OTableColumnDef[] = [
     id: "opensource",
     header: t("about.edition_opensource"),
     accessorFn: (row: Feature) => row.values.opensource,
-    cell: (({ value }: any) => renderFeatureCell(value)) as any,
     sortable: false,
     size: 150,
     maxSize: 150,
@@ -146,7 +151,6 @@ const columns: OTableColumnDef[] = [
     id: "enterprise",
     header: t("about.edition_enterprise"),
     accessorFn: (row: Feature) => row.values.enterprise,
-    cell: (({ value }: any) => renderFeatureCell(value)) as any,
     sortable: false,
     size: 150,
     maxSize: 150,
@@ -162,7 +166,6 @@ const columns: OTableColumnDef[] = [
     id: "cloud",
     header: t("about.edition_cloud"),
     accessorFn: (row: Feature) => row.values.cloud,
-    cell: (({ value }: any) => renderFeatureCell(value)) as any,
     sortable: false,
     size: 150,
     maxSize: 150,

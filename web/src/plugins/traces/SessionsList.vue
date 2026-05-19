@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import TenstackTable from "@/components/TenstackTable.vue";
 import useStreams from "@/composables/useStreams";
@@ -416,7 +416,7 @@ const tableColumns = computed(() => [
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
   // Backend ships timestamps as nanoseconds — quasar's date wants ms.
-  return date.formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
 function shortId(id: string): string {

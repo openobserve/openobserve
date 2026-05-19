@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import FullViewContainer from '@/components/functions/FullViewContainer.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('FullViewContainer.vue', () => {
   let wrapper: VueWrapper;
@@ -47,7 +49,7 @@ describe('FullViewContainer.vue', () => {
     return mount(FullViewContainer, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [currentStore, Quasar],
+        plugins: [currentStore],
         stubs: {
           'OIcon': {
             template: '<div class="OIcon-stub" :class="$attrs.class" @click.stop="$emit(\'click\', $event)">{{ name }}</div>',
@@ -104,7 +106,7 @@ describe('FullViewContainer.vue', () => {
           default: '<div class="test-content">Expanded Content</div>'
         },
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: {
             'OIcon': true
           }
@@ -126,7 +128,7 @@ describe('FullViewContainer.vue', () => {
           default: '<div class="test-content">Hidden Content</div>'
         },
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: {
             'OIcon': true
           }
@@ -293,7 +295,7 @@ describe('FullViewContainer.vue', () => {
           left: '<button class="left-button">Left Content</button>'
         },
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: {
             'OIcon': true
           }
@@ -314,7 +316,7 @@ describe('FullViewContainer.vue', () => {
           right: '<span class="right-content">Right Content</span>'
         },
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: {
             'OIcon': true
           }
@@ -336,7 +338,7 @@ describe('FullViewContainer.vue', () => {
           right: '<div class="right-slot">Right</div>'
         },
         global: {
-          plugins: [store, Quasar],
+          plugins: [store],
           stubs: {
             'OIcon': true
           }
@@ -418,7 +420,7 @@ describe('FullViewContainer.vue', () => {
           label: 'Test'
         },
         global: {
-          plugins: [emptyStore, Quasar],
+          plugins: [emptyStore],
           stubs: {
             'OIcon': true
           }

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import CustomDateTimePicker from '@/components/CustomDateTimePicker.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('CustomDateTimePicker.vue', () => {
   let wrapper: VueWrapper;
@@ -38,7 +40,7 @@ describe('CustomDateTimePicker.vue', () => {
     return mount(CustomDateTimePicker, {
       props,
       global: {
-        plugins: [currentStore, Quasar],
+        plugins: [currentStore],
         stubs: {
           'q-btn': true,
           'q-menu': true,

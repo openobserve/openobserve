@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { shallowMount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import PipelinesDestinationList from './PipelinesDestinationList.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -73,6 +73,8 @@ const mockI18n = createI18n({
   },
 });
 
+installQuasar();
+
 describe('PipelinesDestinationList Component - Comprehensive Function Tests', () => {
   let wrapper: any;
 
@@ -81,7 +83,7 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
 
     wrapper = shallowMount(PipelinesDestinationList, {
       global: {
-        plugins: [Quasar, mockI18n],
+        plugins: [mockI18n],
         provide: {
           store: mockStore,
         },

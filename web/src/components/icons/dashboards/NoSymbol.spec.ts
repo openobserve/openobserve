@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import NoSymbol from '@/components/icons/dashboards/NoSymbol.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
+
+installQuasar();
 
 describe('NoSymbol.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +12,7 @@ describe('NoSymbol.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(NoSymbol, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(NoSymbol, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

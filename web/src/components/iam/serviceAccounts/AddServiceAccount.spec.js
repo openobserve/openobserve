@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Quasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -113,7 +112,7 @@ describe("AddServiceAccount Component", () => {
         ...props,
       },
       global: {
-        plugins: [[Quasar, { platform }], i18n, router],
+        plugins: [[{ platform }], i18n, router],
         provide: { store: mockStore, platform },
         stubs: {
           ODrawer: ODrawerStub,

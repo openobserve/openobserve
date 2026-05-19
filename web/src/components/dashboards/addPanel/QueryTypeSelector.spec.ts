@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import QueryTypeSelector from "./QueryTypeSelector.vue";
 import { reactive } from "vue";
@@ -101,6 +101,8 @@ const ConfirmDialogStub = {
   emits: ["update:ok", "update:cancel"],
 };
 
+installQuasar();
+
 describe("QueryTypeSelector", () => {
   let wrapper: VueWrapper;
 
@@ -108,7 +110,7 @@ describe("QueryTypeSelector", () => {
     return mount(QueryTypeSelector, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
         },

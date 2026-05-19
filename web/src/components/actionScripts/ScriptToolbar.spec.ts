@@ -3,7 +3,7 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createStore } from 'vuex';
 import ScriptToolbar from '@/components/actionScripts/ScriptToolbar.vue';
-import { Quasar } from 'quasar';
+import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock vue-i18n
 vi.mock('vue-i18n', () => ({
@@ -11,6 +11,8 @@ vi.mock('vue-i18n', () => ({
     t: (key: string) => key
   })
 }));
+
+installQuasar();
 
 describe('ScriptToolbar.vue', () => {
   let wrapper: VueWrapper;

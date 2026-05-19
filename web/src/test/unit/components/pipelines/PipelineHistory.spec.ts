@@ -16,7 +16,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar, date } from "quasar";
+import { date } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelineHistory from "@/components/pipelines/PipelineHistory.vue";
 import i18n from "@/locales";
 import router from "../../helpers/router";
@@ -64,6 +65,8 @@ vi.mock("@/services/http", () => ({
   })),
 }));
 
+installQuasar();
+
 describe("PipelineHistory.vue", () => {
   let store: any;
 
@@ -82,7 +85,7 @@ describe("PipelineHistory.vue", () => {
     return mount(PipelineHistory, {
       props,
       global: {
-        plugins: [store, router, i18n, Quasar],
+        plugins: [store, router, i18n],
         stubs: {
           DateTime: {
             template: '<div data-test="datetime-stub"></div>',

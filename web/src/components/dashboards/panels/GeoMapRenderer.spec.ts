@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
 
 // Mock Leaflet
@@ -155,6 +155,8 @@ Object.defineProperty(window, 'removeEventListener', {
   value: removeEventListenerSpy,
 });
 
+installQuasar();
+
 describe("GeoMapRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -185,7 +187,7 @@ describe("GeoMapRenderer", () => {
         ...props
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
       ...options
     });
@@ -251,7 +253,7 @@ describe("GeoMapRenderer", () => {
           data: { options: {} }
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       await wrapper.vm.$nextTick();

@@ -156,11 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'width: 250px; max-height: 400px; overflow-y: auto; overflow-x: auto'
               "
             >
-              <q-list data-test="logs-search-saved-view-list">
-                <q-item style="padding: 0px 0px 0px 0px">
-                  <q-item-section
-                    class="column"
-                    no-hover
+              <div data-test="logs-search-saved-view-list">
+                <div class="tw:flex tw:p-0">
+                  <div
+                    class="tw:flex tw:flex-col"
                     :style="
                       localSavedViews.length > 0
                         ? 'width: 60%; border-right: 1px solid lightgray; min-width: 0'
@@ -176,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:w-full tw:my-2"
                         :placeholder="t('search.searchSavedView')"
                       >
-                        <template #prepend>
+                        <template #icon-left>
                           <OIcon name="search" size="sm" />
                         </template>
                       </OInput>
@@ -199,9 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="paginatedSavedViews.length === 0"
                         class="q-pl-sm q-pt-sm"
                       >
-                        <q-item-label>{{
+                        <span class="tw:text-sm">{{
                           t("search.savedViewsNotFound")
-                        }}</q-item-label>
+                        }}</span>
                       </div>
                       <div
                         v-for="row in paginatedSavedViews"
@@ -304,20 +303,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </q-item-section>
+                  </div>
 
-                  <q-item-section
-                    class="column"
+                  <div
+                    class="tw:flex tw:flex-col"
                     style="width: 40%; padding: 0; margin-left: 0px; justify-content: flex-start; align-self: flex-start"
                     v-if="localSavedViews.length > 0"
                   >
-                    <q-item style="padding: 0px">
-                      <q-item-label
-                        header
-                        class="q-pa-sm text-bold favorite-label"
-                        >{{ t("search.favoriteViews") }}</q-item-label
-                      >
-                    </q-item>
+                    <div class="tw:p-0">
+                      <div class="q-pa-sm text-bold favorite-label">
+                        {{ t("search.favoriteViews") }}
+                      </div>
+                    </div>
                     <OSeparator class="tw:mx-4" />
                     <div
                       data-test="log-search-saved-view-favorite-list-fields-table"
@@ -381,9 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                </div>
+              </div>
             </div>
           </ODropdown>
         </OButtonGroup>
@@ -534,7 +531,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
-        <ODropdown side="bottom" align="start">
+        <ODropdown
+          side="bottom"
+          align="start"
+          @update:open="(open) => { if (!open) showDownloadSubmenu = false; }"
+        >
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
@@ -569,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="searchHistoryIcon"
                 alt="Search History"
-                style="width: 20px; height: 20px"
+                style="width: 16px; height: 16px"
               />
             </template>
             {{ t("search.searchHistory") }}
@@ -577,32 +578,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator />
 
-          <!-- Download CSV/JSON (flattened from nested submenu) -->
-          <ODropdownItem
-            data-test="search-download-csv-btn"
-            @select="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+          <!-- Download results — nested sub-dropdown (hover to open) -->
+          <div
+            data-test="search-download-submenu-trigger"
+            class="search-download-item"
+            @mouseenter="showDownloadSubmenu = true"
+            @mouseleave="showDownloadSubmenu = false"
           >
-            <template #icon-left>
-              <OIcon name="grid-on" size="xs" />
-            </template>
-            {{ t("search.downloadTable") }} ({{ t("search.downloadCSV") }})
-          </ODropdownItem>
-          <ODropdownItem
-            data-test="search-download-json-btn"
-            @select="downloadLogs(searchObj.data.queryResults.hits, 'json')"
-          >
-            <template #icon-left>
-              <OIcon name="data-object" size="xs" />
-            </template>
-            {{ t("search.downloadTable") }} ({{ t("search.downloadJSON") }})
-          </ODropdownItem>
+            <OIcon size="sm" name="download" class="search-download-item-icon" />
+            <span class="search-download-item-label">{{ t("search.downloadTable") }}</span>
+            <OIcon size="sm" name="chevron-right" />
+
+            <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+            <div
+              v-if="showDownloadSubmenu"
+              class="search-download-submenu"
+              data-test="search-download-submenu"
+            >
+              <button
+                type="button"
+                data-test="search-download-csv-btn"
+                class="search-download-submenu-item"
+                @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
+              >
+                <OIcon name="grid-on" size="sm" />
+                <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
+              </button>
+              <button
+                type="button"
+                data-test="search-download-json-btn"
+                class="search-download-submenu-item"
+                @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
+              >
+                <OIcon name="data-object" size="sm" />
+                <span class="tw:flex-1">{{ t("search.downloadJSON") }}</span>
+              </button>
+            </div>
+          </div>
 
           <ODropdownItem @select="toggleCustomDownloadDialog">
             <template #icon-left>
               <img
                 :src="customRangeIcon"
                 alt="Custom Range"
-                style="width: 20px; height: 20px"
+                style="width: 16px; height: 16px"
               />
             </template>
             {{ t("search.customRange") }}
@@ -617,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="openExplainDialog"
           >
             <template #icon-left>
-              <OIcon name="lightbulb" size="md" />
+              <OIcon name="lightbulb" size="sm" />
             </template>
             {{ t("search.explainQuery") }}
           </ODropdownItem>
@@ -633,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="createScheduledSearchIcon"
                 alt="Create Scheduled Search"
-                style="width: 20px; height: 20px"
+                style="width: 16px; height: 16px"
               />
             </template>
             <span data-test="search-scheduler-create-new-label">
@@ -650,7 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="listScheduledSearchIcon"
                 alt="List Scheduled Search"
-                style="width: 20px; height: 20px"
+                style="width: 16px; height: 16px"
               />
             </template>
             <span data-test="search-scheduler-list-label">
@@ -670,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="openSearchInspectDialog"
           >
             <template #icon-left>
-              <OIcon name="troubleshoot" size="md" />
+              <OIcon name="troubleshoot" size="sm" />
             </template>
             <span data-test="search-inspect-label">Search Inspect</span>
           </ODropdownItem>
@@ -4168,6 +4187,9 @@ export default defineComponent({
     const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
     const downloadCustomFileName = ref("");
     const downloadCustomFileType = ref("csv");
+    // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
+    // Resets automatically when the parent ODropdown closes (via @update:open handler).
+    const showDownloadSubmenu = ref(false);
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4826,6 +4848,7 @@ export default defineComponent({
       syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,
+      showDownloadSubmenu,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -5270,6 +5293,95 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* "Download results" item with hover-triggered CSV/JSON sub-popover.
+   Matches the language sub-menu pattern in Header.vue. */
+.search-download-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  /* Invisible hover bridge extending to the LEFT of the parent item,
+     covering the gap between the parent and the submenu. Without this,
+     moving the cursor leftward toward the submenu briefly enters dead
+     space, fires mouseleave on the parent, and closes the submenu
+     before the cursor can land on it. */
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 100%;
+    width: 10px;
+    height: 100%;
+    /* Stays transparent — only present to extend the hover hit-test area */
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.search-download-item-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.search-download-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 4px;
+  min-width: 160px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 9999;
+
+  body.body--dark & {
+    background-color: #1f2937;
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.search-download-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
 .expand-on-focus {
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;

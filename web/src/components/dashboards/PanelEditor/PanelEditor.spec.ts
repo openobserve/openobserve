@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelEditor from "./PanelEditor.vue";
 
 // Mock vuex store
@@ -271,7 +271,7 @@ const ODialogStub = {
 // Shared global mount options. Centralizing avoids the same 12-line block
 // repeated in every test and keeps the stub set in one place.
 const mountGlobal = {
-  plugins: [i18n, Quasar],
+  plugins: [i18n],
   stubs: {
     QSeparator: true,
     QSplitter: {
@@ -291,6 +291,8 @@ const mountGlobal = {
     },
   },
 };
+
+installQuasar();
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;
