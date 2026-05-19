@@ -130,7 +130,11 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      expect(wrapper.findAll("q-list").length).toBe(0);
+      // After Quasar -> native HTML migration the values list is a <ul> that's
+      // always rendered, but its <li> children come from v-for over displayValues.
+      // With no cached values during loading, no row items should be present.
+      const valueRows = wrapper.findAll('[data-test^="logs-search-subfield-add-"]');
+      expect(valueRows.length).toBe(0);
     });
   });
 

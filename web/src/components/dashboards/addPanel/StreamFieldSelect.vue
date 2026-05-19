@@ -23,17 +23,15 @@
             :data-test="`stream-field-select-group-${scope.index}`"
           >
             <template v-for="child in scope.opt.children" :key="child.name">
-              <q-item
-                clickable
-                v-ripple
-                v-close-popup
+              <li
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="selectField(child)"
                 :data-test="`stream-field-select-option-${child.name}`"
               >
-                <q-item-section>
-                  <q-item-label>{{ child.name }}</q-item-label>
-                </q-item-section>
-              </q-item>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm">{{ child.name }}</span>
+                </div>
+              </li>
             </template>
           </OCollapsible>
         </template>

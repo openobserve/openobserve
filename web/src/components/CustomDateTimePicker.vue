@@ -447,11 +447,6 @@ const computedClass = computed(() => {
     }
   }
 }
-.timezone-select {
-  .q-item:nth-child(2) {
-    border-bottom: 1px solid #dcdcdc;
-  }
-}
 .dashboard-add-btn {
   cursor: pointer;
   padding: 0px 5px;

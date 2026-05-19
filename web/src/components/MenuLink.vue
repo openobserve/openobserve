@@ -15,32 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-item
+  <!-- External link → plain anchor -->
+  <a
+    v-if="external"
     :data-test="`menu-link-${link}-item`"
-    v-ripple="true"
-    :to="
-      !external
-        ? {
-            path: link,
-            exact: false,
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          }
-        : ''
-    "
-    clickable
-    :class="{
-      'q-router-link--active':
-        router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
-      'q-link-function': title == 'Functions',
-    }"
+    href="#"
     :target="target"
+    :class="['nav-menu-item', { 'menu-link-function': title === 'Functions' }]"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
-    v-on="external ? { click: () => openWebPage(link) } : {}"
+    @click.prevent="openWebPage(link)"
   >
-    <q-item-section v-if="icon" avatar>
+    <div v-if="icon" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
         <OIcon :name="icon" size="sm" />
         <div
@@ -52,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-    <q-item-section v-else-if="iconComponent" avatar>
+      <span class="nav-menu-item-label">{{ title }}</span>
+    </div>
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
         <component :is="iconComponent" class="o-icon tw:size-4" />
         <div
@@ -66,9 +52,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-  </q-item>
+      <span class="nav-menu-item-label">{{ title }}</span>
+    </div>
+  </a>
+
+  <!-- Internal link → router-link (rendered as <a>) -->
+  <router-link
+    v-else
+    :data-test="`menu-link-${link}-item`"
+    :to="{
+      path: link,
+      query: {
+        org_identifier: store.state.selectedOrganization?.identifier,
+      },
+    }"
+    :class="[
+      'nav-menu-item',
+      {
+        'nav-menu-item--active': isActive,
+        'menu-link-function': title === 'Functions',
+      },
+    ]"
+    :target="target"
+    :aria-current="isActive ? 'page' : undefined"
+    :aria-label="ariaLabel"
+  >
+    <div v-if="icon" class="nav-menu-item-avatar">
+      <div class="icon-wrapper">
+        <OIcon :name="icon" size="sm" />
+        <div
+          v-if="badge && badge > 0"
+          class="menu-badge"
+          aria-live="polite"
+          :aria-label="`${badge} notifications`"
+        >
+          {{ badge > 99 ? '99+' : badge }}
+        </div>
+      </div>
+      <span class="nav-menu-item-label">{{ title }}</span>
+    </div>
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar">
+      <div class="icon-wrapper">
+        <component :is="iconComponent" class="o-icon tw:size-4" />
+        <div
+          v-if="badge && badge > 0"
+          class="menu-badge"
+          aria-live="polite"
+          :aria-label="`${badge} notifications`"
+        >
+          {{ badge > 99 ? '99+' : badge }}
+        </div>
+      </div>
+      <span class="nav-menu-item-label">{{ title }}</span>
+    </div>
+  </router-link>
 </template>
 
 <script lang="ts">
@@ -167,7 +204,10 @@ export default defineComponent({
 @import "../styles/menu-variables";
 @import "../styles/menu-animations";
 
-.q-item {
+.nav-menu-item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
   padding: 1px 8px;
   margin: 0px;
   border-radius: 6px;
@@ -192,7 +232,7 @@ export default defineComponent({
   transform: translateZ(0);
 
   // Phase 2: Enhanced hover state with 3D icon effect
-  &:hover:not(.q-router-link--active) {
+  &:hover:not(.nav-menu-item--active) {
     transform: translateZ(0);
     // background-color: rgba(30, 41, 59, 0.6);
 
@@ -203,14 +243,14 @@ export default defineComponent({
       filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
     }
 
-    .q-item-label {
+    .nav-menu-item-label {
       color: var(--o2-menu-color);
       transform: translateY(-2px);
     }
   }
 
   // Phase 2 & 3: Enhanced active state with modern UX
-  &.q-router-link--active {
+  &.nav-menu-item--active {
     transform: translateZ(0) !important;
     // Rich, vibrant multi-layer gradient background
     // background:
@@ -238,7 +278,7 @@ export default defineComponent({
       color: var(--o2-menu-color); // Lighter purple for better visibility
     }
 
-    .q-item-label {
+    .nav-menu-item-label {
       font-weight: 700;
       color: var(--o2-menu-color); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
@@ -296,7 +336,7 @@ export default defineComponent({
 }
 
 // Phase 3: Enhanced icon container with 3D effects and spring bounce-back
-.q-item__section--avatar {
+.nav-menu-item-avatar {
   margin: 0;
   padding: 0;
   min-width: 40px;
@@ -312,7 +352,7 @@ export default defineComponent({
 }
 
 // Add spring bounce-back transition to label
-.q-item-label {
+.nav-menu-item-label {
   transition: all 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
   transform-style: preserve-3d;
 }
@@ -355,29 +395,14 @@ export default defineComponent({
   }
 }
 
-// Light mode support - using :deep() to pierce scoped styles
-body.body--light {
-  .q-item {
-
-
-    &.q-router-link--active {
-
-      // &::before {
-      //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
-      //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
-      // }
-    }
-  }
-}
-
 </style>
 
-<!-- Unscoped: targets Quasar-rendered DOM inside .navbar-links container -->
+<!-- Unscoped: targets nav-menu-item rendered inside .navbar-links container -->
 <style lang="scss">
 .navbar-links {
   padding-top: 0.25rem;
 
-  .q-item {
+  .nav-menu-item {
     margin: 0 0.156rem;
     padding: 0.125rem;
     border-radius: 0.313rem;
@@ -385,7 +410,7 @@ body.body--light {
     text-align: center;
     list-style: none;
 
-    &__section--avatar {
+    .nav-menu-item-avatar {
       padding-right: 0;
       min-width: 1.5rem;
       display: list-item;
@@ -398,21 +423,21 @@ body.body--light {
       width: 1.3rem;
     }
 
-    .q-item__label {
+    .nav-menu-item-label {
       padding-bottom: 0.25rem;
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--o2-text-secondary);
     }
 
-    &.q-router-link--active {
+    &.nav-menu-item--active {
       color: var(--o2-menu-color);
 
       .OIcon img {
         filter: brightness(100);
       }
 
-      .q-item__label {
+      .nav-menu-item-label {
         color: var(--o2-menu-color);
       }
 
@@ -423,7 +448,7 @@ body.body--light {
           color: #19191e !important;
         }
 
-        .q-item__label {
+        .nav-menu-item-label {
           color: #19191e !important;
         }
       }
@@ -435,7 +460,7 @@ body.body--light {
           color: #ffffff !important;
         }
 
-        .q-item__label {
+        .nav-menu-item-label {
           color: #ffffff !important;
         }
       }

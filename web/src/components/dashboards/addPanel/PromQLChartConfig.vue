@@ -185,18 +185,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </div>
           </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps" dense style="padding: 0px 4px">
-              <q-item-section side class="q-pa-none">
-                <OCheckbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
+          <template v-slot:option="{ opt, selected, toggleOption }">
+            <div
+              class="tw:flex tw:items-center tw:gap-2 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+              @click="toggleOption(opt)"
+            >
+              <OCheckbox
+                class="tw:shrink-0"
+                :model-value="selected"
+                @update:model-value="toggleOption(opt)"
+              />
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm">{{ opt.label }}</span>
+              </div>
+            </div>
           </template>
         </OSelect>
       </template>
@@ -255,20 +257,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
+            <div
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
               style="min-height: auto; padding: 0px 4px"
+              @click="toggleOption(opt)"
             >
-              <q-item-section side class="q-pa-none">
+              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
+              </div>
+              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm">{{ opt }}</span>
+              </div>
+            </div>
           </template>
         </OSelect>
 
@@ -310,20 +313,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
+            <div
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
               style="min-height: auto; padding: 0px 4px"
+              @click="toggleOption(opt)"
             >
-              <q-item-section side class="q-pa-none">
+              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
+              </div>
+              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm">{{ opt }}</span>
+              </div>
+            </div>
           </template>
         </OSelect>
       </template>
@@ -403,20 +407,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
+            <div
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
               style="min-height: auto; padding: 0px 4px"
+              @click="toggleOption(opt)"
             >
-              <q-item-section side class="q-pa-none">
+              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
+              </div>
+              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm">{{ opt }}</span>
+              </div>
+            </div>
           </template>
         </OSelect>
       </template>

@@ -118,7 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field values list -->
-      <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+      <ul
+        class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
+        data-test="field-values-panel-values-list"
+      >
         <li v-for="value in displayValues" :key="value.key">
           <label
             class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"

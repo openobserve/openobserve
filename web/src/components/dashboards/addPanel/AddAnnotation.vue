@@ -30,25 +30,27 @@
             popup-content-style="z-index: 10001"
           >
             <template v-slot:option="{ opt, selected, toggleOption }">
-              <q-item
+              <div
                 v-if="opt.isTab"
-                class="bg-grey-3 text-bold text-dark"
-                style="pointer-events: none"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:bg-muted tw:font-bold tw:pointer-events-none"
               >
-                <q-item-section>{{ opt.label }}</q-item-section>
-              </q-item>
+                <span class="tw:text-sm">{{ opt.label }}</span>
+              </div>
 
-              <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                <q-item-section side>
-                  <OCheckbox
-                    :model-value="selected"
-                    @update:model-value="() => toggleOption(opt)"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ opt.label }}</q-item-label>
-                </q-item-section>
-              </q-item>
+              <div
+                v-else
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                @click="toggleOption(opt)"
+              >
+                <OCheckbox
+                  class="tw:shrink-0"
+                  :model-value="selected"
+                  @update:model-value="() => toggleOption(opt)"
+                />
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm">{{ opt.label }}</span>
+                </div>
+              </div>
             </template>
           </OSelect>
         <div class="text-caption q-mt-md">

@@ -307,7 +307,7 @@ describe("FunctionSelector", () => {
   });
 
   it("should render function items in the list", () => {
-    const functionItems = wrapper.findAll(".q-item");
+    const functionItems = wrapper.findAll('[data-test^="logs-search-saved-function-"]');
     // Should have function items plus the "not found" item container
     expect(functionItems.length).toBeGreaterThan(0);
   });

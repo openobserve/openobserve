@@ -49,47 +49,47 @@ Legend: `[ ]` = not done · `[x]` = done · `[!]` = complex / needs special hand
 
 Items are `q-item[clickable]` rows. Migrate to `ODropdownItem` children.
 
-- [ ] `src/views/Dashboards/addPanel/Group.vue` — `v-model="showAddMenu"`, 2 items (Add Condition, Add Group)
-- [ ] `src/components/pipeline/PipelinesList.vue` — 2 separate `<q-menu>` instances (context menus on pipeline rows)
-- [ ] `src/components/common/sidebar/FolderList.vue` — context menu on folder rows
-- [ ] `src/components/O2AIChat.vue` — chat history menu (1 `<q-menu>` instance at line 51)
+- [x] `src/views/Dashboards/addPanel/Group.vue` — `v-model="showAddMenu"`, 2 items (Add Condition, Add Group)
+- [x] `src/components/pipeline/PipelinesList.vue` — 2 separate `<q-menu>` instances (context menus on pipeline rows)
+- [x] `src/components/common/sidebar/FolderList.vue` — context menu on folder rows
+- [x] `src/components/O2AIChat.vue` — chat history menu (1 `<q-menu>` instance at line 51)
 
 #### Dashboard Query Builder Field Menus — Pattern 1 + 4
 
 Each field chip in the query builder (x/y/z axes, breakdowns) has a config menu. Uses `@show` pattern.
 
-- [ ] `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` — 4 instances (x, y, breakdown, filter field config menus)
-- [ ] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — 3 instances
-- [ ] `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` — 2 instances
-- [ ] `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue` — 3 instances
-- [ ] `src/views/Dashboards/addPanel/AddCondition.vue` — `class="q-pa-md" @show="loadFilterItem"` — Pattern 4
-- [ ] `src/views/Dashboards/addPanel/DashboardJoinsOption.vue` — field config menu
+- [x] `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` — 4 instances (x, y, breakdown, filter field config menus)
+- [x] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — 3 instances
+- [x] `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` — 2 instances
+- [x] `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue` — 3 instances
+- [x] `src/views/Dashboards/addPanel/AddCondition.vue` — `class="q-pa-md" @show="loadFilterItem"` — Pattern 4
+- [x] `src/views/Dashboards/addPanel/DashboardJoinsOption.vue` — field config menu
 
 #### PromQL Builder Menus — Pattern 1 + 4
 
-- [ ] `src/components/promql/components/OperationsList.vue` — `class="q-pa-md"`, inside a filter chip
-- [ ] `src/components/promql/components/LabelFilterEditor.vue` — `class="q-pa-md"`, filter value picker
+- [x] `src/components/promql/components/OperationsList.vue` — `class="q-pa-md"`, inside a filter chip
+- [x] `src/components/promql/components/LabelFilterEditor.vue` — `class="q-pa-md"`, filter value picker
 
 #### Syntax Guide Panels — Pattern 2
 
 Non-interactive documentation card toggled by a button. Content moves into the default slot.
 
-- [ ] `src/plugins/logs/SyntaxGuide.vue` — `:class` theme toggle, syntax guide panel
-- [ ] `src/plugins/metrics/SyntaxGuideMetrics.vue` — `:class` theme toggle, metrics syntax guide
-- [ ] `src/plugins/metrics/MetricLegends.vue` — `:class` theme toggle, legend info panel
-- [ ] `src/plugins/traces/SyntaxGuide.vue` — `data-test="syntax-guide-menu"`, trace query guide
+- [x] `src/plugins/logs/SyntaxGuide.vue` — `:class` theme toggle, syntax guide panel
+- [x] `src/plugins/metrics/SyntaxGuideMetrics.vue` — `:class` theme toggle, metrics syntax guide
+- [x] `src/plugins/metrics/MetricLegends.vue` — `:class` theme toggle, legend info panel
+- [x] `src/plugins/traces/SyntaxGuide.vue` — `data-test="syntax-guide-menu"`, trace query guide
 
 #### ServiceIdentity Context Menu — Pattern 1
 
-- [ ] `src/components/settings/ServiceIdentitySetup.vue` — `anchor="bottom left" self="top left"`, action menu
+- [x] `src/components/settings/ServiceIdentitySetup.vue` — `anchor="bottom left" self="top left"`, action menu
 
 #### AlertList Context Menu — Pattern 1
 
-- [ ] `src/components/alerts/AlertList.vue` — row action menu (edit, clone, delete, etc.)
+- [x] `src/components/alerts/AlertList.vue` — row action menu (edit, clone, delete, etc.)
 
 #### SearchBar Menus — Pattern 3 + 4
 
-- [ ] `src/plugins/logs/SearchBar.vue` — 3 instances:
+- [x] `src/plugins/logs/SearchBar.vue` — 3 instances:
   - Line 436: suggestions menu `anchor="bottom left" self="top left"`
   - Line 652: simple overflow menu (no positioning attrs)
   - Line 713: download format menu `v-model="showDownloadMenu" anchor="top end" self="top start" :offset="[0,0]"` — **controlled**
@@ -98,23 +98,22 @@ Non-interactive documentation card toggled by a button. Content moves into the d
 
 Large date-picker UI rendered inside the menu. Requires controlled open state. All three files below carry `no-route-dismiss` on `<q-menu>`.
 
-- [ ] `src/components/DateTimePicker.vue` — `no-route-dismiss id="date-time-menu" class="date-time-dialog" anchor="bottom left" self="top left"` — **complex content**
-- [ ] `src/components/DateTime.vue` — `no-route-dismiss`, `@before-show @before-hide @hide @show` lifecycle hooks — **complex content**
-- [ ] `src/components/CustomDateTimePicker.vue` — `no-route-dismiss`, date picker variant
+- [x] `src/components/DateTimePicker.vue` — `no-route-dismiss id="date-time-menu" class="date-time-dialog" anchor="bottom left" self="top left"` — **complex content**
+- [x] `src/components/DateTime.vue` — `no-route-dismiss`, `@before-show @before-hide @hide @show` lifecycle hooks — **complex content**
+- [x] `src/components/CustomDateTimePicker.vue` — `no-route-dismiss`, date picker variant
 
 #### AutoRefreshInterval Menu — Pattern 3
 
-- [ ] `src/components/AutoRefreshInterval.vue` — `content-style="z-index: 10001"`, interval buttons — **complex content**
+- [x] `src/components/AutoRefreshInterval.vue` — `content-style="z-index: 10001"`, interval buttons — **complex content**
 
 #### Header Menus — Pattern 3 + 5 (Complex)
 
-- [!] `src/components/Header.vue` — **3 `<q-menu>` instances**, requires special handling:
-  - **Help menu** at line 242 (`fit anchor="bottom right" self="top right" transition-show="jump-down"`) — simple action list — Pattern 1
-  - **User profile menu** at line 320 (`fit anchor="bottom right" self="top right" transition-show="jump-down"`) — contains the language sub-menu — Pattern 3
-  - **Language selection sub-menu** at line 380 (`auto-close anchor="top end" self="top start"`) nested inside the user profile menu — **Pattern 5 ⚠ nested sub-menu not supported by ODropdown**
+- [x] `src/components/Header.vue` — **3 `<q-menu>` instances**, all migrated:
+  - **Help menu** — migrated to `ODropdown` + `ODropdownItem` — Pattern 1 ✅
+  - **User profile menu** — migrated to `ODropdown` — Pattern 3 ✅
+  - **Language selection sub-menu** — **Workaround A**: flattened into the user-profile dropdown as an `ODropdownGroup` rather than a true nested sub-menu (avoids the unsupported nesting pattern) ✅
 
-  > The language selector nested sub-menu requires a custom workaround — do not use `ODropdown` nesting. Consider a flat panel or a separate `ODialog`.  
-  > Note: the `auto-close` Quasar prop (close on any child click) needs no equivalent — `ODropdownItem`'s `@select` already closes the dropdown.
+  > Workaround A (Header language sub-menu) and Workaround C (nested sub-menus in OperationsList / LabelFilterEditor that kept Quasar `<q-menu>` inside `ODropdown` with a pointer-down-outside guard) are documented in `quasar-menu-migration.md`.
 
 ---
 
@@ -124,19 +123,19 @@ These files override `.q-menu` styles or check for `.q-menu` in JS. Each needs a
 
 Excluded from this list: internal `.q-menu` guards in `src/lib/overlay/Dialog/ODialog.vue`, `src/lib/overlay/Drawer/ODrawer.vue`, and `src/lib/overlay/Dropdown/ODropdown.vue` — these are intentional cross-portal interop with Quasar popups and stay until Quasar is fully removed.
 
-- [ ] `src/plugins/traces/TraceDetails.vue` — 4 rules (active, dark-active, focused, dark-focused item overrides)
-- [ ] `src/plugins/traces/IndexList.vue` — 1 rule
-- [ ] `src/plugins/metrics/MetricList.vue` — 2 rules
-- [ ] `src/components/dashboards/addPanel/FieldList.vue` — 1 rule (CSS-only, no template `<q-menu>`)
-- [ ] `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/promql/components/OperationsList.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/promql/components/LabelFilterEditor.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/iam/users/UpdateRole.vue` — 1 rule (overrides a popup from a parent's `q-select` / `q-menu`)
-- [ ] `src/views/Dashboards/addPanel/AddCondition.vue` — 1 rule (also has template usage above)
-- [ ] `src/components/alerts/IncidentDetailDrawer.vue` — inline JS selector `'.q-dialog, .q-menu'` used as a "popup-is-open" check (line 2063); rewrite to use the dropdown content class once neighbouring `<q-menu>`s are migrated
+- [x] `src/plugins/traces/TraceDetails.vue` — 4 rules (active, dark-active, focused, dark-focused item overrides)
+- [x] `src/plugins/traces/IndexList.vue` — 1 rule
+- [x] `src/plugins/metrics/MetricList.vue` — 2 rules
+- [x] `src/components/dashboards/addPanel/FieldList.vue` — 1 rule (CSS-only, no template `<q-menu>`)
+- [x] `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` — 1 rule (also has template usage above)
+- [x] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — 1 rule (also has template usage above)
+- [x] `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` — 1 rule (also has template usage above)
+- [x] `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue` — 1 rule (also has template usage above)
+- [x] `src/components/promql/components/OperationsList.vue` — 1 rule (also has template usage above)
+- [x] `src/components/promql/components/LabelFilterEditor.vue` — 1 rule (also has template usage above)
+- [x] `src/components/iam/users/UpdateRole.vue` — 1 rule (overrides a popup from a parent's `q-select` / `q-menu`)
+- [x] `src/views/Dashboards/addPanel/AddCondition.vue` — 1 rule (also has template usage above)
+- [x] `src/components/alerts/IncidentDetailDrawer.vue` — inline JS selector `'.q-dialog, .q-menu'` used as a "popup-is-open" check (line 2063); rewrite to use the dropdown content class once neighbouring `<q-menu>`s are migrated
 
 ---
 

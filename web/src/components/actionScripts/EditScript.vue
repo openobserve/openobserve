@@ -1139,14 +1139,6 @@ onMounted(async () => {
 });
 </script>
 
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>
-
 <style scoped lang="scss">
 .lookup-table-file-uploader {
   :deep(.q-field__label) {

@@ -359,23 +359,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="min-width: 200px"
                           >
                             <template v-slot:option="scope">
-                              <q-item
-                                v-bind="scope.itemProps"
-                                :disable="scope.opt.disable"
+                              <div
+                                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                                :class="{ 'tw:opacity-50 tw:pointer-events-none': scope.opt.disable }"
+                                @click="scope.toggleOption(scope.opt)"
                               >
-                                <q-item-section>
-                                  <q-item-label>{{
+                                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                                  <span class="tw:text-sm">{{
                                     scope.opt.label
-                                  }}</q-item-label>
-                                  <q-item-label
+                                  }}</span>
+                                  <span
                                     v-if="scope.opt.disable"
-                                    caption
-                                    class="text-negative"
+                                    class="tw:block tw:text-xs tw:text-muted-foreground text-negative"
                                   >
                                     Not supported for PDF
-                                  </q-item-label>
-                                </q-item-section>
-                              </q-item>
+                                  </span>
+                                </div>
+                              </div>
                             </template>
                           </OSelect>
                         </div>
@@ -1839,10 +1839,3 @@ const openCancelDialog = () => {
 };
 </script>
 
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>

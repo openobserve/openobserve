@@ -306,8 +306,7 @@
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 0.375rem; // 6px
       }
     }
@@ -461,14 +460,6 @@
     border-radius: 0.375rem; // 6px
   }
 
-  .q-item {
-    padding: 0 !important;
-
-    &:hover {
-      background-color: var(--o2-hover-accent) !important;
-    }
-  }
-
   .q-focus-helper:hover {
     background: transparent !important;
   }
@@ -501,16 +492,6 @@
   .region-dropdown-list {
     min-width: 9.375rem; // 150px
     border-radius: 0.375rem; // 6px
-
-    .q-item__section {
-      display: inline-block;
-    }
-
-    .q-item__label {
-      margin-left: 1.25rem; // 20px
-      text-transform: capitalize;
-      margin-top: 0.125rem; // 2px
-    }
   }
 }
 .saved-view-table {
@@ -556,10 +537,6 @@
 
   .saved-view-item {
     padding: 0.25rem 0.3125rem 0.25rem 0.625rem !important; // 4px 5px 4px 10px
-  }
-
-  .q-item__section--main ~ .q-item__section--side {
-    padding-left: 0.3125rem !important; // 5px
   }
 }
 
@@ -860,20 +837,6 @@
     }
   }
 
-  .q-item {
-    min-height: 1.3rem;
-    padding: 5px 10px;
-
-    &__label {
-      font-size: 0.75rem;
-    }
-
-    &.q-manual-focusable--focused > .q-focus-helper {
-      background: currentColor !important;
-      opacity: 0.3 !important;
-    }
-  }
-
   .q-field--dense .q-field__before,
   .q-field--dense .q-field__prepend {
     padding: 0px 0px 0px 0px;
@@ -903,30 +866,6 @@
       table-layout: fixed;
 
       .q-expansion-item {
-        .q-item {
-          display: flex;
-          align-items: center;
-          padding: 0;
-          height: 25px !important;
-          min-height: 25px !important;
-        }
-
-        .q-item__section--avatar {
-          min-width: 12px;
-          max-width: 12px;
-          margin-right: 8px;
-        }
-
-        .filter-values-container {
-          .q-item {
-            padding-left: 4px;
-
-            .q-focus-helper {
-              background: none !important;
-            }
-          }
-        }
-
         .q-item-type {
           &:hover {
             .field_overlay {

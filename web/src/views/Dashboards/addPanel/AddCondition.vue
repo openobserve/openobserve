@@ -117,18 +117,21 @@
                             toggleOption,
                           }"
                         >
-                          <q-item v-bind="itemProps">
-                            <q-item-section side>
+                          <div
+                            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                            @click="toggleOption(opt)"
+                          >
+                            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                               <OCheckbox
                                 :model-value="selected"
                                 @update:model-value="toggleOption(opt)"
                                 data-test="dashboard-add-condition-list-item"
                               />
-                            </q-item-section>
-                            <q-item-section>
+                            </div>
+                            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                               <SanitizedHtmlRenderer :html-content="opt" />
-                            </q-item-section>
-                          </q-item>
+                            </div>
+                          </div>
                         </template>
                       </OSelect>
                     </OTabPanel>

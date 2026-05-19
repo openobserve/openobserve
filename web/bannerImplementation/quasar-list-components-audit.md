@@ -207,7 +207,7 @@
 
 **Count:** 1 confirmed file (`MenuLink.vue`). `common/sidebar/FolderList.vue` historically lived here but its current `<q-item>` usage is inside a `<q-menu>` context menu (counted under Context A); it has no sidebar-link `q-item` rows left.
 
-**Migration target:** Native `<router-link>` + Tailwind CSS. `MenuLink.vue` requires a full rewrite — do not rush.
+**Migration target:** Native `<router-link>` / `<a>` + Tailwind CSS. Implemented as a drop-in replacement that keeps the existing visual design — `.q-item*` selectors were renamed to `.nav-menu-item*` (no full nav redesign required).
 
 ---
 

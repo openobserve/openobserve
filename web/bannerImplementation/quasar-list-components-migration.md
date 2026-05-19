@@ -40,10 +40,10 @@ All dropdown-context replacements come from the `ODropdown` family located at `w
 ## Migration Order (Recommended)
 
 ```
-Context A — q-menu → ODropdown  (10 files, direct 1:1 mapping, highest value, unblocked)
-Context D — display rows → native HTML + Tailwind  (30 files, no new API needed)
-Context B — OSelect / q-select #option slots  (9 files, coordinate with the OSelect option-slot cleanup)
-Context C — navigation (MenuLink.vue only)  (1 file, long-term — full nav rework, do not rush)
+Context A — q-menu → ODropdown  (10 files, direct 1:1 mapping, highest value, unblocked) — DONE
+Context D — display rows → native HTML + Tailwind  (30 files, no new API needed) — DONE
+Context B — OSelect / q-select #option slots  (9 files, coordinate with the OSelect option-slot cleanup) — DONE
+Context C — navigation (MenuLink.vue only)  (1 file) — DONE via lightweight `<router-link>` / `<a>` + `.nav-menu-item*` CSS rename (no full nav rework needed)
 ```
 
 ---

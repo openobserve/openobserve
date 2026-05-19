@@ -2290,10 +2290,6 @@ watch(
     overflow: hidden;
   }
 
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 13px;

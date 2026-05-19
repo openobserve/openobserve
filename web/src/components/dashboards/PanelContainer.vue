@@ -1013,15 +1013,4 @@ export default defineComponent({
   color: var(--q-warning);
 }
 
-.panel-dropdown-list {
-  :deep(.q-item) {
-    align-items: center;
-  }
-  :deep(.q-item__section--side) {
-    padding-right: 6px;
-  }
-  :deep(.q-item__label) {
-    line-height: 1.1;
-  }
-}
 </style>

@@ -730,7 +730,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
                   </OButton>
                 </template>
-                <div class="tw:p-2 tw:min-w-[240px]">
+                <div
+                  class="tw:p-2 tw:min-w-[240px]"
+                  data-test="logs-search-bar-region-menu"
+                >
                   <OInput
                     clearable
                     class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"

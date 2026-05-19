@@ -383,16 +383,4 @@ loadConfig();
   color: var(--o2-text-primary);
 }
 
-body.body--dark {
-  .q-list .q-item__label {
-    color: white !important;
-  }
-}
-</style>
-<style lang="scss">
-.expanstion-item-o2 {
-  .q-item__section--side {
-    min-width: auto;
-  }
-}
 </style>

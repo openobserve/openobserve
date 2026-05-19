@@ -260,6 +260,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 // @ts-nocheck
 import {
   ref,
@@ -1339,9 +1341,6 @@ export default defineComponent({
   }
 }
 .timezone-select {
-  .q-item:nth-child(2) {
-    border-bottom: 1px solid #dcdcdc;
-  }
   margin: 0.5rem 0.4rem 0.5rem 0.4rem;
 }
 </style>

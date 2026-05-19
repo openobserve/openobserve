@@ -42,34 +42,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template v-slot:option="scope">
-        <q-item
+        <div
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
           :class="
             store.state.theme === 'dark' &&
             selectedMetric?.value !== scope.opt.value
               ? 'text-white'
               : ''
           "
-          v-bind="scope.itemProps"
+          @click="scope.toggleOption(scope.opt)"
         >
-          <q-item-section
+          <div
             :title="scope?.opt?.type"
-            class="metric-explore-metric-icon"
-            avatar
+            class="metric-explore-metric-icon tw:flex tw:items-center tw:shrink-0"
           >
             <OIcon
               size="xs"
               :name="metricsIconMapping[scope?.opt?.type] || ''"
             />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>{{ scope.opt.label }}</q-item-label>
-          </q-item-section>
-        </q-item>
+          </div>
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+            <span class="tw:text-sm">{{ scope.opt.label }}</span>
+          </div>
+        </div>
       </template>
       <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
+        <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0"> {{ t("search.noResult") }}</div>
+        </li>
       </template>
     </OSelect>
     <div class="metric-list">
@@ -156,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ?.values || []"
                           :key="value.key + value.count"
                         >
-                          <q-list dense>
-                            <q-item tag="label" class="q-pr-none">
+                          <ul>
+                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 q-pr-none">
                               <div
                                 class="flex row wrap justify-between"
                                 style="width: calc(100% - 46px)"
@@ -221,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <NotEqualIcon class="tw:size-3" />
                                 </OButton>
                               </div>
-                            </q-item>
-                          </q-list>
+                            </label>
+                          </ul>
                         </div>
                       </div>
                   </div>
@@ -566,31 +566,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -729,32 +704,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
-
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -794,15 +743,6 @@ export default defineComponent({
         }
       }
 
-      .filter-values-container {
-        .q-item {
-          padding-left: 4px;
-
-          .q-focus-helper {
-            background: none !important;
-          }
-        }
-      }
     }
 
     .field-container {

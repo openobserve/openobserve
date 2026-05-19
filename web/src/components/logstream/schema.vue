@@ -534,12 +534,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text">
                             {{ row.name }}
-                            <q-tooltip
+                            <OTooltip
                               v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </q-tooltip>
+                              :content="row.name"
+                            />
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -550,9 +548,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :alt="t('logStream.envQuickModeMsg')"
                               class="tw:w-[20px] tw:h-[20px]"
                             />
-                            <q-tooltip class="tw:text-[12px] tw:w-[200px]">
-                              {{ t("logStream.envQuickModeMsg") }}
-                            </q-tooltip>
+                            <OTooltip
+                              :content="t('logStream.envQuickModeMsg')"
+                              max-width="200px"
+                            />
                           </span>
                         </div>
                       </template>
@@ -576,7 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template #cell-index_type="{ row }">
-                        <q-select
+                        <OSelect
                           v-if="
                             !(
                               row.name ==
@@ -585,87 +584,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                           :model-value="computedIndexType({ row }).value"
-                          :options="streamIndexType"
-                          option-label="label"
-                          option-value="value"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
-                          bg-color="input-bg"
+                          :options="indexTypeOptionsForRow(row)"
+                          label-key="label"
+                          value-key="value"
                           class="mini-select"
-                          input-class="mini-select"
-                          :option-disable="
-                            (_option) => disableOptions(row, _option)
-                          "
                           multiple
-                          :max-values="2"
-                          map-options
-                          emit-value
-                          autoclose
-                          borderless
-                          dense
-                          input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
+                          clearable
+                          :data-test="`schema-field-${row.name}-index-type-select`"
                           style="width: 190px"
                           @update:model-value="
-                            (val) => updateIndexType({ row }, val)
+                            (val) =>
+                              updateIndexType({ row }, enforceMaxIndexTypes(val))
                           "
                         >
-                          <template v-slot:append>
-                            <OIcon
-                              v-if="row.index_type && row.index_type.length > 0"
-                              name="cancel"
-                              size="14px"
-                              style="
-                                cursor: pointer;
-                                display: flex;
-                                align-items: center;
-                                font-weight: bold;
-                                margin-top: 8px;
-                              "
-                              @click.stop="updateIndexType({ row }, [])"
-                            />
-                          </template>
-                          <template v-slot:option="scope">
-                            <q-item
-                              style="
-                                margin: 0px !important;
-                                border-radius: 0px !important;
-                              "
-                              v-bind="scope.itemProps"
-                              :disable="disableOptions(row, scope.opt)"
-                            >
-                              <q-item-section>
-                                <q-item-label>
-                                  {{ scope.opt.label }}
-                                </q-item-label>
-                              </q-item-section>
-                              <q-tooltip
-                                class="tw:text-[12px] tw:w-[200px]"
-                                v-if="
-                                  checkIfOptionPresentInDefaultEnv(
-                                    row.name,
-                                    scope.opt,
-                                  ) == true
-                                "
-                              >
-                                This is a predefined environment setting and
-                                cannot be changed.
-                              </q-tooltip>
-                            </q-item>
-                          </template>
-                          <q-tooltip
+                          <OTooltip
                             v-if="row.index_type && row.index_type.length > 0"
-                            class="tw:text-[12px]"
-                          >
-                            {{
+                            :content="
                               streamIndexType
                                 .filter((opt) =>
                                   row.index_type.includes(opt.value),
                                 )
                                 .map((opt) => opt.label)
-                                .join(", ")
-                            }}
-                          </q-tooltip>
-                        </q-select>
+                                .join(', ')
+                            "
+                          />
+                        </OSelect>
                       </template>
                       <template #cell-patterns="{ row }">
                         <template
@@ -3230,47 +3173,6 @@ export default defineComponent({
     }
   }
 
-  .q-list {
-    border-radius: 0 0 0.5rem 0.5rem;
-
-    .q-item {
-      height: 2.5rem;
-      padding: 0;
-
-      &__section {
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-
-        &:not(:first-child) {
-          border-left: 1px solid $input-field-border-color;
-          align-items: flex-start;
-          min-width: 29%;
-        }
-      }
-
-      &.list-head {
-        border: 1px solid $input-field-border-color;
-        border-radius: 0.5rem 0.5rem 0 0;
-        border-bottom: none;
-      }
-
-      &.list-item {
-        border-right: 1px solid $input-field-border-color;
-        border-left: 1px solid $input-field-border-color;
-
-        &,
-        &--side {
-          font-weight: 600;
-        }
-
-        &:last-of-type {
-          border-bottom: 1px solid $input-field-border-color;
-          border-radius: 0 0 0.5rem 0.5rem;
-        }
-      }
-    }
-  }
-
   .data-retention-input {
     border: 1px solid $input-field-border-color;
     border-radius: 0.2rem;
@@ -3290,41 +3192,6 @@ export default defineComponent({
   color: #865300;
 }
 
-.q-item {
-  padding: 3px 8px;
-  margin: 0 8px;
-  border-radius: 6px;
-
-  /* Overriding default height */
-  min-height: 30px;
-
-  &.q-router-link--active {
-    background-color: $primary;
-    color: white;
-
-    &::before {
-      content: " ";
-
-      position: absolute;
-      top: 0;
-      background-color: inherit;
-    }
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-}
-
-.q-item__section--avatar {
-  margin: 0;
-  padding: 0;
-  min-width: 40px;
-}
 .single-line-tab {
   display: inline-flex;
 }

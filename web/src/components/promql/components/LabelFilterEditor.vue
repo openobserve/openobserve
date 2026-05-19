@@ -42,15 +42,15 @@
                     data-test="promql-label-select"
                   >
                     <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
+                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             loadingLabels
                               ? "Loading labels..."
                               : "No labels found"
                           }}
-                        </q-item-section>
-                      </q-item>
+                        </div>
+                      </li>
                     </template>
                   </OSelect>
 
@@ -87,29 +87,31 @@
                     data-test="promql-value-select"
                   >
                     <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
+                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             !label.label
                               ? "Select a label first"
                               : "No values found"
                           }}
-                        </q-item-section>
-                      </q-item>
+                        </div>
+                      </li>
                     </template>
                     <template v-slot:option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt.label }}</q-item-label>
-                          <q-item-label
+                      <div
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                        @click="scope.toggleOption(scope.opt)"
+                      >
+                        <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                          <span class="tw:text-sm">{{ scope.opt.label }}</span>
+                          <span
                             v-if="scope.opt.isVariable"
-                            caption
-                            class="text-grey-7"
+                            class="tw:block tw:text-xs tw:text-muted-foreground text-grey-7"
                           >
                             Variable
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
+                          </span>
+                        </div>
+                      </div>
                     </template>
                     <template v-slot:hint>
                       {{ getOperatorHint(label.op) }}
