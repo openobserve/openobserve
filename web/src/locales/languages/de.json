@@ -2936,7 +2936,75 @@
     "copyStacktrace": "Stacktrace kopieren",
     "noStacktraceAvailable": "Kein Stacktrace verfügbar",
     "stacktraceCopied": "Stacktrace wurde in die Zwischenablage kopiert",
-    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden"
+    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden",
+    "sessionsList": {
+      "noStreamsTooltip": "Keine LLM-Streams verfügbar.",
+      "session": "Sitzung",
+      "sessions": "Sitzungen",
+      "countPill": "{Anzahl} von {total} {unit}",
+      "noStreamsFound": "Keine LLM-Streams gefunden",
+      "noStreamsDescription1": "Die Sitzungsgruppe umfasst",
+      "noStreamsDescription2": "across verfolgt Streams, die als LLM-Streams gekennzeichnet sind. Entweder existiert kein solcher Stream, oder es wurden noch keine Spans aufgenommen.",
+      "failedToLoad": "Sitzungen konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "noSessionsFound": "Keine Sessions gefunden",
+      "noSessionsDescription": "In diesem Zeitraum wurden keine LLM-Sitzungen auf {stream} aufgezeichnet. Versuchen Sie, den Zeitbereich zu erweitern oder zu einem anderen Stream zu wechseln.",
+      "loading": "Sitzungen werden geladen...",
+      "tokenTooltip": "Eingabe: {input} · Ausgabe: {output} · Summe: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zeitstempel",
+        "sessionId": "Sitzungs-ID",
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "tokens": "Tokens",
+        "cost": "Kosten",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Zurück zu Sessions",
+      "pageTitle": "Einzelheiten der Sitzung",
+      "failedToLoad": "Sitzung konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "sessionNotFound": "Sitzung nicht gefunden",
+      "noSpansFound": "Im aktuellen Zeitraum wurden keine Zeitspannen für {id} gefunden.",
+      "searchPlaceholder": "Suchen Sie in dieser Sitzung nach Spuren...",
+      "turn": "Wende",
+      "turns": "wendet sich",
+      "turnsShown": "{gefiltert} von {total} {unit} angezeigt",
+      "userBadge": "Nutzer",
+      "sessionPrefix": "Sitzung",
+      "copySessionId": "Sitzungs-ID kopieren",
+      "openInTraceExplorer": "Im Trace Explorer öffnen",
+      "unknownUser": "Unbekannter Benutzer",
+      "kpi": {
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "inputTokens": "Eingabe-Token",
+        "outputTokens": "Ausgabetokens",
+        "cost": "Kosten"
+      },
+      "conversation": "Konversation",
+      "turnLabel": "Wende",
+      "openTrace": "Trace öffnen",
+      "noUserMessage": "Für diesen Spielzug wurde keine Benutzernachricht erfasst.",
+      "noAssistantMessage": "Für diesen Zug wurde keine Reaktion des Assistenten erfasst.",
+      "roles": {
+        "user": "Nutzer",
+        "assistant": "Assistentin"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Modell",
+        "tokens": "Tokens",
+        "input": "Eingabe",
+        "output": "Ausgang",
+        "total": "Insgesamt",
+        "cost": "Kosten",
+        "spans": "Spannweiten"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
