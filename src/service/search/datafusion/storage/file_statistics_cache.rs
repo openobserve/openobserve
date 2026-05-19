@@ -181,7 +181,9 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
 
         self.cacher.lock().push_back(k);
 
-        let max_bytes = config::get_config().limit.datafusion_file_stat_cache_max_size;
+        let max_bytes = config::get_config()
+            .limit
+            .datafusion_file_stat_cache_max_size;
         if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
             self.evict(max_bytes);
         }
