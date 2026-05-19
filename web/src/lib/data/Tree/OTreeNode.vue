@@ -173,6 +173,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         :model-value="checkboxState"
         :disabled="isDisabled"
         size="sm"
+        class="tw:cursor-pointer"
         @click.stop
         @update:model-value="onTickChange"
       />
