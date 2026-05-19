@@ -1805,7 +1805,7 @@ pub struct Limit {
         default = 0, // MB, default is 5% of total memory
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
-    pub footer_cache_max_size: usize,
+    pub inverted_index_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
         default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
@@ -3112,12 +3112,12 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.footer_cache_max_size == 0 {
-        cfg.limit.footer_cache_max_size =
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.limit.bloom_footer_cache_max_size == 0 {
         // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
