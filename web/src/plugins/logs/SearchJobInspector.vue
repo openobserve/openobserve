@@ -256,16 +256,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Error Message -->
-      <q-banner
+      <OBanner
         v-if="errorMessage"
-        class="bg-negative text-white tw:mb-[0.625rem]"
+        variant="error"
+        icon="error"
+        :content="errorMessage"
+        class="tw:mb-[0.625rem]"
         data-test="inspector-error-banner"
-      >
-        <template v-slot:avatar>
-          <OIcon name="error" size="sm" />
-        </template>
-        {{ errorMessage }}
-      </q-banner>
+      />
 
       <!-- Loading State -->
       <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
@@ -390,6 +388,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 interface ProfileEvent {
   timestamp: string;

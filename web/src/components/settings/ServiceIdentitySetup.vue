@@ -1289,20 +1289,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Section 3: Warnings -->
       <div v-if="warnings.length > 0" class="tw:mb-6">
-        <q-banner
-          rounded
-          class="tw:bg-amber-50 dark:tw:bg-amber-900/20 tw:border tw:border-amber-300 dark:tw:border-amber-700"
+        <OBanner
+          variant="warning"
+          icon="warning"
           data-test="service-identity-warnings-banner"
         >
-          <template #avatar>
-            <OIcon name="warning" size="sm" />
-          </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
               {{ warn }}
             </div>
           </div>
-        </q-banner>
+        </OBanner>
       </div>
 
       <!-- Field Details Dialog -->
@@ -1554,6 +1551,7 @@ import type {
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 

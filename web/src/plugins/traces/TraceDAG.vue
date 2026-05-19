@@ -22,12 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="error" class="error-message q-pa-md">
-      <q-banner class="bg-negative text-white">
-        <template #avatar>
-          <OIcon name="error" size="sm" />
-        </template>
-        Failed to load DAG: {{ error }}
-      </q-banner>
+      <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
@@ -93,6 +88,7 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 interface SpanNode {

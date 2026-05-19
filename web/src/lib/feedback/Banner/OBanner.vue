@@ -41,15 +41,17 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
       inlineActions && 'obanner--inline-actions',
     ]"
   >
-    <div v-if="showIconArea" class="obanner__icon">
-      <slot name="icon">
-        <OIcon :name="icon" size="sm" />
-      </slot>
-    </div>
+    <div class="obanner__body">
+      <div v-if="showIconArea" class="obanner__icon">
+        <slot name="icon">
+          <OIcon :name="icon" size="sm" />
+        </slot>
+      </div>
 
-    <div class="obanner__content">
-      <slot />
-      <template v-if="showContentProp">{{ content }}</template>
+      <div class="obanner__content">
+        <slot />
+        <template v-if="showContentProp">{{ content }}</template>
+      </div>
     </div>
 
     <div v-if="hasActionsSlot" class="obanner__actions">
@@ -61,18 +63,26 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 <style scoped>
 .obanner {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   border-radius: 0.375rem;
 }
 
-.obanner:not(.obanner--inline-actions) {
-  flex-direction: column;
-  gap: 0.5rem;
+.obanner__body {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.75rem;
 }
 
 .obanner--inline-actions {
   flex-direction: row;
   align-items: center;
   gap: 0.75rem;
+}
+
+.obanner--inline-actions .obanner__body {
+  flex: 1;
 }
 
 .obanner:not(.obanner--dense) {
@@ -85,59 +95,36 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 
 /* variant: default */
 .obanner--default {
-  background-color: var(--color-gray-100, #f3f4f6);
-  color: var(--color-gray-800, #1f2937);
-}
-:root.dark .obanner--default {
-  background-color: var(--color-gray-800, #1f2937);
-  color: var(--color-gray-200, #e5e7eb);
+  background-color: var(--color-banner-default-bg);
+  color: var(--color-banner-default-text);
 }
 
 /* variant: info */
 .obanner--info {
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a5f;
-}
-:root.dark .obanner--info {
-  background-color: rgba(30, 58, 138, 0.2);
-  border-color: #1d4ed8;
-  color: #dbeafe;
+  background-color: var(--color-banner-info-bg);
+  border: 1px solid var(--color-banner-info-border);
+  color: var(--color-banner-info-text);
 }
 
 /* variant: success */
 .obanner--success {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #14532d;
-}
-:root.dark .obanner--success {
-  background-color: rgba(20, 83, 45, 0.2);
-  border-color: #15803d;
-  color: #dcfce7;
+  background-color: var(--color-banner-success-bg);
+  border: 1px solid var(--color-banner-success-border);
+  color: var(--color-banner-success-text);
 }
 
 /* variant: warning */
 .obanner--warning {
-  background-color: #fffbeb;
-  border: 1px solid #fcd34d;
+  background-color: var(--color-banner-warning-bg);
+  border: 1px solid var(--color-banner-warning-border);
   border-left-width: 4px;
-  color: #78350f;
-}
-:root.dark .obanner--warning {
-  background-color: rgba(120, 53, 15, 0.2);
-  border-color: #b45309;
-  color: #fef3c7;
+  color: var(--color-banner-warning-text);
 }
 
 /* variant: error */
 .obanner--error {
-  background-color: #dc2626;
-  color: #ffffff;
-}
-:root.dark .obanner--error {
-  background-color: #b91c1c;
-  color: #ffffff;
+  background-color: var(--color-banner-error-bg);
+  color: var(--color-banner-error-text);
 }
 
 .obanner__icon {

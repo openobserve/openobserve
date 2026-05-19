@@ -386,18 +386,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mt-sm"
                         data-test="add-report-png-note"
                       >
-                        <q-banner
-                          rounded
-                          class="bg-orange-1 text-orange-9"
-                          style="font-size: 13px"
-                        >
-                          <template v-slot:avatar>
-                            <OIcon name="info" size="sm" />
-                          </template>
-                          PNG captures only the first visible page of the
-                          dashboard. Use PDF if the dashboard spans multiple
-                          pages.
-                        </q-banner>
+                        <OBanner
+                          variant="warning"
+                          icon="info"
+                          content="PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages."
+                        />
                       </div>
 
                       <!-- Custom Dimensions (Advanced) -->
@@ -919,6 +912,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

@@ -42,16 +42,40 @@
 
   /* --- Success palette --- */
   --color-success-50:  #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
   --color-success-500: #22c55e;
   --color-success-700: #15803d;
+  --color-success-900: #14532d;
 
   /* --- Warning palette (Tailwind yellow scale) --- */
   --color-warning-50:  #fefce8;
   --color-warning-100: #fef9c3;
+  --color-warning-300: #fcd34d;
   --color-warning-400: #facc15;
   --color-warning-500: #eab308;
   --color-warning-600: #ca8a04;
   --color-warning-700: #a16207;
+  --color-warning-900: #78350f;
+
+  /* --- Info palette (blue, used by OBanner info variant) --- */
+  --color-info-50:  #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e3a8a;
+  --color-info-900: #1e3a5f;
+
+  /* --- Note container palette (pipeline guideline cards) --- */
+  --color-note-light-bg:        #f9f290;
+  --color-note-light-border:    #f5a623;
+  --color-note-light-text:      #865300;
+  --color-note-dark-border:     #b45309;
+  --color-note-dark-text:       #fef3c7;
+  --color-note-highlight-light: #007bff;
+  --color-note-highlight-dark:  #93c5fd;
+  --color-note-code-light:      #d63384;
+  --color-note-code-dark:       #f9a8d4;
 
   /* --- White / Black --- */
   --color-white: #ffffff;

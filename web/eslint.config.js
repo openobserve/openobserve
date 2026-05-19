@@ -237,7 +237,11 @@ export default [
         // {
         //   element: 'q-skeleton',
         //   message: 'Use <OSkeleton> from "@/lib/feedback/Skeleton/OSkeleton.vue" instead of <q-skeleton>.'
-        // }
+        // },
+        // {
+        //   element: 'q-banner',
+        //   message: 'Use <OBanner> from "@/lib/feedback/Banner/OBanner.vue" instead of <q-banner>.'
+        // },
         // {        //   element: 'q-stepper',
         //   message: 'Use <OStepper> from "@/lib/navigation/Stepper/OStepper.vue" instead of <q-stepper>.'
         // },
@@ -332,6 +336,10 @@ export default [
         // {
         //   element: 'q-virtual-scroll',
         //   message: 'Use <OVirtualScroll> from "@/lib/core/VirtualScroll/OVirtualScroll.vue" instead of <q-virtual-scroll>.',
+        // },
+        // {
+        //   element: 'q-tree',
+        //   message: 'Use <OTree> from "@/lib/data/Tree/OTree.vue" instead of <q-tree>.',
         // },
       ],
       'no-restricted-imports': [
