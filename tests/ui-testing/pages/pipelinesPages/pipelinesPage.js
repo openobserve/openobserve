@@ -2474,18 +2474,21 @@ export class PipelinesPage {
     async clearPipelineFieldSearch() {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
-        // Wait for the field list count to stabilize after clearing.
+        // Wait for the virtual-scroll container's scrollHeight to expand after
+        // clearing the filter. In a virtual-scroll table the rendered label count
+        // is always ~viewport size, so we must wait for Quasar to recompute the
+        // full scroll dimensions before counting.
         await this.page.waitForFunction(() => {
-            const table = document.querySelector('[data-test="log-search-index-list-fields-table"]');
-            if (!table) return false;
-            const labels = table.querySelectorAll('.field_label');
-            const count = labels.length;
-            const prev = Number(table.dataset.prevFieldCount ?? -1);
-            table.dataset.prevFieldCount = String(count);
-            return prev >= 0 && count === prev && count > 0;
+            const container = document.querySelector('[data-test="log-search-index-list-fields-table"] .q-table__middle, [data-test="log-search-index-list-fields-table"] .q-virtual-scroll__container');
+            if (!container) return false;
+            // scrollHeight must be large enough to indicate the full list is loaded
+            // (more than 1.2x the clientHeight, meaning content overflows)
+            return container.scrollHeight > container.clientHeight * 1.2;
         }, null, { timeout: 8000 }).catch(() => {
-            testLogger.info('Field list stabilization wait timed out — continuing with current count');
+            testLogger.info('Field list scrollHeight expansion wait timed out — continuing with current count');
         });
+        // Extra animation frame to let Quasar finish re-rendering visible rows
+        await this.page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
         testLogger.info('Field list search cleared');
     }
 
