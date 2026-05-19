@@ -177,8 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
       
-      <div class="tw:flex tw:gap-3 tw:items-center tw:mb-3">
-        <div class="col-auto">
+      <div class="tw:flex tw:gap-3 tw:items-center">
+        <div class="tw:flex tw:gap-x-2">
           <OInput
             v-model="newDomain"
             class="domain-input"
@@ -188,14 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="domainError"
             @update:model-value="domainError = ''"
           />
-        </div>
-        <div class="col-auto tw:my-0">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="addDomain"
-            :disabled="!newDomain || !isValidDomain(newDomain)"
-          >{{ t('settings.addDomain') }}</OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="addDomain"
+              :disabled="!newDomain || !isValidDomain(newDomain)"
+            >{{ t('settings.addDomain') }}
+          </OButton>
         </div>
       </div>
 
@@ -249,16 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Specific users section -->
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="tw:flex tw:gap-3 tw:items-center tw:mb-3">
-              <div class="tw:flex tw:flex-col">
+              <div class="tw:flex tw:gap-x-2 tw:items-center">
                 <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
                   class="email-input"
                   @keydown.enter="addEmail(domain)"
                 />
-              </div>
-              <div class="col-auto tw:my-0">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -266,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
                 >{{ t('settings.addEmail') }}</OButton>
               </div>
-            </div>
 
             <!-- Email List -->
             <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">

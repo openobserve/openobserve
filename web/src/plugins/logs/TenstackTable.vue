@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="cancel"
+                  name="close"
                   class="tw:m-0 close-icon cursor-pointer"
                   :class="
                     store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
