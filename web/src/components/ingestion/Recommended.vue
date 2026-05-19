@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
+    :horizontal="false"
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
@@ -59,12 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -78,7 +80,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "RecommendedPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab, OSplitter },
   props: {
     currOrgIdentifier: {
       type: String,

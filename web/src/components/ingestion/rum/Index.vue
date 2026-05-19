@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
+    :horizontal="false"
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
@@ -49,13 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </router-view>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
@@ -70,7 +72,7 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestRum",
   components: {
-    OTabs, OTab, ORouteTab,},
+    OTabs, OTab, ORouteTab, OSplitter,},
   data() {
     return {};
   },
