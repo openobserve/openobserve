@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </template>
-      <q-form id="action-script-clone-form" @submit="submitForm">
+      <OForm id="action-script-clone-form" :default-values="{}" @submit="submitForm">
         <OInput
           data-test="to-be-clone-action-name"
           v-model="toBeCloneAlertName"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="streamNames"
           @update:model-value="updateStreamName"
         />
-      </q-form>
+      </OForm>
     </ODialog>
   </div>
 </template>
@@ -247,6 +247,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -279,6 +280,7 @@ export default defineComponent({
     OCheckbox,
     OTooltip,
     OSelect,
+    OForm,
     OTable,
   },
   emits: [

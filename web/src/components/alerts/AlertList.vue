@@ -186,22 +186,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span>{{ computedName(row.name) }}</span>
                   </div>
-                  <q-tooltip
+                  <OTooltip
                     v-if="row.name?.length > 30"
-                    class="alert-name-tooltip"
-                  >
-                    {{ row.name }}
-                  </q-tooltip>
+                    :content="row.name"
+                    content-class="alert-name-tooltip"
+                  />
                 </template>
 
                 <template #cell-owner="{ row }">
                   {{ computedOwner(row.owner) }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="row.owner?.length > 15"
-                    class="alert-name-tooltip"
-                  >
-                    {{ row.owner }}
-                  </q-tooltip>
+                    :content="row.owner"
+                    content-class="alert-name-tooltip"
+                  />
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">

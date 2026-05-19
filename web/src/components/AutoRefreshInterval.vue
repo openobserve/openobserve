@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator />
+        <OSeparator />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
           <div
             v-for="(item, j) in items"
