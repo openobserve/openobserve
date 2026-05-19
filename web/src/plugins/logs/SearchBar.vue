@@ -156,11 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'width: 250px; max-height: 400px; overflow-y: auto; overflow-x: auto'
               "
             >
-              <q-list data-test="logs-search-saved-view-list">
-                <q-item style="padding: 0px 0px 0px 0px">
-                  <q-item-section
-                    class="column"
-                    no-hover
+              <div data-test="logs-search-saved-view-list">
+                <div class="tw:flex tw:p-0">
+                  <div
+                    class="tw:flex tw:flex-col"
                     :style="
                       localSavedViews.length > 0
                         ? 'width: 60%; border-right: 1px solid lightgray; min-width: 0'
@@ -199,9 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="paginatedSavedViews.length === 0"
                         class="q-pl-sm q-pt-sm"
                       >
-                        <q-item-label>{{
+                        <span class="tw:text-sm">{{
                           t("search.savedViewsNotFound")
-                        }}</q-item-label>
+                        }}</span>
                       </div>
                       <div
                         v-for="row in paginatedSavedViews"
@@ -304,20 +303,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </q-item-section>
+                  </div>
 
-                  <q-item-section
-                    class="column"
+                  <div
+                    class="tw:flex tw:flex-col"
                     style="width: 40%; padding: 0; margin-left: 0px; justify-content: flex-start; align-self: flex-start"
                     v-if="localSavedViews.length > 0"
                   >
-                    <q-item style="padding: 0px">
-                      <q-item-label
-                        header
-                        class="q-pa-sm text-bold favorite-label"
-                        >{{ t("search.favoriteViews") }}</q-item-label
-                      >
-                    </q-item>
+                    <div class="tw:p-0">
+                      <div class="q-pa-sm text-bold favorite-label">
+                        {{ t("search.favoriteViews") }}
+                      </div>
+                    </div>
                     <OSeparator class="tw:mx-4" />
                     <div
                       data-test="log-search-saved-view-favorite-list-fields-table"
@@ -381,9 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                </div>
+              </div>
             </div>
           </ODropdown>
         </OButtonGroup>
