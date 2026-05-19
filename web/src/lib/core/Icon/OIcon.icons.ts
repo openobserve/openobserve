@@ -165,6 +165,7 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
+import PaidIcon from "~icons/material-symbols/paid-outline-rounded";
 import AutorenewIcon from "~icons/material-symbols/autorenew";
 import CardGiftcardIcon from "~icons/material-symbols/redeem";
 import CircleIcon from "~icons/material-symbols/circle-outline";
@@ -208,7 +209,7 @@ import LoginIcon from "~icons/material-symbols/login";
 import LogoutIcon from "~icons/material-symbols/logout";
 import ManageAccountsIcon from "~icons/material-symbols/manage-accounts-outline";
 import MemoryIcon from "~icons/material-symbols/memory-outline";
-import MonetizationOnIcon from "~icons/material-symbols/attach-money";
+import MonetizationOnIcon from "~icons/material-symbols/paid-outline-rounded";
 import NoteAddIcon from "~icons/material-symbols/note-add-outline";
 import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
 import PaletteIcon from "~icons/material-symbols/palette-outline";
@@ -453,6 +454,7 @@ export const iconRegistry = {
   "assignment": AssignmentIcon,
   "attach-file": AttachFileIcon,
   "attach-money": AttachMoneyIcon,
+  "paid": PaidIcon,
   "autorenew": AutorenewIcon,
   "card-giftcard": CardGiftcardIcon,
   "check-circle-outline": CheckCircleOutline,

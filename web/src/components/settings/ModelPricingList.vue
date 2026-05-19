@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px;" />
+            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.15; color: var(--o2-text-secondary);" />
             <div class="text-subtitle1 text-grey-7 q-mt-sm">
               {{ t("modelPricing.noModels") }}
             </div>
