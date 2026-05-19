@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none"
-    style="min-height: inherit; height: calc(100vh - 88px)"
-  >
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -32,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage">
+    <div v-if="!showImportModelPricingPage" class="tw:flex tw:flex-col tw:h-full">
       <!-- List View Header -->
+      <div class="tw:flex-shrink-0">
       <div
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+        style="position: sticky; top: 0; z-index: 1000;"
       >
         <div
           class="q-table__title tw:font-[600]"
@@ -104,8 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      </div>
 
       <!-- List Table -->
+      <div class="tw:flex-1 tw:min-h-0">
       <OTable
         ref="qTableRef"
         data-test="model-pricing-list-table"
@@ -124,10 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         expansion="multiple"
         :expanded-ids="[...expandedParents]"
         :get-sub-rows="getSubRows"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :class="{
-          'tw:h-[calc(100vh-var(--navbar-height)-87px)]': filteredModels.length > 0,
-        }"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
         <template #cell-name="{ row }">
@@ -391,6 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      </div>
     </div>
     <!-- end v-if="!showImportModelPricingPage" -->
 
