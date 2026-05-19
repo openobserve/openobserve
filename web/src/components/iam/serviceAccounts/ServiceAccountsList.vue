@@ -347,10 +347,8 @@ export default defineComponent({
         header: t("user.actions"),
         isAction: true,
         pinned: "right",
-        size: 100,
-        minSize: 80,
-        maxSize: 120,
-        meta: { align: "left" },
+        size: 130,
+        meta: { align: "center" },
       },
     ];
     const userEmail: any = ref("");
