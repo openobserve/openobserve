@@ -2949,7 +2949,75 @@
     "copyStacktrace": "Stacktrace kopiëren",
     "noStacktraceAvailable": "Geen stacktrace beschikbaar",
     "stacktraceCopied": "Stacktrace gekopieerd naar het klembord",
-    "stacktraceCopyFailed": "Kopiëren van stacktrace is mislukt"
+    "stacktraceCopyFailed": "Kopiëren van stacktrace is mislukt",
+    "sessionsList": {
+      "noStreamsTooltip": "Geen LLM-streams beschikbaar.",
+      "session": "sessie",
+      "sessions": "sessies",
+      "countPill": "{count} van {total} {unit}",
+      "noStreamsFound": "Geen LLM-streams gevonden",
+      "noStreamsDescription1": "De sessiegroep omvat",
+      "noStreamsDescription2": "over traces-streams die zijn gemarkeerd als LLM-streams. Ofwel bestaat zo'n stroom niet, ofwel zijn er nog geen overspanningen ingenomen.",
+      "failedToLoad": "Laden van sessies is mislukt",
+      "retry": "Probeer het opnieuw",
+      "noSessionsFound": "Geen sessies gevonden",
+      "noSessionsDescription": "Er zijn in deze periode geen LLM-sessies opgenomen op {stream}. Probeer het tijdbereik te vergroten of over te schakelen naar een andere stream.",
+      "loading": "Sessies worden geladen...",
+      "tokenTooltip": "Invoer: {input} · Uitgang: {output} · Totaal: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Tijdstempel",
+        "sessionId": "Sessie-ID",
+        "turns": "Bochten",
+        "duration": "Duur",
+        "tokens": "Munten",
+        "cost": "Kost",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Terug naar Sessions",
+      "pageTitle": "Details van de sessie",
+      "failedToLoad": "Laden van de sessie is mislukt",
+      "retry": "Probeer het opnieuw",
+      "sessionNotFound": "Sessie niet gevonden",
+      "noSpansFound": "Er zijn geen spans gevonden voor {id} in de huidige periode.",
+      "searchPlaceholder": "Zoek naar sporen in deze sessie...",
+      "turn": "beurt",
+      "turns": "omdraaien",
+      "turnsShown": "{gefilterd} van {total} {unit} getoond",
+      "userBadge": "Gebruiker",
+      "sessionPrefix": "sessie",
+      "copySessionId": "Sessie-id kopiëren",
+      "openInTraceExplorer": "Openen in trace explorer",
+      "unknownUser": "Onbekende gebruiker",
+      "kpi": {
+        "turns": "Bochten",
+        "duration": "Duur",
+        "inputTokens": "Invoertokens",
+        "outputTokens": "Output-tokens",
+        "cost": "Kost"
+      },
+      "conversation": "Conversatie",
+      "turnLabel": "Draai",
+      "openTrace": "Spoor openen",
+      "noUserMessage": "Er is geen gebruikersbericht vastgelegd voor deze beurt.",
+      "noAssistantMessage": "Er is geen reactie van de assistent geregistreerd voor deze beurt.",
+      "roles": {
+        "user": "Gebruiker",
+        "assistant": "Assistent"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Model",
+        "tokens": "Munten",
+        "input": "Invoer",
+        "output": "Uitgang",
+        "total": "Totaal",
+        "cost": "Kost",
+        "spans": "Overspant"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3690,7 +3758,8 @@
     "errSave": "Opslaan is mislukt",
     "errLoadModel": "Het laden van het model is mislukt",
     "tierDefaultName": "Standaard",
-    "tierConditionalName": "Voorwaardelijke laag"
+    "tierConditionalName": "Voorwaardelijke laag",
+    "shadowedWarningBanner": "De onderstaande regels worden overschaduwd door „{name}” — vervangen door een regel met een hogere prioriteit en worden niet gebruikt voor kostenberekeningen."
   },
   "overview": {
     "title": "Overzicht van het systeem",

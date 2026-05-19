@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mb-xs no-border"
               :placeholder="t('logStream.search')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="search" size="sm" />
               </template>
             </OInput>

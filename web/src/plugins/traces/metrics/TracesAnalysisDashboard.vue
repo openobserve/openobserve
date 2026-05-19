@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
-      <OIcon name="timeline" size="1.5rem" />
+      <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
       <div
         class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:w-full"
                     data-test="dimension-search-input"
                   >
-                    <template #prepend>
+                    <template #icon-left>
                       <OIcon
                         name="search" size="sm"
                         class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
@@ -264,9 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon
                     name="error-outline"
-                    size="3.75rem"
-                    class="tw:mb-4"
-                  />
+                    class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
                   <div class="tw:text-base tw:mb-2">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>

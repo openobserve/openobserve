@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else-if="!traceId">
       <div class="q-pa-md text-center text-grey-7">
-        <OIcon name="info" size="1.5rem" class="q-mb-sm" />
+        <OIcon name="info" size="md" class="q-mb-sm" />
         <div>No trace information available for this event</div>
       </div>
     </template>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -270,10 +270,8 @@ const calculatePercentage = (value: number, total: number) => {
 };
 
 const copyTraceId = () => {
-  copyToClipboard(props.traceId);
-  toast({
-    variant: "success",
-    message: "Trace ID copied to clipboard",
+  copyToClipboard(props.traceId, {
+    successMessage: "Trace ID copied to clipboard",
     timeout: 1500,
   });
 };

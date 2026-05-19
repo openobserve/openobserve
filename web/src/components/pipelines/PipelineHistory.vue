@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               :name="row.is_silenced ? 'volume-off' : 'volume-up'"
               :color="row.is_silenced ? 'grey' : 'positive'"
-              size="20px"
+              size="md"
             >
               <q-tooltip>
                 {{ row.is_silenced ? "Silenced" : "Not Silenced" }}
@@ -492,7 +492,7 @@ import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -846,7 +846,7 @@ const formatDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);
-  return date.formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
+  return formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
 };
 
 const formatDuration = (microseconds: number) => {

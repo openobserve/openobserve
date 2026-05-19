@@ -77,10 +77,8 @@
                     fill-input
                     hide-selected
                     input-debounce="300"
-                    emit-value
-                    map-options
-                    option-value="value"
-                    option-label="label"
+                    value-key="value"
+                    label-key="label"
                     @filter="
                       (val, update) =>
                         filterLabelValues(val, update, label.label)

@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :placeholder="t('nodes.searchRegion')"
                     class="full-width filter-input"
                   >
-                    <template #prepend>
+                    <template #icon-left>
                       <OIcon name="search" size="sm" />
                     </template>
                   </OInput>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('nodes.searchCluster')"
                       class="full-width filter-input"
                     >
-                      <template #prepend>
+                      <template #icon-left>
                         <OIcon name="search" size="sm" />
                       </template>
                     </OInput>
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 400px"
               :placeholder="t('nodes.search')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="search" size="sm" class="o2-search-input-icon" />
               </template>
             </OInput>

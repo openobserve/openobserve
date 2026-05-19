@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             class="tw:mx-2 q-px-xs"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
@@ -145,7 +145,6 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
     watch,
   } from "vue";
   import { useStore } from "vuex";
-  import { date, debounce } from "quasar";
   import { useI18n } from "vue-i18n";
 
   import dashboardService from "@/services/dashboards";

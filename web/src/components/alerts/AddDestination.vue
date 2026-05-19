@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon
                     :name="getDestinationTypeIcon(formData.destination-type)"
-                    size="20px"
+                    size="md"
                     class="q-mr-sm"
                   />
                   <span class="text-body2">{{

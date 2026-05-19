@@ -39,7 +39,7 @@
             :name="
               expandGroupRows[row.group] ? 'expand-more' : 'chevron-right'
             "
-            size="14px"
+            size="sm"
           />
         </OButton>
       </div>

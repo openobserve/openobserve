@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               class="o2-search-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
@@ -176,7 +176,7 @@ import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue"
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
 import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -402,7 +402,7 @@ export default defineComponent({
     };
 
     const formatTimestamp = (timestamp: number) => {
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      return formatToReadable(timestamp);
     };
 
     const formatDimensions = (dimensions: Record<string, string>) => {

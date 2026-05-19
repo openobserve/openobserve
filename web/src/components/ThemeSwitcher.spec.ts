@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import ThemeSwitcher from './ThemeSwitcher.vue';
 import { createStore } from 'vuex';
-import { Dialog } from 'quasar';
 import { createI18n } from 'vue-i18n';
 
 // Mock localStorage
@@ -25,9 +24,7 @@ const mockStore = createStore({
 });
 
 // Install Quasar with proper plugins
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Create i18n instance
 const i18n = createI18n({

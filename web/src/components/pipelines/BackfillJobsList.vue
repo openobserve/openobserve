@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -655,7 +655,7 @@ const formatTimestamp = (timestamp?: number) => {
   const unixSeconds = timestamp / 1e6; // Convert from microseconds to seconds
   const dateToFormat = new Date(unixSeconds * 1000);
   const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 };
 </script>
 

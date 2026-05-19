@@ -63,7 +63,6 @@
                     <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"
-                      emit-value
                       @update:model-value="updateCustomPeriod"
                     >
                       <template v-slot:selected-item>

@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="row col-11 justify-center q-mt-xl">
     <OIcon
-      name="warning"
-      size="80px"
-    /><br />
+      name="warning" style="width: 80px; height: 80px;" /><br />
     <h5>
       <b
         ><u><span class="text-red">Warning:</span></u></b

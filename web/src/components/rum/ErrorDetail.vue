@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ column.error_handling }}
       </div>
-      <OIcon name="schedule" size="0.875rem" class="text-grey-8" />
+      <OIcon name="schedule" size="sm" class="text-grey-8" />
       <span class="q-pl-xs text-grey-8">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { defineProps } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
@@ -58,7 +58,7 @@ const props = defineProps({
 const emit = defineEmits(["event-emitted"]);
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss.SSS Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss.SSS Z");
 
 const handleErrorTypeClick = () => {
   emit("event-emitted", {

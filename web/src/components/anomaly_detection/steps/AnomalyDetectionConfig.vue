@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
               <OIcon
                 name="info"
-                size="17px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -266,10 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="config.histogram_interval_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
+                  label-key="label"
+                  value-key="value"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-histogram-interval-unit"
@@ -298,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Detection Resolution <span class="text-negative tw:ml-1">*</span>
             <OIcon
               name="info"
-              size="17px"
+              size="sm"
               class="q-ml-xs cursor-pointer"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -324,10 +322,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
-                option-label="label"
-                option-value="value"
-                emit-value
-                map-options
+                label-key="label"
+                value-key="value"
                 class="alert-v3-select"
                 style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
@@ -355,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
               <OIcon
                 name="info"
-                size="17px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -381,10 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="config.schedule_interval_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
+                  label-key="label"
+                  value-key="value"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-schedule-interval-unit"
@@ -409,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
               <OIcon
                 name="info"
-                size="17px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -435,10 +429,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="config.detection_window_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
+                  label-key="label"
+                  value-key="value"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-detection-window-unit"
@@ -468,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
               <OIcon
                 name="info"
-                size="17px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -513,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.retrainEvery") }}
               <OIcon
                 name="info"
-                size="17px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :class="
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -529,10 +521,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               v-model="config.retrain_interval_days"
               :options="retrainIntervalOptions"
-              option-label="label"
-              option-value="value"
-              emit-value
-              map-options
+              label-key="label"
+              value-key="value"
               data-test="anomaly-retrain-interval"
               class="alert-v3-select"
               style="max-width: 200px"
@@ -549,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.sensitivity") }}
             <OIcon
               name="info"
-              size="17px"
+              size="sm"
               class="q-ml-xs cursor-pointer"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -613,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon
                       name="bar-chart"
-                      size="2rem"
+                      size="lg"
                       class="tw:mb-2 tw:opacity-40"
                     />
                     <span class="text-caption">{{

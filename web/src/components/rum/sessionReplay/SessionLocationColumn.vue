@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           data-test="circle-icon"
           name="circle"
-          size="4px"
+          size="xs"
           class="q-mx-md text-grey-6"
         />
         <div class="text-grey-8">{{ column.browser }}</div>
         <OIcon
           data-test="circle-icon"
           name="circle"
-          size="4px"
+          size="xs"
           class="q-mx-md text-grey-6"
         />
         <div class="text-grey-8">{{ column.os }}</div>

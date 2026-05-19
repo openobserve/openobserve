@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach, beforeAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import LogStream from "@/views/LogStream.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -25,9 +24,7 @@ import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 
 // Install Quasar plugins
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock services
 vi.mock("@/services/stream", () => ({

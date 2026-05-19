@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
       <OIcon
         name="error"
-        size="1rem"
+        size="sm"
         class="tw:text-[var(--o2-status-error-text)]"
       />
       <span
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="
                 expandedEvents[String(row._index)] ? 'expand-more' : 'chevron-right'
               "
-              size="14px"
+              size="sm"
             />
           </OButton>
           <span>{{ formatTimestamp(row) }}</span>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatTimestampNs } from "@/utils/date";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
@@ -251,7 +251,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps<{
   span: object;
@@ -289,8 +289,8 @@ const exceptionData = computed(() =>
 );
 
 const formatTimestamp = (row: any) =>
-  date.formatDate(
-    Math.floor(row[timestampColumn.value] / 1000000),
+  formatTimestampNs(
+    row[timestampColumn.value],
     "MMM DD, YYYY HH:mm:ss.SSS Z",
   );
 
@@ -570,22 +570,11 @@ function formatExceptionMessage(message: any) {
 
 function copyStackTrace(stacktrace: string) {
   if (!stacktrace) return;
-  navigator.clipboard
-    .writeText(stacktrace)
-    .then(() => {
-      toast({
-        message: t("traces.stacktraceCopied"),
-        position: "top-center",
-        timeout: 2000,
-      });
-    })
-    .catch(() => {
-      toast({
-        message: t("traces.stacktraceCopyFailed"),
-        position: "top-center",
-        timeout: 2000,
-      });
-    });
+  copyToClipboard(stacktrace, {
+    successMessage: t("traces.stacktraceCopied"),
+    errorMessage: t("traces.stacktraceCopyFailed"),
+    timeout: 2000,
+  });
 }
 </script>
 

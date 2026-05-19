@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   ></router-view>
   <OToastProvider />
+  <ConfirmDialogProvider />
 </template>
 
 <script lang="ts">
@@ -28,9 +29,10 @@ import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 
 export default {
-  components: { OToastProvider },
+  components: { OToastProvider, ConfirmDialogProvider },
   setup() {
     const store = useStore();
     const router = useRouter();

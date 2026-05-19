@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <OIcon size="20px">
+      <OIcon size="md">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </OIcon>
       <OTooltip side="top" align="center">
@@ -70,7 +70,7 @@ const loadMonaco = async () => {
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
-import { debounce } from "quasar";
+import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";

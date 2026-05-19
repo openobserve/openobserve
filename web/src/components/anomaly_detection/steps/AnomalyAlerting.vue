@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('alerts.anomaly.notifications') }}
           <OIcon
             name="info"
-            size="17px"
+            size="sm"
             class="q-ml-xs cursor-pointer"
             :class="
               store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'

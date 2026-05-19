@@ -66,8 +66,8 @@ const pageSizeSelectOptions = computed(() =>
       <span class="tw:text-text-primary tw:text-xs">
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
       </span>
-      <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" />
-      <div class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-primary tw:text-xs">
+      <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" v-if="pageSizeOptions.length > 0" />
+      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-primary tw:text-xs">
         <span class="tw:whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"

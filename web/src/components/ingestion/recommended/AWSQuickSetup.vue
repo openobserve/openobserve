@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
         <OIcon
           name="rocket-launch"
-          size="2.5rem"
+          size="xl"
           class="tw:flex-shrink-0"
         />
         <div>
@@ -371,6 +371,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
@@ -451,10 +452,8 @@ export default defineComponent({
     });
 
     const copyParam = (value: string) => {
-      navigator.clipboard.writeText(value);
-      toast({
-        variant: "success",
-        message: "Copied to clipboard",
+      copyToClipboard(value, {
+        successMessage: "Copied to clipboard",
         timeout: 1500,
       });
     };

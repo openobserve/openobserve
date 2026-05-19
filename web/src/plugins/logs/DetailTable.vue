@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="log-json-field-dropdown-btn"
                         aria-label="Add icon"
                       >
-                        <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
+                        <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
                       </OButton>
                     </template>
                     <ODropdownItem
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><OIcon name="navigate-before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><OIcon name="navigate-before" size="sm" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<OIcon name="navigate-next" size="14px" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<OIcon name="navigate-next" size="sm" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </OCardSection>
@@ -400,7 +400,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -658,13 +658,10 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log)).then(() =>
-        toast({
-          variant: "success",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(JSON.stringify(log), {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     const addFieldToTable = (value: string) => {

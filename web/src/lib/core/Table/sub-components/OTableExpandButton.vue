@@ -22,7 +22,7 @@ defineEmits<{
   >
     <OIcon
       :name="expanded ? 'expand-less' : 'expand-more'"
-      size="1rem"
+      size="sm"
     />
   </button>
 </template>

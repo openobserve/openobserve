@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :clearable="searchAcrossFolders"
               @clear="clearSearch"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
@@ -283,7 +283,7 @@ import { useRouter } from "vue-router";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
@@ -565,7 +565,7 @@ function convertUnixToQuasarFormat(unixMicroseconds: any) {
   if (!unixMicroseconds) return "";
   const unixSeconds = unixMicroseconds / 1e6;
   const dateToFormat = new Date(unixSeconds * 1000);
-  return date.formatDate(dateToFormat.toISOString(), "YYYY-MM-DDTHH:mm:ssZ");
+  return formatDate(dateToFormat.toISOString(), "YYYY-MM-DDTHH:mm:ssZ");
 }
 
 const filterData = (rows: any[], terms: any) => {

@@ -26,7 +26,7 @@
         v-if="queryData.length === 0"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-[var(--o2-text-muted)]"
       >
-        <OIcon name="info" size="48px" />
+        <OIcon name="info" style="width: 48px; height: 48px;" />
         <p class="tw:mt-2">No queries executed for this panel.</p>
       </div>
 
@@ -258,6 +258,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import DOMPurify from "dompurify";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -368,7 +369,7 @@ export default defineComponent({
 
     const copyText = (text: string) => {
       if (!text) return;
-      navigator.clipboard.writeText(text);
+      copyToClipboard(text, { silent: true });
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

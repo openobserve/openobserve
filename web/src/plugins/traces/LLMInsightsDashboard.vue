@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="streamsLoaded && availableStreams.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
     >
-      <OIcon name="auto-awesome" size="3rem" class="tw:mb-3" />
+      <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM streams found
       </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="streamHasNoLLMFields"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[300px]"
     >
-      <OIcon name="auto-awesome" size="3rem" class="tw:mb-3" />
+      <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM data in <b>{{ activeStream }}</b>
       </div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="error && hasLoadedOnce"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
-      <OIcon name="error-outline" size="3rem" class="tw:mb-3" />
+      <OIcon name="error-outline" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:mb-2">Failed to load LLM Insights</div>
       <div class="tw:text-sm tw:text-gray-500 tw:mb-3">{{ error }}</div>
       <OButton
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="hasLoadedOnce && !hasData"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
-      <OIcon name="info" size="3rem" class="tw:mb-3" />
+      <OIcon name="info" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
         No LLM data found for the selected time range
       </div>
@@ -308,13 +308,13 @@ const kpiCards = computed<KpiCard[]>(() => {
   const traces = splitNumberWithUnit(kpi.value.traceCount);
   const p95 = splitDuration(kpi.value.p95DurationMicros);
   const errorRate =
-    kpi.value.requestCount > 0
-      ? (kpi.value.errorCount / kpi.value.requestCount) * 100
+    kpi.value.traceCount > 0
+      ? (kpi.value.errorCount / kpi.value.traceCount) * 100
       : 0;
 
   const errorRatePrev =
-    kpiPrev.value.requestCount > 0
-      ? (kpiPrev.value.errorCount / kpiPrev.value.requestCount) * 100
+    kpiPrev.value.traceCount > 0
+      ? (kpiPrev.value.errorCount / kpiPrev.value.traceCount) * 100
       : 0;
 
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.

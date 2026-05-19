@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="events.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-16 tw:text-gray-500"
     >
-      <OIcon name="forum" size="56px" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="forum" class="tw:mb-3 tw:opacity-40" style="width: 56px; height: 56px;" />
       <div class="tw:text-base tw:font-medium tw:mb-1">No activity yet</div>
       <div class="tw:text-sm tw:text-gray-400">Events and comments will appear here</div>
     </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon
                       :name="getEventIcon(event)"
-                      size="14px"
+                      size="sm"
                       :style="{ color: getEventBadgeColor(event) }"
                     />
                   </div>
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { date } from "quasar";
+import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -615,7 +615,7 @@ const formatRelativeTime = (timestamp: number): string => {
   const days = Math.floor(diff / 86400000);
   if (diff < 604800000) return `${days} day${days === 1 ? '' : 's'} ago`;
 
-  return date.formatDate(timestamp / 1000, "MMM D, YYYY");
+  return formatToDateOnly(timestamp);
 };
 
 watch(() => props.visible, async (visible) => {

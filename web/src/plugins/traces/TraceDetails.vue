@@ -318,8 +318,8 @@ size="sm">
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
                 >
-                  <template v-slot:prepend>
-                    <OIcon name="search" size="1rem" />
+                  <template v-slot:icon-left>
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -409,7 +409,7 @@ size="xs"
               >
                 <template #icon-left
                   ><OIcon name="play-circle"
-size="14px"
+size="sm"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
               </OButton>
@@ -699,9 +699,8 @@ size="14px"
               >
                 <OIcon
                   name="table-chart"
-                  size="48px"
-                  style="margin-bottom: 16px"
-                />
+                  style="margin-bottom: 16px; width: 48px; height: 48px;"
+                 />
                 <div
                   style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
                 >
@@ -836,7 +835,7 @@ import {
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -2218,12 +2217,17 @@ export default defineComponent({
           if (maxDepth < depth) maxDepth = depth;
         }
       };
+
+      // Handle multiple root nodes - process each root span to ensure
+      // all root services appear in the service map
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
+
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
         maxDepth,
+        true, // Enable multi-root handling for trace service maps
       );
     };
 
@@ -2392,12 +2396,10 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      toast({
-        variant: "success",
-        message: "Trace ID copied to clipboard",
+      copyToClipboard(spanList.value[0]["trace_id"], {
+        successMessage: "Trace ID copied to clipboard",
         timeout: 2000,
       });
-      copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
     const sessionId = computed<string>(() =>
@@ -2406,10 +2408,8 @@ export default defineComponent({
 
     const copySessionId = () => {
       if (!sessionId.value) return;
-      copyToClipboard(sessionId.value);
-      toast({
-        variant: "success",
-        message: "Session ID copied to clipboard",
+      copyToClipboard(sessionId.value, {
+        successMessage: "Session ID copied to clipboard",
         timeout: 2000,
       });
     };

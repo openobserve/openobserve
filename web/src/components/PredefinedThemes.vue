@@ -236,12 +236,12 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
+const $q = useQuasar();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
@@ -313,7 +313,6 @@ watch(activeTab, (newTab) => {
     localStorage.setItem("theme", newTheme);
     // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
     document.documentElement.classList.toggle("dark", newTheme === "dark");
-    $q.dark.set(newTheme === "dark");
   }
 });
 

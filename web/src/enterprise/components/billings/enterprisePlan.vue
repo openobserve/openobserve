@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="q-mr-sm"
           />
-          <OIcon v-else name="" color="green" size="16px" class="q-mr-sm" />
+          <OIcon v-else name="" color="green" size="sm" class="q-mr-sm" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>

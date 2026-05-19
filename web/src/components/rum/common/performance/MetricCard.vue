@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           v-if="icon"
           :name="icon"
-          size="1rem"
+          size="sm"
           :color="statusColor"
         />
         <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon
         v-if="status"
         :name="statusIcon"
-        size="0.875rem"
+        size="sm"
         :color="statusColor"
       />
     </div>

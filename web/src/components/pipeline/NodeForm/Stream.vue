@@ -61,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="stream_name"
                 :options="filteredStreams"
-                option-label="label"
-                option-value="value"
+                label-key="label"
+                value-key="value"
                 :label="t('alerts.stream_name') + ' *'"
                 :loading="isFetchingStreams"
                 :popup-content-style="{ textTransform: 'lowercase' }"

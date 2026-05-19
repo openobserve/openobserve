@@ -155,19 +155,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           <OIcon
             v-if="getSortIcon?.(col.id) === 'asc'"
             name="arrow-upward"
-            size="0.85rem"
+            size="sm"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
             name="arrow-downward"
-            size="0.85rem"
+            size="sm"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else
             name="unfold-more"
-            size="0.85rem"
+            size="sm"
             class="tw:opacity-40"
           />
         </div>
@@ -204,19 +204,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         <OIcon
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
           name="arrow-upward"
-          size="0.85rem"
+          size="sm"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
           name="arrow-downward"
-          size="0.85rem"
+          size="sm"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
           name="unfold-more"
-          size="0.85rem"
+          size="sm"
           class="tw:opacity-40 tw:ml-1"
         />
       </th>
@@ -329,21 +329,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
-                size="0.85rem"
+                size="sm"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
-                size="0.85rem"
+                size="sm"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
                 name="unfold-more"
-                size="0.85rem"
+                size="sm"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
               />
@@ -367,7 +367,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
-            <OIcon name="cancel" size="1rem" />
+            <OIcon name="cancel" size="sm" />
           </button>
         </div>
 
@@ -452,21 +452,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
-                size="0.85rem"
+                size="sm"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
-                size="0.85rem"
+                size="sm"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
                 name="unfold-more"
-                size="0.85rem"
+                size="sm"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
               />
@@ -486,7 +486,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
-            <OIcon name="cancel" size="1rem" />
+            <OIcon name="cancel" size="sm" />
           </button>
         </div>
         <div

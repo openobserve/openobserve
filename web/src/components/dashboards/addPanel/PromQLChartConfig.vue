@@ -161,8 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.tableAggregations')"
           multiple
           class="showLabelOnTop"
-          emit-value
-          map-options
           data-test="dashboard-config-table-aggregations"
           :display-value="getTableAggregationsDisplay"
         >

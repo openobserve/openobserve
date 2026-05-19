@@ -207,15 +207,16 @@ export function useLLMInsights() {
     // column that doesn't exist on the stream's schema fails the query — the
     // safe path forward is to use the standard fields exclusively.
     //
-    // Errors are counted across all spans (not just those tagged with
-    // `gen_ai_operation_name`) because OTel SDKs typically propagate the
-    // failure to a deeper child span (e.g. `tool.tools_call`) that doesn't
-    // itself carry the gen_ai operation attribute.
+    // Error rate = error traces / total traces, always [0%, 100%].
+    // OTel SDKs propagate errors to child spans that don't carry
+    // gen_ai_operation_name, so filtering errors to only LLM spans yields 0.
+    // Counting error spans vs LLM-only spans yields values >> 100%.
+    // Trace-level counting fixes both: a trace either errored or it didn't.
     const sql = `
       SELECT
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
         approx_distinct(trace_id) as trace_count,
-        COUNT(*) FILTER (WHERE span_status = 'ERROR') as error_count,
+        approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
         COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
         COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
         COALESCE(AVG(duration), 0) as avg_duration,
@@ -352,7 +353,7 @@ export function useLLMInsights() {
         histogram(_timestamp, '${interval}') as ts,
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
         approx_distinct(trace_id) as trace_count,
-        COUNT(*) FILTER (WHERE span_status = 'ERROR') as error_count,
+        approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
         COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
         COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
@@ -383,14 +384,14 @@ export function useLLMInsights() {
         for (const row of hits) {
           const idx = bucketIndex.get(String(row.ts));
           if (idx === undefined) continue;
-          const requestCount = Number(row.request_count) || 0;
+          const traceCount = Number(row.trace_count) || 0;
           const errorCount = Number(row.error_count) || 0;
           series.tokens[idx] = Number(row.total_tokens) || 0;
-          series.traces[idx] = Number(row.trace_count) || 0;
+          series.traces[idx] = traceCount;
           series.p95Micros[idx] = Number(row.p95_duration) || 0;
           series.cost[idx] = Number(row.total_cost) || 0;
           series.errorRate[idx] =
-            requestCount > 0 ? (errorCount / requestCount) * 100 : 0;
+            traceCount > 0 ? (errorCount / traceCount) * 100 : 0;
         }
       },
       size,

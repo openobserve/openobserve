@@ -139,15 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  QItem,
-  QItemLabel,
-  QItemSection,
-  QBtn,
-  QBtnDropdown,
-  QIcon,
-  QSelect,
-} from "quasar";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
@@ -215,14 +206,7 @@ export default defineComponent({
     WebinarBanner,
     "keep-alive": KeepAlive,
     ONavbar,
-    "q-item": QItem,
-    "q-item-label": QItemLabel,
-    "q-item-section": QItemSection,
-    "q-btn": QBtn,
-    "q-btn-dropdown": QBtnDropdown,
     "router-view": RouterView,
-    "OIcon": QIcon,
-    "q-select": QSelect,
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,

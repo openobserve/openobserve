@@ -1,6 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -29,9 +28,7 @@ vi.mock('quasar', async () => {
   };
 });
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 // Mock the pipeline service
 vi.mock("@/services/pipelines", () => ({

@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left
-              ><OIcon name="dashboard-customize" size="16px"
+              ><OIcon name="dashboard-customize" size="sm"
             /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><OIcon name="file-download" size="16px"
+              ><OIcon name="file-download" size="sm"
             /></template>
             {{ t("panel.downloadAsCSV") }}
           </ODropdownItem>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><OIcon name="report-problem" size="16px"
+              ><OIcon name="report-problem" size="sm"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>

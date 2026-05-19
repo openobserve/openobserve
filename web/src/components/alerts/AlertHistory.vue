@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               @clear="clearSearch"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon
                   class="o2-search-input-icon"
                   :class="
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
               :color="value ? 'grey' : 'positive'"
-              size="20px"
+              size="md"
              />
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
           </template>
@@ -480,7 +480,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -819,7 +819,7 @@ const formatDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);
-  return date.formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
+  return formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
 };
 
 const formatDuration = (microseconds: number) => {

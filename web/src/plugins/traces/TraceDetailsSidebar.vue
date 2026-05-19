@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="error"
-            size="1rem"
+            size="sm"
             class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
           />
         </span>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="chip-value">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
-              size="10px"
+              size="xs"
               class="q-ml-xs copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <template #icon><OIcon name="arrow-upward" size="10px" /></template>
+              <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </OBadge>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <template #icon><OIcon name="arrow-downward" size="10px" /></template>
+              <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </OBadge>
@@ -369,7 +369,7 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="14px"
+                        size="sm"
                       />
                     </OButton>
                     <OButton
@@ -436,7 +436,7 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="14px"
+                        size="sm"
                       />
                     </OButton>
                     <OButton
@@ -873,7 +873,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
-import { date, type QTableProps, copyToClipboard, useQuasar } from "quasar";
+import { formatTimestamp, formatTimestampNs } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toggleFullscreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1048,7 +1050,6 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 0,
     });
-    const q = useQuasar();
     const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
@@ -1256,8 +1257,8 @@ export default defineComponent({
         name: "@timestamp",
         field: "@timestamp",
         prop: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+          formatTimestampNs(
+            row[store.state.zoConfig.timestamp_column],
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
@@ -1318,8 +1319,8 @@ export default defineComponent({
           header: "Timestamp",
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
-            date.formatDate(
-              Math.floor(row[tsCol] / 1000000),
+            formatTimestampNs(
+              row[tsCol],
               "MMM DD, YYYY HH:mm:ss.SSS Z",
             ),
           meta: {
@@ -1413,20 +1414,18 @@ export default defineComponent({
 
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
-        date.formatDate(
-          Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
-          ),
+        formatTimestamp(
+          spanDetails.attrs[store.state.zoConfig.timestamp_column],
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
 
-      spanDetails.attrs["start_time"] = date.formatDate(
-        Math.floor(spanDetails.attrs["start_time"] / 1000000),
+      spanDetails.attrs["start_time"] = formatTimestampNs(
+        spanDetails.attrs["start_time"],
         "MMM DD, YYYY HH:mm:ss.SSS Z",
       );
 
-      spanDetails.attrs["end_time"] = date.formatDate(
-        Math.floor(spanDetails.attrs["end_time"] / 1000000),
+      spanDetails.attrs["end_time"] = formatTimestampNs(
+        spanDetails.attrs["end_time"],
         "MMM DD, YYYY HH:mm:ss.SSS Z",
       );
 
@@ -1496,11 +1495,8 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "");
-
-      q?.notify?.({
-        variant: "success",
-        message: "Span ID copied to clipboard",
+      copyToClipboard(props.span?.span_id || "", {
+        successMessage: "Span ID copied to clipboard",
         timeout: 2000,
       });
     };
@@ -1509,11 +1505,8 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText);
-
-      q?.notify?.({
-        variant: "success",
-        message: "Attributes copied to clipboard",
+      copyToClipboard(attributesText, {
+        successMessage: "Attributes copied to clipboard",
         timeout: 2000,
       });
     };
@@ -1815,23 +1808,11 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy)
-          .then(() => {
-            toast({
-              variant: "success",
-              message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-              position: "top-center",
-              timeout: 2000,
-            });
-          })
-          .catch(() => {
-            toast({
-              variant: "error",
-              message: "Failed to copy to clipboard",
-              position: "top-center",
-              timeout: 2000,
-            });
-          });
+        copyToClipboard(textToCopy, {
+          successMessage: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
+          errorMessage: "Failed to copy to clipboard",
+          timeout: 2000,
+        });
       } catch (error) {
         toast({
           variant: "error",
@@ -1905,8 +1886,7 @@ export default defineComponent({
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
-        q.fullscreen
-          .toggle(ioContainerRef.value)
+        toggleFullscreen(ioContainerRef.value)
           .then(() => {
             // Check if this specific element is now fullscreen
             nextTick(() => {
@@ -1972,13 +1952,10 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log)).then(() =>
-        toast({
-          variant: "success",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(JSON.stringify(log), {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     return {

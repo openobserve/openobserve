@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
               :placeholder="t('common.search')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="search" size="sm" class="cursor-pointer" />
               </template>
             </OInput>
@@ -81,7 +81,7 @@ import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";

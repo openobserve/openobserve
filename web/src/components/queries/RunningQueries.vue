@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon name="search" size="sm" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
           </OInput>

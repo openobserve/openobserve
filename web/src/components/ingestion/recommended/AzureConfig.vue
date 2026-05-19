@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
       <OIcon
         name="cloud"
-        size="2.5rem"
+        size="xl"
         class="tw:flex-shrink-0"
       />
       <div>

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full"
             data-test="built-in-pattern-search"
           >
-            <template v-slot:prepend>
+            <template v-slot:icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <OIcon name="error" size="50px" />
+      <OIcon name="error" style="width: 50px; height: 50px;" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li v-if="filteredPatterns.length === 0" class="tw:flex tw:items-center tw:px-3 tw:py-2">
             <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-grey-6">
               <div class="q-pa-xl">
-                <OIcon name="search-off" size="50px" />
+                <OIcon name="search-off" style="width: 50px; height: 50px;" />
                 <div class="q-mt-md">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>

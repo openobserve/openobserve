@@ -55,13 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Traffic Summary: Total | Failed | Error Rate -->
             <div class="traffic-row">
               <div class="traffic-pill total" data-test="service-graph-edge-side-panel-total">
-                <OIcon name="swap-horiz" size="13px" />
+                <OIcon name="swap-horiz" size="xs" />
                 <span class="traffic-label">Total</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.total_requests ?? 0) }}</span>
                 <OTooltip content="Total requests flowing through this connection" />
               </div>
               <div class="traffic-pill failed" data-test="service-graph-edge-side-panel-failed">
-                <OIcon name="close" size="13px" />
+                <OIcon name="close" size="xs" />
                 <span class="traffic-label">Failed</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.failed_requests ?? 0) }}</span>
                 <OTooltip content="Number of failed requests on this connection" />
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getErrorRateClass()"
                 data-test="service-graph-edge-side-panel-error-rate"
               >
-                <OIcon name="error-outline" size="13px" />
+                <OIcon name="error-outline" size="xs" />
                 <span class="traffic-label">Error Rate</span>
                 <span class="traffic-value">{{ errorRateFormatted }}</span>
                 <OTooltip content="Percentage of requests that failed" />
@@ -238,6 +238,7 @@ import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useQuasar } from "quasar";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
@@ -270,6 +271,7 @@ export default defineComponent({
   },
   emits: ['close'],
   setup(props, { emit }) {
+    const $q = useQuasar();
     const store = useStore();
 
     const trendChartRef = ref<HTMLElement | null>(null);

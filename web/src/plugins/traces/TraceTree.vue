@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-mr-sm"
                       >
-                        <OIcon name="functions" size="10px" />
+                        <OIcon name="functions" size="xs" />
                         {{
                           formatTokens(
                             (spans as any[])[virtualRow.index].genAiUsage.total,
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (spans as any[])[virtualRow.index].genAiCost?.total > 0
                         "
                       >
-                        <OIcon name="attach-money" size="10px" />
+                        <OIcon name="attach-money" size="xs" />
                         {{
                           formatCost(
                             (spans as any[])[virtualRow.index].genAiCost.total,
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <OIcon name="event-note" size="0.625rem" />
+                      <OIcon name="event-note" size="xs" />
                       {{ getEventCount((spans as any[])[virtualRow.index]) }}
                     </span>
                   </div>

@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'feature-card--dark' : ''"
           >
             <div class="feature-card__icon-box" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark' : ''">
-              <OIcon :name="feature.icon" size="20px" class="feature-card__icon" />
+              <OIcon :name="feature.icon" size="md" class="feature-card__icon" />
             </div>
             <div class="feature-card__content">
               <div class="feature-card__title">{{ feature.title }}</div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- double-ring icon -->
       <div class="ent-empty__icon-outer">
         <div class="ent-empty__icon-inner" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark' : ''">
-          <OIcon name="cloud-upload" size="28px" class="ent-empty__icon" />
+          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon" />
         </div>
       </div>
 
@@ -126,15 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- key fact chips -->
       <div class="ent-empty__chips">
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="corporate-fare" size="13px" />
+          <OIcon name="corporate-fare" size="xs" />
           {{ t("storage_settings.perOrgIsolation") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="bolt" size="13px" />
+          <OIcon name="bolt" size="xs" />
           {{ t("storage_settings.appliesImmediately") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="lock" size="13px" />
+          <OIcon name="lock" size="xs" />
           {{ t("storage_settings.usesOrgCredentials") }}
         </span>
       </div>
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="success"
                 style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
               >
-                <OIcon name="check-circle" size="11px" style="margin-right: 3px;" />
+                <OIcon name="check-circle" size="xs" style="margin-right: 3px;" />
                 {{ t("storage_settings.active") }}
               </OBadge>
             </div>

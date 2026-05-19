@@ -59,7 +59,7 @@
               data-test="dashboard-promql-builder-step-value"
               style="width: 140px"
             >
-              <template v-slot:append>
+              <template v-slot:icon-right>
                 <OIcon
                   name="info"
                   size="sm"

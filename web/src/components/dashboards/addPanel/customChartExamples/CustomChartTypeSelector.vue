@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%"
           >
             <div class="text-center">
-              <OIcon name="search-off" size="4rem" />
+              <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
               <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
               <div class="text-body2 text-grey-6 q-mt-sm">
                 Try searching with different keywords

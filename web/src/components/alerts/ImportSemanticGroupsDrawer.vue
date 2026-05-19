@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state text-center q-pa-lg">
-        <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
+        <OIcon name="cloud-upload" class="q-mb-md" style="width: 64px; height: 64px;" />
         <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
         <div class="text-body2 text-grey-6">
           The system will analyze the file and show you what will change

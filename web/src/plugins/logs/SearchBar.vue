@@ -152,236 +152,238 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               :style="
                 localSavedViews.length > 0
-                  ? 'width: 500px; max-height: 400px; overflow-y: auto'
-                  : 'width: 250px; max-height: 400px; overflow-y: auto'
+                  ? 'width: 500px; max-height: 400px; overflow-y: auto; overflow-x: auto'
+                  : 'width: 250px; max-height: 400px; overflow-y: auto; overflow-x: auto'
               "
             >
-              <div data-test="logs-search-saved-view-list" class="tw:flex">
-                <div
-                  class="tw:flex tw:flex-col"
-                  :style="
-                    localSavedViews.length > 0
-                      ? 'width: 60%; border-right: 1px solid lightgray'
-                      : 'width: 100%'
-                  "
-                >
-                  <OTable
-                    data-test="log-search-saved-view-list-fields-table"
-                    :data="searchObj.data.savedViews"
-                    :columns="savedViewColumns"
-                    row-key="view_id"
-                    :global-filter="searchObj.data.savedViewFilterFields"
-                    :page-size="rowsPerPage"
-                    :page-size-options="[10, 20, 50]"
-                    class="saved-view-table full-height o2-table-hide-header"
+              <q-list data-test="logs-search-saved-view-list">
+                <q-item style="padding: 0px 0px 0px 0px">
+                  <q-item-section
+                    class="column"
+                    no-hover
+                    :style="
+                      localSavedViews.length > 0
+                        ? 'width: 60%; border-right: 1px solid lightgray; min-width: 0'
+                        : 'width: 100%; min-width: 0'
+                    "
                   >
-                    <template #top>
-                      <div class="full-width">
-                        <OInput
-                          data-test="log-search-saved-view-field-search-input"
-                          v-model="searchObj.data.savedViewFilterFields"
-                          clearable
-                          :debounce="1"
-                          class="tw:mx-2 tw:my-2"
-                          :placeholder="t('search.searchSavedView')"
-                        >
-                          <template #prepend>
-                            <OIcon name="search" size="sm" />
-                          </template>
-                        </OInput>
-                      </div>
-                      <div
-                        v-if="searchObj.loadingSavedView == true"
-                        class="full-width float-left"
+                    <div style="box-sizing: border-box; width: 100%; padding: 0 8px">
+                      <OInput
+                        data-test="log-search-saved-view-field-search-input"
+                        v-model="searchObj.data.savedViewFilterFields"
+                        clearable
+                        :debounce="1"
+                        class="tw:w-full tw:my-2"
+                        :placeholder="t('search.searchSavedView')"
                       >
-                        <div
-                          class="text-subtitle2 text-weight-bold float-left"
-                        >
-                          <OSpinner size="xs" />
-                          {{ t("confirmDialog.loading") }}
-                        </div>
+                        <template #prepend>
+                          <OIcon name="search" size="sm" />
+                        </template>
+                      </OInput>
+                    </div>
+                    <div
+                      v-if="searchObj.loadingSavedView == true"
+                      class="full-width float-left q-pa-xs"
+                    >
+                      <div class="text-subtitle2 text-weight-bold float-left">
+                        <OSpinner size="xs" />
+                        {{ t("confirmDialog.loading") }}
                       </div>
-                    </template>
-                    <template #cell-view_name="{ row, value }">
-                      <div class="field_list">
-                        <div
-                          class="q-pa-xs saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
-                          :data-test="`logs-search-bar-saved-view-row-${value}`"
-                        >
-                          <div
-                            class="tw:flex tw:flex-1 tw:min-w-0"
-                            :title="value"
-                            @click.stop="applySavedView(row)"
-                          >
-                            <span
-                              class="ellipsis"
-                              style="max-width: 140px"
-                              >{{ value }}</span
-                            >
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                row,
-                                favoriteViews.includes(row.view_id),
-                              )
-                            "
-                          >
-                            <OButton
-                              :title="t('common.favourite')"
-                              class="logs-saved-view-icon"
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <OIcon
-                                :name="
-                                  favoriteViews.includes(row.view_id)
-                                    ? 'favorite'
-                                    : 'favorite-border'
-                                "
-                                size="xs"
-                              />
-                            </OButton>
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
-                            @click.stop="handleUpdateSavedView(row)"
-                          >
-                            <OButton
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <OIcon name="edit" size="xs" />
-                            </OButton>
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
-                            @click.stop="handleDeleteSavedView(row)"
-                          >
-                            <OButton
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <OIcon name="delete" size="xs" />
-                            </OButton>
-                          </div>
-                        </div>
-                      </div>
-                    </template>
-                    <template #empty>
+                    </div>
+                    <div
+                      v-else
+                      data-test="log-search-saved-view-list-fields-table"
+                      style="max-height: 320px; overflow-y: auto; overflow-x: hidden"
+                    >
                       <div
-                        v-if="searchObj.loadingSavedView == false"
+                        v-if="paginatedSavedViews.length === 0"
                         class="q-pl-sm q-pt-sm"
                       >
-                        <span>{{
+                        <q-item-label>{{
                           t("search.savedViewsNotFound")
-                        }}</span>
+                        }}</q-item-label>
                       </div>
-                    </template>
-                  </OTable>
-                </div>
-
-                <div
-                  class="tw:flex tw:flex-col"
-                  style="width: 40%; margin-left: 0px"
-                  v-if="localSavedViews.length > 0"
-                >
-                  <OTable
-                    data-test="log-search-saved-view-favorite-list-fields-table"
-                    :data="localSavedViews"
-                    :columns="savedViewColumns"
-                    row-key="view_id"
-                    pagination="none"
-                    class="saved-view-table full-height o2-table-hide-header"
-                  >
-                    <template #top>
-                      <div class="tw:flex tw:flex-col">
+                      <div
+                        v-for="row in paginatedSavedViews"
+                        :key="row.view_id"
+                        style="display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 2px"
+                        class="tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
+                        :data-test="`logs-search-saved-view-item-${row.view_name}`"
+                      >
                         <div
-                          class="q-pa-sm text-bold favorite-label tw:text-xs tw:uppercase tw:tracking-wide tw:text-muted-foreground"
+                          class="tw:truncate tw:text-sm tw:min-w-0"
+                          :title="row.view_name"
+                          @click.stop="applySavedView(row)"
+                          v-close-popup
                         >
-                          {{ t("search.favoriteViews") }}
+                          {{ row.view_name }}
                         </div>
-                        <div class="tw:border-t tw:my-1 tw:border-border" />
-                      </div>
-                    </template>
-                    <template #cell-view_name="{ row, value }">
-                      <div class="field_list q-pa-xs">
-                        <div
-                          class="q-pa-xs saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
-                          :data-test="`logs-search-bar-favorite-saved-view-row-${value}`"
+                        <OButton
+                          :data-test="`logs-search-bar-favorite-${row.view_name}-saved-view-btn`"
+                          :title="t('common.favourite')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="
+                            handleFavoriteSavedView(
+                              row,
+                              favoriteViews.includes(row.view_id),
+                            )
+                          "
                         >
-                          <div
-                            class="tw:flex tw:flex-1 tw:min-w-0"
-                            @click.stop="applySavedView(row)"
-                          >
-                            <span
-                              class="ellipsis"
-                              style="max-width: 90px"
-                              >{{ value }}</span
-                            >
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                row,
-                                favoriteViews.includes(row.view_id),
-                              )
+                          <OIcon
+                            :name="
+                              favoriteViews.includes(row.view_id)
+                                ? 'favorite'
+                                : 'favorite-border'
                             "
-                          >
-                            <OIcon
-                              :name="
-                                favoriteViews.includes(row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite-border'
-                              "
-                              color="grey"
-                              size="xs"
-                            />
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
-                            @click.stop="handleUpdateSavedView(row)"
-                          >
-                            <OButton
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <OIcon name="edit" size="xs" />
-                            </OButton>
-                          </div>
-                          <div
-                            class="tw:flex tw:items-center tw:shrink-0"
-                            :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
-                            @click.stop="handleDeleteSavedView(row)"
-                          >
-                            <OButton
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <OIcon name="delete" size="xs" />
-                            </OButton>
-                          </div>
-                        </div>
+                            size="xs"
+                          />
+                        </OButton>
+                        <OButton
+                          :data-test="`logs-search-bar-update-${row.view_name}-saved-view-btn`"
+                          :title="t('common.edit')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="handleUpdateSavedView(row)"
+                        >
+                          <OIcon name="edit" size="xs" />
+                        </OButton>
+                        <OButton
+                          :data-test="`logs-search-bar-delete-${row.view_name}-saved-view-btn`"
+                          :title="t('common.delete')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="handleDeleteSavedView(row)"
+                        >
+                          <OIcon name="delete" size="xs" />
+                        </OButton>
                       </div>
-                    </template>
-                  </OTable>
-                </div>
-              </div>
+                    </div>
+                    <div
+                      v-if="savedViewTotalPages > 1"
+                      class="tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1 tw:border-t tw:border-[var(--color-border-default)]"
+                    >
+                      <span class="tw:text-xs tw:text-gray-500">
+                        {{ (savedViewPage - 1) * savedViewPageSize + 1 }}–{{ Math.min(savedViewPage * savedViewPageSize, filteredSavedViews.length) }} / {{ filteredSavedViews.length }}
+                      </span>
+                      <div class="tw:flex tw:gap-0.5">
+                        <OButton
+                          size="icon"
+                          variant="ghost"
+                          :disabled="savedViewPage <= 1"
+                          @click.stop="savedViewPage = 1"
+                        >
+                          <OIcon name="first-page" size="xs" />
+                        </OButton>
+                        <OButton
+                          size="icon"
+                          variant="ghost"
+                          :disabled="savedViewPage <= 1"
+                          @click.stop="savedViewPage--"
+                        >
+                          <OIcon name="chevron-left" size="xs" />
+                        </OButton>
+                        <OButton
+                          size="icon"
+                          variant="ghost"
+                          :disabled="savedViewPage >= savedViewTotalPages"
+                          @click.stop="savedViewPage++"
+                        >
+                          <OIcon name="chevron-right" size="xs" />
+                        </OButton>
+                        <OButton
+                          size="icon"
+                          variant="ghost"
+                          :disabled="savedViewPage >= savedViewTotalPages"
+                          @click.stop="savedViewPage = savedViewTotalPages"
+                        >
+                          <OIcon name="last-page" size="xs" />
+                        </OButton>
+                      </div>
+                    </div>
+                  </q-item-section>
+
+                  <q-item-section
+                    class="column"
+                    style="width: 40%; padding: 0; margin-left: 0px; justify-content: flex-start; align-self: flex-start"
+                    v-if="localSavedViews.length > 0"
+                  >
+                    <q-item style="padding: 0px">
+                      <q-item-label
+                        header
+                        class="q-pa-sm text-bold favorite-label"
+                        >{{ t("search.favoriteViews") }}</q-item-label
+                      >
+                    </q-item>
+                    <OSeparator class="tw:mx-4" />
+                    <div
+                      data-test="log-search-saved-view-favorite-list-fields-table"
+                      style="max-height: 320px; overflow-y: auto; overflow-x: hidden"
+                    >
+                      <div
+                        v-for="row in localSavedViews"
+                        :key="row.view_id"
+                        style="display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 2px"
+                        class="tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
+                      >
+                        <div
+                          class="tw:truncate tw:text-sm tw:min-w-0"
+                          :title="row.view_name"
+                          @click.stop="applySavedView(row)"
+                          v-close-popup
+                        >
+                          {{ row.view_name }}
+                        </div>
+                        <OButton
+                          :data-test="`logs-search-bar-favorite-${row.view_name}-saved-view-btn`"
+                          :title="t('common.favourite')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="
+                            handleFavoriteSavedView(
+                              row,
+                              favoriteViews.includes(row.view_id),
+                            )
+                          "
+                        >
+                          <OIcon
+                            :name="
+                              favoriteViews.includes(row.view_id)
+                                ? 'favorite'
+                                : 'favorite-border'
+                            "
+                            size="xs"
+                          />
+                        </OButton>
+                        <OButton
+                          :data-test="`logs-search-bar-update-${row.view_name}-favorite-saved-view-btn`"
+                          :title="t('common.edit')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="handleUpdateSavedView(row)"
+                        >
+                          <OIcon name="edit" size="xs" />
+                        </OButton>
+                        <OButton
+                          :data-test="`logs-search-bar-delete-${row.view_name}-favorite-saved-view-btn`"
+                          :title="t('common.delete')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                          @click.stop="handleDeleteSavedView(row)"
+                        >
+                          <OIcon name="delete" size="xs" />
+                        </OButton>
+                      </div>
+                    </div>
+                  </q-item-section>
+                </q-item>
+              </q-list>
             </div>
           </ODropdown>
         </OButtonGroup>
@@ -1127,7 +1129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
-                      size="16px"
+                      size="sm"
                       :color="searchObj.meta.liveMode ? 'primary' : ''"
                     />
                   </template>
@@ -1525,7 +1527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="q-ml-xs cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
                 <span style="font-size: 14px">{{
@@ -1633,7 +1635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mx-2 tw:my-2"
                       :placeholder="t('search.searchSavedView')"
                     >
-                      <template #prepend>
+                      <template #icon-left>
                         <OIcon name="search" size="sm" />
                       </template>
                     </OInput>
@@ -1856,8 +1858,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { copyToClipboard, is, QTooltip } from "quasar";
-
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -4179,6 +4179,30 @@ export default defineComponent({
       }
     };
 
+    const filteredSavedViews = computed(() => {
+      const filter = (searchObj.data.savedViewFilterFields ?? "").toLowerCase();
+      if (!filter) return searchObj.data.savedViews;
+      return searchObj.data.savedViews.filter((v: any) =>
+        (v.view_name ?? "").toLowerCase().includes(filter),
+      );
+    });
+
+    const savedViewPage = ref(1);
+    const savedViewPageSize = ref(10);
+
+    const savedViewTotalPages = computed(() =>
+      Math.ceil(filteredSavedViews.value.length / savedViewPageSize.value),
+    );
+
+    const paginatedSavedViews = computed(() => {
+      const start = (savedViewPage.value - 1) * savedViewPageSize.value;
+      return filteredSavedViews.value.slice(start, start + savedViewPageSize.value);
+    });
+
+    watch(filteredSavedViews, () => {
+      savedViewPage.value = 1;
+    });
+
     const handleFavoriteSavedView = (row: any, flag: boolean) => {
       let localSavedView: any = {};
       let savedViews = useLocalSavedView();
@@ -4868,6 +4892,11 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       filterSavedViewFn,
+      filteredSavedViews,
+      savedViewPage,
+      savedViewPageSize,
+      savedViewTotalPages,
+      paginatedSavedViews,
       savedViewColumns,
       config,
       handleRegionsSelection,

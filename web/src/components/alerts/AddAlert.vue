@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="sm" />
               <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <OIcon name="query-stats" size="36px" class="tw:opacity-20" />
+                <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
                 <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ t('alerts.previewEmptyState') }}
                 </span>

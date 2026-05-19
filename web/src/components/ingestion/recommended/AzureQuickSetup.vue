@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <OIcon name="cloud" size="2.5rem" />
+            <OIcon name="cloud" size="xl" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
@@ -193,7 +193,7 @@ import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useQuasar } from "quasar";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "AzureQuickSetup",
@@ -202,7 +202,7 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const showDetails = ref(false);
     const addingDashboard = ref(false);
 
@@ -304,15 +304,9 @@ export default defineComponent({
         let shouldReplace = false;
         if (existingDashboard) {
           // Ask user if they want to replace
-          shouldReplace = await new Promise<boolean>((resolve) => {
-            q.dialog({
-              title: "Dashboard Already Exists",
-              message: `A dashboard named "${dashboardTitle}" already exists in the Microsoft folder. Do you want to replace it?`,
-              cancel: true,
-              persistent: true,
-            })
-              .onOk(() => resolve(true))
-              .onCancel(() => resolve(false));
+          shouldReplace = await confirm({
+            title: "Dashboard Already Exists",
+            message: `A dashboard named "${dashboardTitle}" already exists in the Microsoft folder. Do you want to replace it?`,
           });
 
           if (!shouldReplace) {

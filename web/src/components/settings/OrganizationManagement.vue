@@ -201,6 +201,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -217,6 +218,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
+    const { confirm } = useConfirmDialog();
 
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
@@ -487,13 +489,12 @@ export default defineComponent({
       }
     };
 
-    const confirmRevokeContract = (row: any) => {
-      $q.dialog({
+    const confirmRevokeContract = async (row: any) => {
+      const ok = await confirm({
         title: "Revoke External Contract",
         message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
-        cancel: true,
-        persistent: true,
-      }).onOk(() => {
+      });
+      if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
         const dismiss = toast({
@@ -521,16 +522,15 @@ export default defineComponent({
               timeout: 5000,
             });
           });
-      });
+      }
     };
 
-    const toggleOrgStorage = (row: any) => {
-      $q.dialog({
+    const toggleOrgStorage = async (row: any) => {
+      const ok = await confirm({
         title: "Enable Storage Settings",
         message: `Are you sure you want to enable storage settings for "${row.name}"?`,
-        cancel: true,
-        persistent: true,
-      }).onOk(() => {
+      });
+      if (ok) {
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
@@ -558,7 +558,7 @@ export default defineComponent({
               timeout: 5000,
             });
           });
-      });
+      }
     };
 
     const updateTrialPeriod = (org_id: string, extended_week: number) => {

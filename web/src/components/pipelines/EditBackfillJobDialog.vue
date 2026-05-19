@@ -145,7 +145,11 @@ import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { useQuasar } from "quasar";
+
+const $q = useQuasar();
 
 interface Props {
   modelValue: boolean;
@@ -161,6 +165,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+
+const { confirm } = useConfirmDialog();
 
 const show = computed({
   get: () => props.modelValue,
@@ -272,22 +278,16 @@ const onSubmit = async () => {
 
   // Show confirmation dialog if delete_before_backfill is enabled
   if (formData.value.deleteBeforeBackfill) {
-    $q.dialog({
+    const ok = await confirm({
       title: "Confirm Data Deletion",
       message:
         "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
-      cancel: {
-        label: "Cancel",
-        flat: true,
-      },
-      ok: {
-        label: "Yes, Delete and Backfill",
-      },
-      persistent: true,
-      focus: "cancel", // Focus on cancel button by default for safety
-    }).onOk(() => {
-      updateBackfillJobRequest();
+      confirmLabel: "Yes, Delete and Backfill",
+      cancelLabel: "Cancel",
     });
+    if (ok) {
+      updateBackfillJobRequest();
+    }
   } else {
     updateBackfillJobRequest();
   }

@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none"
-    style="min-height: inherit; height: calc(100vh - 88px)"
-  >
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -32,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage">
+    <div v-if="!showImportModelPricingPage" class="tw:flex tw:flex-col tw:h-full">
       <!-- List View Header -->
+      <div class="tw:flex-shrink-0">
       <div
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+        style="position: sticky; top: 0; z-index: 1000;"
       >
         <div
           class="q-table__title tw:font-[600]"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="no-border o2-search-input"
             :placeholder="t('modelPricing.searchPlaceholder')"
           >
-            <template #prepend>
+            <template #icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
@@ -104,8 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      </div>
 
       <!-- List Table -->
+      <div class="tw:flex-1 tw:min-h-0">
       <OTable
         ref="qTableRef"
         data-test="model-pricing-list-table"
@@ -113,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :selected-ids="selectedIds"
-        :selection="hasSelectableModels ? 'multiple' : 'none'"
+        selection="multiple"
         pagination="client"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
@@ -121,30 +123,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        expansion="multiple"
-        :expanded-ids="[...expandedParents]"
-        :get-sub-rows="getSubRows"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :class="{
-          'tw:h-[calc(100vh-var(--navbar-height)-87px)]': filteredModels.length > 0,
-        }"
+        tree
+        tree-column-id="name"
+        :get-row-warning="(row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <template #tree-warning="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:text-sm tw:leading-none">
+            <OIcon name="warning-amber" size="sm" class="shadowed-icon" />
+            <span class="tw:leading-tight">
+              {{
+                t("modelPricing.shadowedWarningBanner", { name: row.name })
+              }}
+            </span>
+          </div>
+        </template>
         <template #cell-name="{ row }">
           <div class="row items-center no-wrap tree-node-content">
-            <div class="tree-icon-wrapper">
-              <OIcon
-                v-if="row.children?.length > 0"
-                :name="
-                  expandedParents.has(row.id)
-                    ? 'keyboard_arrow_down'
-                    : 'keyboard_arrow_right'
-                "
-                size="xs"
-                class="cursor-pointer tree-expand-icon"
-                @click.stop="toggleExpand(row.id)"
-              />
-            </div>
             <span
               v-if="getSource(row) === 'built_in'"
               class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
@@ -195,16 +190,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1">
             <code
               class="text-caption pattern-code o2-table-cell-content"
-              :class="{ 'shadowed-pattern': row.__type === 'child' }"
+              :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
             <OIcon
-              v-if="row.__type === 'child'"
+              v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
               class="tw:shrink-0 shadowed-icon"
-             />
-              <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: row._parentName })" />
+            >
+              <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
+            </OIcon>
           </div>
         </template>
         <template #cell-pricing="{ row }">
@@ -341,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <OIcon name="monetization-on" size="48px" />
+            <OIcon name="monetization-on" style="width: 48px; height: 48px;" />
             <div class="text-subtitle1 text-grey-7 q-mt-sm">
               {{ t("modelPricing.noModels") }}
             </div>
@@ -391,6 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      </div>
     </div>
     <!-- end v-if="!showImportModelPricingPage" -->
 
@@ -562,8 +559,6 @@ function onTabChange() {
   selectedIds.value = [];
 }
 
-const hasSelectableModels = computed(() => models.value.length > 0);
-
 /** Flat list of all models (parents + children) for ID-based lookups. */
 const allModels = computed(() => {
   const result: any[] = [];
@@ -574,14 +569,33 @@ const allModels = computed(() => {
   return result;
 });
 
+/** Set of model ids that are children of some parent (= shadowed rows). */
+const childIds = computed(() => {
+  const ids = new Set<string>();
+  for (const m of models.value) {
+    for (const c of m.children ?? []) ids.add(c.id);
+  }
+  return ids;
+});
+
+function isChildRow(row: any): boolean {
+  return !!(row && childIds.value.has(row.id));
+}
+
+function getParentName(row: any): string {
+  for (const m of models.value) {
+    if (m.children?.some((c: any) => c.id === row.id)) return m.name;
+  }
+  return "";
+}
+
 const columns: OTableColumnDef[] = [
   {
     id: "name",
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
-    size: 280,
-    meta: { align: "left" },
+    meta: { align: "left" , autoWidth: true },
   },
   {
     id: "match_pattern",
@@ -595,6 +609,7 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
     meta: { align: "left" },
+    size: 300,
   },
   {
     id: "actions",
@@ -661,27 +676,14 @@ const filteredModels = computed(() => {
   return items;
 });
 
-// ── Parent-children expand/collapse ──────────────────────────────────────────
-
-const expandedParents = ref(new Set<string>());
-
-function toggleExpand(id: string) {
-  const next = new Set(expandedParents.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  expandedParents.value = next;
-}
-
-function getSubRows(row: any): any[] {
-  if (row.children?.length > 0 && expandedParents.value.has(row.id)) {
-    return row.children.map((child: any) => ({
-      ...child,
-      __type: 'child',
-      _parentName: row.name,
-    }));
+/** Names of parents that shadow at least one child — used to gate the warning row. */
+const shadowingParentNames = computed(() => {
+  const names = new Set<string>();
+  for (const m of models.value) {
+    if (m.children?.length) names.add(m.name);
   }
-  return [];
-}
+  return names;
+});
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {

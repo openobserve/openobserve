@@ -16,8 +16,6 @@
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
-            emit-value
-            map-options
             @update:model-value="updateSelectedPanels"
             :display-value="displayValue"
             style="min-width: 150px"

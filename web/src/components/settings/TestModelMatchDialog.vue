@@ -34,10 +34,10 @@
               class="tmm-model-input"
               data-test="test-match-model-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="smart-toy" size="sm" class="tmm-search-icon" />
               </template>
-              <template #append>
+              <template #icon-right>
                 <OButton
                   v-if="testModelName"
                   variant="ghost"
@@ -66,7 +66,7 @@
               class="tmm-empty-state"
               data-test="test-match-empty"
             >
-              <OIcon name="manage-search" size="40px" class="tmm-empty-icon" />
+              <OIcon name="manage-search" size="xl" class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.enterModelName") }}
               </div>
@@ -79,7 +79,7 @@
               class="tmm-empty-state"
               data-test="test-match-waiting"
             >
-              <OIcon name="ads-click" size="40px" class="tmm-empty-icon" />
+              <OIcon name="ads-click" size="xl" class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.clickToTest") }}
               </div>
@@ -94,7 +94,7 @@
             >
               <div class="tmm-status-card tmm-status-card--error">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--error">
-                  <OIcon name="error-outline" size="22px" />
+                  <OIcon name="error-outline" size="md" />
                 </div>
                 <div>
                   <div class="tmm-status-title">
@@ -131,7 +131,7 @@
               <!-- Match status -->
               <div class="tmm-status-card tmm-status-card--success">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--success">
-                  <OIcon name="check-circle" size="22px" />
+                  <OIcon name="check-circle" size="md" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
                   <div class="tmm-status-title">
@@ -162,7 +162,7 @@
                     :key="step.key"
                   >
                     <div class="tmm-flow-arrow" v-if="sIdx > 0">
-                      <OIcon name="arrow-forward" size="13px" />
+                      <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
                       class="tmm-flow-step"
@@ -173,14 +173,14 @@
                     >
                       <OIcon
                         :name="step.icon"
-                        size="14px"
+                        size="sm"
                         class="tmm-flow-step-icon"
                       />
                       <span class="tmm-flow-step-label">{{ step.label }}</span>
                       <OIcon
                         v-if="step.key === winnerSource"
                         name="check-circle"
-                        size="13px"
+                        size="xs"
                         class="tmm-flow-step-check"
                       />
                     </div>
@@ -231,7 +231,7 @@
                   </div>
                 </div>
                 <div v-else class="tmm-cost-empty">
-                  <OIcon name="info-outline" size="15px" />
+                  <OIcon name="info-outline" size="sm" />
                   {{ t("modelPricing.noPricingForTier") }}
                 </div>
               </div>

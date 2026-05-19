@@ -19,7 +19,7 @@
               class="tw:max-w-md"
               data-test="kubernetes-cluster-name-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon name="dns" size="sm" />
               </template>
             </OInput>

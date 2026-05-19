@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="drag-indicator"
             class="home-tab-drag-handle"
-            size="0.875em"
+            size="sm"
           />
           {{ tab.label }}
         </OButton>

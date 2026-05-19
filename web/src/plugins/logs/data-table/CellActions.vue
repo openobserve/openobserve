@@ -12,7 +12,7 @@
         @click.prevent.stop="copyLogToClipboard(row[column.id])"
         title="Copy"
       >
-        <OIcon name="content-copy" size="10px" />
+        <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">

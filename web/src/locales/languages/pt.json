@@ -2938,7 +2938,75 @@
     "copyStacktrace": "Copiar stacktrace",
     "noStacktraceAvailable": "Nenhum stacktrace disponível",
     "stacktraceCopied": "Stacktrace copiado para a área de transferência",
-    "stacktraceCopyFailed": "Falha ao copiar o stacktrace"
+    "stacktraceCopyFailed": "Falha ao copiar o stacktrace",
+    "sessionsList": {
+      "noStreamsTooltip": "Não há streams LLM disponíveis.",
+      "session": "sessão",
+      "sessions": "sessões",
+      "countPill": "{contagem} de {total} {unidade}",
+      "noStreamsFound": "Nenhum fluxo LLM encontrado",
+      "noStreamsDescription1": "O grupo de sessões se estende por",
+      "noStreamsDescription2": "em fluxos de rastreamentos marcados como fluxos LLM. Ou esse fluxo não existe ou nenhum período foi ingerido ainda.",
+      "failedToLoad": "Falha ao carregar sessões",
+      "retry": "Tente novamente",
+      "noSessionsFound": "Nenhuma sessão encontrada",
+      "noSessionsDescription": "Nenhuma sessão de LLM foi gravada nesse intervalo de tempo em {stream}. Tente ampliar o intervalo de tempo ou mudar para um fluxo diferente.",
+      "loading": "Carregando sessões...",
+      "tokenTooltip": "Entrada: {entrada} · Saída: {saída} · Total: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Carimbo de data/hora",
+        "sessionId": "ID da sessão",
+        "turns": "Vira",
+        "duration": "Duração",
+        "tokens": "Tokens",
+        "cost": "Custo",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Voltar às sessões",
+      "pageTitle": "Detalhe da sessão",
+      "failedToLoad": "Falha ao carregar a sessão",
+      "retry": "Tente novamente",
+      "sessionNotFound": "Sessão não encontrada",
+      "noSpansFound": "Nenhum intervalo de tempo encontrado para {id} no intervalo de tempo atual.",
+      "searchPlaceholder": "Pesquise rastros nesta sessão...",
+      "turn": "vire",
+      "turns": "gira",
+      "turnsShown": "{filtrado} de {total} {unidade} mostrada",
+      "userBadge": "Usuário",
+      "sessionPrefix": "sessão",
+      "copySessionId": "Copiar ID da sessão",
+      "openInTraceExplorer": "Abrir no Trace Explorer",
+      "unknownUser": "Usuário desconhecido",
+      "kpi": {
+        "turns": "Vira",
+        "duration": "Duração",
+        "inputTokens": "Tokens de entrada",
+        "outputTokens": "Tokens de saída",
+        "cost": "Custo"
+      },
+      "conversation": "Conversa",
+      "turnLabel": "Vire",
+      "openTrace": "Rastreamento aberto",
+      "noUserMessage": "Nenhuma mensagem do usuário foi capturada para este turno.",
+      "noAssistantMessage": "Nenhuma resposta do assistente foi capturada para este turno.",
+      "roles": {
+        "user": "Usuário",
+        "assistant": "Assistente"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "modelo",
+        "tokens": "Tokens",
+        "input": "Entrada",
+        "output": "Saída",
+        "total": "Total",
+        "cost": "Custo",
+        "spans": "Vãos"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3679,7 +3747,8 @@
     "errSave": "Falha ao salvar",
     "errLoadModel": "Falha ao carregar o modelo",
     "tierDefaultName": "Padrão",
-    "tierConditionalName": "Nível condicional"
+    "tierConditionalName": "Nível condicional",
+    "shadowedWarningBanner": "As regras abaixo são sombreadas por “{name}” — substituídas por uma regra de maior prioridade e não serão usadas para cálculos de custos."
   },
   "overview": {
     "title": "Visão geral do sistema",

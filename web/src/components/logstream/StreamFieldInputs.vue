@@ -71,7 +71,6 @@
             class="q-py-sm"
             multiple
             :max-values="2"
-            map-options
             :option-disable="(_option: any) => disableOptions(field, _option)"
             emit-value
             clearable
@@ -101,15 +100,14 @@
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
             class="q-py-sm"
-            option-label="label"
-            option-value="value"
+            label-key="label"
+            value-key="value"
             clearable
             borderless
             dense
             use-input
             fill-input
             hide-selected
-            emit-value
             style="width: 250px"
             :placeholder="
               !isDataTypeFocused && (!field.type || field.type.length === 0)

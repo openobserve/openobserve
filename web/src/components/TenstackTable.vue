@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
-                size="12px"
+                size="xs"
                 class="q-ml-xs pivot-sort-icon"
                 :class="{
                   'pivot-sort-active': pivotSortState.sortBy === col.name,
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
-                size="12px"
+                size="xs"
                 class="q-ml-xs pivot-sort-icon"
                 :class="{
                   'pivot-sort-active':
@@ -256,14 +256,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'
                       "
                       data-test="tenstack-table-sort-icon-active"
-                      size="0.85rem"
+                      size="sm"
                       class="tw:text-[var(--o2-primary-color)]"
                     />
                     <OIcon
                       v-else
                       name="unfold-more"
                       data-test="tenstack-table-sort-icon-inactive"
-                      size="0.85rem"
+                      size="sm"
                       class="tw:opacity-40"
                     />
                   </template>
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="
                       isFunctionErrorOpen ? 'expand-more' : 'chevron-right'
                     "
-                    size="14px"
+                    size="sm"
                   /> </OButton
                 ><b>
                   <OIcon name="warning" size="sm"></OIcon>
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'check'
                               : 'content-copy'
                           "
-                          size="14px"
+                          size="sm"
                         />
                       </OButton>
                     </span>
@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'check'
                               : 'content-copy'
                           "
-                          size="14px"
+                          size="sm"
                         />
                       </OButton>
                     </span>
@@ -762,7 +762,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'expand-more'
                             : 'chevron-right'
                         "
-                        size="14px"
+                        size="sm"
                       />
                     </OButton>
                     <slot
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   ? 'check'
                                   : 'content-copy'
                               "
-                              size="14px"
+                              size="sm"
                             />
                           </OButton>
                         </span>
@@ -907,7 +907,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   ? 'check'
                                   : 'content-copy'
                               "
-                              size="14px"
+                              size="sm"
                             />
                           </OButton>
                         </span>
@@ -1030,7 +1030,8 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import { debounce, copyToClipboard } from "quasar";
+import { debounce } from "lodash-es";
+import { copyToClipboard } from "@/utils/clipboard";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1519,13 +1520,11 @@ const shouldShowCopyButton = (value: any) => {
 
 const copyCellContent = (value: any, rowIndex: number, colName: string) => {
   if (value === null || value === undefined) return;
-  copyToClipboard(String(value))
-    .then(() => {
-      const key = `${rowIndex}_${colName}`;
-      copiedCells.value.set(key, true);
-      setTimeout(() => copiedCells.value.delete(key), 3000);
-    })
-    .catch(() => {});
+  copyToClipboard(String(value), { silent: true }).then(() => {
+    const key = `${rowIndex}_${colName}`;
+    copiedCells.value.set(key, true);
+    setTimeout(() => copiedCells.value.delete(key), 3000);
+  });
 };
 
 // ── Dashboard: pagination ────────────────────────────────────────────────────

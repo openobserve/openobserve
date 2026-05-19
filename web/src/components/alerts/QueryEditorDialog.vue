@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('common.goBack')"
             @click="closeDialog"
           >
-            <OIcon name="arrow-back-ios-new" size="9px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
           <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
 
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
-                        <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                        <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
                         <span>Write a query to get started</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle: not yet run -->
                   <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <OIcon name="table-chart" size="48px" class="empty-state-icon" />
+                      <OIcon name="table-chart" class="empty-state-icon" style="width: 48px; height: 48px;" />
                       <span class="empty-state-text">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle -->
                   <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <OIcon name="data-object" size="48px" class="empty-state-icon" />
+                      <OIcon name="data-object" class="empty-state-icon" style="width: 48px; height: 48px;" />
                       <span class="empty-state-text">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>

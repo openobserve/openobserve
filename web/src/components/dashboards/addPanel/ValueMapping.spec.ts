@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog } from "quasar";
 import ValueMapping from "@/components/dashboards/addPanel/ValueMapping.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -42,9 +41,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-installQuasar({
-  plugins: [Dialog],
-});
+installQuasar();
 
 describe("ValueMapping", () => {
   let wrapper: any;
