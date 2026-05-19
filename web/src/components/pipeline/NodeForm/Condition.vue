@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else class="q-pa-md text-grey-7">Loading conditions...</div>
           </div>
-          <q-card class="note-container">
-            <q-card-section class="q-pa-sm">
+          <OCard class="note-container">
+            <OCardSection class="tw:p-2">
               <div class="note-heading">Condition value Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </q-banner>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
 
         <div class="tw:flex tw:gap-2">
@@ -159,6 +159,8 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";

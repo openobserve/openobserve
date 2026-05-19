@@ -168,15 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
 
       <div class="q-pa-md">
-      <q-card
-        flat
-        bordered
+      <OCard
         class="storage-card"
         :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
         style="max-width: 680px;"
       >
         <!-- Card header: logo + name + badge | update button -->
-        <q-card-section class="row items-center justify-between q-py-md q-px-lg no-wrap">
+        <OCardSection role="header">
           <div class="row items-center no-wrap" style="gap: 14px;">
             <img
               :src="configuredProviderImage"
@@ -205,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("storage_settings.updateStorage") }}
           </OButton>
-        </q-card-section>
+        </OCardSection>
 
         <OSeparator />
 
         <!-- Field grid -->
-        <q-card-section class="q-px-lg q-pt-md q-pb-md">
+        <OCardSection role="body">
           <div class="storage-detail-grid">
             <div v-if="storageData.bucket_name" class="storage-field">
               <div class="storage-field__label">{{ t("storage_settings.bucketName") }}</div>
@@ -237,12 +235,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="storage-field__value" style="word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
-        </q-card-section>
+        </OCardSection>
 
         <OSeparator v-if="configTimestamps" />
 
         <!-- Timestamps -->
-        <q-card-section v-if="configTimestamps" class="q-px-lg q-py-sm">
+        <OCardSection v-if="configTimestamps">
           <div class="row" style="gap: 40px;">
             <div v-if="configTimestamps.created_at" class="row items-center" style="gap: 6px;">
               <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
@@ -253,8 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-body2">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
+        </OCardSection>
+      </OCard>
       </div>
     </div>
     </template>
@@ -269,6 +267,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";

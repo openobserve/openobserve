@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-      <q-card-section
+      <OCardSection
         class=""
         :data-test="`${type}-folder-move-body`"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- select folder or create new folder and select -->
           <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
-      </q-card-section>
+      </OCardSection>
   </ODrawer>
   </template>
 
@@ -56,10 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
   import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
   import OInput from "@/lib/forms/Input/OInput.vue";
+  import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown, ODrawer, OInput },
+    components: { SelectFolderDropDown, ODrawer, OInput, OCardSection },
     props: {
       activeFolderId: {
         type: String,

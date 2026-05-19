@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
+  <OCard
     data-test="custom-chart-type-selector-popup"
     style="
       padding: 0;
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <!-- Header -->
-    <q-card-section>
+    <OCardSection role="header">
       <div class="flex justify-between items-center q-pa-none">
         <div class="flex items-center q-table__title">
           <OIcon name="bar-chart" size="sm" class="q-mr-sm" />
@@ -53,20 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
       </div>
-    </q-card-section>
+    </OCardSection>
 
     <OSeparator />
 
     <!-- Main Content -->
-    <q-card-section
-      class="flex"
+    <OCardSection
+      class="tw:flex"
       style="height: calc(100% - 60px); overflow: hidden; padding: 0"
     >
       <div class="row no-wrap" style="height: 100%; width: 100%">
         <!-- Left Sidebar -->
-        <q-card
-          flat
-          class="sidebar q-pa-md"
+        <OCard
+          class="sidebar tw:p-4"
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
           <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
@@ -84,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:text-sm">{{ category.chartLabel }}</span>
             </li>
           </ul>
-        </q-card>
+        </OCard>
 
         <!-- Right Content Area -->
         <div
@@ -124,17 +123,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="chartIndex"
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
-                <q-card
-                  flat
-                  bordered
-                  class="chart-card cursor-pointer"
+                <OCard
+                  class="chart-card tw:cursor-pointer"
                   :class="{
                     'selected-chart': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
-                  <q-card-section class="q-pa-sm">
+                  <OCardSection class="tw:p-2">
                     <div class="chart-image-container">
                       <img
                         :src="chart.asset"
@@ -143,19 +140,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         loading="lazy"
                       />
                     </div>
-                  </q-card-section>
-                  <q-card-section class="q-pt-none q-px-sm q-pb-sm">
+                  </OCardSection>
+                  <OCardSection class="tw:pt-0 tw:px-2 tw:pb-2">
                     <div class="text-caption text-center text-weight-medium">
                       {{ chart.label }}
                     </div>
-                  </q-card-section>
-                </q-card>
+                  </OCardSection>
+                </OCard>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </q-card-section>
+    </OCardSection>
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
@@ -166,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
     />
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
@@ -187,6 +184,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
@@ -195,6 +194,8 @@ export default defineComponent({
     CustomChartConfirmDialog,
     OButton,
     OInput,
+    OCard,
+    OCardSection,
     OIcon,
 },
   emits: ["close", "select"],

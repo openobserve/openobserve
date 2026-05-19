@@ -1322,7 +1322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="primaryDim?.display"
         :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <q-card-section class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
+        <OCardSection class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
           <!-- Header section with cardinality details -->
           <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
             <span class="tw:font-medium">Cardinality:</span>
@@ -1518,7 +1518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
             No sample data available for this field.
           </div>
-        </q-card-section>
+        </OCardSection>
       </ODialog>
     </div>
   </div>
@@ -1526,6 +1526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";

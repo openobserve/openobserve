@@ -88,22 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="function-definition-section"
         >
-          <q-card class="function-definition-card">
-            <q-card-section class="function-definition-header q-pb-sm">
+          <OCard class="function-definition-card">
+            <OCardSection role="header" class="function-definition-header">
               <div class="text-body1 text-weight-medium text-primary">
                 {{ t("function.function_definition") }}
               </div>
-            </q-card-section>
+            </OCardSection>
             <OSeparator />
-            <q-card-section class="function-definition-content q-pa-none">
+            <OCardSection class="tw:p-0 function-definition-content">
               <div class="function-code-container">
                 <pre class="function-code">{{
                   pipelineObj.functions[selectedFunction]?.function ||
                   "No definition available"
                 }}</pre>
               </div>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
 
         <div v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
@@ -128,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Info note explaining RAF/RBF -->
-          <q-card class="note-container">
-            <q-card-section class="q-pa-sm">
+          <OCard class="note-container">
+            <OCardSection class="tw:p-2">
               <div class="note-heading">Function Execution Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
@@ -147,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </q-banner>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
 
         <div class="tw:flex tw:gap-2">
@@ -209,6 +209,8 @@ import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 interface RouteCondition {
   column: string;
