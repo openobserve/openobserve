@@ -3758,7 +3758,8 @@
     "errSave": "저장 실패",
     "errLoadModel": "모델을 로드하지 못했습니다.",
     "tierDefaultName": "디폴트",
-    "tierConditionalName": "조건부 등급"
+    "tierConditionalName": "조건부 등급",
+    "shadowedWarningBanner": "아래 규칙은 “{name}”으로 가려져 있습니다. 이 규칙은 우선 순위가 더 높은 규칙으로 대체되며 비용 계산에 사용되지 않습니다."
   },
   "overview": {
     "title": "시스템 개요",

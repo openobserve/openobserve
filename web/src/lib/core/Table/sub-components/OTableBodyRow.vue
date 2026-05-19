@@ -2,10 +2,11 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, ref, onMounted, watch, useSlots } from "vue";
+import { computed, inject, ref, onMounted, watch, useSlots } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
+import { OTableTreeContextKey } from "../composables/useTableTree";
 
 const props = defineProps<{
   row: Row<any>;
@@ -75,6 +76,34 @@ const isStriped = computed(() => {
 });
 
 const hasExpansionSlot = computed(() => !!slots.expansion);
+
+// ── Tree mode ────────────────────────────────────────────────────
+const treeCtx = inject(OTableTreeContextKey, null);
+const treeMeta = computed(() => {
+  if (!treeCtx?.value?.enabled) return null;
+  return treeCtx.value.getMeta(props.row.original);
+});
+const isTreeParent = computed(() => !!treeMeta.value?.isParent);
+const isTreeExpanded = computed(() => !!treeMeta.value?.isExpanded);
+const showTreeWarning = computed(() =>
+  treeCtx?.value?.enabled &&
+  isTreeParent.value &&
+  isTreeExpanded.value &&
+  treeCtx.value.hasWarning(props.row.original) &&
+  !!slots["tree-warning"],
+);
+
+/**
+ * Horizontal offset (px) of the tree-column chevron from the row's left edge.
+ * Used to align the warning row's content + connector line under the chevron.
+ */
+const treeConnectorX = computed(() => {
+  const selectionWidth = props.selectionEnabled ? 36 : 0; // tw:w-9
+  const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
+  const cellPaddingLeft = 8; // tw:px-2
+  const halfChevron = 9; // 18px / 2
+  return selectionWidth + expansionWidth + cellPaddingLeft + halfChevron;
+});
 
 function onClick(event: MouseEvent) {
   emit("row-click", props.row.original, event);
@@ -166,6 +195,26 @@ function onDblclick(event: MouseEvent) {
     </OTableBodyCell>
   </tr>
 
+  <!-- Tree-mode warning row (rendered between parent and its children) -->
+  <tr
+    v-if="showTreeWarning"
+    :data-test="`o2-table-tree-warning-${row.index}`"
+    class="o2-table-tree-warning-row"
+  >
+    <td
+      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
+      :class="[
+        'o2-table-tree-warning-cell',
+        bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+      ]"
+      :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
+    >
+      <div class="o2-table-tree-warning-content">
+        <slot name="tree-warning" :row="row.original" />
+      </div>
+    </td>
+  </tr>
+
   <!-- Expanded row content -->
   <tr
     v-if="hasExpansionSlot && isExpanded"
@@ -180,3 +229,31 @@ function onDblclick(event: MouseEvent) {
     </td>
   </tr>
 </template>
+
+<style scoped>
+.o2-table-tree-warning-row {
+  background: var(--color-warning-surface, rgba(251, 191, 36, 0.08));
+}
+.o2-table-tree-warning-cell {
+  position: relative;
+}
+/* Continuation of the tree connector vertical line through the warning row */
+.o2-table-tree-warning-cell::after {
+  content: "";
+  position: absolute;
+  left: var(--o2-tree-connector-x);
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background-color: var(--q-primary, #6366f1);
+  opacity: 0.55;
+  z-index: 0;
+}
+.o2-table-tree-warning-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

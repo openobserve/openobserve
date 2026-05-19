@@ -3745,7 +3745,8 @@
     "errSave": "No se pudo guardar",
     "errLoadModel": "No se pudo cargar el modelo",
     "tierDefaultName": "Predeterminado",
-    "tierConditionalName": "Nivel condicional"
+    "tierConditionalName": "Nivel condicional",
+    "shadowedWarningBanner": "Las reglas siguientes aparecen sombreadas por «{name}», lo que las anula una regla de mayor prioridad y no se utilizará para los cálculos de costos."
   },
   "overview": {
     "title": "Descripción general del sistema",

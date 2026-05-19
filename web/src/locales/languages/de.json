@@ -3747,7 +3747,8 @@
     "errSave": "konnte nicht gespeichert werden",
     "errLoadModel": "Modell konnte nicht geladen werden",
     "tierDefaultName": "Standard",
-    "tierConditionalName": "Bedingte Stufe"
+    "tierConditionalName": "Bedingte Stufe",
+    "shadowedWarningBanner": "Die folgenden Regeln werden von „{name}“ überschattet — sie werden durch eine Regel mit höherer Priorität außer Kraft gesetzt und werden nicht für Kostenberechnungen verwendet."
   },
   "overview": {
     "title": "Überblick über das System",
