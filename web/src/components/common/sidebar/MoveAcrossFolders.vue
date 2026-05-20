@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
       <OCardSection
-        class=""
+        role="body"
         :data-test="`${type}-folder-move-body`"
       >
           <OInput

@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
 
         <!-- Search Input -->
-        <div style="width: 100%;" class="tw:flex folder-item tw:py-1">
+        <div class="tw:px-2 tw:py-1">
           <OInput
             v-model="searchQuery"
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
             clearable
-            class="tw:mx-2 tw:px-1"
+            class="tw:w-full"
           >
             <template #icon-left>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
