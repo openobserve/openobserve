@@ -49,35 +49,35 @@ This document consolidates every icon/chip/badge-related finding from the 30 pag
 Every finding from the 30 audits where an `OIcon name=` uses underscores instead of hyphens, or otherwise doesn't match the registry. Per `css_class_level_audit.md §7.1`, the registry only accepts hyphenated keys.
 
 ### Direct `OIcon name="..."` usage:
-- [ ] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
+- [x] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
   **Solution:**
   ```diff
   - <OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />
   + <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
   ```
 
-- [ ] **`web/src/plugins/traces/ServiceGraphEdgeSidePanel.vue:103,123,143`** — `:name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"` (3 instances p50/p95/p99) — `css_class_level_audit.md §7.1`
+- [x] **`web/src/plugins/traces/ServiceGraphEdgeSidePanel.vue:103,123,143`** — `:name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"` (3 instances p50/p95/p99) — `css_class_level_audit.md §7.1`
   **Solution:**
   ```diff
   - :name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"
   + :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
   ```
 
-- [ ] **`web/src/components/settings/License.vue:293`** — `name="check_circle"` (snake_case Quasar name) — `settings_audit.md §7`
+- [x] **`web/src/components/settings/License.vue:293`** — `name="check_circle"` (snake_case Quasar name) — `settings_audit.md §7`
   **Solution:**
   ```diff
   - <OIcon name="check_circle" size="18px" ... />
   + <OIcon name="check-circle" size="sm" ... />
   ```
 
-- [ ] **`web/src/components/rum/common/performance/MetricCard.vue:146`** — `good: "check_circle"` icon mapping uses underscore — registry only has `check-circle` — `rum_performance_audit.md C1`
+- [x] **`web/src/components/rum/common/performance/MetricCard.vue:146`** — `good: "check_circle"` icon mapping uses underscore — registry only has `check-circle` — `rum_performance_audit.md C1`
   **Solution:**
   ```diff
   - good: "check_circle",
   + good: "check-circle",
   ```
 
-- [ ] **`web/src/plugins/metrics/MetricLegends.vue:354`** — `Histogram: "bar_chart", Counter: "pin"` — neither `bar_chart` nor `pin` exist in registry; `MetricList.vue` correctly uses `bar-chart` / `tag` — `metrics_audit.md`
+- [x] **`web/src/plugins/metrics/MetricLegends.vue:354`** — `Histogram: "bar_chart", Counter: "pin"` — neither `bar_chart` nor `pin` exist in registry; `MetricList.vue` correctly uses `bar-chart` / `tag` — `metrics_audit.md`
   **Solution:**
   ```diff
   - Histogram: "bar_chart", Counter: "pin",
@@ -85,7 +85,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
   ```
 
 ### Computed / passed-through icon strings (also resolve via OIcon registry on host components):
-- [ ] **`web/src/enterprise/components/billings/proPlan.vue:94,109`** — `<OBadge variant="success-soft" icon="check_circle" ...>` — OBadge passes string to OIcon registry — `billing_audit.md #2`
+- [x] **`web/src/enterprise/components/billings/proPlan.vue:94,109`** — `<OBadge variant="success-soft" icon="check_circle" ...>` — OBadge passes string to OIcon registry — `billing_audit.md #2`
   **Solution:**
   ```diff
   - <OBadge variant="success-soft" icon="check_circle" class="tw:px-3 tw:py-2">
@@ -95,14 +95,14 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
   + </OBadge>
   ```
 
-- [ ] **`web/src/plugins/traces/TraceEvaluationsView.vue:656`** — `accuracy: "check_circle"` computed source — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/pipelines/BackfillJobDetails.vue:183`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/rum/ResourceDetailDrawer.vue:250`** — `return "check_circle";` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/rum/common/performance/ViewPerformanceMetrics.vue:110`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/alerts/AlertHistorySummary.vue:154`** — `return "check_circle";` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/alerts/ImportSemanticGroups.vue:212`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/alerts/ImportSemanticGroupsDrawer.vue:193`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/alerts/AlertHistoryDrawer.vue:717`** — `return "check_circle_outline";` — `css_class_level_audit.md §7.1` (use `check-circle-outline` or `check-circle`)
+- [x] **`web/src/plugins/traces/TraceEvaluationsView.vue:656`** — `accuracy: "check_circle"` computed source — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/pipelines/BackfillJobDetails.vue:183`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/rum/ResourceDetailDrawer.vue:250`** — `return "check_circle";` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/rum/common/performance/ViewPerformanceMetrics.vue:110`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/alerts/AlertHistorySummary.vue:154`** — `return "check_circle";` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/alerts/ImportSemanticGroups.vue:212`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/alerts/ImportSemanticGroupsDrawer.vue:193`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/alerts/AlertHistoryDrawer.vue:717`** — `return "check_circle_outline";` — `css_class_level_audit.md §7.1` (use `check-circle-outline` or `check-circle`)
   **Solution (apply pattern to all 9 above):**
   ```diff
   - icon="check_circle"           // or return "check_circle"
@@ -110,7 +110,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
   ```
 
 ### Settings tab icon names (rely on Material Icons font fallback):
-- [ ] **`web/src/components/settings/index.vue`** — tab `icon=` props use snake_case for: `query_stats`, `domain`, `location_on`, `person_pin_circle`, `card_membership`, `smart_toy`, `group_work`, `lan`, `key`, `paid`, `hub`, `regex_patterns`, `pipeline_destinations`, `organization_management`, `model_pricing`, `domain_management`, `correlation_settings`, `alert_destinations`, `ai_toolsets` — only single-word ones already registered; `card-membership`, `person-pin-circle` need registry entries — `settings_audit.md §11` + `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/settings/index.vue`** — tab `icon=` props use snake_case for: `query_stats`, `domain`, `location_on`, `person_pin_circle`, `card_membership`, `smart_toy`, `group_work`, `lan`, `key`, `paid`, `hub`, `regex_patterns`, `pipeline_destinations`, `organization_management`, `model_pricing`, `domain_management`, `correlation_settings`, `alert_destinations`, `ai_toolsets` — only single-word ones already registered; `card-membership`, `person-pin-circle` need registry entries — `settings_audit.md §11` + `css_class_level_audit.md §7.1`
   **Solution:**
   ```diff
   - icon="query_stats"
@@ -123,7 +123,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
 - [ ] **`web/src/components/pipeline/NodeForm/CreateDestinationForm.vue`** — `name="url_endpoint"`, `name="output_format"`, `name="esbulk_index"` (verify these are intentional route keys vs icon names) — `css_class_level_audit.md §7.1`
 
 ### Pipelines node-form icon string typo:
-- [ ] **`web/src/plugins/pipelines/CustomNode.vue` line ~71-89** — `<OIcon :name="getIcon(data, io - type)" size="md" ... />` — `io - type` is computed JS subtraction; should be `io_type` (string) — `pipelines_audit.md`
+- [x] **`web/src/plugins/pipelines/CustomNode.vue` line ~71-89** — `<OIcon :name="getIcon(data, io - type)" size="md" ... />` — `io - type` is computed JS subtraction; should be `io_type` (string) — `pipelines_audit.md`
   **Solution:**
   ```diff
   - <OIcon :name="getIcon(data, io - type)" size="md" ... />
@@ -134,21 +134,21 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
 
 Mass-replace of Quasar utility classes prefixed `tw:` accidentally rewrote icon `name="..."` attribute values.
 
-- [ ] **`web/src/components/alerts/AlertHistory.vue:190`** — `<OIcon name="tw:block" size="sm" />` should be `name="block"` — breaks dedup "Suppressed" icon — `alerts_audit.md #1`
+- [x] **`web/src/components/alerts/AlertHistory.vue:190`** — `<OIcon name="tw:block" size="sm" />` should be `name="block"` — breaks dedup "Suppressed" icon — `alerts_audit.md #1`
   **Solution:**
   ```diff
   - <OIcon name="tw:block" size="sm" />
   + <OIcon name="block" size="sm" />
   ```
 
-- [ ] **`web/src/components/iam/organizations/OrganizationManagement.vue:90`** — `<OIcon name="tw:block" size="xs" />` should be `name="block"` — Revoke action icon — `iam_audit.md` / `settings_audit.md #2`
+- [x] **`web/src/components/iam/organizations/OrganizationManagement.vue:90`** — `<OIcon name="tw:block" size="xs" />` should be `name="block"` — Revoke action icon — `iam_audit.md` / `settings_audit.md #2`
   **Solution:**
   ```diff
   - <OIcon name="tw:block" size="xs" />
   + <OIcon name="block" size="xs" />
   ```
 
-- [ ] **`web/src/enterprise/components/billings/proPlan.vue:65`** — `<OIcon v-else name="" color="green" size="sm" />` — `name=""` empty string, also dead `color` prop — `billing_audit.md #6` + `css_class_level_audit.md §7.2`
+- [x] **`web/src/enterprise/components/billings/proPlan.vue:65`** — `<OIcon v-else name="" color="green" size="sm" />` — `name=""` empty string, also dead `color` prop — `billing_audit.md #6` + `css_class_level_audit.md §7.2`
   **Solution:**
   ```diff
   - <OIcon v-else name="" color="green" size="sm" class="tw:mr-2" />
@@ -157,10 +157,10 @@ Mass-replace of Quasar utility classes prefixed `tw:` accidentally rewrote icon 
   + </span>
   ```
 
-- [ ] **`web/src/enterprise/components/billings/enterprisePlan.vue:66`** — `<OIcon v-else name="" color="green" size="sm" />` — same empty-name + dead color — `billing_audit.md #6`
+- [x] **`web/src/enterprise/components/billings/enterprisePlan.vue:66`** — `<OIcon v-else name="" color="green" size="sm" />` — same empty-name + dead color — `billing_audit.md #6`
   **Solution:** Same as above.
 
-- [ ] **`web/src/enterprise/components/billings/enterprisePlan.vue:80`** — `<OButton ... tw:block @click="contactSales">` — `block` prop was reformatted as `tw:block` attribute (HTML-attr namespace), button no longer full-width — `billing_audit.md #1`
+- [x] **`web/src/enterprise/components/billings/enterprisePlan.vue:80`** — `<OButton ... tw:block @click="contactSales">` — `block` prop was reformatted as `tw:block` attribute (HTML-attr namespace), button no longer full-width — `billing_audit.md #1`
   **Solution:**
   ```diff
   - <OButton variant="primary" size="sm-action" tw:block @click="contactSales">
@@ -171,7 +171,7 @@ Mass-replace of Quasar utility classes prefixed `tw:` accidentally rewrote icon 
 
 Names referenced but missing from `web/src/lib/core/Icon/OIcon.icons.ts`.
 
-- [ ] **`web/src/components/HomeView` (O2AIChat.vue context) — `radio-button-unchecked`** — used by Auto Navigation toggle off-state; not registered — `home_audit.md C4`
+- [x] **`web/src/components/HomeView` (O2AIChat.vue context) — `radio-button-unchecked`** — used by Auto Navigation toggle off-state; not registered — `home_audit.md C4`
   **Solution (add to OIcon.icons.ts):**
   ```diff
   // web/src/lib/core/Icon/OIcon.icons.ts
@@ -180,13 +180,13 @@ Names referenced but missing from `web/src/lib/core/Icon/OIcon.icons.ts`.
   +   "radio-button-unchecked": RadioButtonUnchecked,
   ```
 
-- [ ] **`web/src/plugins/metrics/MetricLegends.vue:354`** — `bar_chart` / `pin` — not in registry; reconcile with `MetricList.vue` (`bar-chart` / `tag`) — `metrics_audit.md`
+- [x] **`web/src/plugins/metrics/MetricLegends.vue:354`** — `bar_chart` / `pin` — not in registry; reconcile with `MetricList.vue` (`bar-chart` / `tag`) — `metrics_audit.md`
 
 - [ ] **`web/src/views/Dashboards/RenderDashboardCharts.vue`** — `name="before_panels"` (likely custom — verify in registry) — `css_class_level_audit.md §7.1`
 
 - [ ] **`web/src/enterprise/components/billings/Billing.vue`** — `name="invoice_history"` (verify in registry) — `css_class_level_audit.md §7.1`
 
-- [ ] **Settings tabs icons** referenced via Material Icons font fallback in `OTab.vue:111-114` — see Section 1 for full list; missing kebab-case registry entries: `card-membership`, `domain`, `person-pin-circle` — `settings_audit.md §11`
+- [x] **Settings tabs icons** referenced via Material Icons font fallback in `OTab.vue:111-114` — see Section 1 for full list; missing kebab-case registry entries: `card-membership`, `domain`, `person-pin-circle` — `settings_audit.md §11`
 
 ## 4. `OIcon :color` — Unsupported Prop
 
@@ -200,7 +200,7 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
 ```
 
 ### Most affected files (counts from css_class_level_audit.md):
-- [ ] **`web/src/components/O2AIChat.vue:345,397,1317,1335`** — 4 instances (status colors for AI tool calls — success/warning/failure indistinguishable) — `home_audit.md C3`
+- [x] **`web/src/components/O2AIChat.vue:345,397,1317,1335`** — 4 instances (status colors for AI tool calls — success/warning/failure indistinguishable) — `home_audit.md C3`
   **Solution:**
   ```diff
   - <OIcon :color="block.success ? 'positive' : block.warning ? 'warning' : 'negative'" name="..." />
@@ -209,19 +209,19 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
   +   name="..." />
   ```
 
-- [ ] **`web/src/components/pipelines/PipelineHistory.vue:155,165,178,377`** — 4 instances — `pipelines_audit.md C8`
-- [ ] **`web/src/components/alerts/IncidentDetailDrawer.vue:1015,1064,1120`** — 3 instances using Quasar tokens (`warning`/`negative`/`grey-5`) — `alerts_audit.md M-4`
+- [x] **`web/src/components/pipelines/PipelineHistory.vue:155,165,178,377`** — 4 instances — `pipelines_audit.md C8`
+- [x] **`web/src/components/alerts/IncidentDetailDrawer.vue:1015,1064,1120`** — 3 instances using Quasar tokens (`warning`/`negative`/`grey-5`) — `alerts_audit.md M-4`
   **Solution:**
   ```diff
   - :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
   + :class="correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-500'"
   ```
 
-- [ ] **`web/src/plugins/traces/TraceDetailsSidebar.vue`** — 2 instances — `css_class_level_audit.md`
-- [ ] **`web/src/plugins/logs/SearchBar.vue`** — 2 instances — `css_class_level_audit.md`
-- [ ] **`web/src/components/ingestion/recommended/AWSQuickSetup.vue`** — 2 instances — `css_class_level_audit.md`
-- [ ] **`web/src/components/rum/EventDetailDrawerContent.vue`** — 2 instances — `css_class_level_audit.md`
-- [ ] **`web/src/components/rum/common/performance/MetricCard.vue` lines ~163,175** — 2 instances (status colors lost) — `rum_performance_audit.md C2`
+- [x] **`web/src/plugins/traces/TraceDetailsSidebar.vue`** — 2 instances — `css_class_level_audit.md`
+- [x] **`web/src/plugins/logs/SearchBar.vue`** — 2 instances — `css_class_level_audit.md`
+- [x] **`web/src/components/ingestion/recommended/AWSQuickSetup.vue`** — 2 instances — `css_class_level_audit.md`
+- [x] **`web/src/components/rum/EventDetailDrawerContent.vue`** — 2 instances — `css_class_level_audit.md`
+- [x] **`web/src/components/rum/common/performance/MetricCard.vue` lines ~163,175** — 2 instances (status colors lost) — `rum_performance_audit.md C2`
   **Solution:**
   ```diff
   - <OIcon v-if="icon" :name="icon" size="sm" :color="statusColor" />
@@ -232,15 +232,15 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
   Where `statusColorClass` is a computed returning `'tw:text-[var(--o2-positive)]' | 'tw:text-[var(--o2-warning)]' | 'tw:text-[var(--o2-negative)]'` etc.
 
 - [ ] **`web/src/components/alerts/AlertHistory.vue`** — 2 instances — `css_class_level_audit.md`
-- [ ] **`web/src/plugins/traces/TraceEvaluationsView.vue:361`** — `:color="getDimColor(dim.dimension)"` — `css_class_level_audit.md`
-- [ ] **`web/src/components/pipelines/CreateBackfillJobDialog.vue:163`** — `:color="store.state.theme === 'dark' ? 'orange-4' : 'orange'"` — `pipelines_audit.md C8/M5`
+- [x] **`web/src/plugins/traces/TraceEvaluationsView.vue:361`** — `:color="getDimColor(dim.dimension)"` — `css_class_level_audit.md`
+- [x] **`web/src/components/pipelines/CreateBackfillJobDialog.vue:163`** — `:color="store.state.theme === 'dark' ? 'orange-4' : 'orange'"` — `pipelines_audit.md C8/M5`
   **Solution:**
   ```diff
   - <OIcon name="warning" :color="store.state.theme === 'dark' ? 'orange-4' : 'orange'" size="md" />
   + <OIcon name="warning" class="tw:text-orange-500 dark:tw:text-orange-400" size="md" />
   ```
 
-- [ ] **`web/src/components/pipelines/PipelineHistory.vue` (general):** `<OIcon :name="..." :color="row.is_realtime ? 'positive' : 'grey'" />` — `pipelines_audit.md C8`
+- [x] **`web/src/components/pipelines/PipelineHistory.vue` (general):** `<OIcon :name="..." :color="row.is_realtime ? 'positive' : 'grey'" />` — `pipelines_audit.md C8`
   **Solution:**
   ```diff
   - <OIcon :name="..." :color="row.is_realtime ? 'positive' : 'grey'" />
@@ -250,7 +250,7 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
   + />
   ```
 
-- [ ] **`web/src/components/functions/AddEnrichmentTable.vue:108`** — `:color="job.status === 'completed' ? 'positive' : ..."` — `enrichment_tables_audit.md §3` + `functions_audit.md M1`
+- [x] **`web/src/components/functions/AddEnrichmentTable.vue:108`** — `:color="job.status === 'completed' ? 'positive' : ..."` — `enrichment_tables_audit.md §3` + `functions_audit.md M1`
   **Solution:**
   ```diff
   - <OIcon :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : ..." size="sm" />
@@ -260,31 +260,31 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
   + />
   ```
 
-- [ ] **`web/src/components/alerts/AddAlert.vue:348`** — `:color="...'positive' : 'grey-5'"` — `alerts_audit.md class-level §7`
-- [ ] **`web/src/components/dashboards/addPanel/PanelFieldList.vue`** — 1 instance — `css_class_level_audit.md`
-- [ ] **`web/src/enterprise/components/billings/enterprisePlan.vue:66`** + **`proPlan.vue:65`** — `color="green"` — see Section 2 above
+- [x] **`web/src/components/alerts/AddAlert.vue:348`** — `:color="...'positive' : 'grey-5'"` — `alerts_audit.md class-level §7`
+- [x] **`web/src/components/dashboards/addPanel/PanelFieldList.vue`** — 1 instance — `css_class_level_audit.md`
+- [x] **`web/src/enterprise/components/billings/enterprisePlan.vue:66`** + **`proPlan.vue:65`** — `color="green"` — see Section 2 above
 
 ### Remaining single-instance files (drop `:color`, apply `class="tw:text-*"` directly on `<OIcon>`):
-- [ ] `web/src/plugins/traces/SearchBar.vue` — 1
-- [ ] `web/src/components/settings/ServiceIdentitySetup.vue` — 1
-- [ ] `web/src/components/settings/AddRegexPattern.vue` — 1
-- [ ] `web/src/components/ingestion/recommended/AzureQuickSetup.vue` — 1
-- [ ] `web/src/components/rum/ResourceDetailDrawer.vue` — 1
-- [ ] `web/src/components/alerts/AlertHistoryDrawer.vue` — 1
-- [ ] `web/src/components/alerts/AlertHistorySummary.vue` — 1
+- [x] `web/src/plugins/traces/SearchBar.vue` — 1
+- [x] `web/src/components/settings/ServiceIdentitySetup.vue` — 1
+- [x] `web/src/components/settings/AddRegexPattern.vue` — 1
+- [x] `web/src/components/ingestion/recommended/AzureQuickSetup.vue` — 1
+- [x] `web/src/components/rum/ResourceDetailDrawer.vue` — 1
+- [x] `web/src/components/alerts/AlertHistoryDrawer.vue` — 1
+- [x] `web/src/components/alerts/AlertHistorySummary.vue` — 1
 
 ## 5. `OIcon :size` — Invalid Pixel Values
 
 OIcon's `size` prop only accepts `xs|sm|md|lg|xl` per `OIcon.types.ts`. Pixel values fall back to default `md`.
 
-- [ ] **`web/src/components/settings/License.vue:285`** — `<OIcon name="warning" size="18px" ... />` — `settings_audit.md §8`
+- [x] **`web/src/components/settings/License.vue:285`** — `<OIcon name="warning" size="18px" ... />` — `settings_audit.md §8`
   **Solution:**
   ```diff
   - <OIcon name="warning" size="18px" ... />
   + <OIcon name="warning" size="sm" ... />
   ```
 
-- [ ] **`web/src/components/settings/License.vue:294`** — `<OIcon name="check_circle" size="18px" ... />` — both name and size invalid — `settings_audit.md §8`
+- [x] **`web/src/components/settings/License.vue:294`** — `<OIcon name="check_circle" size="18px" ... />` — both name and size invalid — `settings_audit.md §8`
   **Solution:**
   ```diff
   - <OIcon name="check_circle" size="18px" ... />
@@ -389,23 +389,23 @@ OTooltip in "child mode" (no default slot) attaches mouse handlers to its **pare
 External font-icon classes that depend on the Material Icons font CSS being loaded (conflicts with the offline SVG OIcon registry — see `OIcon.icons.ts` design: "zero runtime fetches, fully functional in air-gapped environments"). Source: `css_class_level_audit.md §1.6`.
 
 ### Library-level (highest priority):
-- [ ] **`web/src/lib/navigation/Pagination/OPagination.vue:70,86,123,139`** — `material-icons` with literal characters like `skip_previous` — `css_class_level_audit.md` / `o_library_audit.md`
+- [x] **`web/src/lib/navigation/Pagination/OPagination.vue:70,86,123,139`** — `material-icons` with literal characters like `skip_previous` — `css_class_level_audit.md` / `o_library_audit.md`
   **Solution:**
   ```diff
   - <span class="material-icons">skip_previous</span>
   + <OIcon name="skip-previous" />
   ```
 
-- [ ] **`web/src/lib/navigation/Tabs/OTabs.vue:163,192`** — `material-icons-outlined` fallback — `css_class_level_audit.md` / `o_library_audit.md`
-- [ ] **`web/src/lib/navigation/Tabs/OTab.vue:113`** — `material-icons-outlined` fallback when icon name not in registry — `css_class_level_audit.md` / `settings_audit.md §11`
-- [ ] **`web/src/lib/data/Timeline/OTimelineItem.vue:42`** — `material-icons` — `css_class_level_audit.md`
-- [ ] **`web/src/lib/core/Collapsible/OCollapsible.vue:116`** — `material-icons-outlined` — `css_class_level_audit.md` / `o_library_audit.md #6`
+- [x] **`web/src/lib/navigation/Tabs/OTabs.vue:163,192`** — `material-icons-outlined` fallback — `css_class_level_audit.md` / `o_library_audit.md`
+- [x] **`web/src/lib/navigation/Tabs/OTab.vue:113`** — `material-icons-outlined` fallback when icon name not in registry — `css_class_level_audit.md` / `settings_audit.md §11`
+- [x] **`web/src/lib/data/Timeline/OTimelineItem.vue:42`** — `material-icons` — `css_class_level_audit.md`
+- [x] **`web/src/lib/core/Collapsible/OCollapsible.vue:116`** — `material-icons-outlined` — `css_class_level_audit.md` / `o_library_audit.md #6`
   **Solution:**
   ```diff
   - <span class="material-icons-outlined">{{ icon }}</span>
   + <OIcon :name="icon" :size="size === 'sm' ? 'xs' : 'sm'" />
   ```
-- [ ] **`web/src/lib/core/Badge/OBadge.vue:151`** — `material-icons-outlined` — Critical: this is the core OBadge component; `OBadge.icon` prop should be `IconName`, render via OIcon — `o_library_audit.md #6` + `css_class_level_audit.md`
+- [x] **`web/src/lib/core/Badge/OBadge.vue:151`** — `material-icons-outlined` — Critical: this is the core OBadge component; `OBadge.icon` prop should be `IconName`, render via OIcon — `o_library_audit.md #6` + `css_class_level_audit.md`
   **Solution:**
   ```diff
   - <span class="material-icons-outlined">{{ icon }}</span>
@@ -414,9 +414,9 @@ External font-icon classes that depend on the Material Icons font CSS being load
   Update the `icon` prop type to `IconName` (imported from `@/lib/core/Icon/OIcon.icons`).
 
 ### Page-level:
-- [ ] **`web/src/components/rum/performance/WebVitalsDashboard.vue:32`** — `material-symbols-outlined` — `css_class_level_audit.md`
-- [ ] **`web/src/components/alerts/AlertList.vue:298`** — `material-symbols-outlined` — `css_class_level_audit.md`
-- [ ] **`web/src/components/rum/common/performance/MetricCard.vue` and other RUM metric cards** — `<OIcon name="info" size="sm" class="material-symbols-outlined tw:mr-1" />` — dead class but harmless — `rum_performance_audit.md CSS2`
+- [x] **`web/src/components/rum/performance/WebVitalsDashboard.vue:32`** — `material-symbols-outlined` — `css_class_level_audit.md`
+- [x] **`web/src/components/alerts/AlertList.vue:298`** — `material-symbols-outlined` — `css_class_level_audit.md`
+- [x] **`web/src/components/rum/common/performance/MetricCard.vue` and other RUM metric cards** — `<OIcon name="info" size="sm" class="material-symbols-outlined tw:mr-1" />` — dead class but harmless — `rum_performance_audit.md CSS2`
   **Solution:**
   ```diff
   - <OIcon name="info" size="sm" class="material-symbols-outlined tw:mr-1" />
@@ -457,7 +457,7 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
   ```
   Update prop type `icon: string` → `icon: IconName`.
 
-- [ ] **`web/src/enterprise/components/billings/proPlan.vue:94,109`** — `<OBadge variant="success-soft" icon="check_circle" ...>` — switch to default slot + OIcon — `billing_audit.md #2, #22`
+- [x] **`web/src/enterprise/components/billings/proPlan.vue:94,109`** — `<OBadge variant="success-soft" icon="check_circle" ...>` — switch to default slot + OIcon — `billing_audit.md #2, #22`
   **Solution:**
   ```diff
   - <OBadge variant="success-soft" icon="check_circle" class="tw:px-3 tw:py-2">
@@ -467,13 +467,13 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
   + </OBadge>
   ```
 
-- [ ] **`web/src/components/alerts/ImportSemanticGroups.vue:212`** + **`ImportSemanticGroupsDrawer.vue:193`** — `icon="check_circle"` — same fix — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/pipelines/BackfillJobDetails.vue:183`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
-- [ ] **`web/src/components/rum/common/performance/ViewPerformanceMetrics.vue:110`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/alerts/ImportSemanticGroups.vue:212`** + **`ImportSemanticGroupsDrawer.vue:193`** — `icon="check_circle"` — same fix — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/pipelines/BackfillJobDetails.vue:183`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
+- [x] **`web/src/components/rum/common/performance/ViewPerformanceMetrics.vue:110`** — `icon="check_circle"` — `css_class_level_audit.md §7.1`
 
 ## 11. OBadge Empty Label / Missing Body
 
-- [ ] **`web/src/components/rum/FrustrationBadge.vue:19-25`** — `<OBadge variant="..." size="sm" />` empty body — count never renders — original had `<q-badge :label="count">` — `rum_sessions_audit.md C3`
+- [x] **`web/src/components/rum/FrustrationBadge.vue:19-25`** — `<OBadge variant="..." size="sm" />` empty body — count never renders — original had `<q-badge :label="count">` — `rum_sessions_audit.md C3`
   **Solution:**
   ```diff
   - <OBadge
@@ -485,7 +485,7 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
   + </OTooltip>
   ```
 
-- [ ] **`web/src/components/rum/FrustrationEventBadge.vue:22-29`** — `<OBadge v-for="(type, index) in frustrationTypes" ... />` empty body — `rum_sessions_audit.md C4`
+- [x] **`web/src/components/rum/FrustrationEventBadge.vue:22-29`** — `<OBadge v-for="(type, index) in frustrationTypes" ... />` empty body — `rum_sessions_audit.md C4`
   **Solution:**
   ```diff
   - <OBadge v-for="(type, index) in frustrationTypes" :variant="getBadgeVariant(type)" />
@@ -504,7 +504,7 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
   + skill: "warning",     // or another non-blue variant; OR add a "purple" variant to OBadge.types.ts
   ```
 
-- [ ] **`web/src/components/alerts/IncidentDetailDrawer.vue:1015,1064,1120`** — `:color="'warning'|'negative'|'grey-5'"` Quasar tokens passed to OIcon (not OBadge but related to badge-adjacent state icons) — verify variant tokens — `alerts_audit.md M-4`
+- [x] **`web/src/components/alerts/IncidentDetailDrawer.vue:1015,1064,1120`** — `:color="'warning'|'negative'|'grey-5'"` Quasar tokens passed to OIcon (not OBadge but related to badge-adjacent state icons) — verify variant tokens — `alerts_audit.md M-4`
 
 - [ ] **`web/src/views/Dashboards/viewPanel/ViewPanel.vue:75`** — `:variant="isVariablesChanged ? 'outline' : 'warning'"` on OButton — confirm `warning` variant exists (other places use `ghost-warning`) — `dashboards_audit.md §3`
   **Solution:**
@@ -715,12 +715,12 @@ Plus 48 instances of `text-blue-500 hover:text-blue-600` link colors across `web
 
 ### P3 — library-level fixes
 - [ ] Fix `OBadge.icon` to render via OIcon registry instead of Material font (`web/src/lib/core/Badge/OBadge.vue:149-154`) — also update prop type `icon: string` → `icon: IconName`
-- [ ] Fix `OCollapsible.icon` (same pattern: `web/src/lib/core/Collapsible/OCollapsible.vue:116`)
-- [ ] Fix `OTabs.vue:163,192` + `OTab.vue:113` to render fallback icons via OIcon registry
-- [ ] Fix `OPagination.vue:70,86,123,139` to use OIcon (`skip-previous`, `skip-next`, etc.) instead of `material-icons` ligature
-- [ ] Fix `OTimelineItem.vue:42` material-icons → OIcon
+- [x] Fix `OCollapsible.icon` (same pattern: `web/src/lib/core/Collapsible/OCollapsible.vue:116`)
+- [x] Fix `OTabs.vue:163,192` + `OTab.vue:113` to render fallback icons via OIcon registry
+- [x] Fix `OPagination.vue:70,86,123,139` to use OIcon (`skip-previous`, `skip-next`, etc.) instead of `material-icons` ligature
+- [x] Fix `OTimelineItem.vue:42` material-icons → OIcon
 - [ ] *(Optional)* Consider adding a typed `tone` prop to OIcon as syntactic sugar for the `tw:text-[var(--o2-tone)]` class. Not needed — current attribute-fallthrough approach (`class="tw:text-..."`) works cleanly and is the canonical fix.
-- [ ] Add missing icons to OIcon registry: `radio-button-unchecked`, `card-membership`, `domain`, `person-pin-circle`, `add-outlined` (if outlined add icon desired), `check-circle-outline` (if used distinctly from `check-circle`), plus any custom dashboard route-key icons (`before_panels`, `invoice_history`)
+- [x] Add missing icons to OIcon registry: `radio-button-unchecked`, `card-membership`, `domain`, `person-pin-circle`, `add-outlined` (if outlined add icon desired), `check-circle-outline` (if used distinctly from `check-circle`), plus any custom dashboard route-key icons (`before_panels`, `invoice_history`)
 - [ ] Sanitize `OBadge` `count: 0` behaviour (q-badge hid empty counts; current OBadge renders the `0` chip — confirm intent or add `hideZeroCount` flag)
 - [ ] Drop redundant `:tabindex="0"` on native `<button>` in clickable OBadge (OBadge.vue:138)
 - [ ] Derive `<OIcon size>` inside OButton from parent button size (OButton.vue:292,296 — currently forces `sm` regardless of button size, looks under-sized in `lg`/`icon-lg`)

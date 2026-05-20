@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="resize-btn bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+        class="resize-btn tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >

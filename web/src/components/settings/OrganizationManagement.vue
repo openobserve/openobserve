@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
               extendedTrial === page
-                ? 'bg-primary text-white'
-                : 'bg-white text-gray-700 border-gray-3',
+                ? 'tw:bg-[var(--o2-primary)] tw:text-white'
+                : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
             ]"
           >
             {{ page }}

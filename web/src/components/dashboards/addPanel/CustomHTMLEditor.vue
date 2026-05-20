@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <div class="splitter-vertical splitter-enabled"></div>
           <div
-            class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+            class="tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
             style="top: 10px; left: 3.5px"
             data-test="dashboard-html-editor-drag-indicator"
           >
