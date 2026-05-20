@@ -15,9 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md" data-test="backfill-jobs-list-page">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-      <!-- Header -->
+  <div
+    data-test="backfill-jobs-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <!-- Header -->
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
@@ -34,33 +37,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Backfill Jobs
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center tw:gap-2">
             <!-- Filters -->
-            <div class="tw:flex tw:gap-2">
-              <OSelect
-                v-model="filters.status"
-                :options="allStatusOptions"
-                placeholder="Status"
-                clearable
-                searchable
-                style="width: 150px"
-                data-test="status-filter"
-              />
-              <OSelect
-                v-model="filters.pipelineId"
-                :options="allPipelineOptions"
-                labelKey="label"
-                valueKey="value"
-                placeholder="Pipeline"
-                clearable
-                searchable
-                style="width: 250px"
-                data-test="pipeline-filter"
-              />
-            </div>
+            <OSelect
+              v-model="filters.status"
+              :options="allStatusOptions"
+              placeholder="Status"
+              clearable
+              searchable
+              class="tw:w-[150px]"
+              data-test="status-filter"
+            />
+            <OSelect
+              v-model="filters.pipelineId"
+              :options="allPipelineOptions"
+              labelKey="label"
+              valueKey="value"
+              placeholder="Pipeline"
+              clearable
+              searchable
+              class="tw:w-[250px]"
+              data-test="pipeline-filter"
+            />
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               @click="clearFilters"
               data-test="clear-filters-btn"
             >
@@ -79,10 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Jobs Table -->
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
+    <!-- Jobs Table -->
+    <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:h-full">
           <OTable
             ref="qTableRef"
             :data="filteredJobs"
@@ -95,12 +97,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :show-global-filter="false"
-            class="tw:h-full"
+            width="100%"
+            class="tw:w-full tw:h-full"
             data-test="backfill-jobs-table"
           >
             <!-- Empty State -->
             <template #empty>
               <NoData />
+            </template>
+
+            <!-- Bottom footer -->
+            <template #bottom="{ totalRows }">
+              <div
+                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+              >
+                {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
+              </div>
             </template>
 
             <!-- Pipeline Name Column -->
@@ -226,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTable>
         </div>
-      </div>
     </div>
 
     <!-- Job Details Dialog -->
