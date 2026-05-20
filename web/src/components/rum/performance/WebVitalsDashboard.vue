@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="info"
           size="sm"
-          class="material-symbols-outlined tw:mr-1"
+          class="tw:mr-1"
         />
         {{ t("rum.learnWebVitalsLabel") }}
         <a

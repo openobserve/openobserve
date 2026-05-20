@@ -54,61 +54,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-xs-circle"
+              icon-left="event"
               data-test="otg-management-extend-trial-btn"
               @click.stop="toggleExtendTrialDialog(row)"
             >
-              <OIcon name="event" size="xs" />
               <OTooltip :content="t('settings.extendTrial')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === '-'"
               variant="ghost"
               size="icon-xs-circle"
+              icon-left="note-add"
               data-test="org-management-add-contract-btn"
               @click.stop="toggleContractDialog(row, 'create')"
             >
-              <OIcon name="note-add" size="xs" />
               <OTooltip content="Add Contract" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
               variant="ghost"
               size="icon-xs-circle"
+              icon-left="event"
               data-test="org-management-extend-contract-btn"
               @click.stop="toggleContractDialog(row, 'extend')"
             >
-              <OIcon name="event" size="xs" />
               <OTooltip content="Extend Contract" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
               variant="ghost-destructive"
               size="icon-xs-circle"
+              icon-left="block"
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(row)"
             >
-              <OIcon name="block" size="xs" />
               <OTooltip content="Revoke" />
             </OButton>
             <OButton
               v-if="!row.org_storage_enabled"
               variant="ghost"
               size="icon-xs-circle"
+              icon-left="cloud-upload"
               data-test="org-management-storage-enable-btn"
               @click.stop="toggleOrgStorage(row)"
             >
-              <OIcon name="cloud-upload" size="xs" />
               <OTooltip content="Enable Storage" />
             </OButton>
             <OButton
               v-else
               variant="ghost"
               size="icon-xs-circle"
+              icon-left="cloud-done"
               disabled
               class="tw:text-green-500"
               data-test="org-management-storage-enabled-btn"
             >
-              <OIcon name="cloud-done" size="xs" />
               <OTooltip content="Storage Enabled" />
             </OButton>
           </div>

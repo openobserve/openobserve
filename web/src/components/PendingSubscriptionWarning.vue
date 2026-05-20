@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:w-11/12 tw:justify-center tw:mt-6">
     <OIcon
-      name="warning" style="width: 80px; height: 80px;" /><br />
+      name="warning" class="tw:text-[var(--o2-warning)]" style="width: 80px; height: 80px;" /><br />
     <h5>
       <b
         ><u><span class="text-red">Warning:</span></u></b
