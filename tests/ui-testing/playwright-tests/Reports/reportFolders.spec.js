@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
+const { createReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
 
 const timestamp = Date.now();
 const FOLDER_A = `test_folder_a_${timestamp}`;
@@ -61,7 +62,7 @@ test.describe("Report Folders", () => {
     await pm.reportFoldersPage.navigateToReports();
 
     testLogger.info('Creating test report via API');
-    const result = await pm.apiCleanup.createReportViaApi(REPORT_A);
+    const result = await createReportViaApi(pm.apiCleanup, REPORT_A);
     if (!result.success) {
       throw new Error(`Failed to create test report: ${result.error}`);
     }
