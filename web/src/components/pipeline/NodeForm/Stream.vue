@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AddStream
             ref="addStreamRef"
             @added:stream-added="getLogStream"
+            @close="openCancelDialog"
             :is-in-pipeline="true"
           />
         </div>
