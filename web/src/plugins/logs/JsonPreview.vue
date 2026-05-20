@@ -68,7 +68,7 @@
     <div v-show="activeTab !== 'unflattened'" class="tw:pl-3">
       {
       <div
-        class="log_json_content"
+        class="log_json_content tw:flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
       >
@@ -81,7 +81,7 @@
           <template #trigger>
             <OButton
               data-test="log-details-include-exclude-field-btn"
-              size="icon-xs"
+              size="xs"
               variant="ghost"
               class="tw:ml-2 log-json-field-dropdown-btn"
               aria-label="Add icon"
