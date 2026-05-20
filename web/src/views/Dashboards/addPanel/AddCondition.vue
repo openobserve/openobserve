@@ -86,52 +86,12 @@
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
                         multiple
-                        :rules="[
-                          (val: any) =>
-                            val.length > 0 || 'At least 1 item required',
-                        ]"
-                        use-input
-                        @filter="filterListFn"
+                        searchable
+                        :error="condition.values?.length === 0"
+                        :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
                         data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"
-                      >
-                        <template v-slot:selected>
-                          {{
-                            condition.values[0]?.length > 15
-                              ? condition.values[0]?.substring(0, 15) + "..."
-                              : condition.values[0]
-                          }}
-                          {{
-                            condition.values?.length > 1
-                              ? " +" + (condition.values?.length - 1)
-                              : ""
-                          }}
-                        </template>
-                        <template
-                          v-slot:option="{
-                            itemProps,
-                            opt,
-                            selected,
-                            toggleOption,
-                          }"
-                        >
-                          <div
-                            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-                            @click="toggleOption(opt)"
-                          >
-                            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-                              <OCheckbox
-                                :model-value="selected"
-                                @update:model-value="toggleOption(opt)"
-                                data-test="dashboard-add-condition-list-item"
-                              />
-                            </div>
-                            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                              <SanitizedHtmlRenderer :html-content="opt" />
-                            </div>
-                          </div>
-                        </template>
-                      </OSelect>
+                      />
                     </OTabPanel>
                   </OTabPanels>
                 </div>
@@ -161,11 +121,9 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -185,10 +143,8 @@ export default defineComponent({
     OTabPanels,
     OTabPanel,
     CommonAutoComplete,
-    SanitizedHtmlRenderer,
     StreamFieldSelect,
     OSelect,
-    OCheckbox,
   },
   props: [
     "condition",
@@ -309,7 +265,6 @@ export default defineComponent({
       computedLabel,
       t,
       filterStreamFn,
-      filterListFn,
       filterOptions,
       emitLogicalOperatorChange,
       handleFieldChange,

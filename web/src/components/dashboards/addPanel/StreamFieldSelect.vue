@@ -1,61 +1,26 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <template>
   <div>
-    <div>
-      <OSelect
-        ref="streamFieldSelect"
-        v-model="displayValue"
-        :options="filteredOptions"
-        label="Select Field"
-        use-input
-        input-debounce="0"
-        behavior="menu"
-        hide-selected
-        fill-input
-        @filter="filterFields"
-        data-test="stream-field-select"
-        class="o2-custom-select-dashboard"
-      >
-        <template v-slot:option="scope">
-          <OCollapsible
-            :model-value="openStreamGroups[scope.index] !== undefined ? openStreamGroups[scope.index] : scope.index === 0"
-            @update:model-value="(v) => (openStreamGroups[scope.index] = v)"
-            :label="scope.opt.label"
-            :data-test="`stream-field-select-group-${scope.index}`"
-          >
-            <template v-for="child in scope.opt.children" :key="child.name">
-              <li
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
-                @click="selectField(child)"
-                :data-test="`stream-field-select-option-${child.name}`"
-              >
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm">{{ child.name }}</span>
-                </div>
-              </li>
-            </template>
-          </OCollapsible>
-        </template>
-      </OSelect>
-    </div>
+    <OSelect
+      :model-value="selectValue"
+      :options="flatOptions"
+      label="Select Field"
+      searchable
+      data-test="stream-field-select"
+      class="o2-custom-select-dashboard"
+      @update:model-value="onSelect"
+    />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, PropType, inject, reactive } from "vue";
+import { defineComponent, ref, watch, computed, inject } from "vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
-export interface OptionChild {
-  label: string;
-  value: string;
-}
-
-export interface Option {
-  label: string;
-  children: OptionChild[];
-}
+// Composite key separator — unlikely to appear in stream/field names
+const SEP = "\x00";
 
 export default defineComponent({
   name: "StreamFieldSelect",
@@ -67,13 +32,13 @@ export default defineComponent({
     },
     modelValue: {
       type: Object,
-      default: {},
+      default: () => ({}),
     },
   },
 
   emits: ["update:modelValue"],
 
-  components: { OSelect, OCollapsible },
+  components: { OSelect },
 
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
@@ -81,163 +46,131 @@ export default defineComponent({
       "dashboard",
     );
 
-    const internalModel = ref(props.modelValue);
-    const displayValue = ref(props.modelValue?.field || "");
-    const options = ref<Option[]>([]);
-    const filteredOptions = ref<Option[]>([]);
-
     const { getStream } = useStreams();
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
 
-    const streamFieldSelect = ref<any>(null);
-    const openStreamGroups = reactive<Record<number, boolean>>({}); 
+    // Raw loaded groups: { label, streamRef, children: [{name, ...}] }
+    const groups = ref<{ label: string; streamRef: any; children: any[] }[]>(
+      [],
+    );
+
+    // valueMap: composite key -> { field, streamAlias }
+    const valueMap = new Map<string, { field: string; streamAlias?: string }>();
+
+    // Flat OSelect-compatible options: headers + { label, value } items
+    const flatOptions = computed(() => {
+      const result: any[] = [];
+      const showHeaders = groups.value.length > 1;
+      for (const group of groups.value) {
+        if (showHeaders) {
+          result.push({ header: true, label: group.label });
+        }
+        for (const field of group.children ?? []) {
+          result.push({
+            label: field.name,
+            value: `${group.label}${SEP}${field.name}`,
+          });
+        }
+      }
+      return result;
+    });
+
+    // Derive the currently selected string key from the modelValue object.
+    // Computed from `groups` (reactive ref) so it re-runs after fields load.
+    const selectValue = computed<string | null>(() => {
+      const mv = props.modelValue;
+
+      if (!mv?.field) return undefined;
+
+      // Exact match: field + streamAlias
+      for (const group of groups.value) {
+        const fieldStreamAlias = group.streamRef?.streamAlias ?? null;
+        if ((mv.streamAlias ?? null) === fieldStreamAlias) {
+          const match = group.children?.find((f: any) => f.name === mv.field);
+          if (match) return `${group.label}${SEP}${match.name}`;
+        }
+      }
+
+      // Fallback: match by field name only
+      for (const group of groups.value) {
+        const match = group.children?.find((f: any) => f.name === mv.field);
+        if (match) return `${group.label}${SEP}${match.name}`;
+      }
+
+      return null;
+    });
 
     async function loadStreamFields(streamName: string) {
+      if (!streamName) return null;
       try {
-        if (streamName != "") {
-          return await getStream(
-            streamName,
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type ?? "logs",
-            true,
-          ).then((res) => {
-            return res;
-          });
-        } else {
-        }
-        return;
-      } catch (e: any) {
-        console.log("Error while loading stream fields");
-      }
-    }
-
-    function updateInputValue(val: string) {
-      if (val !== undefined && val !== null) {
-        displayValue.value = val;
-        streamFieldSelect?.value?.updateInputValue?.(val);
+        return await getStream(
+          streamName,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type ?? "logs",
+          true,
+        );
+      } catch {
+        return null;
       }
     }
 
     async function fetchFieldsForStreams() {
       if (!props.streams || props.streams.length === 0) {
-        options.value = [];
-        filteredOptions.value = [];
-        displayValue.value = internalModel.value?.field || "";
+        groups.value = [];
+        valueMap.clear();
         return;
       }
 
-      // Fetch schema for each stream and build options
-      options.value = await Promise.all(
-        props.streams.map(async (stream: any) => {
-          const streamSchemaObj = await loadStreamFields(stream.stream);
+      valueMap.clear();
 
-          return {
-            label: stream.streamAlias
-              ? `${stream.stream}(${stream.streamAlias})`
-              : `${stream.stream}`,
-            children: streamSchemaObj?.schema?.map((field: any) => ({
-              ...field,
-              stream: stream,
-            })),
-          };
+      groups.value = await Promise.all(
+        props.streams.map(async (stream: any) => {
+          const schema = await loadStreamFields(stream.stream);
+          const label = stream.streamAlias
+            ? `${stream.stream}(${stream.streamAlias})`
+            : `${stream.stream}`;
+          const children = (schema?.schema ?? []).map((field: any) => ({
+            ...field,
+            stream,
+          }));
+
+          for (const field of children) {
+            const key = `${label}${SEP}${field.name}`;
+            valueMap.set(key, {
+              field: field.name,
+              streamAlias: stream.streamAlias,
+            });
+          }
+
+          return { label, streamRef: stream, children };
         }),
       );
-
-      // Initialize filtered options with all options
-      filteredOptions.value = [...options?.value];
-
-      displayValue.value = internalModel.value?.field || "";
     }
 
-    function filterFields(val: string, update: any) {
-      // val is now always a string since we're using displayValue
-      let searchText = "";
-
-      if (val === "" || val === displayValue.value) {
-        update(() => {
-          filteredOptions.value = [...options?.value];
-        });
-        return;
-      }
-
-      // val is always string now
-      if (val !== "") {
-        searchText = val.toLowerCase();
+    function onSelect(key: string | null) {
+      if (!key) return;
+      const mapped = valueMap.get(key);
+      if (mapped) {
+        emit("update:modelValue", { ...mapped });
       } else {
-        update(() => {
-          filteredOptions.value = [...options?.value];
-        });
-        return;
+        // Fallback: treat raw value as plain field name
+        emit("update:modelValue", { field: key, streamAlias: undefined });
       }
-
-      update(() => {
-        const needle = searchText;
-        // Filter options where either stream name (label) or field name contains the search term
-        filteredOptions.value = options?.value
-          ?.map((stream) => {
-            // First check if stream name matches
-            const streamMatches = stream?.label?.toLowerCase().includes(needle);
-
-            // Then filter child fields that match
-            const matchingFields = stream?.children?.filter((field: any) =>
-              field?.name?.toLowerCase()?.includes(needle),
-            );
-
-            // If stream name matches or has matching fields, include in results
-            if (streamMatches || matchingFields.length > 0) {
-              return {
-                ...stream,
-                // If stream matches directly, include all fields
-                // Otherwise only include matching fields
-                children: streamMatches ? stream?.children : matchingFields,
-              };
-            }
-            return null;
-          })
-          .filter(Boolean) as Option[];
-      });
     }
 
-    function selectField(field: any) {
-      internalModel.value = {
-        streamAlias: field?.stream?.streamAlias,
-        field: field.name,
-      };
-      displayValue.value = field.name;
-      updateInputValue(field.name);
-    }
-
-    // Watch for v-model changes
-    watch(internalModel, (newValue) => {
-      emit("update:modelValue", newValue);
-      displayValue.value = newValue?.field || "";
+    // Re-fetch when streams list changes
+    watch(() => props.streams, fetchFieldsForStreams, {
+      immediate: true,
+      deep: true,
     });
 
-    // Watch for external modelValue changes
-    watch(
-      () => props.modelValue,
-      (newValue) => {
-        internalModel.value = newValue;
-        displayValue.value = newValue?.field || "";
-      },
-    );
-
-    // Watch for streams changes
-    watch(() => props.streams, fetchFieldsForStreams, { immediate: true });
-
     return {
-      internalModel,
-      displayValue,
-      options,
-      filteredOptions,
-      selectField,
-      filterFields,
-      streamFieldSelect,
-      updateInputValue,
-      openStreamGroups,
+      flatOptions,
+      selectValue,
+      onSelect,
     };
   },
 });
