@@ -917,7 +917,16 @@ const mainContentContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { width: "100%", height: "100%" };
   }
-  return { display: "flex", flexDirection: "row", overflowX: "hidden" };
+  // flex:1 and minWidth:0 are required so this column fills the remaining row width
+  // (alongside the fixed-width ChartSelection sidebar) and lets the inner OSplitter
+  // resolve its `width: 100%` against a real parent width instead of intrinsic content.
+  return {
+    display: "flex",
+    flexDirection: "row",
+    overflowX: "hidden",
+    flex: "1 1 0%",
+    minWidth: "0",
+  };
 });
 
 // Splitter limits - logs/build uses [0, 100], others use [0, 20]
