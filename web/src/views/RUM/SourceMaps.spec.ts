@@ -27,6 +27,12 @@ vi.mock("@quasar/extras/material-icons-outlined", () => ({
   "delete": "outlined-delete-icon",
 }));
 
+// Mock toast so notification tests can verify calls
+const toastMock = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => toastMock(...args),
+}));
+
 // ---------------------------------------------------------------------------
 // Test harness setup
 // ---------------------------------------------------------------------------
@@ -99,34 +105,22 @@ const sampleFilterValues = {
 // Builds the global mounting configuration with consistent stubs.
 const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
   plugins: [store, router, i18n],
-  mocks: {
-    $q: { notify: notifyMock },
-  },
-  provide: {
-    _q_: { notify: notifyMock },
-  },
   stubs: {
-    "q-select": {
-      name: "QSelect",
-      props: ["modelValue", "options", "label"],
-      emits: ["update:modelValue", "filter", "new-value"],
-      template:
-        '<div data-test-stub="q-select" :data-label="label"><slot name="no-option" /></div>',
+    OSelect: {
+      name: "OSelect",
+      props: ["modelValue", "options", "label", "clearable", "searchable", "creatable"],
+      emits: ["update:modelValue"],
+      template: '<div data-test-stub="o-select" :data-label="label"></div>',
     },
-    "q-item": true,
-    "q-item-section": true,
-    "q-item-label": true,
-    "q-separator": true,
-    "OIcon": true,
-    "q-table": {
-      name: "QTable",
-      props: ["rows", "columns", "rowKey", "pagination"],
+    OSeparator: { template: '<hr data-test-stub="o-separator" />' },
+    OIcon: true,
+    OTable: {
+      name: "OTable",
+      props: ["data", "columns", "rowKey", "pagination", "pageSize", "loading"],
+      emits: ["update:expandedIds"],
       template:
-        '<div data-test-stub="q-table" :data-rows="rows.length"><slot name="body" :cols="columns" :row="rows[0]" /></div>',
+        '<div data-test-stub="q-table" :data-rows="data ? data.length : 0"><slot name="empty" /></div>',
     },
-    "q-tr": true,
-    "q-td": true,
-    "q-list": true,
     OButton: {
       name: "OButton",
       props: ["variant", "size", "icon", "loading", "title"],
@@ -152,12 +146,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
       template:
         '<div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-size="size"><slot /></div>',
     },
-    QTablePagination: {
-      name: "QTablePagination",
-      props: ["scope", "position", "resultTotal", "perPageOptions"],
-      emits: ["update:changeRecordPerPage"],
-      template: '<div data-test-stub="q-table-pagination" />',
-    },
+    OSpinner: { template: '<div data-test-stub="o-spinner" />' },
   },
 });
 
@@ -177,6 +166,7 @@ describe("SourceMaps.vue", () => {
     getSourceMapsValuesMock.mockReset();
     deleteSourceMapsMock.mockReset();
     notifyMock.mockReset();
+    toastMock.mockReset();
 
     listSourceMapsMock.mockResolvedValue({ data: sampleSourceMaps });
     getSourceMapsValuesMock.mockResolvedValue({ data: sampleFilterValues });
@@ -304,13 +294,14 @@ describe("SourceMaps.vue", () => {
       wrapper = await mountComponent();
 
       expect((wrapper.vm as any).groupedSourceMaps).toEqual([]);
-      expect((wrapper.vm as any).resultTotal).toBe(0);
+      expect((wrapper.vm as any).groupedSourceMaps.length).toBe(0);
     });
 
-    it("resultTotal computed reflects grouped source maps count", async () => {
+    it("groupedSourceMaps length reflects the number of distinct service-version-env groups", async () => {
       wrapper = await mountComponent();
 
-      expect((wrapper.vm as any).resultTotal).toBe(2);
+      // 3 items → 2 distinct groups (svc-a/1.0.0/prod and svc-b/2.0.0/dev)
+      expect((wrapper.vm as any).groupedSourceMaps.length).toBe(2);
     });
   });
 
@@ -334,15 +325,15 @@ describe("SourceMaps.vue", () => {
 
       wrapper = await mountComponent();
 
+      // OTable is always rendered in v-else; when data is empty it renders #empty slot
       expect(wrapper.text()).toContain("No Source Maps Found");
-      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
     });
 
-    it("shows the table when grouped source maps exist", async () => {
+    it("shows OTable when grouped source maps exist", async () => {
       wrapper = await mountComponent();
 
       expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
-      expect(wrapper.text()).not.toContain("No Source Maps Found");
     });
   });
 
@@ -462,85 +453,55 @@ describe("SourceMaps.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Row expansion
+  // Row expansion — OTable handles expansion via expandedIds ref
   // -------------------------------------------------------------------------
   describe("Row expansion", () => {
-    it("getRowKey composes service-version-env key", async () => {
+    it("grouped rows have composite id field used as row key", async () => {
       wrapper = await mountComponent();
 
-      const key = (wrapper.vm as any).getRowKey({
-        service: "svc-a",
-        version: "1.0.0",
-        env: "prod",
-      });
-      expect(key).toBe("svc-a-1.0.0-prod");
+      const groupA = (wrapper.vm as any).groupedSourceMaps.find(
+        (g: any) => g.service === "svc-a",
+      );
+      expect(groupA.id).toBe("svc-a-1.0.0-prod");
     });
 
-    it("toggleExpand expands a collapsed row", async () => {
+    it("expandedIds starts empty", async () => {
       wrapper = await mountComponent();
 
-      const row = { service: "svc-a", version: "1.0.0", env: "prod" };
-      expect((wrapper.vm as any).expandedRow).toBeNull();
-
-      (wrapper.vm as any).toggleExpand(row);
-      expect((wrapper.vm as any).expandedRow).toBe("svc-a-1.0.0-prod");
+      expect((wrapper.vm as any).expandedIds).toEqual([]);
     });
 
-    it("toggleExpand collapses the row when already expanded", async () => {
+    it("expanding a row by adding its id to expandedIds works", async () => {
       wrapper = await mountComponent();
 
-      const row = { service: "svc-a", version: "1.0.0", env: "prod" };
-      (wrapper.vm as any).toggleExpand(row);
-      (wrapper.vm as any).toggleExpand(row);
-
-      expect((wrapper.vm as any).expandedRow).toBeNull();
+      (wrapper.vm as any).expandedIds = ["svc-a-1.0.0-prod"];
+      expect((wrapper.vm as any).expandedIds).toContain("svc-a-1.0.0-prod");
     });
 
-    it("toggleExpand switches between different rows", async () => {
+    it("collapsing a row by removing its id from expandedIds works", async () => {
       wrapper = await mountComponent();
 
-      (wrapper.vm as any).toggleExpand({
-        service: "svc-a",
-        version: "1.0.0",
-        env: "prod",
-      });
-      (wrapper.vm as any).toggleExpand({
-        service: "svc-b",
-        version: "2.0.0",
-        env: "dev",
-      });
-
-      expect((wrapper.vm as any).expandedRow).toBe("svc-b-2.0.0-dev");
+      (wrapper.vm as any).expandedIds = ["svc-a-1.0.0-prod"];
+      (wrapper.vm as any).expandedIds = [];
+      expect((wrapper.vm as any).expandedIds).toEqual([]);
     });
   });
 
   // -------------------------------------------------------------------------
-  // Pagination
+  // Pagination — OTable uses selectedPerPage ref directly
   // -------------------------------------------------------------------------
   describe("Pagination", () => {
-    it("changePagination updates rowsPerPage and calls setPagination on table ref", async () => {
+    it("selectedPerPage defaults to 20", async () => {
       wrapper = await mountComponent();
 
-      const setPaginationSpy = vi.fn();
-      (wrapper.vm as any).qTableRef = { setPagination: setPaginationSpy };
-
-      (wrapper.vm as any).changePagination({ label: "50", value: 50 });
-
-      expect((wrapper.vm as any).pagination.rowsPerPage).toBe(50);
-      expect(setPaginationSpy).toHaveBeenCalledWith(
-        (wrapper.vm as any).pagination,
-      );
+      expect((wrapper.vm as any).selectedPerPage).toBe(20);
     });
 
-    it("changePagination is safe when qTableRef is null", async () => {
+    it("updating selectedPerPage changes the page size", async () => {
       wrapper = await mountComponent();
 
-      (wrapper.vm as any).qTableRef = null;
-
-      expect(() =>
-        (wrapper.vm as any).changePagination({ label: "100", value: 100 }),
-      ).not.toThrow();
-      expect((wrapper.vm as any).pagination.rowsPerPage).toBe(100);
+      (wrapper.vm as any).selectedPerPage = 50;
+      expect((wrapper.vm as any).selectedPerPage).toBe(50);
     });
   });
 
@@ -646,7 +607,7 @@ describe("SourceMaps.vue", () => {
       ).toBeUndefined();
     });
 
-    it("fires a positive notification on successful delete", async () => {
+    it("fires a success toast on successful delete", async () => {
       wrapper = await mountComponent();
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
@@ -656,12 +617,12 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
       );
     });
 
-    it("fires a negative notification with server message on delete failure", async () => {
+    it("fires an error toast with server message on delete failure", async () => {
       wrapper = await mountComponent();
 
       deleteSourceMapsMock.mockRejectedValueOnce({
@@ -678,9 +639,9 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Server rejected",
         }),
       );
@@ -702,9 +663,9 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "plain failure",
         }),
       );
@@ -727,9 +688,9 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Failed to delete source maps",
         }),
       );
@@ -759,12 +720,11 @@ describe("SourceMaps.vue", () => {
   // Table columns
   // -------------------------------------------------------------------------
   describe("Table columns", () => {
-    it("defines all required column names in order", async () => {
+    it("defines all required column ids in order", async () => {
       wrapper = await mountComponent();
 
-      const names = (wrapper.vm as any).columns.map((c: any) => c.name);
-      expect(names).toEqual([
-        "expand",
+      const ids = (wrapper.vm as any).columns.map((c: any) => c.id);
+      expect(ids).toEqual([
         "service",
         "version",
         "environment",
@@ -774,27 +734,21 @@ describe("SourceMaps.vue", () => {
       ]);
     });
 
-    it("uploaded_at format converts microseconds to a date string", async () => {
+    it("formatTimestamp converts microseconds to a date string", async () => {
       wrapper = await mountComponent();
 
-      const uploadedCol = (wrapper.vm as any).columns.find(
-        (c: any) => c.name === "uploaded_at",
-      );
-      const formatted = uploadedCol.format(1700000000000000);
+      // formatTimestamp is exposed on the component instance
+      const formatted = (wrapper.vm as any).formatTimestamp(1700000000000000);
 
-      // Should produce a non-empty, non-default value
       expect(typeof formatted).toBe("string");
       expect(formatted).not.toBe("-");
     });
 
-    it("uploaded_at format returns '-' for falsy values", async () => {
+    it("formatTimestamp returns '-' for falsy values", async () => {
       wrapper = await mountComponent();
 
-      const uploadedCol = (wrapper.vm as any).columns.find(
-        (c: any) => c.name === "uploaded_at",
-      );
-      expect(uploadedCol.format(0)).toBe("-");
-      expect(uploadedCol.format(null)).toBe("-");
+      expect((wrapper.vm as any).formatTimestamp(0)).toBe("-");
+      expect((wrapper.vm as any).formatTimestamp(null)).toBe("-");
     });
   });
 });

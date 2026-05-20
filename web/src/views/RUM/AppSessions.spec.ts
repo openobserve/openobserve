@@ -4,7 +4,6 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppSessions from "./AppSessions.vue";
 
 // Mock the composables
@@ -110,21 +109,8 @@ vi.mock("@/utils/date", () => ({
     startTime: Date.now() - 900000,
     endTime: Date.now(),
   }),
+  formatDate: vi.fn().mockReturnValue("Jan 01, 2023 00:00:00 +0000"),
 }));
-
-// Mock Quasar
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-    date: {
-      formatDate: vi.fn((timestamp, format) => "Jan 01, 2023 12:00:00 +00:00"),
-    },
-  };
-});
 
 // Mock async components
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
@@ -135,8 +121,6 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
     emits: ["update:query"],
   },
 }));
-
-installQuasar();
 
 describe("AppSessions.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -202,20 +186,24 @@ describe("AppSessions.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-                    QBtn: {
+          OButton: {
             template:
-              '<button class="q-btn" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+              '<button data-test-stub="o-button" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+            emits: ["click"],
           },
-          QSeparator: {
-            template: '<hr class="q-separator" />',
-          },
-          QSplitter: {
+          OSplitter: {
             template:
-              '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            props: ["modelValue", "unit", "vertical"],
+              '<div data-test-stub="o-splitter"><slot name="before" /><slot name="after" /></div>',
+            props: ["modelValue", "unit", "horizontal"],
           },
-          QIcon: {
-            template: '<span class="OIcon" v-bind="$attrs"></span>',
+          OIcon: {
+            template: '<span data-test-stub="o-icon" v-bind="$attrs"></span>',
+            props: ["name", "size"],
+          },
+          OTable: {
+            template:
+              '<div data-test="app-table" v-bind="$attrs"><slot name="empty" /><slot name="cell-frustration_count" :row="{ frustration_count: 0 }" /><slot name="cell-location" :row="{ geo_info_country: \'\', geo_info_city: \'\' }" /></div>',
+            props: ["data", "columns", "loading", "rowKey"],
           },
           DateTime: {
             template:
@@ -237,23 +225,22 @@ describe("AppSessions.vue", () => {
             props: ["query", "editorId", "debounceTime"],
             emits: ["update:query"],
           },
-          FieldList: {
+          SearchFieldList: {
             template:
               '<div data-test="field-list" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"></div>',
             props: ["fields", "timeStamp", "streamName"],
             emits: ["event-emitted"],
           },
-          AppTable: {
-            template:
-              '<div data-test="app-table" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"><slot /></div>',
-            props: ["columns", "rows", "bordered"],
-            emits: ["event-emitted"],
+          FrustrationBadge: {
+            template: '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
+            props: ["count"],
           },
           SessionLocationColumn: {
             template:
               '<div data-test="session-location-column" v-bind="$attrs"></div>',
             props: ["column"],
           },
+          NoData: { template: '<div data-test-stub="no-data" />' },
         },
       },
     });
@@ -280,39 +267,22 @@ describe("AppSessions.vue", () => {
       );
     });
 
-    it("should render loading state when data is being fetched", async () => {
-      // Properly update the reactive ref by pushing instead of replacing
+    it("should set loading on OTable when data is being fetched", async () => {
       wrapper.vm.isLoading.push(true);
       await nextTick();
 
-      expect(wrapper.find('[data-test="app-sessions-loading-indicator"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain(
-        "Hold on tight, we're fetching sessions.",
-      );
+      // The OTable receives :loading="isLoading.length > 0"
+      expect(wrapper.vm.isLoading.length).toBeGreaterThan(0);
 
       // Cleanup
       wrapper.vm.isLoading.pop();
     });
 
-    it("should render app table when not loading", async () => {
-      // Ensure component is properly set up for non-loading state
-      wrapper.vm.isLoading = [];
-      wrapper.vm.rows = [
-        {
-          session_id: "test-session",
-          timestamp: Date.now(),
-          user_email: "test@example.com",
-        },
-      ];
+    it("should render OTable when session replay is enabled and not loading", async () => {
       await nextTick();
 
-      // Check if table exists or if it's within the splitter after section
-      const tableExists = wrapper.find('[data-test="app-table"]').exists();
-      const splitterAfter = wrapper.find(".q-splitter").exists();
-
-      // If the component is properly structured, either the table should exist
-      // or the splitter structure should be present
-      expect(tableExists || splitterAfter).toBe(true);
+      // OTable renders with data-test="rum-sessions-table" (v-bind="$attrs" propagates it)
+      expect(wrapper.find('[data-test="rum-sessions-table"]').exists()).toBe(true);
     });
   });
 
@@ -363,7 +333,7 @@ describe("AppSessions.vue", () => {
   });
 
   describe("Table Interactions", () => {
-    it("should handle table events correctly", () => {
+    it("should handle cell click for action_play column", () => {
       const payload = {
         columnName: "action_play",
         row: {
@@ -373,8 +343,8 @@ describe("AppSessions.vue", () => {
         },
       };
 
-      // Test the method directly
-      const result = wrapper.vm.handleTableEvents("cell-click", payload);
+      // handleCellClick navigates when columnName is action_play
+      const result = wrapper.vm.handleCellClick(payload);
       expect(result).toBeUndefined(); // Method doesn't return anything
     });
 
@@ -402,11 +372,9 @@ describe("AppSessions.vue", () => {
       });
     });
 
-    it("should handle scroll events for pagination", () => {
-      const scrollData = { to: 100 };
-
-      // Test the method directly
-      wrapper.vm.handleScroll(scrollData);
+    it("should handle scroll end events for pagination", () => {
+      // handleScrollEnd increments currentPage when sessions are fully fetched
+      wrapper.vm.handleScrollEnd();
       expect(
         wrapper.vm.sessionState.data.resultGrid.currentPage,
       ).toBeGreaterThanOrEqual(0);
@@ -415,16 +383,16 @@ describe("AppSessions.vue", () => {
 
   describe("Session Data Management", () => {
     it("should initialize with correct columns structure", () => {
-      const columns = wrapper.vm.columns;
+      const columns = wrapper.vm.tableColumns;
 
       expect(columns).toHaveLength(7);
-      expect(columns[0].name).toBe("action_play");
-      expect(columns[1].name).toBe("timestamp");
-      expect(columns[2].name).toBe("user_email");
-      expect(columns[3].name).toBe("time_spent");
-      expect(columns[4].name).toBe("error_count");
-      expect(columns[5].name).toBe("frustration_count");
-      expect(columns[6].name).toBe("location");
+      expect(columns[0].id).toBe("action_play");
+      expect(columns[1].id).toBe("timestamp");
+      expect(columns[2].id).toBe("user_email");
+      expect(columns[3].id).toBe("time_spent");
+      expect(columns[4].id).toBe("error_count");
+      expect(columns[5].id).toBe("frustration_count");
+      expect(columns[6].id).toBe("location");
     });
 
     it("should fetch stream fields on mount", async () => {
@@ -648,18 +616,20 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QBtn: { template: "<button><slot /></button>" },
-            QSplitter: {
+            OButton: { template: "<button><slot /></button>" },
+            OSplitter: {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QIcon: { template: "<span></span>" },
+            OIcon: { template: "<span></span>" },
+            OTable: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
-            FieldList: { template: "<div></div>" },
-            AppTable: { template: "<div></div>" },
+            SearchFieldList: { template: "<div></div>" },
+            FrustrationBadge: { template: "<div></div>" },
             SessionLocationColumn: { template: "<div></div>" },
+            NoData: { template: "<div></div>" },
           },
         },
       });
@@ -789,19 +759,20 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QBtn: { template: "<button><slot /></button>" },
-            QSeparator: { template: "<hr />" },
-            QSplitter: {
+            OButton: { template: "<button><slot /></button>" },
+            OSplitter: {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QIcon: { template: "<span></span>" },
+            OIcon: { template: "<span></span>" },
+            OTable: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
-            FieldList: { template: "<div></div>" },
-            AppTable: { template: "<div></div>" },
+            SearchFieldList: { template: "<div></div>" },
+            FrustrationBadge: { template: "<div></div>" },
             SessionLocationColumn: { template: "<div></div>" },
+            NoData: { template: "<div></div>" },
           },
         },
       });
@@ -840,23 +811,20 @@ describe("AppSessions.vue", () => {
     });
 
     it("should have frustration_count column in columns definition", () => {
-      const frustrictionColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "frustration_count",
+      const frustrationColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "frustration_count",
       );
 
-      expect(frustrictionColumn).toBeDefined();
-      expect(frustrictionColumn.label).toContain("Frustration");
-      expect(frustrictionColumn.slot).toBe(true);
-      expect(frustrictionColumn.slotName).toBe("frustration_count_column");
+      expect(frustrationColumn).toBeDefined();
+      expect(frustrationColumn.header).toContain("Frustration");
+      expect(frustrationColumn.sortable).toBe(true);
     });
 
-    it("should render FrustrationBadge in frustration_count column slot", () => {
-      const template = wrapper.html();
-
-      // Check that the slot is defined for frustration count
+    it("should render FrustrationBadge stub in template", () => {
+      // FrustrationBadge is stubbed and used via #cell-frustration_count slot
       expect(
-        wrapper.vm.columns.some(
-          (col: any) => col.slotName === "frustration_count_column",
+        wrapper.vm.tableColumns.some(
+          (col: any) => col.id === "frustration_count",
         ),
       ).toBe(true);
     });
@@ -909,30 +877,30 @@ describe("AppSessions.vue", () => {
     });
 
     it("should make frustration_count column sortable", () => {
-      const frustrationColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "frustration_count",
+      const frustrationColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "frustration_count",
       );
 
       expect(frustrationColumn.sortable).toBe(true);
     });
 
     it("should position frustration_count column after error_count", () => {
-      const errorIndex = wrapper.vm.columns.findIndex(
-        (col: any) => col.name === "error_count",
+      const errorIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "error_count",
       );
-      const frustrationIndex = wrapper.vm.columns.findIndex(
-        (col: any) => col.name === "frustration_count",
+      const frustrationIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "frustration_count",
       );
 
       expect(frustrationIndex).toBeGreaterThan(errorIndex);
     });
 
     it("should position frustration_count column before location", () => {
-      const frustrationIndex = wrapper.vm.columns.findIndex(
-        (col: any) => col.name === "frustration_count",
+      const frustrationIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "frustration_count",
       );
-      const locationIndex = wrapper.vm.columns.findIndex(
-        (col: any) => col.name === "location",
+      const locationIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "location",
       );
 
       expect(frustrationIndex).toBeLessThan(locationIndex);

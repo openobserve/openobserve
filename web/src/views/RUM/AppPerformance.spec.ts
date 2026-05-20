@@ -4,13 +4,9 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppPerformance from "./AppPerformance.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-
-// Install Quasar globally for all tests
-installQuasar();
 
 // Mock the composables
 const mockPerformanceState = {
