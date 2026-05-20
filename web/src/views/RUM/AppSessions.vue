@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
         v-model="splitterModel"
         unit="px"
-        :horizontal="true"
+        :horizontal="false"
       >
         <template #before>
           <div class="card-container tw:p-[0.325rem] tw:h-full">
@@ -107,11 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   row-key="session_id"
                   pagination="none"
                   virtual-scroll
-                  dense
+                  :dense="false"
                   class="tw:h-full"
                   data-test="rum-sessions-table"
                   @row-click="handleRowClick"
                   @scroll-end="handleScrollEnd"
+                  :show-global-filter="false"
                 >
                   <template #cell-action_play="{ row }">
                     <OIcon
@@ -302,6 +303,7 @@ const tableColumns = [
     header: t("rum.timestamp"),
     accessorFn: (row: any) => getFormattedDate(row["timestamp"] / 1000),
     sortable: true,
+    size: 240,
     meta: { align: "left" },
   },
   {
@@ -309,7 +311,7 @@ const tableColumns = [
     header: t("login.userEmail"),
     accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "time_spent",
@@ -337,6 +339,7 @@ const tableColumns = [
     header: t("rum.location"),
     accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
+    size: 360,
     meta: { align: "left" },
   },
 ];

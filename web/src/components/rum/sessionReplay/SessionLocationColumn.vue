@@ -15,31 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div>
-      <div class="tw:flex tw:items-center tw:flex-nowrap">
-        <span :class="`fi fi-${column.country_iso_code} tw:mr-2`" />
-        <div class="tw:text-[0.75rem]">{{ column.country }}</div>
-      </div>
-      <div class="tw:flex tw:mt-1 tw:items-center">
-        <div class="tw:text-gray-500">
-          {{ column.city || "Unknown" }}
-        </div>
-        <OIcon
-          data-test="circle-icon"
-          name="circle"
-          size="xs"
-          class="tw:mx-3 tw:text-gray-400"
-        />
-        <div class="tw:text-gray-500">{{ column.browser }}</div>
-        <OIcon
-          data-test="circle-icon"
-          name="circle"
-          size="xs"
-          class="tw:mx-3 tw:text-gray-400"
-        />
-        <div class="tw:text-gray-500">{{ column.os }}</div>
-      </div>
+  <div class="tw:flex tw:flex-col tw:gap-[0.125rem] tw:leading-tight tw:min-w-0 tw:py-[0.125rem]">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
+      <span :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`" />
+      <div class="tw:text-[0.6875rem] tw:truncate">{{ column.country }}</div>
+    </div>
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-[0.625rem] tw:text-gray-500">
+      <span class="tw:truncate">{{ column.city || "Unknown" }}</span>
+      <OIcon
+        data-test="circle-icon"
+        name="circle"
+        size="xs"
+        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
+      />
+      <span class="tw:truncate">{{ column.browser }}</span>
+      <OIcon
+        data-test="circle-icon"
+        name="circle"
+        size="xs"
+        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
+      />
+      <span class="tw:truncate">{{ column.os }}</span>
     </div>
   </div>
 </template>

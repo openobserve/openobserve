@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   stickyHeader: true,
   wrap: false,
   rowKey: "id",
-  rowHeight: 24,
+  rowHeight: undefined,
   showGlobalFilter: true,
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
@@ -223,7 +223,7 @@ const {
   parentRef: scrollContainerRef,
   scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
   scrollMargin: props.scrollMargin ?? 0,
-  rowHeight: props.rowHeight ?? 24,
+  rowHeight: props.rowHeight ?? (props.dense ? 36 : 44),
   overscan: 100,
 });
 

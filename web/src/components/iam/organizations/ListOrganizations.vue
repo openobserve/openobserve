@@ -163,6 +163,7 @@ export default defineComponent({
         header: t("organization.identifier"),
         accessorKey: "identifier",
         sortable: true,
+        size: 260,
         meta: { align: "left" },
       },
       {

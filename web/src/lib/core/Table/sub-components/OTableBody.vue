@@ -112,15 +112,18 @@ function getRowForIndex(index: number) {
     </OTableBodyRow>
   </tbody>
 
-  <!-- Virtual scroll body -->
+  <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
+       reserve the offset above first and below last visible row so cells
+       inherit the parent table's column layout (same as non-virtual). -->
   <tbody
     v-else
     data-test="o2-table-body"
-    class="tw:relative"
   >
-    <!-- Spacer for total scroll height -->
-    <tr v-if="totalSize" aria-hidden="true">
-      <td :style="{ height: `${totalSize}px` }" />
+    <tr
+      v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0"
+      aria-hidden="true"
+    >
+      <td :style="{ height: `${virtualRows[0].start + (baseOffset ?? 0)}px`, padding: 0, border: 0 }" />
     </tr>
 
     <OTableBodyRow
@@ -145,12 +148,7 @@ function getRowForIndex(index: number) {
       :row-class-fn="rowClass"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"
-      :row-style-fn="(row: any) => ({
-        ...(rowStyleFn?.(row) ?? {}),
-        position: 'absolute',
-        top: '0',
-        transform: `translateY(${virtualRow.start + (baseOffset ?? 0)}px)`,
-      })"
+      :row-style-fn="rowStyleFn"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
@@ -168,5 +166,18 @@ function getRowForIndex(index: number) {
         <slot name="expansion" v-bind="expSlotProps" />
       </template>
     </OTableBodyRow>
+
+    <tr
+      v-if="virtualRows && virtualRows.length && totalSize"
+      aria-hidden="true"
+    >
+      <td
+        :style="{
+          height: `${Math.max(0, totalSize - (virtualRows[virtualRows.length - 1].start + virtualRows[virtualRows.length - 1].size))}px`,
+          padding: 0,
+          border: 0,
+        }"
+      />
+    </tr>
   </tbody>
 </template>

@@ -126,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'width: 100%; height: calc(100vh - 124px)'
                     : 'width: 100%'
                 "
+                :show-global-filter="false"
               >
                 <template #empty>
                   <NoData />
