@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
-        <OIcon name="drag-indicator" size="xs" />
+        <OIcon name="drag-indicator" size="sm" />
       </div>
     </div>
     <div

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OBadge
           data-test="traces-count-badge"
           variant="default"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
         <OBadge
           v-if="
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
         <!-- Insights Button -->
         <OButton

@@ -91,6 +91,7 @@ export default {
     OButton,
     ODropdown,
     OTooltip,
+    OIcon,
   },
   props: {
     value: {
