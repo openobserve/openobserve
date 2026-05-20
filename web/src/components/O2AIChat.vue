@@ -345,7 +345,7 @@
                 <OIcon
                   size="sm"
                   name="person"
-                  :color="store.state.theme == 'dark' ? 'white' : '#4a5568'"
+                  class='tw:text-white'
                 />
               </div>
               <div
@@ -405,14 +405,14 @@
                               : 'check-circle'
                         "
                         size="sm"
-                        :color="
+                        :class="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'primary'
-                              : 'warning'
+                              ? 'tw:text-[var(--o2-primary)]'
+                              : 'tw:text-[var(--o2-warning)]'
                             : block.success === false
-                              ? 'negative'
-                              : 'positive'
+                              ? 'tw:text-[var(--o2-negative)]'
+                              : 'tw:text-[var(--o2-positive)]'
                         "
                       />
                       <span class="tool-call-name">
@@ -433,8 +433,9 @@
                         @click.stop="
                           handleNavigationAction(block.navigationAction)
                         "
-                       />
+                      >
                         <OTooltip :content="block.navigationAction.label" />
+                      </OIcon>
                       <OIcon
                         v-if="
                           hasToolCallDetails(block) &&
@@ -1317,7 +1318,7 @@
                 <OIcon
                   name="image"
                   size="sm"
-                  :color="store.state.theme == 'dark' ? 'white' : 'grey-7'"
+                  :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
                 />
                 <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
               </OButton>
@@ -1339,14 +1340,12 @@
                       : 'radio-button-unchecked'
                   "
                   size="sm"
-                  :color="
+                  :class="[
+                    'auto-nav-icon',
                     !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark'
-                        ? 'grey-5'
-                        : 'grey-7'
-                      : undefined
-                  "
-                  class="auto-nav-icon"
+                      ? store.state.theme == 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'
+                      : ''
+                  ]"
                 />
                 <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
                 <OTooltip
@@ -1415,6 +1414,7 @@ import {
   ChatHistoryEntry,
   ToolCall,
   ContentBlock,
+  NavigationAction,
   ImageAttachment,
   MAX_IMAGE_SIZE_BYTES,
   ALLOWED_IMAGE_TYPES,

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           padding="xs"
           outline
-          icon="arrow_back_ios_new"
+          icon="arrow-back-ios-new"
           class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel')"

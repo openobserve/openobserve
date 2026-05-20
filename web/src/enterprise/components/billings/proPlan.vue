@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="tw:mr-2"
           />
-          <OIcon v-else name="" color="green" size="sm" class="tw:mr-2" />
+          <OIcon v-else name="check-circle-outline" size="sm" class="tw:mr-2 tw:text-green-500" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div
@@ -91,9 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
         <OBadge
           variant="success-soft"
-          icon="check_circle"
-          class="tw:px-3 tw:py-2"
+          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
         >
+          <OIcon name="check-circle" size="xs" />
           Managed via AWS Marketplace
         </OBadge>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
@@ -106,9 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OBadge
           variant="success-soft"
-          icon="check_circle"
-          class="tw:px-3 tw:py-2"
+          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
         >
+          <OIcon name="check-circle" size="xs" />
           Managed via Azure Marketplace
         </OBadge>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">

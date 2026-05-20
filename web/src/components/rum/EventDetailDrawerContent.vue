@@ -382,10 +382,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
                       <OIcon
-                        :name="getStatusIcon(item.resource-status-code)"
-                        :color="getStatusColor(item.resource_status_code)"
+                        :name="getStatusIcon(item.resource_status_code)"
+                        :class="['tw:mr-0.5', getStatusColorClass(item.resource_status_code)]"
                         size="xs"
-                        class="tw:mr-0.5"
                       />
                       <span>{{ item.resource_status_code }}</span>
                     </template>
@@ -442,10 +441,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:flex tw:items-center">
                   <OIcon
-                    :name="getStatusIcon(resource.resource-status-code)"
-                    :color="getStatusColor(resource.resource_status_code)"
+                    :name="getStatusIcon(resource.resource_status_code)"
+                    :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
                     size="xs"
-                    class="tw:mr-1"
                   />
                   {{ resource.resource_status_code }}
                 </div>
@@ -592,7 +590,7 @@ const {
   formatTimestamp,
   formatId,
   getStatusIcon,
-  getStatusColor,
+  getStatusColorClass,
   formatResourceDuration,
   getEventTypeClass,
 } = useEventFormatters();

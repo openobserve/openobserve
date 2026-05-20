@@ -9,7 +9,15 @@ const props = withDefaults(defineProps<IconProps>(), {
 
 defineSlots<IconSlots>();
 
-const iconComponent = computed(() => iconRegistry[props.name]);
+/** True when the icon prop uses the `img:` prefix (renders as <img>) */
+const isImgIcon = computed<boolean>(() => Boolean(props.name?.startsWith("img:")));
+
+/** The src path stripped of the `img:` prefix */
+const imgSrc = computed<string>(() =>
+  props.name?.startsWith("img:") ? props.name.slice(4) : "",
+);
+
+const iconComponent = computed(() => iconRegistry[props.name as keyof typeof iconRegistry]);
 
 // Maps semantic size tokens to Tailwind size utilities (width + height).
 // md = 24px matches the default OIcon rendering size.
@@ -32,7 +40,15 @@ const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
         : { 'aria-hidden': 'true' }
     "
   >
-    <component :is="iconComponent" class="tw:size-full" />
+    <!-- img: prefix → external image (Quasar-compat) -->
+    <img
+      v-if="isImgIcon"
+      :src="imgSrc"
+      :alt="label || ''"
+      class="tw:size-full tw:object-contain"
+    />
+    <!-- Registry icon -->
+    <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" />
     <slot />
   </span>
 </template>

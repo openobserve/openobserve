@@ -56,10 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator vertical />
             <div class="tw:flex tw:items-center">
               <OIcon
-                :name="getStatusIcon(resource.resource - status - code)"
-                :color="getStatusColor(resource.resource_status_code)"
+                :name="getStatusIcon(resource.resource_status_code)"
+                :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
                 size="sm"
-                class="tw:mr-1"
               />
               <span>{{ resource.resource_status_code || "N/A" }}</span>
             </div>
@@ -246,19 +245,19 @@ const formatSessionId = (id: string) => {
 };
 
 const getStatusIcon = (statusCode: number) => {
-  if (!statusCode) return "help";
-  if (statusCode >= 200 && statusCode < 300) return "check_circle";
+  if (!statusCode) return "help-outline";
+  if (statusCode >= 200 && statusCode < 300) return "check-circle";
   if (statusCode >= 300 && statusCode < 400) return "info";
   if (statusCode >= 400 && statusCode < 500) return "warning";
   return "error";
 };
 
-const getStatusColor = (statusCode: number) => {
-  if (!statusCode) return "grey";
-  if (statusCode >= 200 && statusCode < 300) return "positive";
-  if (statusCode >= 300 && statusCode < 400) return "info";
-  if (statusCode >= 400 && statusCode < 500) return "warning";
-  return "negative";
+const getStatusColorClass = (statusCode: number) => {
+  if (!statusCode) return "tw:text-gray-500";
+  if (statusCode >= 200 && statusCode < 300) return "tw:text-[var(--o2-positive)]";
+  if (statusCode >= 300 && statusCode < 400) return "tw:text-[var(--o2-info)]";
+  if (statusCode >= 400 && statusCode < 500) return "tw:text-[var(--o2-warning)]";
+  return "tw:text-[var(--o2-negative)]";
 };
 
 const viewSessionReplay = () => {

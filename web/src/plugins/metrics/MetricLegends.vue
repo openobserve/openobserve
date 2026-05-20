@@ -52,8 +52,8 @@ export default defineComponent({
     const metricsIconMapping: Record<string, string> = {
       Summary: "description",
       Gauge: "speed",
-      Histogram: "bar_chart",
-      Counter: "pin",
+      Histogram: "bar-chart",
+      Counter: "tag",
     };
 
     return {

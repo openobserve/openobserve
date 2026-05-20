@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OCollapsible
               v-model="unchangedOpen"
               :label="`Unchanged (${diffData.unchanged.length})`"
-              icon="check_circle"
+              icon="check-circle"
             >
               <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
                 <li

@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <!-- Assistant Response -->
                 <OCollapsible
                   v-if="record.gen_ai_output_messages"
-                  icon="smart_toy"
+                  icon="smart-toy"
                   :model-value="true"
                   :label="$t('traces.evaluations.assistantResponse')"
                 >
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 >
                   <div class="tw:flex tw:justify-between tw:items-center">
                     <div class="tw:flex tw:items-center tw:gap-2">
-                      <OIcon :name="getDimIcon(dim.dimension)" :color="getDimColor(dim.dimension)" size="sm" />
+                      <OIcon :name="getDimIcon(dim.dimension)" :class="getDimColorClass(dim.dimension)" size="sm" />
                       <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
                       <OBadge
@@ -663,20 +663,20 @@ export default defineComponent({
       llm_judge: "gavel",
       numeric_grounding: "numbers",
     };
-    const DIM_COLORS: Record<string, string> = {
-      relevance: "primary",
-      groundedness: "positive",
-      conciseness: "deep-purple",
-      instruction_following: "orange",
-      accuracy: "negative",
-      trajectory_efficiency: "info",
-      completeness: "teal",
-      safety: "red",
-      slop_filter: "grey-7",
-      technical_question_retrieval: "blue-grey",
-      tool_effectiveness: "indigo",
-      llm_judge: "brown",
-      numeric_grounding: "cyan",
+    const DIM_COLOR_CLASSES: Record<string, string> = {
+      relevance: "tw:text-[var(--o2-primary)]",
+      groundedness: "tw:text-[var(--o2-positive)]",
+      conciseness: "tw:text-purple-700",
+      instruction_following: "tw:text-orange-500",
+      accuracy: "tw:text-[var(--o2-negative)]",
+      trajectory_efficiency: "tw:text-cyan-500",
+      completeness: "tw:text-teal-500",
+      safety: "tw:text-red-500",
+      slop_filter: "tw:text-gray-600",
+      technical_question_retrieval: "tw:text-slate-500",
+      tool_effectiveness: "tw:text-indigo-500",
+      llm_judge: "tw:text-amber-700",
+      numeric_grounding: "tw:text-cyan-500",
     };
     const DIM_BAR_COLORS: Record<string, string> = {
       relevance: "#2196F3",
@@ -697,8 +697,8 @@ export default defineComponent({
 
     const formatDimLabel = (dim: string): string =>
       DIM_LABELS[dim] ?? dim.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    const getDimIcon = (dim: string): string => DIM_ICONS[dim] ?? "star_rate";
-    const getDimColor = (dim: string): string => DIM_COLORS[dim] ?? "grey";
+    const getDimIcon = (dim: string): string => DIM_ICONS[dim] ?? "star-rate";
+    const getDimColorClass = (dim: string): string => DIM_COLOR_CLASSES[dim] ?? "tw:text-gray-500";
     const getDimBarColor = (dim: string): string => DIM_BAR_COLORS[dim] ?? DIM_COLOR_CYCLE[Math.abs(dim.charCodeAt(0)) % DIM_COLOR_CYCLE.length];
 
     const parseCriticalIssues = (value: string | any[]): string[] => {
@@ -1044,7 +1044,7 @@ export default defineComponent({
       getWeakestDimension,
       formatDimLabel,
       getDimIcon,
-      getDimColor,
+      getDimColorClass,
       getDimBarColor,
       parseCriticalIssues,
       truncateContent,

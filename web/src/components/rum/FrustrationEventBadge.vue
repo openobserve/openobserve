@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variant="getBadgeVariant(type)"
       class="frustration-event-badge"
       :data-test="`frustration-event-badge-${type}`"
+      :title="getTooltipText(type)"
     >
+      {{ getBadgeLabel(type) }}
     </OBadge>
   </span>
 </template>

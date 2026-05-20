@@ -101,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
                     <OIcon
-                      :name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                      :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p50DeltaFormatted }}
                   </span>
@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
                     <OIcon
-                      :name="p95DeltaPct > 2 ? 'arrow_upward' : p95DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                      :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p95DeltaFormatted }}
                   </span>
@@ -141,8 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
                     <OIcon
-                      :name="p99DeltaPct > 2 ? 'arrow_upward' : p99DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                      :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p99DeltaFormatted }}
                   </span>

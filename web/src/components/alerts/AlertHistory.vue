@@ -94,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="loading"
               class="tw:mr-2"
             >
-              <OIcon name="search" size="sm" />
               <OTooltip :content="t('common.search') || 'Search'" />
             </OButton>
             <OButton
@@ -105,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
-              <OIcon name="refresh" size="sm" />
               <OTooltip :content="t('common.refresh') || 'Refresh'" />
             </OButton>
           </div>
@@ -165,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :color="value ? 'positive' : 'grey'"
+              :class="value ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
               size="xs"
              />
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -174,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :color="value ? 'grey' : 'positive'"
+              :class="value ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
               size="md"
              />
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -187,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-dedup="{ row }">
             <span v-if="!row.dedup_enabled" class="tw:text-gray-400">-</span>
             <div v-else-if="row.dedup_suppressed" class="tw:text-red-500">
-              <OIcon name="tw:block" size="sm" />
+              <OIcon name="block" size="sm" />
               <OTooltip>
                 <template #content>
                   Suppressed by deduplication

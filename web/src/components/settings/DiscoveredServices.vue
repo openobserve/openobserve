@@ -184,16 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
-                <OIcon
-                  :name="
-                    expandedGroupNames.has(row.service_name)
-                      ? 'expand-more'
-                      : 'chevron-right'
-                  "
-                  size="md"
-                  class="tw:text-gray-400 tw:cursor-pointer"
-                  @click.stop="toggleGroup(row.service_name)"
-                />
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
                 <span class="instance-count-badge">
                   {{ row.instances.length }}
@@ -676,7 +666,9 @@ function toggleGroup(serviceName: string) {
 }
 
 function getSubRows(row: any): any[] {
-  if (row.__type === 'group' && expandedGroupNames.value.has(row.service_name)) {
+  // Always declare children so OTable can show the single expand chevron.
+  // Visibility is controlled by OTable's internal expansion state.
+  if (row.__type === 'group' && Array.isArray(row._instances)) {
     return row._instances;
   }
   return [];
