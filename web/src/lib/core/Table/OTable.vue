@@ -376,13 +376,15 @@ defineExpose({
     >
       <table
         :class="[
-          'tw:w-full',
+          props.horizontalScroll ? 'tw:min-w-max' : 'tw:w-full',
           props.horizontalScroll || props.defaultColumns ? 'tw:table-auto' : 'tw:table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{
           ...columnSizeVars,
-          '--o2-table-row-height': props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)',
+          '--o2-table-row-height': props.rowHeight != null
+            ? `${props.rowHeight}px`
+            : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
         }"
         data-test="o2-table"
       >

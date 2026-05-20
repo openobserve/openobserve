@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
       v-model="splitterModel"
       unit="px"
-      :horizontal="true"
+      :horizontal="false"
     >
       <template #before>
         <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
@@ -103,11 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="_rowKey"
               pagination="none"
               virtual-scroll
-              dense
+              :dense="false"
+              :row-height="86"
+              :show-global-filter="false"
+              horizontal-scroll
               class="tw:h-full"
               data-test="rum-app-errors-table"
               @row-click="handleRowClick"
             >
+              <template #empty>
+                <NoData />
+              </template>
               <template #cell-error="{ row }">
                 <ErrorDetail :column="row" />
               </template>
@@ -150,6 +156,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
@@ -187,13 +194,15 @@ const tableColumns = [
     header: t("rum.error"),
     accessorKey: "error",
     sortable: true,
-    meta: { align: "left" },
+    size: 300,
+    meta: { align: "left" }
   },
   {
     id: "events",
     header: t("rum.events"),
     accessorKey: "events",
     sortable: true,
+    size: 100,
     meta: { align: "left" },
   },
   {
@@ -201,6 +210,7 @@ const tableColumns = [
     header: t("rum.viewURL"),
     accessorKey: "view_url",
     sortable: true,
+    size: 500,
     meta: { align: "left" },
   },
 ];

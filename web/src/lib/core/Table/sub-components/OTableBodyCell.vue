@@ -91,12 +91,19 @@ const displayValue = computed(() => {
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
+const horizontalScroll = inject<{ value: boolean } | null>(
+  "o2TableHorizontalScroll",
+  null,
+);
+
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
   if (!isAutoWidth.value) {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
-    base.maxWidth = sizeVar;
+    if (!horizontalScroll?.value) {
+      base.maxWidth = sizeVar;
+    }
   }
   if (isPinned.value === "left") {
     base.position = "sticky";
@@ -128,10 +135,6 @@ const highlightedHtml = computed(() => {
 
 // ── Tree mode: tw:inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
-const horizontalScroll = inject<{ value: boolean } | null>(
-  "o2TableHorizontalScroll",
-  null,
-);
 const isTreeColumn = computed(
   () =>
     !!treeCtx?.value?.enabled &&
