@@ -602,6 +602,7 @@ pub async fn merge_by_stream(
                     events.push(FileKey {
                         deleted: true,
                         segment_ids: None,
+                        row_group_size: None,
                         ..file.clone()
                     });
                 }
@@ -1331,6 +1332,7 @@ mod tests {
             },
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

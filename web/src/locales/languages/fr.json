@@ -857,7 +857,12 @@
     "groups": "Groupes",
     "customRole": "Rôles personnalisés",
     "description": "Descriptif",
-    "revoke_invite": "Révoquer l'invitation"
+    "revoke_invite": "Révoquer l'invitation",
+    "authType": "Authentification",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Autochtone",
+    "noCustomRolesHint": "Aucun rôle personnalisé n'est défini. Créez-en un dans IAM → Rôles",
+    "externalUserCustomRoleHint": "Les utilisateurs externes ne peuvent être modifiés que via le système source"
   },
   "ticket": {
     "header": "Tickets d'assistance",

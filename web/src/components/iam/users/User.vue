@@ -114,6 +114,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-th>
             </q-tr>
           </template>
+          <template #body-cell-auth_type="props">
+            <q-td :props="props">
+              <span
+                class="role-badge"
+                :class="props.row.is_external ? 'role-badge-sso' : 'role-badge-local'"
+                :data-test="`auth-type-${props.row.email}`"
+              >
+                {{ props.row.auth_type }}
+              </span>
+            </q-td>
+          </template>
+          <template #body-cell-roles="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                <span
+                  class="role-badge role-badge-system"
+                  :data-test="`role-chip-system-${props.row.email}`"
+                >
+                  {{ props.row.role }}
+                </span>
+                <template v-for="(r, i) in (props.row.custom_roles || []).slice(0, 2)" :key="r">
+                  <span
+                    class="role-badge role-badge-custom"
+                    :data-test="`role-chip-custom-${props.row.email}-${i}`"
+                  >
+                    {{ r }}
+                  </span>
+                </template>
+                <span
+                  v-if="(props.row.custom_roles || []).length > 2"
+                  class="role-badge role-badge-more"
+                  :data-test="`role-chip-more-${props.row.email}`"
+                >
+                  +{{ (props.row.custom_roles || []).length - 2 }} more
+                  <q-tooltip>
+                    <div class="tw:flex tw:flex-col tw:gap-1">
+                      <span v-for="r in (props.row.custom_roles || []).slice(2)" :key="r">{{ r }}</span>
+                    </div>
+                  </q-tooltip>
+                </span>
+                <q-spinner
+                  v-if="props.row.custom_roles_loading"
+                  size="14px"
+                  color="grey-6"
+                  :data-test="`role-loading-${props.row.email}`"
+                />
+              </div>
+            </q-td>
+          </template>
           <template #body-cell-actions="props">
             <q-td :props="props" side>
               <OButton
@@ -310,7 +359,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
-import { getRoles } from "@/services/iam";
+import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -371,6 +420,7 @@ export default defineComponent({
       await getOrgMembers();
       updateUserActions();
       await getRoles();
+      await getCustomRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
@@ -428,12 +478,20 @@ export default defineComponent({
         style: "width: 150px",
       },
       {
-        name: "role",
-        field: "role",
-        label: t("user.role"),
+        name: "auth_type",
+        field: "auth_type",
+        label: t("user.authType"),
         align: "left",
         sortable: true,
-        style: "width: 150px",
+        style: "width: 100px",
+      },
+      {
+        name: "roles",
+        field: "roles",
+        label: t("user.roles"),
+        align: "left",
+        sortable: false,
+        style: "min-width: 240px",
       },
       {
         name: "actions",
@@ -463,14 +521,24 @@ export default defineComponent({
           .finally(() => resolve(true));
       });
     };
-    const getCustomRoles = async () => {
-      await getRoles(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          customRoles.value = res.data;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+    const getCustomRoles = async (options: { silent?: boolean } = {}) => {
+      if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+      try {
+        const res = await getCustomRolesApi(
+          store.state.selectedOrganization.identifier,
+        );
+        customRoles.value = Array.isArray(res.data) ? res.data : [];
+      } catch (err: any) {
+        if (!options.silent && err?.response?.status !== 403) {
+          $q.notify({
+            color: "negative",
+            message:
+              err?.response?.data?.message ||
+              "Failed to load custom roles.",
+            timeout: 3000,
+          });
+        }
+      }
     };
 
     const getInvitedMembers = () => {
@@ -497,6 +565,71 @@ export default defineComponent({
           });
       });
     }
+
+    let hydrateGeneration = 0;
+
+    const clearLoading = (targets: any[]) => {
+      for (const u of targets) {
+        u.custom_roles_loading = false;
+      }
+    };
+
+    // Inverts OFGA per-role memberships into per-user role lists.
+    // Cost: O(R) HTTP calls where R is the number of custom roles,
+    // independent of the user count.
+    const hydrateCustomRoles = async () => {
+      const myGen = ++hydrateGeneration;
+      const orgId = store.state.selectedOrganization.identifier;
+      const targets = usersState.users.filter(
+        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
+      );
+      if (targets.length === 0) return;
+
+      const byEmail = new Map<string, any>();
+      for (const u of targets) {
+        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
+      }
+
+      try {
+        // Always fetch a fresh role list scoped to this hydration run so we
+        // don't race with concurrent picker loads mutating the shared ref.
+        // Silent mode: hydration is a background operation; surface fetch
+        // errors via the per-row loading state, not a toast.
+        let roleNames: string[] = [];
+        try {
+          const res = await getCustomRolesApi(orgId);
+          roleNames = Array.isArray(res.data) ? res.data : [];
+        } catch {
+          roleNames = [];
+        }
+        if (myGen !== hydrateGeneration) return;
+        if (roleNames.length === 0) return;
+
+        const results = await Promise.all(
+          roleNames.map((role) =>
+            getRoleUsers(role, orgId)
+              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
+              .catch(() => ({ role, emails: [] as string[] })),
+          ),
+        );
+        if (myGen !== hydrateGeneration) return;
+
+        for (const { role, emails } of results) {
+          for (const email of emails) {
+            const row = byEmail.get(String(email).toLowerCase());
+            if (!row) continue;
+            const next = Array.isArray(row.custom_roles)
+              ? row.custom_roles
+              : [];
+            if (next.indexOf(role) === -1) {
+              row.custom_roles = [...next, role];
+            }
+          }
+        }
+      } finally {
+        clearLoading(targets);
+      }
+    };
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -529,12 +662,19 @@ export default defineComponent({
                 addUser({ row: data }, true);
               }
 
+              const isPending = data?.status == "pending";
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
+                rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                role: isPending ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                prebuiltRole: toCamelCase(data.role || ""),
+                auth_type: data?.is_external ? t("user.authTypeSSO") : t("user.authTypeLocal"),
+                is_external: !!data?.is_external,
+                custom_roles: [] as string[],
+                custom_roles_loading: !isPending,
                 enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
@@ -544,8 +684,13 @@ export default defineComponent({
             });
 
             dismiss();
-
             resolve(true);
+            // Lazy-load custom roles per user in the background so the
+            // table renders immediately. Concurrency-capped to avoid
+            // saturating the browser/network with many users.
+            hydrateCustomRoles().catch((err) => {
+              console.warn("custom-role hydration failed:", err);
+            });
           })
           .catch(() => {
             dismiss();
@@ -1050,7 +1195,11 @@ export default defineComponent({
             rows[i]["first_name"]?.toLowerCase().includes(terms) ||
             rows[i]["last_name"]?.toLowerCase().includes(terms) ||
             rows[i]["email"]?.toLowerCase().includes(terms) ||
-            rows[i]["role"].toLowerCase().includes(terms)
+            rows[i]["role"].toLowerCase().includes(terms) ||
+            (rows[i]["auth_type"] || "").toLowerCase().includes(terms) ||
+            (rows[i]["custom_roles"] || []).some((r: string) =>
+              (r || "").toLowerCase().includes(terms),
+            )
           ) {
             filtered.push(rows[i]);
           }
@@ -1226,5 +1375,44 @@ export default defineComponent({
 .inputHint {
   font-size: 11px;
   color: $light-text;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: transparent;
+  white-space: nowrap;
+}
+
+.role-badge-system {
+  color: #8a6a1f;
+  border: 1px solid #8a6a1f;
+}
+
+.role-badge-custom {
+  color: #a04545;
+  border: 1px solid #a04545;
+  font-weight: 700;
+}
+
+.role-badge-more {
+  color: #a04545;
+  border: 1px solid #a04545;
+  cursor: pointer;
+}
+
+.role-badge-sso {
+  color: #1f6f8b;
+  border: 1px solid #1f6f8b;
+}
+
+.role-badge-local {
+  color: #4a4a4a;
+  border: 1px solid #4a4a4a;
 }
 </style>
