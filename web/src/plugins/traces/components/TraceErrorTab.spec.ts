@@ -16,9 +16,11 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { tempQuasarPlugin } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+tempQuasarPlugin();
 
 // ─── Toast & Quasar mocks ───────────────────────────────────────────────────
 const { mockToast } = vi.hoisted(() => ({
@@ -633,7 +635,7 @@ describe("TraceErrorTab", () => {
         );
         expect(expandedRow.text()).toContain("Stacktrace:");
         // Python-specific formatting
-        expect(expandedRow.find(".stacktrace-content").html()).toContain(
+        expect(expandedRow.find('[data-test="exception-stacktrace-container"]').html()).toContain(
           "stack-file",
         );
       });
@@ -668,7 +670,7 @@ describe("TraceErrorTab", () => {
           const expandedRow = wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
           );
-          expect(expandedRow.find(".copy-btn").exists()).toBe(false);
+          expect(expandedRow.find('[data-test="exception-copy-stacktrace-btn"]').exists()).toBe(false);
         });
       });
     });
@@ -687,7 +689,7 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         expect(copyBtn.exists()).toBe(true);
 
         await copyBtn.trigger("click");
@@ -702,7 +704,7 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         await copyBtn.trigger("click");
         await flushPromises();
 

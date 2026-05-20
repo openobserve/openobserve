@@ -262,7 +262,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="tw:w-8 tw:min-w-8 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-4 tw:min-w-4 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
 
@@ -395,7 +395,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     <tr v-if="!enableColumnReorder">
       <th
         v-if="expansionEnabled"
-        class="tw:w-8 tw:min-w-8 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-4 tw:min-w-4 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
       <th

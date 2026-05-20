@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
       >
-        <OIcon name="cancel" size="xs" />
+        <OIcon name="close" size="xs" />
       </OButton>
     </div>
     <div
@@ -2088,7 +2088,6 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
-    table-layout: fixed;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
     border-radius: 0.5rem;
@@ -2101,12 +2100,27 @@ export default defineComponent({
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 4px !important;
+    padding: 8px !important;
     font-size: 13px;
     word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    min-height: 24px;
+    height: auto;
     max-width: 600px;
+  }
+
+  /* Add proper column sizing */
+  th:first-child,
+  td:first-child {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: auto;
+    min-width: 100px;
   }
   td span {
     display: inline-block;
@@ -2142,6 +2156,7 @@ export default defineComponent({
     border-bottom-right-radius: 0.5rem;
   }
 }
+
 
 .trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);

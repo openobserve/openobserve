@@ -191,6 +191,7 @@ size="xs"
 
             <!-- Expand button (embedded mode) -->
             <OButton
+              v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
               variant="outline"
               size="icon-xs"
