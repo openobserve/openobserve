@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-[0.125rem] tw:leading-tight tw:min-w-0 tw:py-[0.125rem]">
+  <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2 tw:leading-tight tw:min-w-0 tw:h-full">
     <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
       <span :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`" />
       <div class="tw:text-[0.6875rem] tw:truncate">{{ column.country }}</div>

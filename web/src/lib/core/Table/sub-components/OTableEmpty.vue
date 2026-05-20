@@ -17,7 +17,7 @@ defineSlots<{
 <template>
   <div
     data-test="o2-table-empty"
-    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-8 tw:text-center"
+    class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:py-8 tw:text-center tw:min-h-[300px]"
   >
     <slot>
       <div class="tw:text-text-secondary tw:text-sm">
