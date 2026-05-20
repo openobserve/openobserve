@@ -56,18 +56,18 @@ const pageSizeSelectOptions = computed(() =>
     <!-- Left: bulk actions slot or row count -->
     <div class="tw:flex tw:items-center tw:gap-2">
       <slot name="actions" />
-      <span v-if="!slots.actions" class="tw:text-text-primary tw:text-xs" style="font-weight: 700;">
+      <span v-if="!slots.actions" class="tw:text-primary tw:text-xs" style="font-weight: 700;">
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>
     </div>
 
     <!-- Right: controls -->
     <div class="tw:flex tw:items-center tw:gap-3">
-      <span class="tw:text-text-primary tw:text-xs">
+      <span class="tw:text-primary tw:text-xs">
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
       </span>
       <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" v-if="pageSizeOptions.length > 0" />
-      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-primary tw:text-xs">
+      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-primary tw:text-xs">
         <span class="tw:whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
