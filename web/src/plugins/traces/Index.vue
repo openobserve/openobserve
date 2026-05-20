@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
-            ? 'tw:max-h-[3.54rem]!'
+            ? 'tw:max-h-[3.125rem]!'
             : ''
         "
         @update:model-value="onSplitterUpdate"
