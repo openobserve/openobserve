@@ -327,14 +327,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div
             v-if="loading"
-            class="tw:w-full column flex-center tw:mt-1"
+            class="tw:w-full tw:flex tw:flex-col flex-center tw:mt-1"
             style="font-size: 1.5rem"
           >
             <OSpinner size="lg" class="tw:mt-[20vh]" />
           </div>
           <div
             v-else
-            class="tw:w-full column flex-center"
+            class="tw:w-full tw:flex tw:flex-col flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
             <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />

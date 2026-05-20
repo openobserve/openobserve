@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="tw:w-full column flex-center tw:p-6">
+          <div class="tw:w-full tw:flex tw:flex-col flex-center tw:p-6">
             <OIcon name="search-off" style="width: 50px; height: 50px;" />
             <div class="tw:mt-3" style="color: var(--o2-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
