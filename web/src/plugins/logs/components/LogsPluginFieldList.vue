@@ -22,12 +22,13 @@
         :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
         @click="$emit('toggle-group', row.group)"
       >
-        <div class="tw:flex-1 tw:min-w-0">
-          {{ groupName }} ({{
+        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
+          <span>{{ groupName }}</span>
+          <OBadge variant="default">{{
             (showOnlyInterestingFields
               ? interestingExpandedGroupRowsFieldCount[row.group]
               : expandGroupRowsFieldCount[row.group]) ?? 0
-          }})
+          }}</OBadge>
         </div>
         <OButton
           v-if="(expandGroupRowsFieldCount[row.group] ?? 0) > 0"
