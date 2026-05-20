@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PerformanceMetrics from "./PerformanceMetrics.vue";
 
-installQuasar();
 
 vi.mock("./performance/ViewPerformanceMetrics.vue", () => ({
   default: {

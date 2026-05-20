@@ -281,10 +281,11 @@ describe("ApiDashboard", () => {
     });
 
     it("should show loading spinner when isLoading has items", async () => {
-      wrapper.vm.isLoading = [true];
+      wrapper.vm.isLoading.push(true);
       await wrapper.vm.$nextTick();
 
-      const loadingDiv = wrapper.find(".q-pb-lg.flex.items-center");
+      // Loading div uses Tailwind classes in the component
+      const loadingDiv = wrapper.find('[class*="tw:pb-4"]');
       expect(loadingDiv.exists()).toBe(true);
     });
 

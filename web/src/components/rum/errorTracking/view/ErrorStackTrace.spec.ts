@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 describe("ErrorStackTrace Component", () => {
   let wrapper: any;
@@ -78,17 +71,17 @@ describe("ErrorStackTrace Component", () => {
     });
 
     it("should render main container with correct classes", () => {
-      const container = wrapper.find(".row");
+      const container = wrapper.find(".tw\\:flex.tw\\:mt-4");
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("row");
-      expect(container.classes()).toContain("q-mt-lg");
-      expect(container.classes()).toContain("q-ml-xs");
+      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("tw:mt-4");
+      expect(container.classes()).toContain("tw:ml-1");
     });
 
     it("should render column container", () => {
-      const column = wrapper.find(".col-12");
+      const column = wrapper.find(".tw\\:w-full");
       expect(column.exists()).toBe(true);
-      expect(column.classes()).toContain("col-12");
+      expect(column.classes()).toContain("tw:w-full");
     });
   });
 
@@ -102,14 +95,14 @@ describe("ErrorStackTrace Component", () => {
     it("should have correct title styling", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-xs");
+      expect(title.classes()).toContain("tw:font-bold");
+      expect(title.classes()).toContain("tw:mb-1");
     });
   });
 
   describe("First Stack Line Display", () => {
     it("should display the first stack line separately", () => {
-      const firstLine = wrapper.find(".q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
       expect(firstLine.exists()).toBe(true);
       expect(firstLine.text()).toBe(
         "TypeError: Cannot read property 'foo' of undefined",
@@ -117,8 +110,8 @@ describe("ErrorStackTrace Component", () => {
     });
 
     it("should have correct first line styling", () => {
-      const firstLine = wrapper.find(".q-mb-sm");
-      expect(firstLine.classes()).toContain("q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
+      expect(firstLine.classes()).toContain("tw:mb-2");
     });
   });
 
@@ -147,7 +140,7 @@ describe("ErrorStackTrace Component", () => {
 
       stackLines.forEach((line) => {
         expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("q-px-sm");
+        expect(line.classes()).toContain("tw:px-2");
       });
     });
   });
@@ -237,7 +230,7 @@ describe("ErrorStackTrace Component", () => {
         error_stack: [],
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
       const stackLines = wrapper.findAll(".error_stack");
 
       expect(firstLine.text()).toBe("");
@@ -249,7 +242,7 @@ describe("ErrorStackTrace Component", () => {
         error_stack: ["Single error line"],
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
       const stackLines = wrapper.findAll(".error_stack");
 
       expect(firstLine.text()).toBe("Single error line");
@@ -323,7 +316,7 @@ describe("ErrorStackTrace Component", () => {
         error_stack: specialStack,
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
       const stackLines = wrapper.findAll(".error_stack");
 
       expect(firstLine.text()).toBe("Error: Special chars <>&\"'");
@@ -333,9 +326,9 @@ describe("ErrorStackTrace Component", () => {
 
   describe("Component Structure", () => {
     it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".row .col-12");
+      const container = wrapper.find(".tw\\:w-full");
       const title = container.find(".tags-title");
-      const firstLine = container.find(".q-mb-sm");
+      const firstLine = container.find(".tw\\:mb-2");
       const stackContainer = container.find(".error-stacks");
 
       expect(container.exists()).toBe(true);
@@ -361,19 +354,19 @@ describe("ErrorStackTrace Component", () => {
 
       stackLines.forEach((line) => {
         expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("q-px-sm");
+        expect(line.classes()).toContain("tw:px-2");
       });
     });
 
     it("should apply correct CSS classes to containers", () => {
-      const mainContainer = wrapper.find(".row");
-      const colContainer = wrapper.find(".col-12");
+      const mainContainer = wrapper.find(".tw\\:flex.tw\\:mt-4");
+      const colContainer = wrapper.find(".tw\\:w-full");
       const stackContainer = wrapper.find(".error-stacks");
 
       expect(mainContainer.classes()).toEqual(
-        expect.arrayContaining(["row", "q-mt-lg", "q-ml-xs"]),
+        expect.arrayContaining(["tw:flex", "tw:mt-4", "tw:ml-1"]),
       );
-      expect(colContainer.classes()).toContain("col-12");
+      expect(colContainer.classes()).toContain("tw:w-full");
       expect(stackContainer.classes()).toContain("error-stacks");
     });
   });
@@ -388,7 +381,7 @@ describe("ErrorStackTrace Component", () => {
         error: newError,
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
+      const firstLine = wrapper.find(".tw\\:mb-2");
       expect(firstLine.text()).toBe("New error");
 
       expect(wrapper.props("error_stack")).toEqual(newStack);

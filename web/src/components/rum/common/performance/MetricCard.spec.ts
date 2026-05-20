@@ -15,10 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricCard from "@/components/rum/common/performance/MetricCard.vue";
 
-installQuasar();
 
 describe("MetricCard", () => {
   describe("Component rendering", () => {
@@ -42,6 +40,15 @@ describe("MetricCard", () => {
           value: 100,
           icon: "speed",
         },
+        global: {
+          stubs: {
+            OIcon: {
+              template: '<span class="OIcon" aria-hidden="true"></span>',
+              props: ["name", "size", "color"],
+            },
+            OProgressBar: { template: '<div />', props: ["value", "variant", "size"] },
+          },
+        },
       });
 
       const icon = wrapper.find('.OIcon[aria-hidden="true"]');
@@ -53,6 +60,15 @@ describe("MetricCard", () => {
         props: {
           label: "Test Metric",
           value: 100,
+        },
+        global: {
+          stubs: {
+            OIcon: {
+              template: '<span class="OIcon" aria-hidden="true"></span>',
+              props: ["name", "size", "color"],
+            },
+            OProgressBar: { template: '<div />', props: ["value", "variant", "size"] },
+          },
         },
       });
 
@@ -143,6 +159,15 @@ describe("MetricCard", () => {
           unit: "ns",
           status: "good",
         },
+        global: {
+          stubs: {
+            OIcon: {
+              template: '<span class="OIcon" aria-hidden="true"></span>',
+              props: ["name", "size", "color"],
+            },
+            OProgressBar: { template: '<div />', props: ["value", "variant", "size"] },
+          },
+        },
       });
 
       // Check for green background class on wrapper
@@ -162,6 +187,15 @@ describe("MetricCard", () => {
           unit: "ns",
           status: "needs-improvement",
         },
+        global: {
+          stubs: {
+            OIcon: {
+              template: '<span class="OIcon" aria-hidden="true"></span>',
+              props: ["name", "size", "color"],
+            },
+            OProgressBar: { template: '<div />', props: ["value", "variant", "size"] },
+          },
+        },
       });
 
       // Check for yellow background class on wrapper
@@ -180,6 +214,15 @@ describe("MetricCard", () => {
           value: 5000000000,
           unit: "ns",
           status: "poor",
+        },
+        global: {
+          stubs: {
+            OIcon: {
+              template: '<span class="OIcon" aria-hidden="true"></span>',
+              props: ["name", "size", "color"],
+            },
+            OProgressBar: { template: '<div />', props: ["value", "variant", "size"] },
+          },
         },
       });
 

@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import i18n from "@/locales";
 
@@ -24,15 +22,9 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
-
 // Mock functions - using vi.hoisted to make them available in vi.mock
-const { mockRouterBack, mockNotify, mockCopyToClipboard } = vi.hoisted(() => ({
+const { mockRouterBack, mockCopyToClipboard } = vi.hoisted(() => ({
   mockRouterBack: vi.fn(),
-  mockNotify: vi.fn(),
   mockCopyToClipboard: vi.fn(),
 }));
 
@@ -43,16 +35,10 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-    copyToClipboard: mockCopyToClipboard,
-  };
-});
+// Mock clipboard utility used by the component
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
 
 describe("ErrorHeader Component", () => {
   let wrapper: any;
@@ -112,13 +98,14 @@ describe("ErrorHeader Component", () => {
 
   describe("Back Button", () => {
     it("should render back button with correct styling", () => {
+      // Component uses Tailwind classes (tw: prefix) not Quasar classes
       const backButton = wrapper.find("[data-test='back-button']");
       expect(backButton.exists()).toBe(true);
-      expect(backButton.classes()).toContain("flex");
-      expect(backButton.classes()).toContain("justify-center");
-      expect(backButton.classes()).toContain("items-center");
-      expect(backButton.classes()).toContain("q-mr-md");
-      expect(backButton.classes()).toContain("cursor-pointer");
+      expect(backButton.classes()).toContain("tw:flex");
+      expect(backButton.classes()).toContain("tw:justify-center");
+      expect(backButton.classes()).toContain("tw:items-center");
+      expect(backButton.classes()).toContain("tw:mr-3");
+      expect(backButton.classes()).toContain("tw:cursor-pointer");
     });
 
     it("should have correct styling attributes", () => {
@@ -136,7 +123,8 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should render back arrow icon", () => {
-      const backIcon = wrapper.find('[data-test="OIcon"].arrow_back_ios_new');
+      // OIcon stub uses :class="name" — component uses name="arrow-back-ios-new" (kebab-case)
+      const backIcon = wrapper.find('[data-test="OIcon"].arrow-back-ios-new');
       expect(backIcon.exists()).toBe(true);
     });
 
@@ -150,7 +138,8 @@ describe("ErrorHeader Component", () => {
 
   describe("Error ID Display", () => {
     it("should display 'Event ID:' label", () => {
-      const label = wrapper.find(".text-bold");
+      // Component uses tw:font-bold (Tailwind) not text-bold (Quasar)
+      const label = wrapper.find(".tw\\:font-bold");
       expect(label.exists()).toBe(true);
       expect(label.text()).toBe("Event ID:");
     });
@@ -162,39 +151,40 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should have correct error ID classes", () => {
+      // Component uses tw:pl-1 and tw:cursor-pointer (Tailwind) not Quasar classes
       const errorIdElement = wrapper.find("[data-test='error-id']");
-      expect(errorIdElement.classes()).toContain("q-pl-xs");
-      expect(errorIdElement.classes()).toContain("cursor-pointer");
+      expect(errorIdElement.classes()).toContain("tw:pl-1");
+      expect(errorIdElement.classes()).toContain("tw:cursor-pointer");
     });
 
     it("should render copy icon for error ID", () => {
-      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
+      // OIcon stub uses :class="name" — component uses name="content-copy" (kebab-case)
+      const copyIcon = wrapper.find('[data-test="OIcon"].content-copy');
       expect(copyIcon.exists()).toBe(true);
     });
 
     it("should copy error ID when copy icon is clicked", async () => {
-      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content-copy');
       await copyIcon.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("error-abc123");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Copied to clipboard",
-        timeout: 1500,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "error-abc123",
+        expect.objectContaining({ successMessage: "Copied to clipboard" }),
+      );
     });
   });
 
   describe("Timestamp Display", () => {
     it("should display timestamp", () => {
-      const timestamp = wrapper.find(".q-ml-lg");
+      // Component uses tw:ml-4 (Tailwind) not q-ml-lg (Quasar)
+      const timestamp = wrapper.find(".tw\\:ml-4");
       expect(timestamp.exists()).toBe(true);
       expect(timestamp.text()).toBe("2024-01-01 10:00:00 UTC");
     });
 
     it("should have correct timestamp styling", () => {
-      const timestamp = wrapper.find(".q-ml-lg");
-      expect(timestamp.classes()).toContain("q-ml-lg");
+      const timestamp = wrapper.find(".tw\\:ml-4");
+      expect(timestamp.classes()).toContain("tw:ml-4");
     });
   });
 
@@ -206,13 +196,15 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should have correct error type styling", () => {
+      // Component uses tw:font-bold (Tailwind) not text-bold (Quasar)
       const errorType = wrapper.find(".error_type");
       expect(errorType.classes()).toContain("error_type");
-      expect(errorType.classes()).toContain("text-bold");
+      expect(errorType.classes()).toContain("tw:font-bold");
     });
 
     it("should be in correct container", () => {
-      const container = wrapper.find(".row.items-center.no-wrap.q-my-xs");
+      // Component uses tw:flex tw:items-center tw:flex-nowrap tw:my-1 (Tailwind) not Quasar classes
+      const container = wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap.tw\\:my-1");
       expect(container.exists()).toBe(true);
 
       const errorType = container.find(".error_type");
@@ -232,9 +224,9 @@ describe("ErrorHeader Component", () => {
     it("should have correct error message styling", () => {
       const errorMessage = wrapper.find(".error_message");
       expect(errorMessage.classes()).toContain("error_message");
-      expect(errorMessage.classes()).toContain("q-pt-xs");
-      expect(errorMessage.classes()).toContain("row");
-      expect(errorMessage.classes()).toContain("items-center");
+      expect(errorMessage.classes()).toContain("tw:pt-1");
+      expect(errorMessage.classes()).toContain("tw:flex");
+      expect(errorMessage.classes()).toContain("tw:items-center");
     });
   });
 
@@ -249,8 +241,8 @@ describe("ErrorHeader Component", () => {
       const unhandledBadge = wrapper.find(".unhandled_error");
       expect(unhandledBadge.classes()).toContain("unhandled_error");
       expect(unhandledBadge.classes()).toContain("text-red-6");
-      expect(unhandledBadge.classes()).toContain("q-px-xs");
-      expect(unhandledBadge.classes()).toContain("q-mr-sm");
+      expect(unhandledBadge.classes()).toContain("tw:px-1");
+      expect(unhandledBadge.classes()).toContain("tw:mr-2");
     });
 
     it("should not display badge for handled errors", async () => {
@@ -280,27 +272,26 @@ describe("ErrorHeader Component", () => {
 
   describe("Layout Structure", () => {
     it("should have correct header layout", () => {
-      const headerSection = wrapper.find(".q-pt-sm.q-pb-xs.flex.justify-start");
+      const headerSection = wrapper.find(".tw\\:pt-2.tw\\:pb-1.tw\\:flex.tw\\:justify-start");
       expect(headerSection.exists()).toBe(true);
     });
 
     it("should have correct flex layout classes", () => {
-      const headerSection = wrapper.find(".flex.justify-start");
-      expect(headerSection.classes()).toContain("flex");
-      expect(headerSection.classes()).toContain("justify-start");
-      expect(headerSection.classes()).toContain("q-pt-sm");
-      expect(headerSection.classes()).toContain("q-pb-xs");
+      const headerSection = wrapper.find(".tw\\:flex.tw\\:justify-start");
+      expect(headerSection.classes()).toContain("tw:flex");
+      expect(headerSection.classes()).toContain("tw:justify-start");
+      expect(headerSection.classes()).toContain("tw:pt-2");
+      expect(headerSection.classes()).toContain("tw:pb-1");
     });
 
     it("should maintain proper element spacing", () => {
       const backButton = wrapper.find("[data-test='back-button']");
-      const label = wrapper.find(".text-bold");
       const errorId = wrapper.find("span[title]");
-      const timestamp = wrapper.find(".q-ml-lg");
+      const timestamp = wrapper.find(".tw\\:ml-4");
 
-      expect(backButton.classes()).toContain("q-mr-md");
-      expect(errorId.classes()).toContain("q-pl-xs");
-      expect(timestamp.classes()).toContain("q-ml-lg");
+      expect(backButton.classes()).toContain("tw:mr-3");
+      expect(errorId.classes()).toContain("tw:pl-1");
+      expect(timestamp.classes()).toContain("tw:ml-4");
     });
   });
 
@@ -323,7 +314,7 @@ describe("ErrorHeader Component", () => {
       expect(wrapper.find(".error_message").text()).toContain(
         "Variable is not defined",
       );
-      expect(wrapper.find(".q-ml-lg").text()).toBe("2024-02-01 15:30:00 UTC");
+      expect(wrapper.find(".tw\\:ml-4").text()).toBe("2024-02-01 15:30:00 UTC");
     });
   });
 
@@ -333,12 +324,13 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should call copyErrorId with correct ID", async () => {
-      const copyErrorIdSpy = vi.spyOn(wrapper.vm, "copyErrorId");
-
-      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content-copy');
       await copyIcon.trigger("click");
 
-      expect(copyErrorIdSpy).toHaveBeenCalledWith("error-abc123");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "error-abc123",
+        expect.objectContaining({ successMessage: "Copied to clipboard" }),
+      );
     });
 
     it("should handle copy operation for different error IDs", async () => {
@@ -349,10 +341,13 @@ describe("ErrorHeader Component", () => {
         },
       });
 
-      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content-copy');
       await copyIcon.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("different-error-id");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "different-error-id",
+        expect.objectContaining({ successMessage: "Copied to clipboard" }),
+      );
     });
   });
 
@@ -383,7 +378,7 @@ describe("ErrorHeader Component", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find(".error_type").text()).toBe("");
-      expect(wrapper.find(".q-ml-lg").text()).toBe("");
+      expect(wrapper.find(".tw\\:ml-4").text()).toBe("");
     });
 
     it("should handle undefined error properties", async () => {
@@ -403,9 +398,9 @@ describe("ErrorHeader Component", () => {
 
   describe("Responsive Design", () => {
     it("should have responsive flex layout", () => {
-      const headerSection = wrapper.find(".flex.justify-start");
-      expect(headerSection.classes()).toContain("flex");
-      expect(headerSection.classes()).toContain("justify-start");
+      const headerSection = wrapper.find(".tw\\:flex.tw\\:justify-start");
+      expect(headerSection.classes()).toContain("tw:flex");
+      expect(headerSection.classes()).toContain("tw:justify-start");
     });
 
     it("should handle long error IDs gracefully", async () => {
@@ -462,7 +457,7 @@ describe("ErrorHeader Component", () => {
       for (const error of errors) {
         await wrapper.setProps({ error });
         expect(wrapper.find(".error_type").text()).toBe(error.type);
-        expect(wrapper.find(".q-ml-lg").text()).toBe(error.timestamp);
+        expect(wrapper.find(".tw\\:ml-4").text()).toBe(error.timestamp);
       }
     });
   });

@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock AppTabs component
 vi.mock("@/components/common/AppTabs.vue", () => ({
@@ -97,7 +90,7 @@ describe("PlayerEventsSidebar Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-input": {
+          OInput: {
             template: `
               <div data-test="q-input">
                 <input v-model="modelValue" @input="$emit('update:model-value', $event.target.value)" />
@@ -115,14 +108,15 @@ describe("PlayerEventsSidebar Component", () => {
             ],
             emits: ["update:model-value"],
           },
-          "q-select": {
+          OSelect: {
             template: `
-              <div data-test="q-select">
+              <div data-test="q-select" v-bind="$attrs">
                 <select v-model="modelValue" @change="$emit('update:model-value', Array.from($event.target.selectedOptions, option => option.value))">
                   <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
                 </select>
               </div>
             `,
+            inheritAttrs: false,
             props: [
               "modelValue",
               "options",
@@ -133,13 +127,15 @@ describe("PlayerEventsSidebar Component", () => {
               "dense",
               "emit-value",
               "size",
+              "labelKey",
+              "valueKey",
             ],
             emits: ["update:model-value"],
           },
-          "q-separator": {
+          OSeparator: {
             template: '<hr data-test="separator" />',
           },
-          "OIcon": {
+          OIcon: {
             template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
           },
@@ -247,7 +243,7 @@ describe("PlayerEventsSidebar Component", () => {
       const locationSection = wrapper.find(".event-metadata");
       expect(locationSection.text()).toContain("New York, USA");
       const locationIcon = locationSection.find(
-        '[data-test="OIcon"].location_on',
+        '[data-test="OIcon"]',
       );
       expect(locationIcon.exists()).toBe(true);
     });
@@ -271,7 +267,7 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should display breadcrumbs content when breadcrumbs tab is active", () => {
-      const searchSection = wrapper.find(".flex.items-center.justify-between");
+      const searchSection = wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:justify-between");
       expect(searchSection.exists()).toBe(true);
     });
 
@@ -338,7 +334,7 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should have correct event title attribute", () => {
       const firstEventName = wrapper.find(
-        ".event-container .inline:last-child",
+        '[data-test="event-name"]',
       );
       expect(firstEventName.attributes("title")).toBe(
         "TypeError: Cannot read property 'foo'",
@@ -507,7 +503,7 @@ describe("PlayerEventsSidebar Component", () => {
       await wrapper.vm.$nextTick();
 
       const controlsSection = wrapper.find(
-        ".flex.items-center.justify-between",
+        ".tw\\:flex.tw\\:items-center.tw\\:justify-between",
       );
       const eventsList = wrapper.find(".events-list");
 
@@ -534,20 +530,22 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should apply correct classes to event containers", () => {
       const eventContainer = wrapper.find(".event-container");
-      expect(eventContainer.classes()).toContain("cursor-pointer");
-      expect(eventContainer.classes()).toContain("rounded-borders");
-      expect(eventContainer.classes()).toContain("q-mt-xs");
-      expect(eventContainer.classes()).toContain("q-px-sm");
-      expect(eventContainer.classes()).toContain("q-py-sm");
+      // Component uses tw: prefixed Tailwind classes
+      expect(eventContainer.classes()).toContain("tw:cursor-pointer");
+      expect(eventContainer.classes()).toContain("tw:rounded");
+      expect(eventContainer.classes()).toContain("tw:mt-1");
+      expect(eventContainer.classes()).toContain("tw:px-2");
+      expect(eventContainer.classes()).toContain("tw:py-2");
     });
 
-    it("should apply ellipsis class to event content", () => {
-      const eventContent = wrapper.find(".event-container .ellipsis");
+    it("should apply truncate class to event content", () => {
+      // Component uses tw:truncate instead of ellipsis
+      const eventContent = wrapper.find(".event-container .tw\\:truncate");
       expect(eventContent.exists()).toBe(true);
     });
 
     it("should apply inline class to event elements", () => {
-      const inlineElements = wrapper.findAll(".event-container .inline");
+      const inlineElements = wrapper.findAll(".event-container .tw\\:inline");
       expect(inlineElements.length).toBeGreaterThan(0);
     });
   });
@@ -561,12 +559,12 @@ describe("PlayerEventsSidebar Component", () => {
     it("should have cursor pointer on clickable events", () => {
       const eventContainers = wrapper.findAll(".event-container");
       eventContainers.forEach((container) => {
-        expect(container.classes()).toContain("cursor-pointer");
+        expect(container.classes()).toContain("tw:cursor-pointer");
       });
     });
 
     it("should provide title attributes for event names", () => {
-      const eventNames = wrapper.findAll(".event-container .inline:last-child");
+      const eventNames = wrapper.findAll('[data-test="event-name"]');
       eventNames.forEach((name, index) => {
         expect(name.attributes("title")).toBe(mockEvents[index].name);
       });
@@ -583,7 +581,7 @@ describe("PlayerEventsSidebar Component", () => {
 
       await wrapper.setProps({ events: [longEvent] });
 
-      const eventName = wrapper.find(".event-container .inline:last-child");
+      const eventName = wrapper.find('[data-test="event-name"]');
       expect(eventName.attributes("title")).toBe(longEvent.name);
     });
   });

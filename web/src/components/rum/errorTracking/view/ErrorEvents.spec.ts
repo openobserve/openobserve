@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock OTable component
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
@@ -75,21 +68,10 @@ vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
   },
 }));
 
-// Mock date formatting
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    date: {
-      formatDate: vi.fn((timestamp, format) => {
-        if (format === "MMM DD, YYYY HH:mm:ss Z") {
-          return "Jan 01, 2024 10:00:00 +0000";
-        }
-        return "Jan 01, 2024 10:00:00 +0000";
-      }),
-    },
-  };
-});
+// Mock date formatting - component uses @/utils/date not quasar
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn((_timestamp, _format) => "Jan 01, 2024 10:00:00 +0000"),
+}));
 
 describe("ErrorEvents Component", () => {
   let wrapper: any;
@@ -155,9 +137,9 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
+      // Component uses tw:mt-4 (Tailwind) not q-mt-lg (Quasar)
+      const container = wrapper.find('[class*="tw:mt-4"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
     });
 
     it("should render OTable component", () => {
@@ -174,11 +156,10 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should have correct title styling", () => {
+      // Component uses tw:font-bold tw:mb-2 tw:ml-1 (Tailwind) not Quasar classes
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
+      expect(title.classes()).toContain("tw:font-bold");
     });
   });
 
@@ -486,17 +467,17 @@ describe("ErrorEvents Component", () => {
 
   describe("Component Structure", () => {
     it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const title = container.find(".tags-title");
-      const oTable = container.findComponent({ name: "OTable" });
+      // Component uses tw:mt-4 (Tailwind) not q-mt-lg (Quasar)
+      const title = wrapper.find(".tags-title");
+      const oTable = wrapper.findComponent({ name: "OTable" });
 
-      expect(container.exists()).toBe(true);
       expect(title.exists()).toBe(true);
       expect(oTable.exists()).toBe(true);
     });
 
     it("should maintain correct order of elements", () => {
-      const container = wrapper.find(".q-mt-lg");
+      // Component uses tw:mt-4 (Tailwind) not q-mt-lg (Quasar)
+      const container = wrapper.find('[class*="tw:mt-4"]');
       const children = Array.from(container.element.children);
 
       expect(children[0].classList.contains("tags-title")).toBe(true);

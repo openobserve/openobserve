@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ErrorPerformanceMetrics from "./ErrorPerformanceMetrics.vue";
 
-installQuasar();
 
 function createMetrics(errorOverrides: Record<string, any> = {}, viewOverrides: Record<string, any> = {}) {
   return {

@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FrustrationBadge from './FrustrationBadge.vue';
 
-installQuasar();
 
 describe('FrustrationBadge.vue', () => {
   let wrapper: VueWrapper;
@@ -145,21 +143,12 @@ describe('FrustrationBadge.vue', () => {
       expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
     });
 
-    it('should have tooltip data-test attribute', async () => {
+    it('should have tooltip title attribute on badge', () => {
       wrapper = createWrapper(5);
       const badge = wrapper.find('[data-test="frustration-badge-medium"]');
-
-      // Trigger mouseenter to show tooltip
-      await badge.trigger('mouseenter');
-
-      // Wait a bit for Quasar to render the tooltip
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Tooltip is rendered at document level by Quasar, not in wrapper
-      const tooltip = document.querySelector(
-        '[data-test="frustration-badge-tooltip"]',
-      );
-      expect(tooltip).not.toBeNull();
+      // Tooltip is provided via title attribute
+      expect(badge.attributes('title')).toBeDefined();
+      expect(badge.attributes('title')).toContain('frustration signals');
     });
   });
 

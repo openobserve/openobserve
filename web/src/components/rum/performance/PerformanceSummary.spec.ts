@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import PerformanceSummary from './PerformanceSummary.vue';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
@@ -71,7 +70,6 @@ vi.mock('@/views/Dashboards/RenderDashboardCharts.vue', () => ({
   },
 }));
 
-installQuasar();
 
 const mockStore = createStore({
   state: {

@@ -23,8 +23,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -50,10 +48,7 @@ vi.mock("vue", async (importOriginal) => {
 
 import SearchBar from "@/components/rum/SearchBar.vue";
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [],
-});
+// Quasar removed - no installQuasar needed
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
@@ -160,17 +155,11 @@ vi.doMock("@/composables/useTraces", () => ({
   }),
 }));
 
-// Mock Quasar notify
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock toast notification - use vi.hoisted so it's available in the factory
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 // Mock components
 vi.mock("@/components/DateTime.vue", () => ({
@@ -220,7 +209,7 @@ describe("SearchBar Component", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
+    mockToast.mockClear();
 
     wrapper = mount(SearchBar, {
       props: {
@@ -413,12 +402,11 @@ describe("SearchBar Component", () => {
 
       await wrapper.vm.updateQueryValue("SELECT * FROM nonexistent_stream");
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: "Stream not found",
-        color: "negative",
-        position: "top",
-        timeout: 2000,
-      });
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Stream not found",
+        })
+      );
     });
 
     it("should update query via updateQuery method", async () => {

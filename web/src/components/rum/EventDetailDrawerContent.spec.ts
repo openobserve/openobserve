@@ -15,17 +15,11 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import EventDetailDrawerContent from "@/components/rum/EventDetailDrawerContent.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
-
-installQuasar({
-  plugins: [quasar.],
-});
 
 // ============================================================================
 // TEST DATA FACTORIES

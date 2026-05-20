@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ResourcePerformanceMetrics from "./ResourcePerformanceMetrics.vue";
 
-installQuasar();
 
 function createMetrics(overrides: Record<string, any> = {}) {
   return {

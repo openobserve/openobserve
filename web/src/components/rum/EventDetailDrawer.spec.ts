@@ -15,11 +15,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import EventDetailDrawer from "./EventDetailDrawer.vue";
 
-installQuasar();
 
 vi.mock("./EventDetailDrawerContent.vue", () => ({
   default: {

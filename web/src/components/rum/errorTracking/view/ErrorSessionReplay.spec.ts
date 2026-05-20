@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock ErrorTag component
 vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
@@ -67,7 +60,7 @@ describe("ErrorSessionReplay Component", () => {
         plugins: [i18n],
         stubs: {
           "OIcon": {
-            template: '<i data-test="OIcon" :class="name"></i>',
+            template: '<span data-test="OIcon" :class="name"><svg class="icon-svg"></svg></span>',
             props: ["name", "size"],
           },
         },
@@ -93,9 +86,9 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
+      const container = wrapper.find(".tw\\:mt-4");
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
+      expect(container.classes()).toContain("tw:mt-4");
     });
   });
 
@@ -109,9 +102,9 @@ describe("ErrorSessionReplay Component", () => {
     it("should have correct title styling", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
+      expect(title.classes()).toContain("tw:font-bold");
+      expect(title.classes()).toContain("tw:mb-2");
+      expect(title.classes()).toContain("tw:ml-1");
     });
   });
 
@@ -138,9 +131,9 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should render tags in row container", () => {
-      const tagsContainer = wrapper.find(".row");
+      const tagsContainer = wrapper.find(".tw\\:flex");
       expect(tagsContainer.exists()).toBe(true);
-      expect(tagsContainer.classes()).toContain("row");
+      expect(tagsContainer.classes()).toContain("tw:flex");
     });
   });
 
@@ -288,9 +281,9 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Component Structure", () => {
     it("should have proper layout hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
+      const container = wrapper.find(".tw\\:mt-4");
       const title = container.find(".tags-title");
-      const tagsRow = container.find(".row");
+      const tagsRow = container.find(".tw\\:flex");
       const playButton = container.findComponent({ name: "OButton" });
 
       expect(container.exists()).toBe(true);
@@ -300,11 +293,11 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should maintain correct element order", () => {
-      const container = wrapper.find(".q-mt-lg");
+      const container = wrapper.find(".tw\\:mt-4");
       const children = Array.from(container.element.children) as HTMLElement[];
 
       expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].classList.contains("row")).toBe(true);
+      expect(children[1].classList.contains("tw:flex")).toBe(true);
       expect(children[2].tagName.toLowerCase()).toBe("button");
     });
   });

@@ -15,18 +15,11 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 describe("ErrorTag Component", () => {
   let wrapper: any;
@@ -46,7 +39,7 @@ describe("ErrorTag Component", () => {
       },
       global: {
         stubs: {
-          "q-separator": {
+          OSeparator: {
             template: '<div data-test="separator" />',
             props: ["vertical"],
           },
@@ -79,46 +72,46 @@ describe("ErrorTag Component", () => {
     it("should have correct container classes", () => {
       const container = wrapper.find(".tag-block");
       expect(container.classes()).toContain("tag-block");
-      expect(container.classes()).toContain("row");
-      expect(container.classes()).toContain("items-center");
-      expect(container.classes()).toContain("no-wrap");
-      expect(container.classes()).toContain("q-mr-sm");
-      expect(container.classes()).toContain("q-mt-sm");
+      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("tw:items-center");
+      expect(container.classes()).toContain("tw:flex-nowrap");
+      expect(container.classes()).toContain("tw:mr-2");
+      expect(container.classes()).toContain("tw:mt-2");
     });
   });
 
   describe("Tag Key Display", () => {
     it("should display the tag key", () => {
-      const keyElements = wrapper.findAll(".tag-block .q-px-md");
+      const keyElements = wrapper.findAll(".tw\\:px-3");
       expect(keyElements.length).toBeGreaterThan(0);
       expect(keyElements[0].text()).toBe("service");
     });
 
     it("should have correct key styling", () => {
-      const keyElements = wrapper.findAll(".tag-block .q-px-md");
+      const keyElements = wrapper.findAll(".tw\\:px-3");
       expect(keyElements.length).toBeGreaterThan(0);
-      expect(keyElements[0].classes()).toContain("q-px-md");
+      expect(keyElements[0].classes()).toContain("tw:px-3");
     });
   });
 
   describe("Tag Value Display", () => {
     it("should display the tag value", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.exists()).toBe(true);
       expect(valueElement.text()).toBe("web-application");
     });
 
     it("should have correct value styling", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("q-px-md");
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
+      expect(valueElement.classes()).toContain("tw:px-3");
       expect(valueElement.classes()).toContain("tw:break-all");
     });
 
     it("should handle word breaking", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.classes()).toContain("tw:break-all");
     });
   });
@@ -144,10 +137,10 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: customTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElements = wrapper.findAll(".tw\\:px-3");
       expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const keyElement = valueElements[0]; // First tw:px-3 is the key
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
 
       expect(keyElement.text()).toBe("error_type");
       expect(valueElement.text()).toBe("TypeError");
@@ -162,8 +155,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: longTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe(longTag.value);
       expect(valueElement.classes()).toContain("tw:break-all");
     });
@@ -176,10 +169,10 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: specialTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElements = wrapper.findAll(".tw\\:px-3");
       expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const keyElement = valueElements[0]; // First tw:px-3 is the key
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
 
       expect(keyElement.text()).toBe("user@email");
       expect(valueElement.text()).toBe("test@example.com");
@@ -189,10 +182,10 @@ describe("ErrorTag Component", () => {
   describe("Component Structure", () => {
     it("should have proper element hierarchy", () => {
       const container = wrapper.find(".tag-block");
-      const keyElement = container.find(".q-px-md:first-child");
+      const keyElement = container.find("div:first-child");
       const separator = container.find('[data-test="separator"]');
-      const valueElements = container.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = container.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
 
       expect(container.exists()).toBe(true);
       expect(keyElement.exists()).toBe(true);
@@ -205,9 +198,9 @@ describe("ErrorTag Component", () => {
       const children = container.element.children;
 
       expect(children).toHaveLength(3);
-      expect(children[0].classList.contains("q-px-md")).toBe(true);
+      expect(children[0].classList.contains("tw:px-3")).toBe(true);
       expect(children[1].getAttribute("data-test")).toBe("separator");
-      expect(children[2].classList.contains("q-px-md")).toBe(true);
+      expect(children[2].classList.contains("tw:px-3")).toBe(true);
     });
   });
 
@@ -218,23 +211,23 @@ describe("ErrorTag Component", () => {
     });
 
     it("should apply background color to value section", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.classes()).toContain("tw:bg-[var(--o2-table-header-bg)]");
     });
 
     it("should apply correct spacing classes", () => {
       const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("q-mr-sm");
-      expect(container.classes()).toContain("q-mt-sm");
+      expect(container.classes()).toContain("tw:mr-2");
+      expect(container.classes()).toContain("tw:mt-2");
 
-      const valueElements = wrapper.findAll(".q-px-md");
+      const valueElements = wrapper.findAll(".tw\\:px-3");
       expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const keyElement = valueElements[0]; // First tw:px-3 is the key
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
 
-      expect(keyElement.classes()).toContain("q-px-md");
-      expect(valueElement.classes()).toContain("q-px-md");
+      expect(keyElement.classes()).toContain("tw:px-3");
+      expect(valueElement.classes()).toContain("tw:px-3");
     });
   });
 
@@ -247,7 +240,7 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: longKeyTag });
 
-      const keyElements = wrapper.findAll(".q-px-md");
+      const keyElements = wrapper.findAll(".tw\\:px-3");
       expect(keyElements.length).toBeGreaterThan(0);
       const keyElement = keyElements[0];
       expect(keyElement.text()).toBe(longKeyTag.key);
@@ -255,7 +248,7 @@ describe("ErrorTag Component", () => {
 
     it("should use no-wrap class to prevent wrapping", () => {
       const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("no-wrap");
+      expect(container.classes()).toContain("tw:flex-nowrap");
     });
   });
 
@@ -284,8 +277,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: emptyValueTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -297,8 +290,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: nullTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -310,8 +303,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: undefinedTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe("");
     });
 
@@ -323,8 +316,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: numericTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe("42");
     });
 
@@ -336,8 +329,8 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: booleanTag });
 
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElements = wrapper.findAll(".tw\\:px-3");
+      const valueElement = valueElements[1]; // Second tw:px-3 is the value
       expect(valueElement.text()).toBe("true");
     });
   });

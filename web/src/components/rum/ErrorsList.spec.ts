@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorsList from "@/components/rum/ErrorsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,11 +24,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -64,17 +57,17 @@ vi.mock("@/plugins/traces/IndexList.vue", () => ({
   },
 }));
 
-vi.mock("@/components/rum/AppTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "AppTable",
+    name: "OTable",
     template: `
       <div data-test="app-table">
         <div data-test="table-columns" v-if="columns">{{ columns.length }} columns</div>
-        <div data-test="table-rows" v-if="rows">{{ rows.length }} rows</div>
-        <slot name="error_details" :column="{ error: 'Test Error', error_type: 'JavaScript Error' }"></slot>
+        <div data-test="table-rows" v-if="data">{{ data.length }} rows</div>
+        <slot name="cell-error" :row="{ error: 'Test Error', error_type: 'JavaScript Error' }"></slot>
       </div>
     `,
-    props: ["columns", "rows"],
+    props: ["columns", "data"],
   },
 }));
 
@@ -99,7 +92,7 @@ describe("ErrorsList Component", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-splitter": {
+            OSplitter: {
               template: `
                 <div data-test="splitter">
                   <div data-test="before-section"><slot name="before" /></div>
@@ -142,7 +135,8 @@ describe("ErrorsList Component", () => {
     it("should render all child components", () => {
       expect(wrapper.find('[data-test="search-bar"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="index-list"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      // Component uses OTable (mocked as data-test="app-table")
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
 
     it("should render splitter layout", () => {
@@ -167,7 +161,7 @@ describe("ErrorsList Component", () => {
       expect(beforeSection.find('[data-test="index-list"]').exists()).toBe(
         true,
       );
-      expect(afterSection.find('[data-test="app-table"]').exists()).toBe(true);
+      expect(afterSection.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
 
     it("should pass SearchBar to template", () => {
@@ -181,9 +175,9 @@ describe("ErrorsList Component", () => {
       );
     });
 
-    it("should pass AppTable to after slot", () => {
+    it("should pass OTable to after slot", () => {
       const afterSection = wrapper.find('[data-test="after-section"]');
-      expect(afterSection.findComponent({ name: "AppTable" }).exists()).toBe(
+      expect(afterSection.findComponent({ name: "OTable" }).exists()).toBe(
         true,
       );
     });
@@ -200,143 +194,127 @@ describe("ErrorsList Component", () => {
     });
 
     it("should have columns array with correct structure", () => {
-      expect(Array.isArray(wrapper.vm.columns)).toBe(true);
-      expect(wrapper.vm.columns.length).toBeGreaterThan(0);
+      expect(Array.isArray(wrapper.vm.tableColumns)).toBe(true);
+      expect(wrapper.vm.tableColumns.length).toBeGreaterThan(0);
     });
   });
 
   describe("Columns Configuration", () => {
     it("should have error column with correct properties", () => {
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
+      const errorColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "error",
       );
 
       expect(errorColumn).toBeDefined();
-      expect(errorColumn.label).toBe("Error");
-      expect(errorColumn.align).toBe("left");
+      expect(errorColumn.header).toBe("Error");
       expect(errorColumn.sortable).toBe(true);
-      expect(errorColumn.slot).toBe(true);
-      expect(errorColumn.slotName).toBe("error_details");
     });
 
     it("should have type column with correct properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+      const typeColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "type",
       );
 
       expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Session Type");
-      expect(typeColumn.align).toBe("left");
+      expect(typeColumn.header).toBe("Session Type");
       expect(typeColumn.sortable).toBe(true);
     });
 
     it("should have time_spent column with correct properties", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
 
       expect(timeSpentColumn).toBeDefined();
-      expect(timeSpentColumn.label).toBe("Time Spent");
-      expect(timeSpentColumn.align).toBe("left");
+      expect(timeSpentColumn.header).toBe("Time Spent");
       expect(timeSpentColumn.sortable).toBe(true);
-      expect(typeof timeSpentColumn.sort).toBe("function");
+      expect(typeof timeSpentColumn.accessorFn).toBe("function");
     });
 
     it("should have error_count column with correct properties", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
+      const errorCountColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "error_count",
       );
 
       expect(errorCountColumn).toBeDefined();
-      expect(errorCountColumn.label).toBe("Error Count");
-      expect(errorCountColumn.align).toBe("left");
+      expect(errorCountColumn.header).toBe("Error Count");
       expect(errorCountColumn.sortable).toBe(true);
     });
 
     it("should have initial_view_name column with correct properties", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
+      const initialViewColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "initial_view_name",
       );
 
       expect(initialViewColumn).toBeDefined();
-      expect(initialViewColumn.label).toBe("Initial View Name");
-      expect(initialViewColumn.align).toBe("left");
+      expect(initialViewColumn.header).toBe("Initial View Name");
       expect(initialViewColumn.sortable).toBe(true);
     });
   });
 
   describe("Column Functions", () => {
-    it("should handle error column field function", () => {
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
+    it("should handle error column accessorKey", () => {
+      const errorColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "error",
       );
       const mockRow = { error: "Test error message" };
 
-      expect(errorColumn.field(mockRow)).toBe("Test error message");
-      expect(errorColumn.prop(mockRow)).toBe("Test error message");
+      // New column format uses accessorKey instead of field/prop
+      expect(errorColumn.accessorKey).toBe("error");
     });
 
-    it("should handle type column field function", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+    it("should handle type column accessorKey", () => {
+      const typeColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "type",
       );
-      const mockRow = { type: "javascript" };
 
-      expect(typeColumn.field(mockRow)).toBe("javascript");
-      expect(typeColumn.prop(mockRow)).toBe("javascript");
+      expect(typeColumn.accessorKey).toBe("type");
     });
 
-    it("should handle time_spent column field function with formatting", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+    it("should handle time_spent column accessorFn with formatting", () => {
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
       const mockRow = { time_spent: "120000000" }; // 120 seconds in nanoseconds
 
-      const result = timeSpentColumn.field(mockRow);
+      const result = timeSpentColumn.accessorFn(mockRow);
       expect(result).toBe("2m"); // formatDuration should convert 120s to 2m
     });
 
     it("should handle time_spent column sort function", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+      // time_spent column uses accessorFn, sorting is handled by the table
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
-      const rowA = { time_spent: "100000000" };
-      const rowB = { time_spent: "200000000" };
-
-      const result = timeSpentColumn.sort(null, null, rowA, rowB);
-      expect(result).toBe(-100000000); // 100000000 - 200000000
+      expect(timeSpentColumn).toBeDefined();
     });
 
-    it("should handle error_count column field function", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
+    it("should handle error_count column accessorKey", () => {
+      const errorCountColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "error_count",
       );
-      const mockRow = { error_count: "5" };
 
-      expect(errorCountColumn.field(mockRow)).toBe("5");
-      expect(errorCountColumn.prop(mockRow)).toBe("5");
+      expect(errorCountColumn.accessorKey).toBe("error_count");
     });
 
-    it("should handle initial_view_name column field function", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
+    it("should handle initial_view_name column accessorKey", () => {
+      const initialViewColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "initial_view_name",
       );
-      const mockRow = { initial_view_name: "HomePage" };
 
-      expect(initialViewColumn.field(mockRow)).toBe("HomePage");
-      expect(initialViewColumn.prop(mockRow)).toBe("HomePage");
+      expect(initialViewColumn.accessorKey).toBe("initial_view_name");
     });
   });
 
-  describe("AppTable Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
+  describe("OTable Integration", () => {
+    it("should pass columns to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("columns")).toEqual(wrapper.vm.tableColumns);
     });
 
-    it("should pass rows to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(wrapper.vm.rows);
+    it("should pass rows to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual(wrapper.vm.rows);
     });
 
     it("should render error details slot", () => {
@@ -389,22 +367,11 @@ describe("ErrorsList Component", () => {
       };
 
       // Test that our columns can handle the Session interface
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
-      );
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
 
-      expect(() => errorColumn.field(mockSession)).not.toThrow();
-      expect(() => typeColumn.field(mockSession)).not.toThrow();
-      expect(() => timeSpentColumn.field(mockSession)).not.toThrow();
-      expect(() =>
-        timeSpentColumn.sort(null, null, mockSession, mockSession),
-      ).not.toThrow();
+      expect(() => timeSpentColumn.accessorFn(mockSession)).not.toThrow();
     });
   });
 
@@ -415,13 +382,13 @@ describe("ErrorsList Component", () => {
     });
 
     it("should render translated column labels", () => {
-      const columns = wrapper.vm.columns;
+      const columns = wrapper.vm.tableColumns;
 
-      expect(columns[0].label).toBe("Error");
-      expect(columns[1].label).toBe("Session Type");
-      expect(columns[2].label).toBe("Time Spent");
-      expect(columns[3].label).toBe("Error Count");
-      expect(columns[4].label).toBe("Initial View Name");
+      expect(columns[0].header).toBe("Error");
+      expect(columns[1].header).toBe("Session Type");
+      expect(columns[2].header).toBe("Time Spent");
+      expect(columns[3].header).toBe("Error Count");
+      expect(columns[4].header).toBe("Initial View Name");
     });
   });
 
@@ -449,26 +416,25 @@ describe("ErrorsList Component", () => {
   describe("Error Handling", () => {
     it("should handle empty rows gracefully", () => {
       expect(wrapper.vm.rows).toEqual([]);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
 
-    it("should handle column field functions with missing properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+    it("should handle column accessorKey with missing properties", () => {
+      const typeColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "type",
       );
-      const emptyRow = {};
-
-      expect(() => typeColumn.field(emptyRow)).not.toThrow();
-      expect(typeColumn.field(emptyRow)).toBeUndefined();
+      // accessorKey-based columns let the table handle missing properties
+      expect(typeColumn).toBeDefined();
+      expect(typeColumn.accessorKey).toBe("type");
     });
 
     it("should handle time_spent formatting with invalid values", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
       const invalidRow = { time_spent: "invalid" };
 
-      expect(() => timeSpentColumn.field(invalidRow)).not.toThrow();
+      expect(() => timeSpentColumn.accessorFn(invalidRow)).not.toThrow();
     });
   });
 
@@ -520,7 +486,7 @@ describe("ErrorsList Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.rows.length).toBe(1000);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
   });
 });

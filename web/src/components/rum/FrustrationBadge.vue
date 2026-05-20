@@ -16,23 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="frustration-badge-container" data-test="frustration-badge-container">
-    <OBadge
+    <span
       v-if="count > 0"
-      :variant="badgeVariant"
       class="frustration-badge"
+      :class="`frustration-badge-${severity}`"
       :data-test="`frustration-badge-${severity}`"
-    >
-      {{ count }}
-    </OBadge>
+      :title="tooltipText"
+      data-test-tooltip="frustration-badge-tooltip"
+    >{{ count }}</span>
     <span v-else class="tw:text-gray-400" data-test="frustration-badge-none">—</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   count: number;
@@ -59,15 +56,6 @@ const severity = computed(() => {
   return "high";
 });
 
-const badgeVariant = computed<BadgeVariant>(() => {
-  switch (severity.value) {
-    case "low": return "warning";
-    case "medium": return "warning";
-    case "high": return "error";
-    default: return "default";
-  }
-});
-
 const tooltipText = computed(() => {
   if (props.count === 0) return "No frustration signals detected";
   if (props.count === 1) return "1 frustration signal detected";
@@ -76,7 +64,7 @@ const tooltipText = computed(() => {
     low: "Low severity",
     medium: "Medium severity",
     high: "High severity - requires attention",
-  }[severity.value];
+  }[severity.value as "low" | "medium" | "high"];
 
   return `${props.count} frustration signals (${severityLabel})`;
 });
@@ -92,5 +80,27 @@ const tooltipText = computed(() => {
 .frustration-badge {
   min-width: 2rem;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.frustration-badge-low {
+  background-color: rgb(253, 224, 132);
+  color: rgb(113, 63, 18);
+}
+
+.frustration-badge-medium {
+  background-color: rgb(254, 215, 170);
+  color: rgb(124, 45, 18);
+}
+
+.frustration-badge-high {
+  background-color: rgb(254, 202, 202);
+  color: rgb(153, 27, 27);
 }
 </style>

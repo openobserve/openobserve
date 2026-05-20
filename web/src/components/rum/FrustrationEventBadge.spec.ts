@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FrustrationEventBadge from './FrustrationEventBadge.vue';
 
-installQuasar();
 
 describe('FrustrationEventBadge.vue', () => {
   let wrapper: VueWrapper;
@@ -100,21 +98,20 @@ describe('FrustrationEventBadge.vue', () => {
       wrapper = createWrapper(['rage_click']);
       const badge = wrapper.find('[data-test="frustration-event-badge-rage_click"]');
       expect(badge.exists()).toBe(true);
-      // Tooltip exists in component structure
-      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
-      expect(tooltips.length).toBeGreaterThan(0);
+      // Tooltip is provided via title attribute
+      expect(badge.attributes('title')).toBeDefined();
     });
 
     it('should show correct tooltip for dead_click', () => {
       wrapper = createWrapper(['dead_click']);
-      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
-      expect(tooltips.length).toBeGreaterThan(0);
+      const badge = wrapper.find('[data-test="frustration-event-badge-dead_click"]');
+      expect(badge.attributes('title')).toBeDefined();
     });
 
     it('should show correct tooltip for error_click', () => {
       wrapper = createWrapper(['error_click']);
-      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
-      expect(tooltips.length).toBeGreaterThan(0);
+      const badge = wrapper.find('[data-test="frustration-event-badge-error_click"]');
+      expect(badge.attributes('title')).toBeDefined();
     });
   });
 

@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EventTypeBadge from "./EventTypeBadge.vue";
 
-installQuasar();
 
 describe("EventTypeBadge", () => {
   let wrapper: VueWrapper;
@@ -75,14 +73,13 @@ describe("EventTypeBadge", () => {
     it("should apply fallback grey classes for unknown type", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "unknown-type" } });
       const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-grey-100");
-      expect(classes).toContain("tw:text-grey-700");
+      expect(classes).toContain("tw:bg-gray-200");
     });
 
     it("should apply fallback grey classes for empty type string", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "" } });
       const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-grey-100");
+      expect(classes).toContain("tw:bg-gray-200");
     });
   });
 

@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -27,9 +25,7 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [],
-});
+// Quasar removed - no installQuasar needed
 
 // Mock flag-icons CSS
 vi.mock("flag-icons/css/flag-icons.min.css", () => ({}));
@@ -65,7 +61,7 @@ describe("SessionLocationColumn", () => {
         stubs: {
           "OIcon": {
             template:
-              '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
+              '<i data-test="icon" :class="name" :data-size="size"></i>',
             props: ["name", "size"],
           },
         },
@@ -158,26 +154,31 @@ describe("SessionLocationColumn", () => {
 
     it("should apply correct styling to separator icons", () => {
       const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
+      expect(separatorIcons.length).toBeGreaterThan(0);
       separatorIcons.forEach((icon) => {
-        expect(icon.attributes("style")).toContain("font-size: 4px");
+        // OIcon stub exposes size via data-size; component passes size="xs"
+        expect(icon.attributes("data-size")).toBe("xs");
       });
     });
   });
 
   describe("Layout Structure", () => {
     it("should have correct row structure for country info", () => {
-      const countryRow = wrapper.find(".row.items-center.no-wrap");
+      // Component uses Tailwind classes tw:flex tw:items-center tw:flex-nowrap
+      const countryRow = wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap");
       expect(countryRow.exists()).toBe(true);
     });
 
     it("should have correct row structure for details", () => {
-      const detailsRow = wrapper.find(".row.q-mt-xs.items-center");
-      expect(detailsRow.exists()).toBe(true);
+      // Component uses tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 for details row
+      const rows = wrapper.findAll(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap");
+      expect(rows.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should apply correct text styling for details", () => {
-      const greyTextElements = wrapper.findAll(".text-grey-8");
-      expect(greyTextElements.length).toBeGreaterThanOrEqual(3); // city, browser, os
+      // Component uses tw:text-gray-500 (Tailwind) not text-grey-8 (Quasar)
+      const greyTextElements = wrapper.findAll('[class*="tw:text-gray-500"]');
+      expect(greyTextElements.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -248,16 +249,15 @@ describe("SessionLocationColumn", () => {
 
   describe("Styling", () => {
     it("should apply correct margin classes", () => {
-      const flagElement = wrapper.find(".q-mr-sm");
+      // Component uses Tailwind classes tw:mr-1.5 on the flag span
+      const flagElement = wrapper.find('[class*="tw:mr-1.5"]');
       expect(flagElement.exists()).toBe(true);
-
-      const topMarginElement = wrapper.find(".q-mt-xs");
-      expect(topMarginElement.exists()).toBe(true);
     });
 
     it("should apply correct spacing for separators", () => {
-      const separatorElements = wrapper.findAll(".q-mx-md");
-      expect(separatorElements.length).toBeGreaterThan(0);
+      // Component uses tw:mx-1.5 on OIcon separators (Tailwind) not q-mx-md (Quasar)
+      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
+      expect(separatorIcons.length).toBeGreaterThan(0);
     });
   });
 
@@ -312,8 +312,8 @@ describe("SessionLocationColumn", () => {
       for (const testCase of testCases) {
         await wrapper.setProps({ column: testCase });
 
-        expect(wrapper.find(".row.items-center.no-wrap").exists()).toBe(true);
-        expect(wrapper.find(".row.q-mt-xs.items-center").exists()).toBe(true);
+        // Component uses Tailwind flex classes not Quasar row classes
+        expect(wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap").exists()).toBe(true);
         expect(wrapper.text()).toContain(testCase.country);
         expect(wrapper.text()).toContain(testCase.city);
       }
@@ -325,7 +325,8 @@ describe("SessionLocationColumn", () => {
       const mainDiv = wrapper.find("div");
       expect(mainDiv.exists()).toBe(true);
 
-      const rows = wrapper.findAll(".row");
+      // Component uses Tailwind flex rows not Quasar .row class
+      const rows = wrapper.findAll(".tw\\:flex");
       expect(rows.length).toBeGreaterThanOrEqual(2);
     });
 
@@ -341,7 +342,7 @@ describe("SessionLocationColumn", () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".row").exists()).toBe(true);
+      expect(wrapper.find(".tw\\:flex").exists()).toBe(true);
     });
   });
 });

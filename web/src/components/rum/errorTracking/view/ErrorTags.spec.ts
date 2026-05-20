@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock ErrorTag component
 vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
@@ -97,7 +90,7 @@ describe("ErrorTags Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-separator": {
+          OSeparator: {
             template: '<div data-test="separator" />',
             props: ["vertical"],
           },
@@ -132,7 +125,7 @@ describe("ErrorTags Component", () => {
 
   describe("IP Address Display", () => {
     it("should display IP address with icon", () => {
-      const ipSection = wrapper.find(".q-mr-lg.items-center");
+      const ipSection = wrapper.find(".tw\\:mr-4.tw\\:items-center");
       expect(ipSection.exists()).toBe(true);
       expect(ipSection.text()).toContain("192.168.1.1");
     });
@@ -148,7 +141,7 @@ describe("ErrorTags Component", () => {
 
   describe("Browser Information", () => {
     it("should display browser information", () => {
-      const browserSection = wrapper.find(".q-mx-lg.items-center");
+      const browserSection = wrapper.find(".tw\\:mx-4.tw\\:items-center");
       expect(browserSection.exists()).toBe(true);
       expect(browserSection.text()).toContain("Chrome");
       expect(browserSection.text()).toContain("Version 120.0.0");
@@ -157,7 +150,7 @@ describe("ErrorTags Component", () => {
     it("should render correct browser icon for Chrome", () => {
       const browserIcon = wrapper.find("img[src='/mock/chrome.png']");
       expect(browserIcon.exists()).toBe(true);
-      expect(browserIcon.classes()).toContain("inline-block");
+      expect(browserIcon.classes()).toContain("tw:inline-block");
     });
 
     it("should render Firefox icon for Firefox", async () => {
@@ -231,7 +224,7 @@ describe("ErrorTags Component", () => {
 
   describe("Operating System Information", () => {
     it("should display OS information", () => {
-      const osElements = wrapper.findAll(".q-mx-lg.items-center");
+      const osElements = wrapper.findAll(".tw\\:mx-4.tw\\:items-center");
       const osSection = osElements[1]; // Second section is OS
       expect(osSection.text()).toContain("Windows");
       expect(osSection.text()).toContain("Version 10.0.19045");
@@ -472,7 +465,7 @@ describe("ErrorTags Component", () => {
     });
 
     it("should render tags in correct container", () => {
-      const tagsContainer = wrapper.find(".row.items-center.wrap.q-mt-md");
+      const tagsContainer = wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-wrap.tw\\:mt-3");
       expect(tagsContainer.exists()).toBe(true);
     });
   });
@@ -610,13 +603,13 @@ describe("ErrorTags Component", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
 
-      const mainRow = wrapper.find(".row.items-center");
-      expect(mainRow.classes()).toContain("row");
-      expect(mainRow.classes()).toContain("items-center");
+      const mainRow = wrapper.find(".tw\\:flex.tw\\:items-center");
+      expect(mainRow.classes()).toContain("tw:flex");
+      expect(mainRow.classes()).toContain("tw:items-center");
     });
 
     it("should apply inline-block classes", () => {
-      const inlineElements = wrapper.findAll(".inline-block");
+      const inlineElements = wrapper.findAll(".tw\\:inline-block");
       expect(inlineElements.length).toBeGreaterThan(0);
     });
   });

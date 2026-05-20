@@ -15,25 +15,19 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick, ref } from "vue";
 
-// Mock quasar's copyToClipboard to use navigator.clipboard so assertions work
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<typeof quasar>("quasar");
-  return {
-    ...actual,
-    copyToClipboard: (text: string) => {
-      navigator.clipboard.writeText(text);
-      return Promise.resolve();
-    },
-  };
-});
+// Mock clipboard utility used by the component
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: (text: string) => {
+    navigator.clipboard.writeText(text);
+    return Promise.resolve();
+  },
+}));
 
 // ============================================================================
 // TEST DATA FACTORIES
@@ -81,9 +75,7 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [quasar.],
-});
+// Quasar removed - no installQuasar needed
 
 // Mock clipboard API
 Object.assign(navigator, {
