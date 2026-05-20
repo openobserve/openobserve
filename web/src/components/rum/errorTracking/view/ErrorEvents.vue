@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns || []"
       row-key="index"
       pagination="none"
+      :show-global-filter="false"
+      class="tw:w-full"
     >
       <template #cell-type="{ row }">
         <ErrorTypeIcons :column="row" />
@@ -29,12 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-description="{ row }">
         <ErrorEventDescription :column="row" />
       </template>
+      <template #empty>
+        <NoData />
+      </template>
     </OTable>
   </div>
 </template>
 
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { ref } from "vue";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
@@ -58,6 +64,7 @@ const columns = ref<OTableColumnDef[]>([
     accessorKey: "type",
     cell: " ",
     sortable: true,
+    size: 50,
     meta: { align: "left", cellClass: "error-type" },
   },
   {
@@ -73,6 +80,7 @@ const columns = ref<OTableColumnDef[]>([
     accessorKey: "description",
     cell: " ",
     sortable: true,
+    size: 200,
     meta: { align: "left", cellClass: "description-column" },
   },
   {
