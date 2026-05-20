@@ -155,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="filteredPipelines"
             :columns="otableColumns"
             row-key="pipeline_id"
+            :loading="loading"
             :global-filter="filterQuery"
             :show-global-filter="false"
             :page-size="20"
@@ -301,9 +302,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="bottomProps">
-              <div class="bottom-btn tw:py-2">
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-4"
+                  class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
                 >
                   {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
                 </div>
@@ -314,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="pipeline-list-export-pipelines-btn"
                     variant="outline"
-                    size="sm-action"
+                    size="sm"
                     @click="exportBulkPipelines"
                     icon-left="download"
                   >
@@ -323,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="pipeline-list-pause-pipelines-btn"
                     variant="outline"
-                    size="sm-action"
+                    size="sm"
                     @click="bulkTogglePipelines('pause')"
                     icon-left="pause"
                   >
@@ -332,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="pipeline-list-resume-pipelines-btn"
                     variant="outline"
-                    size="sm-action"
+                    size="sm"
                     @click="bulkTogglePipelines('resume')"
                     icon-left="play-arrow"
                   >
@@ -340,8 +343,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     data-test="pipeline-list-delete-pipelines-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="outline-destructive"
+                    size="sm"
                     @click="openBulkDeleteDialog"
                     icon-left="delete"
                   >
@@ -757,6 +760,8 @@ const getColumnsForActiveTab = (tab: any) => {
   ];
 };
 
+columns.value = getColumnsForActiveTab(activeTab.value);
+
 onMounted(async () => {
   await getPipelines(); // Ensure pipelines are fetched before updating
   updateActiveTab();
@@ -766,7 +771,9 @@ const createPipeline = () => {
   showCreatePipeline.value = true;
 };
 
+const loading = ref(true);
 const getPipelines = async () => {
+  loading.value = true;
   try {
     const response = await pipelineService.getPipelines(
       store.state.selectedOrganization.identifier,
@@ -819,6 +826,8 @@ const getPipelines = async () => {
     });
   } catch (error) {
     console.error(error);
+  } finally {
+    loading.value = false;
   }
 };
 const editPipeline = (pipeline: any) => {
@@ -1232,13 +1241,6 @@ const onBackfillSuccess = (jobId: string) => {
 }
 .expanded-sql {
   border-left: #7a54a2 3px solid;
-}
-
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .error-icon {

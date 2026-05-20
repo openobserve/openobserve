@@ -17,37 +17,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md">
-    <div v-if="!showAddJSTransformDialog">
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+  <div
+    data-test="enrichment-tables-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+      <div class="tw:shrink-0">
         <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
+          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
             <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
-            <div class="tw:flex tw:items-center tw:ml-auto">
-              <app-tabs
-                data-test="enrichment-tables-list-tabs"
+            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+              <OToggleGroup
+                :model-value="selectedFilter"
+                @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
                 class="tw:mr-2"
-                :tabs="filterTabs"
-                v-model:active-tab="selectedFilter"
-                @update:active-tab="updateActiveTab"
-              />
+                data-test="enrichment-tables-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("function.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                  <template #icon-left><OIcon name="upload" size="sm" /></template>
+                  {{ t("function.filterFile") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                  <template #icon-left><OIcon name="link" size="sm" /></template>
+                  {{ t("function.filterUrl") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
 
               <OInput
                 data-test="enrichment-tables-search-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input"
+                class="tw:ml-2 tw:w-[200px]"
                 :placeholder="t('function.searchEnrichmentTable')"
               >
                 <template #icon-left>
-                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
+                  <OIcon name="search" size="sm" />
                 </template>
               </OInput>
               <OButton
                 class="tw:ml-2"
                 variant="primary"
-                size="sm-action"
+                size="sm"
                 @click="showAddUpdateFn({})"
               >
                 {{ t(`function.addEnrichmentTable`) }}
@@ -55,8 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-          <div class="card-container tw:h-[calc(100vh-127px)]">
+      </div>
+      <div class="tw:flex-1 tw:min-h-0">
+        <div class="card-container tw:h-full">
             <OTable
               ref="qTable"
               data-test="enrichment-tables-list-table"
@@ -73,7 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selection="multiple"
               :selected-ids="selectedEnrichmentTableIds"
               @update:selected-ids="handleSelectedIdsUpdate"
-              class="tw:h-full"
+              width="100%"
+              class="tw:w-full tw:h-full"
             >
               <template #empty>
                 <NoData />
@@ -213,16 +230,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:py-2">
-                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
+                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
                     {{ resultTotal }} {{ t('function.enrichmentTables') }}
                   </div>
                   <OButton
                     v-if="selectedEnrichmentTables.length > 0"
                     data-test="enrichment-tables-bulk-delete-btn"
-                    variant="outline"
-                    size="sm-action"
-                    class="tw:mr-2"
+                    variant="outline-destructive"
+                    size="sm"
                     icon-left="delete"
                     @click="openBulkDeleteDialog"
                   >
@@ -233,7 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-      </div>
     </div>
     <div v-else>
       <add-enrichment-table
@@ -303,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 
-import { computed, defineComponent, onBeforeMount, onMounted, ref, watch, reactive } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -311,7 +326,8 @@ import { useI18n } from "vue-i18n";
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import AppTabs from "../common/AppTabs.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import segment from "../../services/segment_analytics";
 import {
   formatSizeFromMB,
@@ -341,7 +357,8 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     EnrichmentSchema,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
     OButton,
     ODrawer,
     OInput,
@@ -383,7 +400,7 @@ export default defineComponent({
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },
       { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: 150 },
-      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "center" }, isAction: true },
+      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center" }, isAction: true },
     ];
 
     const selectedEnrichmentTableIds = computed(() =>
@@ -552,24 +569,6 @@ export default defineComponent({
     const selectedPerPage = ref<number>(20);
     const selectedEnrichmentTable = ref<any>(null);
     const selectedFilter = ref<string>("all");
-
-    const filterTabs = reactive([
-      {
-        label: t("function.filterAll"),
-        value: "all",
-        icon: "format-list-bulleted",
-      },
-      {
-        label: t("function.filterFile"),
-        value: "uploaded",
-        icon: "upload",
-      },
-      {
-        label: t("function.filterUrl"),
-        value: "file_url",
-        icon: "link",
-      },
-    ]);
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -905,7 +904,6 @@ export default defineComponent({
       showUrlJobsDialogState,
       selectedTableForUrlJobs,
       formatSizeFromMB,
-      filterTabs,
       updateActiveTab,
     };
   },

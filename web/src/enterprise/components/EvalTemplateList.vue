@@ -17,61 +17,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
     <!-- Header bar -->
-    <div class="card-container tw:mb-[0.625rem]">
-      <div
-        class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px] tw:items-center"
-      >
+    <div class="tw:shrink-0">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="eval-template-list-title"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
-          {{ t("evalTemplate.header") }}
-        </div>
-
-        <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-          <!-- Search input -->
-          <OInput
-            data-test="eval-template-list-search-input"
-            v-model="filterQuery"
-            class="no-border o2-search-input"
-            :placeholder="t('evalTemplate.search')"
+          <div
+            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+            data-test="eval-template-list-title"
           >
-            <template #icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+            {{ t("evalTemplate.header") }}
+          </div>
 
-          <!-- Refresh button -->
-          <OButton
-            data-test="eval-template-list-refresh-btn"
-            variant="outline"
-            size="sm-action"
-            class="tw:ml-2"
-            @click="loadTemplates"
-          >
-            {{ t('common.refresh') }}
-          </OButton>
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+            <!-- Search input -->
+            <OInput
+              data-test="eval-template-list-search-input"
+              v-model="filterQuery"
+              class="tw:ml-2 tw:w-[200px]"
+              :placeholder="t('evalTemplate.search')"
+            >
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
+              </template>
+            </OInput>
 
-          <!-- Add button -->
-          <OButton
-            data-test="eval-template-list-add-btn"
-            variant="primary"
-            size="sm-action"
-            class="tw:ml-2"
-            @click="goToCreate"
-          >
-            {{ t('evalTemplate.newTemplate') }}
-          </OButton>
+            <!-- Refresh button -->
+            <OButton
+              data-test="eval-template-list-refresh-btn"
+              variant="outline"
+              size="sm"
+              class="tw:ml-2"
+              @click="loadTemplates"
+            >
+              {{ t('common.refresh') }}
+            </OButton>
+
+            <!-- Add button -->
+            <OButton
+              data-test="eval-template-list-add-btn"
+              variant="primary"
+              size="sm"
+              class="tw:ml-2"
+              @click="goToCreate"
+            >
+              {{ t('evalTemplate.newTemplate') }}
+            </OButton>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Table area -->
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
+    <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:h-full">
         <OTable
           data-test="eval-template-list-table"
           :data="rows"
@@ -84,7 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
           v-model:selected-ids="selectedIds"
-          style="width: 100%; height: calc(100vh - var(--navbar-height) - 87px)"
+          width="100%"
+          class="tw:w-full tw:h-full"
         >
           <!-- Version column -->
           <template #cell-version="{ row }">
@@ -113,13 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- Loading state -->
-          <template #loading>
-            <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
-              <OSpinner size="lg" />
-            </div>
-          </template>
-
           <!-- Empty state -->
           <template #empty>
             <NoData />
@@ -130,23 +126,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
             >
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:whitespace-nowrap"
-                >
-                  {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
-                </div>
-                <OButton
-                  v-if="selectedIds.length > 0"
-                  data-test="eval-template-list-bulk-delete-btn"
-                  icon-left="delete"
-                  variant="outline"
-                  size="sm-action"
-                  @click="openBulkDeleteDialog"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
+              <div
+                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+              >
+                {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>
+              <OButton
+                v-if="selectedIds.length > 0"
+                data-test="eval-template-list-bulk-delete-btn"
+                icon-left="delete"
+                variant="outline-destructive"
+                size="sm"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </div>
           </template>
         </OTable>
@@ -179,11 +173,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -207,13 +201,13 @@ const router = useRouter();
 // ── State ──────────────────────────────────────────────────────────────────────
 const rows = ref<Template[]>([]);
 const filterQuery = ref("");
-const isLoading = ref(false);
+const isLoading = ref(true);
 const selectedIds = ref<string[]>([]);
 const selectedItems = computed(() =>
   rows.value.filter((r: Template) => selectedIds.value.includes(r.id))
 );
 // ── Columns ────────────────────────────────────────────────────────────────────
-const columns = ref([
+const columns = ref<OTableColumnDef<Template>[]>([
   { id: "#", header: "#", accessorKey: "#", sortable: false, size: 67, meta: { align: "left" } },
   {
     id: "name",

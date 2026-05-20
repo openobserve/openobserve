@@ -17,53 +17,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md">
-    <div v-if="!showAddJSTransformDialog">
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+  <div
+    data-test="function-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+      <div class="tw:shrink-0">
         <div class="card-container tw:mb-[0.625rem]">
           <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
             <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
-                {{ t("function.header") }}
-              </div>
-              <div class="tw:ml-auto" data-test="functions-list-search-input">
-                <OInput
-                  v-model="filterQuery"
-                  class="tw:ml-auto no-border o2-search-input"
-                  :placeholder="t('function.search')"
-                >
-                  <template #icon-left>
-                    <OIcon class="o2-search-input-icon" name="search" size="sm" />
-                  </template>
-                </OInput>
-              </div>
+              {{ t("function.header") }}
+            </div>
+            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+              <OInput
+                data-test="functions-list-search-input"
+                v-model="filterQuery"
+                class="tw:ml-2 tw:w-[200px]"
+                :placeholder="t('function.search')"
+              >
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
+                </template>
+              </OInput>
               <OButton
                 class="tw:ml-2"
                 variant="primary"
-                size="sm-action"
+                size="sm"
                 data-test="function-list-add-function-btn"
                 @click="showAddUpdateFn({})"
               >
                 {{ t(`function.add`) }}
               </OButton>
+            </div>
           </div>
         </div>
-        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-          <div class="card-container tw:h-[calc(100vh-127px)]">
-            <OTable
-              :data="visibleRows"
-              :columns="columns"
-              row-key="name"
-              pagination="client"
-              :page-size="pageSize"
-              :page-size-options="pageSizeOptions"
-              selection="multiple"
-              v-model:selected-ids="selectedFunctionIds"
-              :show-global-filter="false"
-              width="100%"
-              :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
-                  : 'width: 100%'"
-            >
+      </div>
+      <div class="tw:flex-1 tw:min-h-0">
+        <div class="card-container tw:h-full">
+          <OTable
+            :data="visibleRows"
+            :columns="columns"
+            row-key="name"
+            :loading="loading"
+            pagination="client"
+            :page-size="pageSize"
+            :page-size-options="pageSizeOptions"
+            selection="multiple"
+            v-model:selected-ids="selectedFunctionIds"
+            :show-global-filter="false"
+            width="100%"
+            class="tw:w-full tw:h-full"
+          >
               <template #empty>
                 <NoData />
               </template>
@@ -99,15 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #bottom="scope">
                 <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
                     {{ resultTotal }} {{ t('function.header') }}
                   </div>
                   <OButton
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
-                    variant="outline"
+                    variant="outline-destructive"
                     size="sm"
-                    class="tw:mr-2"
                     @click="openBulkDeleteDialog"
                     icon-left="delete"
                   >
@@ -118,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-      </div>
     </div>
     <div v-else>
       <AddFunction
@@ -280,7 +282,9 @@ export default defineComponent({
       window.open(routeUrl, "_blank");
     };
 
+    const loading = ref(false);
     const getJSTransforms = () => {
+      loading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading functions...",
@@ -337,6 +341,9 @@ export default defineComponent({
               timeout: 2000,
             });
           }
+        })
+        .finally(() => {
+          loading.value = false;
         });
     };
 
@@ -661,6 +668,7 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       getJSTransforms,
+      loading,
       resultTotal,
       refreshList,
       pageSize,
