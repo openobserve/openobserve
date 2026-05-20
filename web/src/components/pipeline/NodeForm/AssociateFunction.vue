@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="stream-routing-container tw:w-full tw:pt-1 tw:pb-3 tw:px-3"
+      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4"
     >
-      <div class="tw:flex tw:items-center">
+      <div class="tw:flex tw:items-center tw:gap-3">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -48,35 +48,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="tw:pb-2 container tw:text-sm tw:inline-block tw:pl-4 tw:text-gray-600"
+          class="tw:text-sm tw:text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div>
+      <div class="tw:flex tw:flex-col tw:gap-4">
         <div
           v-if="!createNewFunction"
-          class="tw:flex tw:justify-start tw:items-center tw:w-full"
-          style="padding-top: 0px"
+          class="tw:w-full"
         >
-          <div
+          <OSelect
+            v-model="selectedFunction"
+            :options="props.functions"
+            :label="t('function.selectFunction') + ' *'"
+            searchable
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="functionExists"
+            :error-message="functionExists ? 'Function is already associated' : ''"
             data-test="associate-function-select-function-input"
-            class="alert-stream-type o2-input tw:mr-2 tw:w-full"
-            style="padding-top: 0"
-          >
-            <OSelect
-              v-model="selectedFunction"
-              :options="props.functions"
-              :label="t('function.selectFunction') + ' *'"
-              searchable
-              :readonly="isUpdating"
-              :disabled="isUpdating"
-              :error="functionExists || !selectedFunction"
-              :error-message="functionExists ? 'Function is already associated' : ''"
-              style="min-width: 220px"
-              data-test="associate-function-select-function-input"
-            />
-          </div>
+          />
         </div>
 
         <!-- Function Definition Display -->
@@ -117,8 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="o2-input tw:w-full"
-          style="padding-top: 12px"
+          class="tw:w-full tw:flex tw:flex-col tw:gap-3"
           v-if="!createNewFunction"
         >
           <OSwitch
@@ -128,27 +119,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Info note explaining RAF/RBF -->
-          <OCard class="note-container">
-            <OCardSection class="tw:p-2">
-              <div class="note-heading">Function Execution Guidelines:</div>
-              <OBanner variant="warning" dense>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
-                  <span
-                    ><span class="highlight">RBF (Run Before Flattening):</span>
-                    Function executes before data structure is flattened</span
-                  >
-                </div>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
-                  <span
-                    ><span class="highlight">RAF (Run After Flattening):</span>
-                    Function executes after data structure is flattened</span
-                  >
-                </div>
-              </OBanner>
-            </OCardSection>
-          </OCard>
+          <div class="note-container tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
+            <div class="tw:text-sm tw:text-gray-800">
+              Function Execution Guidelines:
+            </div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                />
+                <span>
+                  <span class="highlight">RBF (Run Before Flattening):</span>
+                  Function executes before data structure is flattened
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                />
+                <span>
+                  <span class="highlight">RAF (Run After Flattening):</span>
+                  Function executes after data structure is flattened
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="tw:flex tw:gap-2">
@@ -203,7 +202,6 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getImageURL } from "@/utils/zincutils";
@@ -448,34 +446,14 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .note-container {
-  background-color: var(--color-note-bg);
-  border-radius: 4px;
-  border: 1px solid var(--color-note-border);
-  color: var(--color-note-text);
+  background-color: #f9f290;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
-  margin-top: 10px;
 }
 
 .note-container .highlight {
   font-weight: bold;
-  color: var(--color-note-highlight);
-}
-
-.note-container .emphasis {
-  font-style: italic;
-  color: var(--color-note-emphasis);
-}
-
-.note-container .code {
-  font-family: monospace;
-  padding: 2px 4px;
-  border-radius: 3px;
-  color: var(--color-note-code);
-}
-
-.note-heading {
-  font-size: medium;
+  color: #007bff;
 }
 
 
