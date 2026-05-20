@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container full-height tw:p-2">
+  <div class="player-container tw:h-full tw:p-2">
     <div
       v-if="isLoading"
       class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime bg-primary tw:absolute"
+          class="progressTime progress-fill tw:absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime bg-primary tw:absolute"
+          class="progressTime progress-fill tw:absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -619,6 +619,10 @@ defineExpose({
 
 .bg-event-default {
   background-color: #14b8a6 !important;
+}
+
+.progress-fill {
+  background-color: var(--o2-primary-btn-bg) !important;
 }
 </style>
 
