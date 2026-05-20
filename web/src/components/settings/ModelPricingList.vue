@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
           </OButton>
         </div>
-        <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2">
           <div class="app-tabs-container tw:h-[36px]">
             <app-tabs
               class="tabs-selection-container"
@@ -334,8 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-else
-            class="tw:w-full tw:flex tw:flex-col flex-center"
-            style="height: calc(100vh - 220px); gap: 8px"
+            class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-y-3"
+            style="height: calc(100vh - 220px);"
           >
             <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
             <div class="tw:text-base tw:font-medium tw:text-gray-400 tw:mt-2">
@@ -347,6 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm"
+              class="tw:self-center"
               @click="openEditor(null)"
               data-test="model-pricing-empty-add-btn"
             >

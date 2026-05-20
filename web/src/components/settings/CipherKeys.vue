@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OInput>
               <OButton
                 variant="primary"
-                size="sm-action"
+                size="sm"
                 class="tw:ml-2"
                 @click="addCipherKey"
               >
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="cipher-keys-list-delete-keys-btn"
             variant="outline"
-            size="sm-action"
+            size="sm"
             icon-left="delete"
             @click="openBulkDeleteDialog"
           >

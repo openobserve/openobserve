@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="template-list-add-btn"
             variant="primary"
-            size="sm-action"
+            size="sm"
             class="tw:ml-2"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton

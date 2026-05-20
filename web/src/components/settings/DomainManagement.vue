@@ -63,102 +63,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Drawer for VRL Information -->
-      <Transition name="vrl-drawer">
-        <div
-          v-if="showVrlInfo"
-          class="vrl-drawer-backdrop"
-          @click.self="showVrlInfo = false"
-        >
-          <aside class="vrl-drawer-panel">
-            <div class="tw:p-4">
-              <div class="tw:flex tw:items-center tw:mb-6">
-                <div class="tw:flex-1 tw:text-lg tw:font-bold">
-                  {{ t("settings.claimParserFunctionInfoTitle") }}
-                </div>
-                <div>
-                  <OButton
-                    icon-left="close"
-                    variant="ghost"
-                    size="icon"
-                    @click="showVrlInfo = false"
-                />
-                </div>
-              </div>
+      <ODrawer
+        v-model:open="showVrlInfo"
+        :title="t('settings.claimParserFunctionInfoTitle')"
+        side="right"
+        :width="40"
+      >
+        <div class="tw:p-4 tw:text-sm">
+          <div class="tw:mb-4 tw:p-4 info-box">
+            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+            <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+          </div>
 
-              <div class="tw:text-sm">
-                <div class="tw:mb-4 tw:p-4 info-box">
-                  <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
-                  <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
-                </div>
+          <div class="tw:mb-4 tw:p-4 info-box">
+            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+            <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+            <div class="tw:ml-4">
+              <div class="tw:mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+              <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
+            </div>
+          </div>
 
-                <div class="tw:mb-4 tw:p-4 info-box">
-                  <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-                  <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-                  <div class="tw:ml-4">
-                    <div class="tw:mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
-                    <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
-                  </div>
-                </div>
-
-                <!-- Recent Errors Section -->
-                <div v-if="claimParserFunction" class="tw:p-4 info-box error-section">
-                  <div class="tw:flex tw:items-center tw:mb-2">
-                    <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
-                    <div>
-                      <OButton
-                        icon-left="refresh"
-                        variant="ghost-muted"
-                        size="icon-xs-sq"
-                        @click="loadRecentErrors"
-                        :loading="loadingErrors"
-                      >
-                            <OTooltip :content="t('common.refresh')" side="top" />
-                      </OButton>
-                    </div>
-                  </div>
-
-                  <div v-if="loadingErrors" class="tw:text-center tw:py-4">
-                    <OSpinner size="xs" />
-                  </div>
-
-                  <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
-                    {{ t("settings.noRecentErrors") }}
-                  </div>
-
-                  <div v-else class="error-list">
-                    <div
-                      v-for="(error, index) in recentErrors.slice(0, 3)"
-                      :key="index"
-                      class="error-item tw:p-2 tw:mb-1"
-                    >
-                      <div class="tw:flex tw:items-start tw:mb-1">
-                        <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
-                        <div class="tw:flex-1">
-                          <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
-                          <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
-                        </div>
-                      </div>
-                      <div class="tw:text-xs error-message">{{ error.error }}</div>
-                    </div>
-
-                    <!-- Show More Button -->
-                    <div class="tw:mt-2 tw:text-center">
-                      <OButton
-                        icon-right="open-in-new"
-                        variant="ghost-primary"
-                        size="sm"
-                        @click="viewAllErrors"
-                      >
-                        {{ t('common.showMore') }}
-                          </OButton>
-                    </div>
-                  </div>
-                </div>
+          <!-- Recent Errors Section -->
+          <div v-if="claimParserFunction" class="tw:p-4 info-box error-section">
+            <div class="tw:flex tw:items-center tw:mb-2">
+              <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+              <div>
+                <OButton
+                  icon-left="refresh"
+                  variant="ghost-muted"
+                  size="icon-xs-sq"
+                  @click="loadRecentErrors"
+                  :loading="loadingErrors"
+                >
+                  <OTooltip :content="t('common.refresh')" side="top" />
+                </OButton>
               </div>
             </div>
-          </aside>
+
+            <div v-if="loadingErrors" class="tw:text-center tw:py-4">
+              <OSpinner size="xs" />
+            </div>
+
+            <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
+              {{ t("settings.noRecentErrors") }}
+            </div>
+
+            <div v-else class="error-list">
+              <div
+                v-for="(error, index) in recentErrors.slice(0, 3)"
+                :key="index"
+                class="error-item tw:p-2 tw:mb-1"
+              >
+                <div class="tw:flex tw:items-start tw:mb-1">
+                  <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
+                  <div class="tw:flex-1">
+                    <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
+                    <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                  </div>
+                </div>
+                <div class="tw:text-xs error-message">{{ error.error }}</div>
+              </div>
+
+              <!-- Show More Button -->
+              <div class="tw:mt-2 tw:text-center">
+                <OButton
+                  icon-right="open-in-new"
+                  variant="ghost-primary"
+                  size="sm"
+                  @click="viewAllErrors"
+                >
+                  {{ t('common.showMore') }}
+                </OButton>
+              </div>
+            </div>
+          </div>
         </div>
-      </Transition>
+      </ODrawer>
     </div>
 
     <!-- Divider -->
@@ -343,6 +324,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
@@ -847,44 +829,6 @@ const resetForm = () => {
 </script>
 
 <style scoped lang="scss">
-// VRL info drawer
-.vrl-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.vrl-drawer-panel {
-  width: 28.125rem; // 450px
-  height: 100%;
-  background: var(--o2-card-bg);
-  box-shadow: -0.25rem 0 1.5rem rgba(0, 0, 0, 0.15);
-  overflow-y: auto;
-}
-
-.vrl-drawer-enter-active,
-.vrl-drawer-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.vrl-drawer-enter-active .vrl-drawer-panel,
-.vrl-drawer-leave-active .vrl-drawer-panel {
-  transition: transform 0.3s ease;
-}
-
-.vrl-drawer-enter-from,
-.vrl-drawer-leave-to {
-  opacity: 0;
-}
-
-.vrl-drawer-enter-from .vrl-drawer-panel,
-.vrl-drawer-leave-to .vrl-drawer-panel {
-  transform: translateX(100%);
-}
-
 .claim-parser-select {
   min-width: 400px;
 }

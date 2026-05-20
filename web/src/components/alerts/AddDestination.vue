@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="flex: 1; overflow-y: auto; overflow-x: hidden"
     >
       <div>
-        <div class="tw:flex tw:gap-2 tw:px-3 tw:mt-2 tw:mb-1">
+        <div class="tw:flex tw:flex-col tw:gap-2 tw:px-3 tw:mt-2 tw:mb-1">
           <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
           <div v-if="isAlerts && !destination" class="tw:w-full tw:pb-3">
             <div class="tw:text-sm tw:font-medium tw:mb-2">
