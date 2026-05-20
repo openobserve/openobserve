@@ -162,7 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             use-input
             @filter="filterFn"
             data-test="user-custom-role-field"
-            :disable="filterdOption.length === 0"
+            :disable="filterdOption.length === 0 || !!formData.is_external"
+            :hint="
+              formData.is_external
+                ? t('user.externalUserCustomRoleHint')
+                : filterdOption.length === 0
+                  ? t('user.noCustomRolesHint')
+                  : ''
+            "
           />
           <div v-if="beingUpdated" class="tw:mt-2">
             <q-toggle
@@ -376,7 +383,14 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
-    const filterdOption = ref(props.customRoles);
+    const filterdOption = ref([...props.customRoles]);
+
+    watch(
+      () => props.customRoles,
+      (next) => {
+        filterdOption.value = [...next];
+      },
+    );
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
