@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-cy="syntax-guide-button"
         variant="outline"
-        size="icon-sm"
-        :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+        size="icon-xs"
+        :class="[
+          sqlmode ? 'sql-mode' : 'normal-mode',
+        ]"
       >
         <OIcon name="help" size="sm" />
         <OTooltip :content="t('search.syntaxGuideLabel')" />
