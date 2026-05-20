@@ -27,15 +27,14 @@
     <div
       v-if="separator !== false"
       :class="[
-        'o-splitter__separator',
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
         'tw:select-none',
         'tw:transition-colors',
         'hover:tw:bg-[var(--o2-border-input)]',
         'tw:relative',
         'tw:z-10',
-        disable ? 'tw:cursor-not-allowed tw:opacity-50' : '',
-        horizontal ? 'tw:h-[4px] tw:w-full tw:cursor-row-resize!' : 'tw:w-[4px] tw:h-full tw:cursor-col-resize!',
+        disable ? 'tw:cursor-default! tw:opacity-50' : '',
+        horizontal ? 'tw:h-[0.625rem] tw:w-full tw:cursor-row-resize' : 'tw:w-[0.625rem] tw:h-full tw:cursor-col-resize',
         separatorClass
       ]"
       :style="[separatorStyle]"

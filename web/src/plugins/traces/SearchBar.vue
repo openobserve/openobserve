@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:h-[calc(100%-3.1rem)]!"
     >
       <div
-        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
+        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full"
       >
         <code-query-editor
           ref="queryEditorRef"
