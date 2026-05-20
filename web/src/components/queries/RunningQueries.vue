@@ -91,8 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="tw:flex tw:justify-end">
-            <span class="tw:text-xs tw:opacity-60">
+          <div class="tw:flex tw:justify-end tw:mt-3">
+            <span class="tw:text-xs tw:font-bold">
               Last Data Refresh Time: {{ lastRefreshed }}
             </span>
           </div>
