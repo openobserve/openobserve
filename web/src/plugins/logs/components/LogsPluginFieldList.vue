@@ -22,12 +22,13 @@
         :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
         @click="$emit('toggle-group', row.group)"
       >
-        <div class="tw:flex-1 tw:min-w-0">
-          {{ groupName }} ({{
+        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
+          <span>{{ groupName }}</span>
+          <OBadge variant="default">{{
             (showOnlyInterestingFields
               ? interestingExpandedGroupRowsFieldCount[row.group]
               : expandGroupRowsFieldCount[row.group]) ?? 0
-          }})
+          }}</OBadge>
         </div>
         <OButton
           v-if="(expandGroupRowsFieldCount[row.group] ?? 0) > 0"
@@ -179,6 +180,7 @@ import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/feedback/Badge/OBadge.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 

@@ -30,7 +30,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
 // Mock search service
@@ -105,8 +104,6 @@ vi.mock("@/composables/useErrorTracking", () => ({
 // Import the component after mocks
 import ErrorViewer from "./ErrorViewer.vue";
 import searchService from "@/services/search";
-
-installQuasar();
 
 describe("ErrorViewer.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -209,6 +206,9 @@ describe("ErrorViewer.vue", () => {
         plugins: [store, router, i18n],
         stubs: {
           QSeparator: {
+            template: "<hr data-test='separator' />",
+          },
+          OSeparator: {
             template: "<hr data-test='separator' />",
           },
         },

@@ -33,7 +33,7 @@
                 name="info"
                 size="sm"
                 class="tw:cursor-pointer field-info-icon"
-               />
+              >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
                     ({{ t("dashboard.optional") }}) <b>Legend - </b>
@@ -42,6 +42,7 @@
                     {{ t("dashboard.overrideMessageExample") }}
                   </template>
                 </OTooltip>
+              </OIcon>
             </div>
           </div>
 
@@ -64,7 +65,7 @@
                   name="info"
                   size="sm"
                   class="tw:cursor-pointer"
-                 />
+                >
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       ({{ t("dashboard.optional") }}) <b>Step - </b>
@@ -75,6 +76,7 @@
                       {{ t("dashboard.stepValueExample") }}
                     </template>
                   </OTooltip>
+                </OIcon>
               </template>
             </OInput>
           </div>
@@ -95,7 +97,7 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer" />
+                <OIcon name="info" size="sm" class="tw:cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       <b>Query Type - </b><br />
@@ -103,6 +105,7 @@
                       Instant: Returns single value at a specific point in time.
                     </template>
                   </OTooltip>
+                </OIcon>
               </template>
             </OSelect>
           </div>

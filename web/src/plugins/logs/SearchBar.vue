@@ -5430,12 +5430,7 @@ export default defineComponent({
     margin: 0 !important;
     font-size: inherit !important;
     font-weight: inherit !important;
-
-    .OIcon {
-      font-size: 1.25rem; // match OIcon size="xs" used by other items
-    }
-
-    .q-btn__content {
+.q-btn__content {
       gap: 0.5rem; // match tw:gap-2
     }
 
@@ -5456,12 +5451,7 @@ export default defineComponent({
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
-
-  .OIcon {
-    font-size: 1.215rem; // 16px
-  }
-
-  &:hover {
+&:hover {
     background-color: var(--o2-hover-accent);
   }
 
@@ -5480,12 +5470,7 @@ export default defineComponent({
   min-height: 1.875rem !important; // 30px
   font-size: 0.75rem; // 12px
   font-weight: 500;
-
-  .OIcon {
-    font-size: 1.125rem; // 18px
-  }
-
-  &:hover {
+&:hover {
     background-color: var(--o2-hover-accent);
   }
 }

@@ -80,10 +80,10 @@
 
         <OSelect
           v-model="modelValue.stream"
-          :options="filteredStreamOptions"
+          :options="streamOptions"
           label="On Stream"
+          searchable
           data-test="dashboard-config-panel-join-to"
-          @search="onStreamSearch"
         />
       </div>
     </div>
@@ -262,7 +262,7 @@ export default defineComponent({
     RightJoinLineSvg,
     InnerJoinTypeSvg,
     OIcon,
-},
+  },
 
   props: {
     mainStream: {
@@ -317,9 +317,11 @@ export default defineComponent({
     );
 
     const streamOptions = ref<StreamOption[]>([]);
-    const filteredStreamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
-    const operationSelectOptions = operationOptions.map((op) => ({ label: op, value: op }));
+    const operationSelectOptions = operationOptions.map((op) => ({
+      label: op,
+      value: op,
+    }));
 
     /**
      * Determines if join summary should be shown
@@ -480,39 +482,6 @@ export default defineComponent({
     }
 
     /**
-     * Filters stream options based on search input
-     */
-    function filterStreamOptions(
-      val: string,
-      update: (fn: () => void) => void,
-    ): void {
-      if (val === "") {
-        update(() => {
-          filteredStreamOptions.value = [...streamOptions.value];
-        });
-        return;
-      }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredStreamOptions.value = streamOptions.value.filter((stream) =>
-          stream.label.toLowerCase().includes(needle),
-        );
-      });
-    }
-
-    function onStreamSearch(val: string): void {
-      if (!val) {
-        filteredStreamOptions.value = [...streamOptions.value];
-        return;
-      }
-      const needle = val.toLowerCase();
-      filteredStreamOptions.value = streamOptions.value.filter((stream) =>
-        stream.label.toLowerCase().includes(needle),
-      );
-    }
-
-    /**
      * Handles join type change
      */
     function handleJoinTypeChange(type: "inner" | "left" | "right"): void {
@@ -560,7 +529,6 @@ export default defineComponent({
 
     onMounted(() => {
       loadStreamsListBasedOnType();
-      filteredStreamOptions.value = [...streamOptions.value];
     });
 
     /**
@@ -573,15 +541,15 @@ export default defineComponent({
     return {
       t,
       store,
-      operationOptions,      operationSelectOptions,      filteredStreamOptions,
+      operationOptions,
+      operationSelectOptions,
+      streamOptions,
       showJoinSummary,
       joinTypeLabel,
       localJoinType,
       rightFieldStreams,
       getJoinTypeLabelClass,
       getStreamsBasedJoinIndex,
-      filterStreamOptions,
-      onStreamSearch,
       handleJoinTypeChange,
       handleAddCondition,
       handleRemoveCondition,

@@ -4,6 +4,7 @@ import { computed, provide, ref, onMounted, onUnmounted, watch, nextTick } from 
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsRoot, TabsList } from 'reka-ui'
+import OIcon from '@/lib/core/Icon/OIcon.vue'
 
 const scrollRef = ref<HTMLElement | null>(null)
 const tablistRef = ref<HTMLElement | null>(null)
@@ -160,7 +161,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
         @click="scrollTabs(-1)"
       >
-        <span class="material-icons-outlined tw:text-[1.5625rem] tw:leading-none">navigate_before</span>
+        <OIcon name="chevron-left" size="md" />
       </button>
 
       <!-- Overflow-hidden scroll container -->
@@ -189,7 +190,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
         @click="scrollTabs(1)"
       >
-        <span class="material-icons-outlined tw:text-[1.5625rem] tw:leading-none">navigate_next</span>
+        <OIcon name="chevron-right" size="md" />
       </button>
     </div>
   </TabsRoot>

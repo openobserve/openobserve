@@ -856,12 +856,7 @@ function formatTime(ns: number): string {
   line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
-
-  .OIcon {
-    color: var(--o2-text-3);
-  }
-
-  &--model {
+&--model {
     color: #8b5cf6;
     background: rgba(139, 92, 246, 0.06);
     border-color: rgba(139, 92, 246, 0.2);
@@ -869,22 +864,14 @@ function formatTime(ns: number): string {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
-
-    .OIcon {
-      color: #8b5cf6;
-    }
-  }
+}
 
   &--error {
     color: #dc2626;
     background: rgba(220, 38, 38, 0.08);
     border-color: rgba(220, 38, 38, 0.25);
     font-weight: 500;
-
-    .OIcon {
-      color: #dc2626;
-    }
-  }
+}
 }
 
 /* ─── grouped tool card (secondary weight) ───────────────────────────── */
@@ -1108,21 +1095,13 @@ function formatTime(ns: number): string {
       color: #c4b5fd;
       background: rgba(139, 92, 246, 0.12);
       border-color: rgba(139, 92, 246, 0.3);
-
-      .OIcon {
-        color: #c4b5fd;
-      }
-    }
+}
 
     &--error {
       color: #f87171;
       background: rgba(248, 113, 113, 0.12);
       border-color: rgba(248, 113, 113, 0.3);
-
-      .OIcon {
-        color: #f87171;
-      }
-    }
+}
   }
 
   .thread-turn__footer {

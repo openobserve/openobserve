@@ -1,5 +1,5 @@
 <template>
-  <div data-test="add-stream-routing-section" class="bg-white full-height">
+  <div data-test="add-stream-routing-section" class="tw:bg-white tw:h-full">
     <div class="tw:py-2 tw:px-3 tw:flex tw:justify-between tw:items-center">
       <div class="stream-routing-title">Stream Routing</div>
       <OIcon
@@ -83,7 +83,7 @@
 
       <div
         class="tw:flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       >
         <OButton
           data-test="add-report-cancel-btn"

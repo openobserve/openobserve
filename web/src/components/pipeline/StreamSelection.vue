@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="tw:h-full"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
   >
     <div>
       <div class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2">

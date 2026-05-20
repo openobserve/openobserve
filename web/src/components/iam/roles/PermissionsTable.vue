@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="tw:py-2 tw:text-left tw:text-gray-700 bg-white relative-position"
+        class="tw:py-2 tw:text-left tw:text-gray-700 tw:bg-white tw:relative"
         :style="{
           paddingLeft: level
             ? parent.has_entities

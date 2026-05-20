@@ -797,12 +797,7 @@ const getStarted = () => {
 
     .q-btn__content {
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .OIcon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
+}
   }
 
   .app-table-container {

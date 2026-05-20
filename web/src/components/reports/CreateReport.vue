@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="info-outline"
                 class="tw:cursor-pointer tw:ml-2"
                 size="sm"
-               />
+              >
                 <OTooltip
                   side="right"
                   align="center"
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #content>Note: Cached reports are stored for quick access to
                   dashboards; sharing is disabled for these reports.</template>
                 </OTooltip>
+              </OIcon>
             </div>
 
             <OStepper
@@ -466,13 +467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="info"
                             size="sm"
-                            class="tw:ml-1 tw:cursor-pointer"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-400'
-                            "
-                           />
+                            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                          >
                             <OTooltip side="right" align="center">
                               <template #content><span style="font-size: 14px">
                                 Pattern: * * * * * * means every second.
@@ -490,6 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 respectively.</span
                               ></template>
                             </OTooltip>
+                          </OIcon>
                         </div>
                         <OInput
                           v-model="frequency.cron"
@@ -540,13 +537,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="info-outline"
                         class="tw:cursor-pointer tw:ml-2"
                         size="sm"
-                       />
+                      >
                         <OTooltip side="right" align="center">
                           <template #content>"Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
                           In "Schedule Later" you can customize the date, time,
                           and timezone.</template>
                         </OTooltip>
+                      </OIcon>
                     </div>
 
                     <div
@@ -719,12 +717,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="info-outline"
                       class="tw:cursor-pointer tw:ml-2"
                       size="sm"
-                     />
+                    >
                       <OTooltip max-width="320px">
                         <template #content>Captures a PNG screenshot of the dashboard and embeds it
                         tw:inline in the email body alongside the PDF attachment
                         for a quick visual preview.</template>
                       </OTooltip>
+                    </OIcon>
                   </div>
                 </div>
                 <div class="tw:flex tw:gap-2 tw:mt-4">
@@ -746,7 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
       style="position: sticky; bottom: 0.375rem; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       :style="{
         'box-shadow':
           store.state.theme === 'dark'

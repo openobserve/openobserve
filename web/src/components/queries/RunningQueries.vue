@@ -23,76 +23,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+          class="tw:flex tw:flex-col tw:px-4 tw:py-3 tw:border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
         >
-          <div class="tw:flex tw:items-center tw:gap-3">
+          <div class="tw:flex tw:justify-between tw:items-center">
             <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="log-stream-title-text">
               {{ t("queries.runningQueries") }}
             </div>
-            <span class="tw:text-xs tw:opacity-60">
+            <div
+              data-test="running-queries-filter-container"
+              class="tw:flex tw:items-center tw:gap-3"
+            >
+              <OToggleGroup
+                :model-value="selectedQueryTypeTab"
+                @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
+                data-test="running-queries-query-type-tabs"
+              >
+                <OToggleGroupItem
+                  v-for="visual in runningQueryTypes"
+                  :key="visual.value"
+                  :value="visual.value"
+                  size="sm"
+                >
+                  {{ visual.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <div class="o2-select-input o2-input">
+                <OSelect
+                  v-model="selectedSearchField"
+                  :options="searchFieldOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  class="tw:p-0 tw:w-[140px]"
+                  data-test="running-queries-search-fields-select"
+                  @update:model-value="filterQuery = ''"
+                />
+              </div>
+              <OInput
+                v-if="selectedSearchField == 'all'"
+                v-model="filterQuery"
+                class="tw:h-[36px] tw:w-[200px]"
+                :placeholder="t('queries.search')"
+                data-test="running-queries-search-input"
+              >
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
+                </template>
+              </OInput>
+              <div v-else class="o2-select-input o2-input">
+                <OSelect
+                  v-model="filterQuery"
+                  :label="filterQuery ? '' : 'Select option'"
+                  :options="otherFieldOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  class="no-border search-input"
+                  data-test="running-queries-search-input"
+                />
+              </div>
+              <OButton
+                data-test="running-queries-refresh-btn"
+                variant="primary"
+                size="sm"
+                @click="refreshData"
+              >
+                {{ t(`queries.refreshQuery`) }}
+              </OButton>
+            </div>
+          </div>
+          <div class="tw:flex tw:justify-end tw:mt-3">
+            <span class="tw:text-xs tw:font-bold">
               Last Data Refresh Time: {{ lastRefreshed }}
             </span>
-          </div>
-          <div
-            data-test="running-queries-filter-container"
-            class="tw:flex tw:items-center tw:gap-3"
-          >
-            <OToggleGroup
-              :model-value="selectedQueryTypeTab"
-              @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
-              data-test="running-queries-query-type-tabs"
-            >
-              <OToggleGroupItem
-                v-for="visual in runningQueryTypes"
-                :key="visual.value"
-                :value="visual.value"
-                size="sm"
-              >
-                {{ visual.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="o2-select-input o2-input">
-              <OSelect
-                v-model="selectedSearchField"
-                :options="searchFieldOptions"
-                labelKey="label"
-                valueKey="value"
-                class="tw:p-0 tw:w-[140px]"
-                data-test="running-queries-search-fields-select"
-                @update:model-value="filterQuery = ''"
-              />
-            </div>
-            <OInput
-              v-if="selectedSearchField == 'all'"
-              v-model="filterQuery"
-              class="tw:h-[36px] tw:w-[200px]"
-              :placeholder="t('queries.search')"
-              data-test="running-queries-search-input"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
-            <div v-else class="o2-select-input o2-input">
-              <OSelect
-                v-model="filterQuery"
-                :label="filterQuery ? '' : 'Select option'"
-                :options="otherFieldOptions"
-                labelKey="label"
-                valueKey="value"
-                class="no-border search-input"
-                data-test="running-queries-search-input"
-              />
-            </div>
-            <OButton
-              data-test="running-queries-refresh-btn"
-              variant="primary"
-              size="sm"
-              @click="refreshData"
-            >
-              {{ t(`queries.refreshQuery`) }}
-            </OButton>
           </div>
         </div>
       </div>

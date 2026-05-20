@@ -1124,12 +1124,7 @@ function getIcon(data, ioType) {
   border: 1px solid var(--node-color) !important;
   color: var(--node-color) !important;
   transition: all 0.2s ease !important;
-
-  .OIcon {
-    font-size: 1.3em !important;
-  }
-
-  &:hover {
+&:hover {
     background: var(--node-color) !important;
     color: white !important;
     transform: scale(1.1) !important;
@@ -1235,13 +1230,7 @@ function getIcon(data, ioType) {
     box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
     z-index: 20;
   }
-
-  .OIcon {
-    font-size: 0.9em !important;
-    color: white !important;
-  }
-
-  .error-count {
+.error-count {
     position: absolute;
     top: -6px;
     right: -6px;

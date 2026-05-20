@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-else
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="tw:ml-1 material-symbols-outlined"
+                      class="tw:ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                       size="icon-circle-sm"
                       :title="

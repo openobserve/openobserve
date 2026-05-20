@@ -115,7 +115,7 @@
             padding: 2px;
           "
           v-model="drilldownData.data.url"
-          :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
           data-test="dashboard-drilldown-url-textarea"
         ></textarea>
         <div

@@ -11,7 +11,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
-  <div class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'">
+  <div class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'">
     <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
     <div class="tw:flex-1 tw:min-h-0">
       <query-editor

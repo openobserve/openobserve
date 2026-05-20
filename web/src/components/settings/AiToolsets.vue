@@ -125,10 +125,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+// Distinct variants so each kind reads visually different (mcp=blue, cli=green,
+// skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
 const KIND_VARIANTS: Record<string, string> = {
   mcp: "primary",
   cli: "success",
-  skill: "primary-soft",
+  skill: "warning",
   generic: "default",
 };
 

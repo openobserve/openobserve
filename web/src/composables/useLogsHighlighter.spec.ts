@@ -102,6 +102,8 @@ vi.mock("vue", () => ({
   ref: vi.fn((value) => ({ value })),
   computed: vi.fn((fn) => ({ value: fn() })),
   watch: vi.fn(),
+  getCurrentInstance: vi.fn(() => null),
+  onBeforeUnmount: vi.fn(),
 }));
 
 describe("useLogsHighlighter", () => {

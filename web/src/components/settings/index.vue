@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="domain"
+                  icon="dns"
                   :label="t('settings.ssoDomainRestrictions')"
                 />
                 <ORouteTab
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pl-1 tw:pb-[0.625rem] tw:pt-1">
             <div
               class="card-container tw:h-[calc(100vh-var(--navbar-height)-15px)] tw:overflow-auto"
             >

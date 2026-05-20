@@ -39,8 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.matchedDimensions') }}
             </h3>
-            <OIcon name="info" size="sm" />
+            <OIcon name="info" size="sm">
               <OTooltip :content="t('correlation.logs.filters.matchedDimensionsTooltip')" side="top" />
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -60,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`matched-dimension-input-${key}`"
                 />
               </div>
-              <OIcon name="check-circle" size="sm" />
+              <OIcon name="check-circle" size="sm">
                 <OTooltip :content="t('correlation.logs.filters.stableDimension')" side="top" />
+              </OIcon>
             </div>
           </div>
         </div>
@@ -72,8 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.additionalDimensions') }}
             </h3>
-            <OIcon name="info" size="sm" />
+            <OIcon name="info" size="sm">
               <OTooltip :content="t('correlation.logs.filters.additionalDimensionsTooltip')" side="top" />
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -114,8 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <OIcon name="sync-problem" size="sm" />
+              <OIcon name="sync-problem" size="sm">
                 <OTooltip :content="t('correlation.logs.filters.unstableDimension')" side="top" />
+              </OIcon>
             </div>
           </div>
         </div>

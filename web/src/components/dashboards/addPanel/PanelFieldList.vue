@@ -1,10 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div
-    class="column index-menu"
-    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
-  >
+  <div class="tw:w-full tw:h-full">
     <OFieldList
       ref="fieldListRef"
       :fields="flattenGroupedFields"
@@ -67,22 +64,60 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="tw:pl-2 tw:py-1 tw:font-semibold field-group-header"
+          class="field-group-header tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:py-[0.125rem] tw:pl-2 tw:pr-1"
           :title="row.groupName"
         >
-          {{ row.groupName }}
+          <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
         </div>
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row }">
+      <template #field-row="{ row, draggable, isDragEnabled }">
+        <OIcon
+          v-if="draggable"
+          name="drag-indicator"
+          size="sm"
+          :class="[
+            'o-field-list__drag-icon',
+            isDragEnabled
+              ? 'o-field-list__drag-icon--enabled'
+              : 'o-field-list__drag-icon--disabled',
+          ]"
+          data-test="o-field-list-drag-indicator"
+        />
         <OIcon
           :name="getTypeIcon(row.type)"
           size="sm"
-          color="grey-6"
-          class="tw:mr-1"
+          class="o-field-list__type-icon"
         />
-        <span class="tw:text-[0.825rem] tw:truncate">{{ row.name }}</span>
+        <span class="o-field-list__field-name">{{ row.name }}</span>
+      </template>
+
+      <!-- Loading state -->
+      <template #loading>
+        <div class="tw:flex tw:flex-col">
+          <div
+            v-for="i in 6"
+            :key="i"
+            class="tw:flex tw:items-center tw:gap-2 tw:py-[0.25rem]"
+          >
+            <OSkeleton
+              type="rect"
+              class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
+            />
+            <OSkeleton type="text" class="tw:flex-1" />
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty state -->
+      <template #empty>
+        <div
+          class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
+        >
+          <OIcon name="info" size="xs" />
+          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+        </div>
       </template>
 
       <!-- Field actions -->
@@ -405,6 +440,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 
 const props = defineProps<{
@@ -458,8 +494,8 @@ const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? fa
 const metricsIconMapping: Record<string, string> = {
   Summary: "description",
   Gauge: "speed",
-  Histogram: "bar_chart",
-  Counter: "pin",
+  Histogram: "bar-chart",
+  Counter: "tag",
 };
 
 const selectedMetricTypeIcon = computed(() => {
@@ -980,27 +1016,6 @@ defineExpose({ fieldListRef });
 </script>
 
 <style lang="scss" scoped>
-.index-menu {
-  width: 100%;
-  height: 100%;
-
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
-  }
-}
-
 .field_icons {
   display: flex;
   align-items: center;
@@ -1009,42 +1024,9 @@ defineExpose({ fieldListRef });
 
 .field-group-header {
   font-size: 0.75rem;
-}
-
-.theme-dark {
-  .field-group-header {
-    background-color: var(--o2-header-menu-bg);
-  }
-}
-
-.theme-light {
-  .field-group-header {
-    background-color: var(--color-primary-100);
-  }
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-
-:deep(.metric_icon_present .q-field__label) {
-  margin-left: -24px;
-}
-
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
+  cursor: default;
+  user-select: none;
+  background-color: var(--o2-card-background);
+  color: var(--o2-text-secondary);
 }
 </style>

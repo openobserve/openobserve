@@ -15,53 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span
-    class="frustration-event-badge-wrapper"
-    data-test="frustration-event-badge-wrapper"
-  >
+  <span class="tw:inline-flex tw:gap-1 tw:items-center" data-test="frustration-event-badge-wrapper">
     <OBadge
       v-for="(type, index) in frustrationTypes"
       :key="index"
       :variant="getBadgeVariant(type)"
-      class="frustration-event-badge"
+      size="sm"
       :data-test="`frustration-event-badge-${type}`"
       :title="getTooltipText(type)"
-    >
-      {{ getBadgeLabel(type) }}
-    </OBadge>
+    >{{ getBadgeLabel(type) }}</OBadge>
   </span>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   frustrationTypes: string[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const frustrationConfig: Record<
   string,
-  { label: string; variant: BadgeVariant; tooltip: string; icon?: string }
+  { label: string; variant: BadgeVariant; tooltip: string }
 > = {
   rage_click: {
     label: "Rage Click",
     variant: "warning",
-    tooltip:
-      "User clicked rapidly multiple times (3+) - indicating frustration",
+    tooltip: "User clicked rapidly multiple times (3+) - indicating frustration",
   },
   dead_click: {
     label: "Dead Click",
-    variant: "warning",
+    variant: "default",
     tooltip: "Click produced no response - element may be broken or misleading",
   },
   error_click: {
     label: "Error Click",
-    variant: "error",
+    variant: "error-soft",
     tooltip: "Click triggered a JavaScript error",
   },
   rage_tap: {
@@ -71,33 +63,17 @@ const frustrationConfig: Record<
   },
   error_tap: {
     label: "Error Tap",
-    variant: "error",
+    variant: "error-soft",
     tooltip: "Tap triggered a JavaScript error",
   },
 };
 
-const getBadgeLabel = (type: string) => {
-  return frustrationConfig[type]?.label || type;
-};
+const getBadgeLabel = (type: string) =>
+  frustrationConfig[type]?.label || type;
 
-const getBadgeVariant = (type: string): BadgeVariant => {
-  return frustrationConfig[type]?.variant || "default";
-};
+const getBadgeVariant = (type: string): BadgeVariant =>
+  frustrationConfig[type]?.variant ?? "default";
 
-const getTooltipText = (type: string) => {
-  return frustrationConfig[type]?.tooltip || `Frustration signal: ${type}`;
-};
+const getTooltipText = (type: string) =>
+  frustrationConfig[type]?.tooltip || `Frustration signal: ${type}`;
 </script>
-
-<style scoped lang="scss">
-.frustration-event-badge-wrapper {
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-.frustration-event-badge {
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-</style>

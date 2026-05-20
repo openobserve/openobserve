@@ -343,14 +343,7 @@ onMounted(async () => {
   font-size: 0.8125rem;
   line-height: 1;
   color: var(--o2-text-secondary);
-
-  .OIcon {
-    flex-shrink: 0;
-    position: relative;
-    top: 0;
-  }
-
-  span {
+span {
     line-height: 1;
   }
 }

@@ -71,18 +71,14 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// ── Mock Quasar useQuasar ──────────────────────────────────────────────────────
-const notifyMock = vi.fn();
+// ── Mock toast ──────────────────────────────────────────────────────────────────
+const { mockToast: notifyMock } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: notifyMock,
-    })),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: notifyMock,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const functionOptions = [

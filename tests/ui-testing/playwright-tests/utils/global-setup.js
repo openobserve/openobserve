@@ -53,8 +53,8 @@ async function globalSetup() {
     }
 
     // Fill login credentials
-    const userIdField = page.locator('[data-cy="login-user-id"]');
-    const passwordField = page.locator('[data-cy="login-password"]');
+    const userIdField = page.locator('[data-cy="login-user-id"] input');
+    const passwordField = page.locator('[data-cy="login-password"] input');
     const signInButton = page.locator('[data-cy="login-sign-in"]');
 
     // Debug: Check if login fields exist

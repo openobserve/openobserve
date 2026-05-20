@@ -165,8 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'check-circle' : 'schedule'"
               :class="value ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
               size="xs"
-             />
+            >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+            </OIcon>
           </template>
 
           <template #cell-is_silenced="{ value }">
@@ -174,8 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'volume-off' : 'volume-up'"
               :class="value ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
               size="md"
-             />
+            >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+            </OIcon>
           </template>
 
           <template #cell-duration="{ row }">
@@ -185,39 +187,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-dedup="{ row }">
             <span v-if="!row.dedup_enabled" class="tw:text-gray-400">-</span>
             <div v-else-if="row.dedup_suppressed" class="tw:text-red-500">
-              <OIcon name="block" size="sm" />
-              <OTooltip>
-                <template #content>
-                  Suppressed by deduplication
-                  <div v-if="row.dedup_count">
-                    {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
-                  </div>
-                </template>
-              </OTooltip>
+              <OIcon name="block" size="sm">
+                <OTooltip>
+                  <template #content>
+                    Suppressed by deduplication
+                    <div v-if="row.dedup_count">
+                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
+                    </div>
+                  </template>
+                </OTooltip>
+              </OIcon>
             </div>
             <div v-else-if="row.grouped" class="text-primary tw:flex tw:items-center tw:justify-center">
-              <OIcon name="group-work" size="md" />
+              <OIcon name="group-work" size="md">
+                <OTooltip>
+                  <template #content>
+                    Grouped notification
+                    <div>{{ row.group_size }} alerts batched together</div>
+                  </template>
+                </OTooltip>
+              </OIcon>
               <span class="tw:text-xs tw:ml-1">×{{ row.group_size || 1 }}</span>
-              <OTooltip>
-                <template #content>
-                  Grouped notification
-                  <div>{{ row.group_size }} alerts batched together</div>
-                </template>
-              </OTooltip>
             </div>
             <div v-else class="tw:text-green-500 tw:flex tw:items-center tw:justify-center">
-              <OIcon name="check-circle" size="md" />
+              <OIcon name="check-circle" size="md">
+                <OTooltip>
+                  <template #content>
+                    Notification sent
+                    <div v-if="row.dedup_count && row.dedup_count > 1">
+                      {{ row.dedup_count }} occurrences deduplicated
+                    </div>
+                  </template>
+                </OTooltip>
+              </OIcon>
               <span v-if="row.dedup_count && row.dedup_count > 1" class="tw:text-xs tw:ml-1">
                 ×{{ row.dedup_count }}
               </span>
-              <OTooltip>
-                <template #content>
-                  Notification sent
-                  <div v-if="row.dedup_count && row.dedup_count > 1">
-                    {{ row.dedup_count }} occurrences deduplicated
-                  </div>
-                </template>
-              </OTooltip>
             </div>
           </template>
 
@@ -229,7 +234,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
-              <OIcon name="visibility" size="sm" />
               <OTooltip content="View Details" />
             </OButton>
             <OButton
@@ -240,7 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="error"
               @click.stop="showErrorDialog(row)"
             >
-              <OIcon name="error" size="sm" />
               <OTooltip :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`" />
             </OButton>
           </template>

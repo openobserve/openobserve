@@ -27,10 +27,15 @@ const isOIcon = computed<boolean>(() =>
   Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
 );
 
-/** True when the right trailing area should render (slot OR count prop). */
-const hasTrailing = computed(
-  () => !!slots.trailing || props.count !== undefined,
-);
+/** True when the right trailing area should render (slot OR count prop).
+ *  When hideZeroCount is set and count is 0, the trailing area is suppressed
+ *  (q-badge-compatible behavior). */
+const hasTrailing = computed(() => {
+  if (slots.trailing) return true;
+  if (props.count === undefined) return false;
+  if (props.hideZeroCount && props.count === 0) return false;
+  return true;
+});
 
 /** Render as <button> when interactive so keyboard + disabled work natively. */
 const tag = computed(() => (props.clickable ? "button" : "span"));
@@ -142,7 +147,7 @@ function handleKeydown(e: KeyboardEvent): void {
     :type="clickable ? 'button' : undefined"
     :disabled="clickable && disabled ? true : undefined"
     :aria-disabled="disabled || undefined"
-    :tabindex="clickable && !disabled ? 0 : undefined"
+    :tabindex="clickable && !disabled && tag !== 'button' ? 0 : undefined"
     :class="classes"
     v-bind="$attrs"
     @click="handleClick"

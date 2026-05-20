@@ -25,24 +25,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="overflow: hidden; height: calc(100vh - 64px)"
     >
       <template #before>
-        <div class="tw:pt-2 tw:mt-4 tw:flex tw:flex-col" style="height: calc(100vh - 64px)">
+        <div class="tw:pt-6 tw:flex tw:flex-col" style="height: 100%">
           <div class="sticky-header tw:px-2 tw:shrink-0">
-            <span class="tw:m-0 tw:p-2" style="font-size: 18px">
-              {{ t("nodes.filter_header") }}
-              <OIcon name="filter-list" size="sm" />
-              <div class="float-right">
-                <a
-                  class="tw:cursor-pointer tw:text-xs tw:underline"
-                  :class="filterApplied ? 'text-primary' : ''"
-                  @click="clearAll()"
-                  >{{ t("nodes.clear_all") }}</a
-                >
-              </div>
-            </span>
+            <div class="tw:flex tw:items-center tw:justify-between tw:p-2" style="font-size: 18px">
+              <span class="tw:flex tw:items-center tw:gap-1">
+                {{ t("nodes.filter_header") }}
+                <OIcon name="filter-list" size="sm" />
+              </span>
+              <a
+                class="tw:cursor-pointer tw:text-xs tw:underline"
+                :class="filterApplied ? 'text-primary' : ''"
+                @click="clearAll()"
+                >{{ t("nodes.clear_all") }}</a
+              >
+            </div>
           </div>
 
           <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
-            <div class="tw:flex tw:flex-col">
+            <div class="tw:flex tw:flex-col tw:pb-2 tw:px-2">
               <OCollapsible
                 v-if="
                   regionRows.length > 0 &&
@@ -198,20 +198,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-2"
                 >
                   <div class="tw:p-0">
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.min"
                       />
-                      <span class="tw:px-2">to</span>
+                      <span class="tw:px-1 tw:text-center">to</span>
                       <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.max"
@@ -240,20 +240,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-2"
                 >
                   <div class="tw:p-0">
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.min"
                       />
-                      <span class="tw:px-2">to</span>
+                      <span class="tw:px-1 tw:text-center">to</span>
                       <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.max"
@@ -287,22 +287,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="establishedToggle"
                       :label="t('nodes.establishedLabel')"
                     />
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-min"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
-                      <span class="tw:px-2">to</span>
+                      <span class="tw:px-1 tw:text-center">to</span>
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.max"
@@ -328,22 +328,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-min"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
-                      <span class="tw:px-2">to</span>
+                      <span class="tw:px-1 tw:text-center">to</span>
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.max"
@@ -369,22 +369,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
-                    <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-min"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
-                      <span class="tw:px-2">to</span>
+                      <span class="tw:px-1 tw:text-center">to</span>
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
                         type="number"
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.max"
@@ -407,23 +407,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OCollapsible>
 
             </div>
-            <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0">
-              <OButton
-                variant="primary"
-                size="sm-action"
-                @click="applyFilter()"
-              >
-                {{ t("nodes.applyFilter") }}
-              </OButton>
-            </div>
+          </div>
+          <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0 tw:border-t">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="applyFilter()"
+            >
+              {{ t("nodes.applyFilter") }}
+            </OButton>
           </div>
         </div>
       </template>
       <template #after>
         <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
-        <div class="tw:flex tw:w-full tw:pt-2 tw:flex tw:items-center tw:shrink-0">
+        <div class="tw:flex tw:justify-between tw:w-full tw:pt-2 tw:items-center tw:shrink-0">
           <div
-            class="tw:flex tw:flex-col tw:text-xl tw:tracking-[0.005em] tw:items-start"
+            class="tw:flex tw:flex-col tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
             data-test="cipher-keys-list-title"
           >
             {{ t("nodes.header") }}

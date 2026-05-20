@@ -19,35 +19,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
       <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]" :class="headerClass">
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex">
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="handleBack"
-              :data-test="`${testPrefix}-import-back-btn`"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
-            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
-          </div>
+        <div class="tw:flex tw:items-center">
+          <OButton
+            variant="ghost"
+            size="icon"
+            @click="handleBack"
+            :data-test="`${testPrefix}-import-back-btn`"
+          >
+            <OIcon name="arrow-back-ios-new" size="sm" />
+          </OButton>
+          <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
         </div>
 
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="tw:flex tw:justify-center tw:gap-2">
+        <div class="tw:flex tw:ml-auto tw:gap-2">
           <OButton
-            v-close-popup
             variant="outline"
-            size="sm-action"
+            size="sm"
             :class="cancelButtonClass"
             @click="handleCancel"
             :data-test="`${testPrefix}-import-cancel-btn`"
           >{{ t('function.cancel') }}</OButton>
           <OButton
             variant="primary"
-            size="sm-action"
+            size="sm"
             type="submit"
             :class="importButtonClass"
             @click="handleImport"
@@ -72,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="tw:w-full tw:h-full">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
+              <div class="card-container tw:py-2 tw:px-2 tw:mb-[0.625rem]">
                 <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -291,7 +288,7 @@ export default defineComponent({
       type: Object,
       default: () => ({
         urlEditor: "calc(100vh - 286px)", // Default for management pages
-        fileEditor: "calc(100vh - 308px)", // Default for management pages
+        fileEditor: "calc(100vh - 290px)", // Default for management pages
         outputContainer: "calc(100vh - 130px)", // Default for management pages
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
@@ -299,7 +296,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1",
+      default: "tw:pr-[0.625rem] tw:mb-[0.625rem]",
     },
     containerStyle: {
       type: String,

@@ -104,28 +104,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('serviceAccounts.refresh')"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="refresh"
                   @click="confirmRefreshAction(row)"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
+                />
                 <OButton
                   data-test="service-accounts-edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="edit"
                   @click="addRoutePush(row)"
-                >
-                  <OIcon name="edit" size="sm" />
-                </OButton>
+                />
                 <OButton
                   data-test="service-accounts-delete"
                   :title="t('serviceAccounts.delete')"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="delete"
                   @click="confirmDeleteAction(row)"
-                >
-                  <OIcon name="delete" size="sm" />
-                </OButton>
+                />
               </template>
             </template>
 
