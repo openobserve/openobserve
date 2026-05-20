@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:mx-4 tw:pt-1">
+  <div class="tw:w-full tw:pt-1">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
+            :searchable="false"
             class="no-case alert-v3-field stream-type-select"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
@@ -161,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
             class="alert-v3-field alert-type-select"
+            :searchable="false"
           />
         </div>
         </div>

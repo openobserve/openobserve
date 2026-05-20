@@ -65,7 +65,7 @@
             :dropdownStyle="{ textTransform: 'capitalize' }"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
             :error="!!operatorError"
-            :searchable="'false'"
+            :searchable="false"
             :error-message="operatorError"
             @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateOperator"

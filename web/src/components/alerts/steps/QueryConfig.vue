@@ -70,18 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert if row -->
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <OSelect
-                    v-model="selectedFunction"
-                    :options="logFunctionOptions"
-                    labelKey="label"
-                    valueKey="value"
-                    class="alert-v3-select"
-                    style="min-width: 130px; max-width: 180px;"
-                    @update:model-value="onLogFunctionChange"
-                  >
+                <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
+                  <div class="tw:min-w-[130px] tw:max-w-[180px]">
+                    <OSelect
+                      v-model="selectedFunction"
+                      :options="logFunctionOptions"
+                      labelKey="label"
+                      valueKey="value"
+                      @update:model-value="onLogFunctionChange"
+                    />
                     <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
-                  </OSelect>
+                  </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
@@ -90,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      :class="columnSelectError ? 'column-select-error' : ''"
-                      class="alert-v3-select"
-                      style="min-width: 140px; max-width: 200px;"
+                      :class="['tw:min-w-[140px] tw:max-w-[200px]', columnSelectError ? 'column-select-error' : '']"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
                   </template>
@@ -102,17 +99,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      class="alert-v3-select"
-                      style="min-width: 70px; max-width: 120px;"
+                      class="tw:min-w-[70px] tw:max-w-[120px]"
                       data-test="alert-trigger-operator-select"
+                      :searchable="false"
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <OInput
                       v-model="triggerThreshold"
                       type="number"
                       @blur="restoreDefaultThreshold"
-                      class="alert-v3-input"
-                      style="min-width: 60px; max-width: 80px;"
+                      class="tw:min-w-[60px] tw:max-w-[80px]"
                       min="1"
                       :error="!!triggerThresholdError"
                       :error-message="triggerThresholdError"
@@ -127,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
-                      class="alert-v3-select"
-                      style="min-width: 70px; max-width: 120px;"
+                      :searchable="false"
+                      class="tw:min-w-[70px] tw:max-w-[120px]"
                       data-test="alert-condition-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -136,8 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionValue"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
-                      class="alert-v3-input"
-                      style="min-width: 80px; max-width: 120px;"
+                      class="tw:min-w-[80px] tw:max-w-[120px]"
                       :error="!!conditionValueError"
                       :error-message="conditionValueError"
                       @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
@@ -195,19 +190,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    class="alert-v3-select"
-                    style="min-width: 70px; max-width: 120px;"
+                    :searchable="false"
+                    class="tw:min-w-[70px] tw:max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="alert-v3-input"
-                    style="min-width: 60px; max-width: 80px;"
+                    class="tw:min-w-[60px] tw:max-w-[80px]"
                     min="1"
                     @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
@@ -261,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="triggerOperator"
                       :options="numericOperators"
+                      :searchable="false"
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
@@ -282,6 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
+                      :searchable="false"
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
@@ -348,19 +344,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    class="alert-v3-select"
-                    style="min-width: 70px; max-width: 120px;"
+                    :searchable="false"
+                    class="tw:min-w-[70px] tw:max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="alert-v3-input"
-                    style="min-width: 60px; max-width: 80px;"
+                    class="tw:min-w-[60px] tw:max-w-[80px]"
                     min="1"
                     @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
@@ -408,6 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
+                    :searchable="false"
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
@@ -725,6 +721,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
+                    :searchable="false"
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
@@ -760,6 +757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="triggerOperator"
                   :options="numericOperators"
+                  :searchable="false"
                   class="alert-v3-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
@@ -788,6 +786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
+                    :searchable="false"
                     class="alert-v3-select"
                     data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
@@ -816,6 +815,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
+                    :searchable="false"
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
