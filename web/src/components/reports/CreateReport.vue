@@ -74,13 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-bind:disable="isEditingReport"
                   :error="!!nameError"
                   :error-message="nameError"
+                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
                   @update:model-value="nameError = ''"
                   tabindex="0"
                   style="width: 330px"
                 >
-                  <template v-slot:hint>
-                    Characters like :, ?, /, #, and spaces are not allowed.
-                  </template>
                 </OInput>
               </div>
 
