@@ -31,33 +31,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             Show
           </span>
-          <div
+          <OToggleGroup
             class="tw:ml-1"
-            style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+            :model-value="usersDisplay"
+            @update:model-value="(v) => updateUserTable(v as string)"
           >
-            <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <OButton
-                :data-test="`iam-roles-selection-show-${visual.value}-btn`"
-                variant="ghost"
-                :active="visual.value === usersDisplay"
-                size="xs"
-                @click="updateUserTable(visual.value)"
-              >
-                {{ visual.label }}
-              </OButton>
-            </template>
-          </div>
+            <OToggleGroupItem
+              v-for="visual in usersDisplayOptions"
+              :key="visual.value"
+              :value="visual.value"
+              size="sm"
+              :data-test="`iam-roles-selection-show-${visual.value}-btn`"
+            >
+              {{ visual.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
         </div>
       </div>
       <div
         data-test="iam-roles-selection-search-input"
         class="tw:mr-3"
-        style="width: 400px"
       >
         <OInput
           data-test="alert-list-search-input"
@@ -83,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
+        :footer-title="t('iam.roles')"
         dense
       >
         <template #cell-select="{ row }">
@@ -109,6 +103,8 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
@@ -243,18 +239,26 @@ const getchOrgUsers = async () => {
 };
 
 const toggleUserSelection = (user: any) => {
-  if (user.isInGroup && !groupUsersMap.value.has(user.role_name)) {
-    props.addedRoles.add(user.role_name);
-  } else if (!user.isInGroup && groupUsersMap.value.has(user.role_name)) {
-    props.removedRoles.add(user.role_name);
-  }
+  user.isInGroup = !user.isInGroup;
 
-  if (!user.isInGroup && props.addedRoles.has(user.role_name)) {
-    props.addedRoles.delete(user.role_name);
-  }
-
-  if (user.isInGroup && props.removedRoles.has(user.role_name)) {
-    props.removedRoles.delete(user.role_name);
+  if (user.isInGroup) {
+    // Newly selected
+    if (!groupUsersMap.value.has(user.role_name)) {
+      // Not originally in group — stage for addition
+      props.addedRoles.add(user.role_name);
+    } else {
+      // Was originally in group — undo pending removal
+      props.removedRoles.delete(user.role_name);
+    }
+  } else {
+    // Newly deselected
+    if (groupUsersMap.value.has(user.role_name)) {
+      // Was originally in group — stage for removal
+      props.removedRoles.add(user.role_name);
+    } else {
+      // Was not originally in group — undo pending addition
+      props.addedRoles.delete(user.role_name);
+    }
   }
 };
 

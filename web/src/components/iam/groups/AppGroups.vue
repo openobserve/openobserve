@@ -91,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <NoData />
           </template>
-          <template v-if="selectedGroups.length > 0" #bottom>
+          <template #bottom>
+            <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ rows.length }} {{ t('iam.groups') }}</span>
             <OButton
+              v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
               variant="outline"
               size="sm"
