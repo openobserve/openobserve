@@ -4,10 +4,10 @@
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <OIcon name="rocket-launch" size="md" />
+        <OIcon name="rocket-launch" size="xl" class="tw:text-[var(--q-primary)]" />
         <div class="tw:flex-1">
-          <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
-          <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
+          <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">Quick Install (Recommended)</h6>
+          <p class="tw:text-sm tw:mt-0 tw:mb-6!" :class="descriptionClass">
             Install OpenObserve collector with a single command. Just set your cluster name and run.
           </p>
 

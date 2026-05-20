@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:m-3 aws-config-page">
     <div class="tw:mb-4">
-      <h6 class="tw:text-lg tw:font-semibold tw:m-0 tw:mb-2 page-title">
+      <div class="page-title">
         AWS Integrations
-      </h6>
-      <p class="tw:text-sm tw:m-0 tw:mb-4 page-description">
+      </div>
+      <div class="page-description">
         Set up AWS monitoring in one click or configure individual services for granular control.
-      </p>
+      </div>
 
       <OTabs
         v-model="activeTab"
@@ -150,14 +150,36 @@ Access Key: [BASIC_PASSCODE]`;
 
 <style scoped lang="scss">
 .aws-config-page {
-  .body--light & {
-    .page-description,
-    .section-description {
-      color: #666;
-    }
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 6px 0;
+    color: #1a1a1a;
   }
 
-  .body--dark & {
+  .page-description {
+    font-size: 0.875rem;
+    margin: 0 0 16px 0;
+    color: #666;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .section-description {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .dark &,
+  body.body--dark & {
+    .page-title {
+      color: #e0e0e0;
+    }
+
     .page-description,
     .section-description {
       color: #b0b0b0;

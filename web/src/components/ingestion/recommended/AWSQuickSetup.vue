@@ -18,20 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="aws-quick-setup">
     <div class="setup-card">
       <!-- Header -->
-      <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-        <OIcon
-          name="rocket-launch"
-          size="xl"
-          class="tw:flex-shrink-0"
-        />
-        <div>
-          <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">
-            Complete AWS Integration
-          </h5>
-          <p class="tw:text-sm tw:m-0 description">
-            Deploy all selected AWS services in one click using a single
-            CloudFormation stack.
-          </p>
+      <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
+        <div class="tw:flex tw:items-start tw:gap-3">
+          <OIcon
+            name="rocket-launch"
+            size="xl"
+            class="tw:text-[var(--q-primary)]"
+          />
+          <div>
+            <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">
+              Complete AWS Integration
+            </h6>
+            <p class="tw:text-sm tw:mt-0 tw:mb-0" :class="descriptionClass">
+              Deploy all selected AWS services in one click using a single
+              CloudFormation stack.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -93,11 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:overflow-hidden tw:min-h-0">
             <div class="tw:mt-3">
-              <div class="tw:flex tw:gap-2">
+              <div class="tw:grid tw:grid-cols-4 tw:gap-x-4 tw:gap-y-2">
                 <div
                   v-for="service in QUICK_SETUP_SERVICES"
                   :key="service.flag"
-                  class="tw:w-1/2 col-sm-4 col-md-3"
                 >
                   <OCheckbox
                     v-model="enabledServices"
@@ -188,11 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="tw:overflow-hidden tw:min-h-0">
               <div class="tw:mt-3">
-                <div class="tw:flex tw:gap-2">
+                <div class="tw:grid tw:grid-cols-3 tw:gap-x-4 tw:gap-y-2">
                   <div
                     v-for="region in AWS_REGIONS"
                     :key="region.value"
-                    class="tw:w-full col-sm-6 col-md-4"
                   >
                     <OCheckbox
                       v-model="targetRegions"
@@ -396,6 +396,16 @@ export default defineComponent({
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
+    const quickInstallBgClass = computed(() => {
+      return store.state.theme === 'dark'
+        ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
+        : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+    });
+
+    const descriptionClass = computed(() => {
+      return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+    });
+
     let endpoint: any = null;
     try {
       endpoint = getEndPoint(getIngestionURL());
@@ -564,6 +574,8 @@ export default defineComponent({
     };
 
     return {
+      quickInstallBgClass,
+      descriptionClass,
       deploymentMode,
       stackSetModel,
       selectedRegion,
@@ -639,44 +651,45 @@ export default defineComponent({
     flex: 1;
   }
 
-  .body--light & {
-    .title {
-      color: #1a1a1a;
-    }
-    .description,
-    .detail-value,
-    .mode-hint {
-      color: #666;
-    }
-    .step-label {
-      color: #333;
-    }
-    .region-hint {
-      color: #888;
-    }
-    .param-helper {
-      background: #f5f5f5;
-    }
-    .param-row {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-    }
-    .param-key {
-      color: #333;
-    }
-    .param-val-text {
-      color: #555;
-    }
-    .region-collapsible-header {
-      background: #f0f4ff;
-      border: 1px solid #d0d9f0;
-      &:hover {
-        background: #e8eeff;
-      }
+  // Light mode defaults (body--light OR no .dark class)
+  .title {
+    color: #1a1a1a;
+  }
+  .description,
+  .detail-value,
+  .mode-hint {
+    color: #666;
+  }
+  .step-label {
+    color: #333;
+  }
+  .region-hint {
+    color: #888;
+  }
+  .param-helper {
+    background: #f5f5f5;
+  }
+  .param-row {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+  }
+  .param-key {
+    color: #333;
+  }
+  .param-val-text {
+    color: #555;
+  }
+  .region-collapsible-header {
+    background: #f0f4ff;
+    border: 1px solid #d0d9f0;
+    &:hover {
+      background: #e8eeff;
     }
   }
 
-  .body--dark & {
+  // Dark mode overrides (both .dark class system and legacy body--dark)
+  .dark &,
+  body.body--dark & {
     .title {
       color: #e0e0e0;
     }

@@ -15,22 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tabContent">
-    <div class="tabContent__head">
-      <div>
-        <div class="copy_action">
-          <OButton
-            data-test="rum-copy-btn"
-            variant="ghost"
-            size="icon"
-            @click="copyToClipboardFn()"
-          >
-            <OIcon name="content-copy" size="sm" />
-          </OButton>
-        </div>
-      </div>
-    </div>
-    <pre data-test="rum-content-text">{{ computedContent }}</pre>
+  <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block">
+    <OButton
+      data-test="rum-copy-btn"
+      variant="ghost"
+      size="icon-xs-sq"
+      class="tw:absolute tw:top-2 tw:right-2 tw:z-10"
+      @click="copyToClipboardFn()"
+    >
+      <OIcon name="content-copy" size="sm" />
+      <OTooltip content="Copy" side="top" />
+    </OButton>
+    <pre data-test="rum-content-text" class="tw:text-sm tw:whitespace-pre-wrap tw:wrap-break-word tw:m-0 tw:p-3 tw:pr-10 tw:leading-5">{{ computedContent }}</pre>
   </div>
 </template>
 
@@ -43,11 +39,13 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "CopyContent",
   components: { OButton,
     OIcon,
+    OTooltip,
 },
   props: {
     content: {
@@ -128,3 +126,15 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+.copy-content-block {
+  background-color: rgba(136, 136, 136, 0.103);
+}
+.dark-mode .copy-content-block {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.light-mode .copy-content-block {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+</style>

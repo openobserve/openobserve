@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="edit-role-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
-    <div class="card-container tw:py-2">
-          <span style="font-size: 18px;" class="tw:px-3 ">{{ editingRole }}</span> 
+    <div class="card-container tw:py-2 tw:flex tw:flex-col">
+          <span style="font-size: 18px;" class="tw:px-3 tw:mb-2">{{ editingRole }}</span>
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -74,12 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class=" tw:flex tw:items-start tw:px-3 tw:py-2 tw:justify-start"
+              class="tw:flex tw:items-start tw:px-3 tw:py-2 tw:justify-start tw:gap-3"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="tw:flex tw:items-center tw:mr-3"
+                class="tw:flex tw:items-center"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border tw:mr-3 o2-search-input tw:h-[36px] tw:w-[200px]"
+                  class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
