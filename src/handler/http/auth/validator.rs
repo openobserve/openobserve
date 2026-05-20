@@ -1062,7 +1062,7 @@ pub(crate) async fn check_permissions(
     // When checking against META_ORG, look up the user's role there
     let effective_role = if org_id == config::META_ORG_ID {
         match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => format!("{}", user.role),
+            Some(user) => user.role.to_string(),
             None => role,
         }
     } else {
