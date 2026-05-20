@@ -205,76 +205,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-show="expandState.setVariables"
-                  class="tw:flex tw:justify-between tw:pl-2 tw:h-full"
-                  style="overflow-y: auto !important"
+                  class="tw:flex tw:flex-col tw:pl-2 tw:pr-2 tw:pt-4 tw:h-full tw:overflow-y-auto"
                 >
-                  <div>
+                  <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
                     <div
                       v-if="
                         selectedStreamType === 'metrics' &&
                         tab === 'promql' &&
                         promqlCondition
                       "
-                      class="tw:flex tw:justify-start tw:items-center tw:font-bold tw:mb-2 tw:mt-3 o2-input"
+                      class="tw:flex tw:items-center tw:gap-2"
                     >
-                      <div style="width: 130px">
-                        {{ t("pipeline.trigger") }}
+                      <div
+                        class="tw:font-bold tw:flex tw:items-center tw:gap-1 tw:w-[160px] tw:shrink-0"
+                      >
+                        <span>{{ t("pipeline.trigger") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="tw:ml-1 tw:cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-400'
-                              : 'tw:text-gray-400'
-                          "
-                         />
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span style="font-size: 14px"
-                                >Based upon the condition of trigger the
-                                pipeline will get trigger <br />
-                                e.g. if the trigger value is >100 and the query
-                                returns a value of 101 then the pipeline will
-                                trigger.</span
-                              >
-                            </template>
-                          </OTooltip>
+                          class="tw:cursor-pointer tw:text-gray-400"
+                        />
+                        <OTooltip side="right" max-width="300px">
+                          <template #content>
+                            <span class="tw:text-[14px]">
+                              Based upon the condition of trigger the
+                              pipeline will get trigger <br />
+                              e.g. if the trigger value is &gt;100 and the query
+                              returns a value of 101 then the pipeline will
+                              trigger.
+                            </span>
+                          </template>
+                        </OTooltip>
                       </div>
-                      <div class="tw:flex tw:justify-start tw:items-center">
-                        <div
-                          data-test="scheduled-pipeline-promlq-condition-operator-select"
-                        >
-                          <OSelect
-                            v-model="promqlCondition.operator"
-                            :options="triggerOperators"
-                            class="no-case tw:py-0 tw:mr-1"
-                            style="width: 88px; border-right: none"
-                            @update:model-value="updatePromqlCondition"
-                          />
-                        </div>
-                        <div
-                          data-test="scheduled-pipeline-promlq-condition-value"
-                          style="width: 160px; margin-left: 0 !important"
-                          class="silence-notification-input o2-input"
-                        >
-                          <OInput
-                            v-model="promqlCondition.value"
-                            type="number"
-                            :min="0"
-                            :placeholder="t('pipeline.value')"
-                            @update:model-value="updatePromqlCondition"
-                          />
-                        </div>
-                      </div>
+                      <OSelect
+                        v-model="promqlCondition.operator"
+                        :options="triggerOperators"
+                        :searchable="false"
+                        width="xs"
+                        class="no-case"
+                        data-test="scheduled-pipeline-promlq-condition-operator-select"
+                        @update:model-value="updatePromqlCondition"
+                      />
+                      <OInput
+                        v-model="promqlCondition.value"
+                        type="number"
+                        :min="0"
+                        :placeholder="t('pipeline.value')"
+                        width="xs"
+                        data-test="scheduled-pipeline-promlq-condition-value"
+                        @update:model-value="updatePromqlCondition"
+                      />
                     </div>
                     <div
                       v-if="tab === 'custom'"
-                      class="tw:flex tw:justify-start tw:items-center tw:font-bold tw:mb-4"
+                      class="tw:flex tw:items-center tw:gap-2 tw:font-bold tw:mb-4"
                     >
                       <div
                         data-test="scheduled-pipeline-aggregation-title"
-                        style="width: 172px"
+                        class="tw:w-[172px] tw:shrink-0"
                       >
                         {{ t("pipeline.aggregation") }}
                       </div>
@@ -525,99 +513,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </div>
                     </div>
-                    <div class="tw:flex tw:items-center tw:mr-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <div
                         data-test="scheduled-pipeline-cron-toggle-title"
-                        class="tw:font-bold tw:flex tw:items-center"
-                        style="width: 130px"
+                        class="tw:font-bold tw:flex tw:items-center tw:gap-1 tw:w-[160px] tw:shrink-0"
                       >
-                        {{ t("alerts.crontitle") + " *" }}
+                        <span>{{ t("alerts.crontitle") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="tw:ml-1 tw:cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-400'
-                              : 'tw:text-gray-400'
-                          "
-                         />
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span style="font-size: 14px"
-                                >Configure the option to enable a cron
-                                expression.</span
-                              >
-                            </template>
-                          </OTooltip>
+                          class="tw:cursor-pointer tw:text-gray-400"
+                        />
+                        <OTooltip side="right" max-width="300px">
+                          <template #content>
+                            <span class="tw:text-[14px]">
+                              Configure the option to enable a cron
+                              expression.
+                            </span>
+                          </template>
+                        </OTooltip>
                       </div>
-                      <div style="min-height: 58px">
-                        <div
-                          class="tw:flex tw:items-center tw:mr-2"
-                          style="width: fit-content"
-                        >
-                          <div
-                            data-test="scheduled-pipeline-cron-input"
-                            class="silence-notification-input"
-                          >
-                            <OSwitch
-                              data-test="scheduled-pipeline-cron-toggle-btn"
-                              v-model="isCronMode"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      <OSwitch
+                        data-test="scheduled-pipeline-cron-toggle-btn"
+                        v-model="isCronMode"
+                      />
                     </div>
-                    <div class="tw:flex tw:items-center tw:justify-start tw:mr-2">
+                    <div class="tw:flex tw:items-start tw:gap-2">
                       <div
                         data-test="scheduled-pipeline-frequency-title"
-                        class="tw:font-bold tw:flex tw:items-center tw:mr-1"
-                        :style="{
-                          width:
-                            triggerData.frequency_type == 'minutes'
-                              ? '130px'
-                              : '100px',
-                        }"
+                        class="tw:font-bold tw:flex tw:items-center tw:gap-1 tw:w-[160px] tw:shrink-0 tw:pt-2"
                       >
-                        {{ t("alerts.frequency") + " *" }}
+                        <span>{{ t("alerts.frequency") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="tw:ml-1 tw:cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-400'
-                              : 'tw:text-gray-400'
-                          "
-                         />
-                          <OTooltip side="right">
-                            <template #content>
-                              <span
-                                style="font-size: 14px"
-                                v-if="triggerData.frequency_type == 'minutes'"
-                                >How often the task should be executed.<br />
-                                e.g., 2 minutes means that the task will run
-                                every 2 minutes and will be processed based on
-                                the other parameters provided.</span
-                              >
-                              <span style="font-size: 14px" v-else>
-                                Pattern: * * * * * * means every second.
-                                <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                                Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday.
-                                <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week,
-                                respectively.</span
-                              >
-                            </template>
-                          </OTooltip>
+                          class="tw:cursor-pointer tw:text-gray-400"
+                        />
+                        <OTooltip side="right">
+                          <template #content>
+                            <span
+                              class="tw:text-[14px]"
+                              v-if="triggerData.frequency_type == 'minutes'"
+                              >How often the task should be executed.<br />
+                              e.g., 2 minutes means that the task will run
+                              every 2 minutes and will be processed based on
+                              the other parameters provided.</span
+                            >
+                            <span class="tw:text-[14px]" v-else>
+                              Pattern: * * * * * * means every second.
+                              <br />
+                              Format: [Second (optional) 0-59] [Minute 0-59]
+                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                              1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                              Sunday].
+                              <br />
+                              Use '*' to represent any value, 'L' for the last
+                              day/weekday.
+                              <br />
+                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                              daily. It specifies second, minute, hour, day of
+                              month, month, and day of week,
+                              respectively.</span
+                            >
+                          </template>
+                        </OTooltip>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
@@ -627,36 +586,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="warning"
                             size="sm"
-                            class="tw:cursor-pointer tw:ml-[8px]"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'tw:text-orange-500'
-                                : 'tw:text-orange-500'
-                            "
-                           />
-                            <OTooltip
-                              side="right"
-                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
-                            />
+                            class="tw:cursor-pointer tw:text-orange-500"
+                          />
+                          <OTooltip
+                            side="right"
+                            content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                          />
                         </template>
                       </div>
-                      <div style="max-height: 50px" class="tw:mb-2">
-                        <div
-                          class="tw:flex tw:items-center tw:mr-2"
-                          style="width: fit-content"
-                        >
+                      <div class="tw:flex tw:flex-col tw:gap-1">
+                        <template v-if="triggerData.frequency_type == 'minutes'">
                           <div
-                            data-test="scheduled-pipeline-frequency-input"
-                            :style="
-                              triggerData.frequency_type == 'minutes'
-                                ? 'width: 87px; margin-left: 0 !important;margin-top: 10px'
-                                : 'width: fit-content !important'
-                            "
-                            class="silence-notification-input"
+                            class="tw:flex tw:items-stretch tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:w-fit tw:overflow-hidden"
                           >
                             <OInput
                               data-test="scheduled-pipeline-frequency-input-field"
-                              v-if="triggerData.frequency_type == 'minutes'"
                               v-model="triggerData.frequency"
                               type="number"
                               :min="
@@ -665,227 +609,167 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     ?.min_auto_refresh_interval / 60,
                                 ) || 1
                               "
+                              width="xs"
                               @update:model-value="updateFrequency"
                             />
                             <div
-                              v-else
-                              class="tw:flex tw:items-center o2-input tw:gap-y-2"
+                              data-test="scheduled-pipeline-frequency-unit"
+                              :class="[
+                                'tw:flex tw:justify-center tw:items-center tw:min-w-[60px] tw:px-2 tw:font-normal',
+                                store.state.theme === 'dark'
+                                  ? 'tw:bg-gray-800'
+                                  : 'tw:bg-gray-100',
+                              ]"
                             >
-                              <OInput
-                                data-test="scheduled-pipeline-cron-input-field"
-                                v-model="triggerData.cron"
-                                :label="t('reports.cronExpression') + ' *'"
-                                style="width: 130px"
-                                @update:model-value="updateCron"
-                              />
-                              <OSelect
-                                data-test="add-report-schedule-start-timezone-select"
-                                v-model="triggerData.timezone"
-                                :options="filteredTimezone"
-                                :label="t('logStream.timezone') + ' *'"
-                                :title="triggerData.timezone"
-                                class="timezone-select tw:ml-2"
-                                style="width: 200px"
-                              />
+                              {{ t("alerts.minutes") }}
                             </div>
                           </div>
-                          <div
-                            v-if="triggerData.frequency_type == 'minutes'"
-                            data-test="scheduled-pipeline-frequency-unit"
-                            style="
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                              margin-top: 10px;
-                              width: 87px;
-                            "
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'tw:bg-gray-800'
-                                : 'tw:bg-gray-100'
-                            "
-                            class="tw:flex tw:justify-center tw:items-center"
-                          >
-                            {{ t("alerts.minutes") }}
+                        </template>
+                        <template v-else>
+                          <div class="tw:flex tw:items-center tw:gap-2">
+                            <OInput
+                              data-test="scheduled-pipeline-cron-input-field"
+                              v-model="triggerData.cron"
+                              :placeholder="t('reports.cronExpression') + ' *'"
+                              width="xs"
+                              @update:model-value="updateCron"
+                              @blur="cronTouched = true"
+                            />
+                            <OSelect
+                              data-test="add-report-schedule-start-timezone-select"
+                              v-model="triggerData.timezone"
+                              :options="filteredTimezone"
+                              :placeholder="t('logStream.timezone') + ' *'"
+                              :title="triggerData.timezone"
+                              width="xs"
+                            />
                           </div>
-                        </div>
+                        </template>
                         <div
                           data-test="scheduled-pipeline-frequency-error-text"
                           v-if="
                             (!Number(triggerData.frequency) &&
                               triggerData.frequency_type == 'minutes') ||
                             (triggerData.frequency_type == 'cron' &&
-                              triggerData.cron == '') ||
+                              triggerData.cron == '' &&
+                              cronTouched) ||
                             cronJobError
                           "
-                          class="text-red-8 tw:pt-1"
-                          style="font-size: 11px; line-height: 12px"
+                          class="tw:text-red-700 tw:text-[11px] tw:leading-3"
                         >
                           {{ cronJobError || t("pipeline.fieldRequired") }}
                         </div>
                       </div>
                     </div>
-                    <div class="tw:flex tw:items-center tw:mr-2 tw:mt-8">
+                    <div class="tw:flex tw:items-start tw:gap-2">
                       <div
                         data-test="scheduled-pipeline-period-title"
-                        class="tw:font-bold tw:flex tw:items-center tw:pb-2"
-                        style="width: 130px"
+                        class="tw:font-bold tw:flex tw:items-center tw:gap-1 tw:w-[160px] tw:shrink-0 tw:pt-2"
                       >
-                        {{ t("alerts.period") + " *" }}
+                        <span>{{ t("alerts.period") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="tw:ml-1 tw:cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-400'
-                              : 'tw:text-gray-400'
-                          "
-                         />
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span style="font-size: 14px"
-                                >Period for which the query should run.<br />
-                                e.g. 10 minutes means that whenever the query
-                                will run it will use the last 10 minutes of
-                                data. If the query runs at 4:00 PM then it will
-                                use the data from 3:50 PM to 4:00 PM.</span
-                              >
-                            </template>
-                          </OTooltip>
+                          class="tw:cursor-pointer tw:text-gray-400"
+                        />
+                        <OTooltip side="right" max-width="300px">
+                          <template #content>
+                            <span class="tw:text-[14px]">
+                              Period for which the query should run.<br />
+                              e.g. 10 minutes means that whenever the query
+                              will run it will use the last 10 minutes of
+                              data. If the query runs at 4:00 PM then it will
+                              use the data from 3:50 PM to 4:00 PM.
+                            </span>
+                          </template>
+                        </OTooltip>
                       </div>
-                      <div style="min-height: 58px">
+                      <div class="tw:flex tw:flex-col tw:gap-1">
                         <div
-                          class="tw:flex tw:items-center tw:mr-2"
-                          style="
-                            border: 1px solid rgba(0, 0, 0, 0.05);
-                            width: fit-content;
-                          "
+                          class="tw:flex tw:items-stretch tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:w-fit tw:overflow-hidden"
                         >
-                          <div
+                          <OInput
                             data-test="scheduled-pipeline-period-input"
-                            style="width: 87px; margin-left: 0 !important"
-                            class="silence-notification-input"
-                          >
-                            <OInput
-                              v-model="triggerData.period"
-                              type="number"
-                              :min="1"
-                              :readonly="
-                                triggerData.frequency_type == 'minutes'
-                              "
-                              :disabled="
-                                triggerData.frequency_type == 'minutes'
-                              "
-                              @update:model-value="updateTrigger"
-                            />
-                          </div>
+                            v-model="triggerData.period"
+                            type="number"
+                            :min="1"
+                            :readonly="triggerData.frequency_type == 'minutes'"
+                            :disabled="triggerData.frequency_type == 'minutes'"
+                            class="silence-notification-input" width="xs"
+                            @update:model-value="updateTrigger"
+                          />
                           <div
                             data-test="scheduled-pipeline-period-unit"
-                            style="
-                              min-width: 90px;
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                            "
-                            :class="
+                            :class="[
+                              'tw:flex tw:justify-center tw:items-center tw:min-w-[60px] tw:px-2 tw:font-normal',
                               store.state.theme === 'dark'
                                 ? 'tw:bg-gray-800'
-                                : 'tw:bg-gray-100'
-                            "
-                            class="tw:flex tw:justify-center tw:items-center"
+                                : 'tw:bg-gray-100',
+                            ]"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
                         </div>
-                      </div>
-                      <div
-                        data-test="scheduled-pipeline-period-error-text"
-                        v-if="!Number(triggerData.period)"
-                        class="text-red-8 tw:pt-1"
-                        style="font-size: 11px; line-height: 12px"
-                      >
-                        Field is required!
-                      </div>
-                      <div
-                        data-test="scheduled-pipeline-period-warning-text"
-                        v-else
-                        class="text-primary tw:pt-1"
-                        style="
-                          font-size: 12px;
-                          line-height: 12px;
-                          padding: 2px 0px;
-                        "
-                      >
-                        Note: The period should be the same as frequency.
+                        <div
+                          v-if="!Number(triggerData.period)"
+                          data-test="scheduled-pipeline-period-error-text"
+                          class="tw:text-red-700 tw:text-[11px] tw:leading-3"
+                        >
+                          Field is required!
+                        </div>
+                        <div
+                          v-else
+                          data-test="scheduled-pipeline-period-warning-text"
+                          class="tw:text-[var(--o2-primary)] tw:text-[12px] tw:leading-3 tw:py-0.5"
+                        >
+                          Note: The period should be the same as frequency.
+                        </div>
                       </div>
                     </div>
-                    <div class="tw:flex tw:items-center tw:mr-2 tw:mt-4">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <div
                         data-test="scheduled-pipeline-delay-title"
-                        class="tw:font-bold tw:flex tw:items-center tw:pb-2"
-                        style="width: 130px"
+                        class="tw:font-bold tw:flex tw:items-center tw:gap-1 tw:w-[160px] tw:shrink-0"
                       >
-                        {{ t("pipeline.delay") + " *" }}
+                        <span>{{ t("pipeline.delay") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="tw:ml-1 tw:cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-400'
-                              : 'tw:text-gray-400'
-                          "
-                         />
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span style="font-size: 14px"
-                                >Delay for which the pipeline is scheduled to
-                                run.<br />
-                                e.g. 10 minutes delay means that the pipeline
-                                will run 10 minutes after its scheduled
-                                time.</span
-                              >
-                            </template>
-                          </OTooltip>
+                          class="tw:cursor-pointer tw:text-gray-400"
+                        />
+                        <OTooltip side="right" max-width="300px">
+                          <template #content>
+                            <span class="tw:text-[14px]"
+                              >Delay for which the pipeline is scheduled to
+                              run.<br />
+                              e.g. 10 minutes delay means that the pipeline
+                              will run 10 minutes after its scheduled
+                              time.</span
+                            >
+                          </template>
+                        </OTooltip>
                       </div>
-                      <div style="min-height: 58px">
+                      <div
+                        class="tw:flex tw:items-stretch tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:w-fit tw:overflow-hidden"
+                      >
+                        <OInput
+                          data-test="scheduled-pipeline-delay-input"
+                          v-model="delayCondition"
+                          type="number"
+                          :min="0"
+                          width="xs"
+                          @update:model-value="updateDelay"
+                        />
                         <div
-                          class="tw:flex tw:items-center tw:mr-2"
-                          style="
-                            border: 1px solid rgba(0, 0, 0, 0.05);
-                            width: fit-content;
-                          "
+                          data-test="scheduled-pipeline-delay-unit"
+                          :class="[
+                            'tw:flex tw:justify-center tw:items-center tw:min-w-[60px] tw:px-2 tw:font-normal',
+                            store.state.theme === 'dark'
+                              ? 'tw:bg-gray-800'
+                              : 'tw:bg-gray-100',
+                          ]"
                         >
-                          <div
-                            data-test="scheduled-pipeline-delay-input"
-                            style="width: 87px; margin-left: 0 !important"
-                            class="silence-notification-input"
-                          >
-                            <OInput
-                              v-model="delayCondition"
-                              type="number"
-                              :min="0"
-                              @update:model-value="updateDelay"
-                            />
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-delay-unit"
-                            style="
-                              min-width: 90px;
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                            "
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'tw:bg-gray-800'
-                                : 'tw:bg-gray-100'
-                            "
-                            class="tw:flex tw:justify-center tw:items-center"
-                          >
-                            {{ t("alerts.minutes") }}
-                          </div>
+                          {{ t("alerts.minutes") }}
                         </div>
                       </div>
                     </div>
@@ -1610,15 +1494,22 @@ watch(
     }
   },
 );
+// The horizontal splitter splits the sidebar into "Build Query" (top) and
+// "Set Variables" (bottom). Each pane carries the FullViewContainer header
+// inside it, so the splitter must NEVER go all the way to 0 / 100 — otherwise
+// the collapsed pane's header disappears and the user can't re-expand it.
+// HEADER_PCT reserves just enough percentage for a single FullViewContainer
+// row to remain visible.
+const HEADER_PCT = 6;
 watch(
   () => expandState.value.buildQuery,
   (val) => {
     if (val == false && expandState.value.setVariables == true) {
-      sideBarSplitterModel.value = 0;
+      sideBarSplitterModel.value = HEADER_PCT;
     } else if (val == false && expandState.value.setVariables == false) {
-      sideBarSplitterModel.value = 0;
+      sideBarSplitterModel.value = HEADER_PCT;
     } else if (val == true && expandState.value.setVariables == false) {
-      sideBarSplitterModel.value = 99;
+      sideBarSplitterModel.value = 100 - HEADER_PCT;
     } else {
       sideBarSplitterModel.value = 60;
     }
@@ -1628,11 +1519,11 @@ watch(
   () => expandState.value.setVariables,
   (val) => {
     if (val == false && expandState.value.buildQuery == true) {
-      sideBarSplitterModel.value = 99;
+      sideBarSplitterModel.value = 100 - HEADER_PCT;
     } else if (val == false && expandState.value.buildQuery == false) {
-      sideBarSplitterModel.value = 0;
+      sideBarSplitterModel.value = HEADER_PCT;
     } else if (val == true && expandState.value.buildQuery == false) {
-      sideBarSplitterModel.value = 0;
+      sideBarSplitterModel.value = HEADER_PCT;
     } else {
       sideBarSplitterModel.value = 60;
     }
@@ -1688,6 +1579,7 @@ const getNumericColumns = computed(() => {
 });
 
 const cronJobError = ref("");
+const cronTouched = ref(false);
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
@@ -1704,14 +1596,14 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-filteredTimezone.value = [...timezoneOptions];
-
 const browserTime =
   "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
+
+filteredTimezone.value = [...timezoneOptions];
 
 const timezoneFilterFn = (val: string, update: Function) => {
   filteredTimezone.value = filterColumns(timezoneOptions, val, update);
@@ -1727,6 +1619,7 @@ const isCronMode = computed({
   get: () => triggerData.value.frequency_type === "cron",
   set: (val: boolean) => {
     triggerData.value.frequency_type = val ? "cron" : "minutes";
+    if (!val) cronTouched.value = false;
   },
 });
 
