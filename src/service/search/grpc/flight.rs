@@ -591,8 +591,11 @@ fn optimizer_physical_plan(
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {
-        let index_optimizer_rule =
-            FollowerIndexOptimizerRule::new(time_range, index_optimizer_rule_ref.clone());
+        let index_optimizer_rule = FollowerIndexOptimizerRule::new(
+            time_range,
+            index_fields.clone(),
+            index_optimizer_rule_ref.clone(),
+        );
         let _ = index_optimizer_rule.optimize(original_plan, ctx.state().config_options())?;
     }
 
@@ -680,6 +683,7 @@ async fn handle_tantivy_optimize(
         idx_optimize_rule,
         Some(IndexOptimizeMode::SimpleCount)
             | Some(IndexOptimizeMode::SimpleHistogram(..))
+            | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
             | Some(IndexOptimizeMode::SimpleTopN(..))
             | Some(IndexOptimizeMode::SimpleDistinct(..))
     ) {
