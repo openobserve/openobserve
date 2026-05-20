@@ -31,21 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ field.label || field.name }}
       </div>
-      <span class="float-right">
-        <OIcon
-          :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-          v-if="showQuickMode && field.name !== timestampColumn"
-          :name="field.isInterestingField ? 'info' : 'info-outline'"
-          :class="theme === 'dark' ? '' : 'light-dimmed'"
-          style="margin-right: 0.375rem"
-          size="sm"
-          :title="
-            field.isInterestingField
-              ? 'Remove from interesting fields'
-              : 'Add to interesting fields'
-          "
-        />
-      </span>
     </div>
     <div
       class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem] tw:overflow-hidden"
