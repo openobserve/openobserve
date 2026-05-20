@@ -81,25 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #after>
         <div class="tw:pr-[0.625rem] tw:h-full">
           <div class="card-container tw:h-full">
-            <template v-if="isLoading.length">
-              <div
-                class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-18.75rem)]"
-              >
-                <div>
-                  <OSpinner
-                    size="md"
-                    class="tw:mx-auto tw:block"
-                    data-test="app-errors-loading-indicator"
-                  />
-                  <div class="tw:text-center tw:w-full">
-                    {{ t("rum.loadingApplicationErrors") }}
-                  </div>
-                </div>
-              </div>
-            </template>
             <OTable
               :data="tableErrors"
               :columns="tableColumns"
+              :loading="isLoading.length > 0"
               row-key="_rowKey"
               pagination="none"
               virtual-scroll

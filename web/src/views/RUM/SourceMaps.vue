@@ -15,11 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="source-maps-container tw:mx-[0.625rem] card-container">
+  <div
+    class="source-maps-container tw:mx-[0.625rem] card-container tw:flex tw:flex-col"
+    style="height: calc(100vh - var(--navbar-height) - 4.4rem)"
+  >
     <!-- Filters Section -->
     <div class="filters-section tw:p-3">
-      <div class="tw:flex tw:justify-between tw:items-center">
-      <div class="tw:flex tw:gap-4 tw:items-center">
+      <div class="tw:flex tw:justify-between tw:items-end">
+      <div class="tw:flex tw:gap-4 tw:items-end">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -79,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list tw:p-3">
+    <div class="source-maps-list tw:flex-1 tw:min-h-0">
       <!-- Loading State -->
       <template v-if="isLoading">
         <div class="tw:p-4 tw:flex tw:items-center tw:justify-center tw:text-center">
@@ -106,11 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
           :show-global-filter="false"
+          footer-title="Source Maps"
           expansion="single"
           expand-on-row-click
           v-model:expanded-ids="expandedIds"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 200px)"
+          class="tw:w-full"
         >
           <template #expansion="{ row }">
             <div class="expanded-details tw:p-3">
@@ -197,6 +200,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -222,11 +226,11 @@ const filteredServiceOptions = ref<string[]>([]);
 const filteredEnvironmentOptions = ref<string[]>([]);
 
 // Filters
-const filters = ref({
-  version: null as string | null,
-  service: null as string | null,
-  environment: null as string | null,
-});
+const filters = ref<{
+  version?: string;
+  service?: string;
+  environment?: string;
+}>({});
 
 // Fetch filter values from API
 const fetchFilterValues = async () => {
@@ -367,7 +371,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "actions",
     meta: { align: "center" },
     isAction: true,
-    size: 100,
+    size: 80,
   },
 ];
 
