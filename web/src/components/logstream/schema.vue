@@ -405,19 +405,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OToggleGroup>
                       </div>
 
-                      <div v-if="hasUserDefinedSchema" class="tw:ml-2">
+                      <div v-if="hasUserDefinedSchema" class="tw:ml-2 tw:flex tw:items-center">
                         <OIcon
                           name="info"
-                          class="tw:mr-1"
                           size="sm"
                           style="color: #f5a623; cursor: pointer"
-                        >
-                          <OTooltip side="right">
-                            Other fields show only the schema fields that
-                            existed before the stream was configured to use a
-                            user-defined schema.
-                          </OTooltip>
-                        </OIcon>
+                        />
+                        <OTooltip
+                          side="right"
+                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                        />
                       </div>
                     </div>
 
