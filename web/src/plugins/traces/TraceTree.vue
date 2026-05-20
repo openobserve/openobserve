@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
-                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+                  store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
                   isLLMTrace((spans as any[])[virtualRow.index])
                     ? ''
                     : 'tw:pt-2',

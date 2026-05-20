@@ -17,7 +17,7 @@
           padding: 2px;
         "
         v-model="fields.rawQuery"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
         data-test="dashboard-raw-query-textarea"
         :rows="6"
       ></textarea>

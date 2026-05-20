@@ -745,7 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
       style="position: sticky; bottom: 0.375rem; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       :style="{
         'box-shadow':
           store.state.theme === 'dark'

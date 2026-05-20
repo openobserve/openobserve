@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
         ref="annotationPopupRef"
       >
         <div
