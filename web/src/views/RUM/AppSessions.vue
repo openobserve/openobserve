@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pagination="none"
                   virtual-scroll
                   :dense="false"
+                  :row-height="54"
                   class="tw:h-full"
                   data-test="rum-sessions-table"
                   @row-click="handleRowClick"

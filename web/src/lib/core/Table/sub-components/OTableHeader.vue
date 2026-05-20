@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -43,6 +43,11 @@ const emit = defineEmits<{
 }>();
 
 const drag = ref(false);
+
+const horizontalScroll = inject<{ value: boolean } | null>(
+  "o2TableHorizontalScroll",
+  null,
+);
 
 function handleSort(columnId: string, toggleHandler?: (event: Event) => void, event?: MouseEvent) {
   const meta = (props.table.getColumn(columnId)?.columnDef?.meta as any);
@@ -292,7 +297,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          ...(isAutoWidthColumn(header) ? {} : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
+          ...(isAutoWidthColumn(header) ? {} : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',
@@ -417,7 +422,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          ...(isAutoWidthColumn(header) ? {} : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
+          ...(isAutoWidthColumn(header) ? {} : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',
