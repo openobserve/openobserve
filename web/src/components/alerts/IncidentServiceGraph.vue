@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-if="loading"
-      class="tw-flex tw-items-center tw-justify-center tw-h-full"
-      :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
+      class="tw:flex tw:items-center tw:justify-center tw:h-full"
+      :class="isDarkMode ? 'tw:bg-gray-900/50' : 'tw:bg-white/50'"
     >
       <OSpinner size="md" />
     </div>
@@ -59,14 +59,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:h-full"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" style="width: 48px; height: 48px;" />
+      <OIcon name="hub" :class="isDarkMode ? 'tw:text-gray-600' : 'tw:text-gray-300'" style="width: 48px; height: 48px;" />
       <div class="tw:text-center">
-        <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+        <div class="tw:text-sm tw:font-medium" :class="isDarkMode ? 'tw:text-gray-400' : 'tw:text-gray-600'">
           Service Graph Unavailable
         </div>
-        <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
+        <div class="tw:text-xs tw:mt-1" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'">
           No topology data available for this incident.
         </div>
       </div>

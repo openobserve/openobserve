@@ -1009,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
@@ -1050,7 +1050,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Metrics Tab Content -->
-        <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+        <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
             <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
@@ -1058,7 +1058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
@@ -1095,7 +1095,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Traces Tab Content -->
-        <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+        <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
           <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
@@ -1114,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
