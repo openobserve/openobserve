@@ -542,7 +542,7 @@
   --color-table-row-expanded-bg: var(--color-surface-subtle);
   /* Row height tokens — change these to resize all OTable rows globally */
   --table-row-height-dense: 2.25rem;   /* 36px */
-  --table-row-height-normal: 2.75rem;  /* 44px */
+  --table-row-height-normal: 3.375rem;  /* 54px */
 
   /* ── Banner (OBanner) ──────────────────────────────────── */
   /* default */

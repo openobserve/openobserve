@@ -223,7 +223,7 @@ const {
   parentRef: scrollContainerRef,
   scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
   scrollMargin: props.scrollMargin ?? 0,
-  rowHeight: props.rowHeight ?? (props.dense ? 36 : 44),
+  rowHeight: props.rowHeight ?? (props.dense ? 36 : 54),
   overscan: 100,
 });
 
@@ -363,7 +363,7 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      class="tw:flex-1 tw:overflow-auto tw:min-h-0 tw:relative"
+      class="tw:flex tw:flex-col tw:flex-1 tw:overflow-auto tw:min-h-0 tw:relative"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'

@@ -315,7 +315,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           <!-- Sortable header -->
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden"
+            class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden tw:whitespace-nowrap"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
@@ -439,7 +439,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full', headerAlignClass(header)]">
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden"
+            class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden tw:whitespace-nowrap"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
