@@ -87,8 +87,8 @@
         />
         <OIcon
           :name="getTypeIcon(row.type)"
-          size="sm"
-          class="o-field-list__type-icon"
+          size="xs"
+          class="o-field-list__type-icon tw:opacity-60"
         />
         <span class="o-field-list__field-name">{{ row.name }}</span>
       </template>
@@ -756,21 +756,40 @@ watch(
 const flattenGroupedFields = computed(() => {
   const flattenedFields: any[] = [];
 
-  dashboardPanelData.meta.stream.customQueryFields.forEach((field: any) => {
+  // Custom query fields (from a user-written SELECT) and VRL function output
+  // fields aren't tied to any stream — give them their own visible section
+  // headers so they don't render as orphan rows above the first stream group.
+  const customQueryFields =
+    dashboardPanelData.meta.stream.customQueryFields ?? [];
+  if (customQueryFields.length > 0) {
     flattenedFields.push({
-      name: field.name,
-      type: field.type,
-      isGroup: false,
+      isGroup: true,
+      groupName: "Query Fields",
     });
-  });
+    customQueryFields.forEach((field: any) => {
+      flattenedFields.push({
+        name: field.name,
+        type: field.type,
+        isGroup: false,
+      });
+    });
+  }
 
-  dashboardPanelData.meta.stream.vrlFunctionFieldList.forEach((field: any) => {
+  const vrlFunctionFields =
+    dashboardPanelData.meta.stream.vrlFunctionFieldList ?? [];
+  if (vrlFunctionFields.length > 0) {
     flattenedFields.push({
-      name: field.name,
-      type: field.type,
-      isGroup: false,
+      isGroup: true,
+      groupName: "Function Fields",
     });
-  });
+    vrlFunctionFields.forEach((field: any) => {
+      flattenedFields.push({
+        name: field.name,
+        type: field.type,
+        isGroup: false,
+      });
+    });
+  }
 
   dashboardPanelData.meta.streamFields.groupedFields.forEach((group: any) => {
     flattenedFields.push({
@@ -886,18 +905,18 @@ function onDragEnd(_row: FieldItem, _event: DragEvent) {
 
 // ── Sort ───────────────────────────────────────────────────────────────
 
-function sortFieldsFn(a: FieldItem, b: FieldItem): number {
-  // Group headers always come first within their section
-  if (a.isGroup && b.isGroup) return 0;
-  if (a.isGroup) return -1;
-  if (b.isGroup) return 1;
-
-  const aIsCustom = customFieldNames.value.has(a.name);
-  const bIsCustom = customFieldNames.value.has(b.name);
-
-  const aPriority = aIsCustom ? 0 : 1;
-  const bPriority = bIsCustom ? 0 : 1;
-  return aPriority - bPriority;
+// We intentionally return 0 (no-op) here.
+//
+// `flattenGroupedFields` already produces the correct order:
+//   [customQueryFields…, vrlFunctionFields…, group_A_header, A_fields…, group_B_header, B_fields…]
+//
+// A naive sort that says "group headers come first" (the previous logic)
+// hoists every group header to the very top of the flat array — which is
+// what caused both stream headers (`_anomalies`, `default`) to stack at
+// the top with all fields jammed underneath the *second* group. Returning
+// 0 preserves the natural section-by-section order from flattenGroupedFields.
+function sortFieldsFn(_a: FieldItem, _b: FieldItem): number {
+  return 0;
 }
 
 // ── Search binding ─────────────────────────────────────────────────────
@@ -1022,11 +1041,17 @@ defineExpose({ fieldListRef });
   gap: 0.125rem;
 }
 
+// Stream/section header — visually distinct band so each joined stream renders
+// as its own section in the field list (matches previous behavior where each
+// stream's fields lived under a clearly delineated stream-name band).
+// No border: in dark mode `--o2-border-color` resolves to `rgba(255,255,255,0.40)`
+// and renders as a glaring white hairline; the band's own background tint is
+// enough delineation between the header and its fields.
 .field-group-header {
   font-size: 0.75rem;
   cursor: default;
   user-select: none;
-  background-color: var(--o2-card-background);
-  color: var(--o2-text-secondary);
+  background-color: var(--o2-hover-accent);
+  color: var(--o2-text-primary);
 }
 </style>
