@@ -892,8 +892,8 @@ async fn search_tantivy_index(
         }
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
+            max_value,
             bucket_width,
-            num_buckets,
             breakdown_field,
         )) => {
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
@@ -908,8 +908,8 @@ async fn search_tantivy_index(
                 &searcher,
                 query,
                 min_value,
+                max_value,
                 bucket_width,
-                num_buckets,
                 &breakdown_field,
             )
         }

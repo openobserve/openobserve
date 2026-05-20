@@ -29,7 +29,10 @@ use tantivy::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants},
         agg_result::{AggregationResult, BucketEntries, BucketResult},
-        bucket::{CustomOrder, HistogramAggregation, Order, OrderTarget, TermsAggregation},
+        bucket::{
+            CustomOrder, HistogramAggregation, HistogramBounds, Order, OrderTarget,
+            TermsAggregation,
+        },
     },
     query::Query,
 };
@@ -162,8 +165,8 @@ impl TantivyResult {
         searcher: &Searcher,
         query: Box<dyn Query>,
         min_value: i64,
+        max_value: i64,
         bucket_width: u64,
-        _num_buckets: usize,
         breakdown_field: &str,
     ) -> anyhow::Result<Self> {
         let limit = config::get_config().limit.query_default_limit;
@@ -175,7 +178,10 @@ impl TantivyResult {
                 interval: bucket_width as f64,
                 offset: Some(offset),
                 min_doc_count: Some(1),
-                hard_bounds: None,
+                hard_bounds: Some(HistogramBounds {
+                    min: min_value as f64,
+                    max: max_value as f64,
+                }),
                 extended_bounds: None,
                 keyed: false,
                 is_normalized_to_ns: false,

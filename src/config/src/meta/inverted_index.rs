@@ -22,7 +22,7 @@ pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
-    SimpleMultiHistogram(i64, u64, usize, String),
+    SimpleMultiHistogram(i64, i64, u64, String),
     SimpleTopN(String, usize, bool),
     SimpleDistinct(String, usize, bool),
 }
@@ -35,13 +35,8 @@ impl IndexOptimizeMode {
             IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
                 format!("h(m:{min_value},b:{bucket_width},n:{num_buckets})")
             }
-            IndexOptimizeMode::SimpleMultiHistogram(
-                min_value,
-                bucket_width,
-                num_buckets,
-                field,
-            ) => {
-                format!("mh(m:{min_value},b:{bucket_width},n:{num_buckets},f:{field})")
+            IndexOptimizeMode::SimpleMultiHistogram(min_value, max_value, bucket_width, field) => {
+                format!("mh(m:{min_value},x:{max_value},b:{bucket_width},f:{field})")
             }
             IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
                 format!("t(f{field},l:{limit},a:{ascend})")
@@ -66,15 +61,10 @@ impl std::fmt::Display for IndexOptimizeMode {
                     "histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
                 )
             }
-            IndexOptimizeMode::SimpleMultiHistogram(
-                min_value,
-                bucket_width,
-                num_buckets,
-                field,
-            ) => {
+            IndexOptimizeMode::SimpleMultiHistogram(min_value, max_value, bucket_width, field) => {
                 write!(
                     f,
-                    "multi_histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets}, field: {field})"
+                    "multi_histogram(min_value: {min_value}, max_value: {max_value}, bucket_width: {bucket_width}, field: {field})"
                 )
             }
             IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
@@ -154,8 +144,9 @@ mod tests {
             "h(m:-100,b:25,n:20)"
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleMultiHistogram(0, 10, 5, "level".to_string()).to_rule_string(),
-            "mh(m:0,b:10,n:5,f:level)"
+            IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string())
+                .to_rule_string(),
+            "mh(m:0,x:1000,b:10,f:level)"
         );
         assert_eq!(
             IndexOptimizeMode::SimpleTopN("cpu".to_string(), 10, true).to_rule_string(),
@@ -215,8 +206,8 @@ mod tests {
                 "histogram(min_value: -100, bucket_width: 25, num_buckets: 20)",
             ),
             (
-                IndexOptimizeMode::SimpleMultiHistogram(0, 10, 5, "level".to_string()),
-                "multi_histogram(min_value: 0, bucket_width: 10, num_buckets: 5, field: level)",
+                IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string()),
+                "multi_histogram(min_value: 0, max_value: 1000, bucket_width: 10, field: level)",
             ),
             (
                 IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),

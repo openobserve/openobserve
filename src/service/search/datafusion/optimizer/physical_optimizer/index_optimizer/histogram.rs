@@ -165,7 +165,7 @@ fn is_timestamp_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
 }
 
 #[rustfmt::skip]
-/// SimpleMultiHistogram(i64, u64, usize, String):
+/// SimpleMultiHistogram(i64, i64, u64, String):
 /// select histogram(_timestamp) as ts, level as zo_sql_breakdown, count(*) as cnt
 ///   from table where match_all() group by ts, zo_sql_breakdown;
 /// condition: group by histogram(_timestamp) AND a secondary index field, only count(*)
@@ -183,13 +183,13 @@ pub(crate) fn is_simple_multi_histogram(
 ) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleMultiHistogramVisitor::new(time_range, index_fields);
     let _ = plan.visit(&mut visitor);
-    if let Some((min_value, bucket_width, num_buckets, breakdown_field)) =
+    if let Some((min_value, max_value, bucket_width, breakdown_field)) =
         visitor.simple_multi_histogram
     {
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
+            max_value,
             bucket_width,
-            num_buckets,
             breakdown_field,
         ))
     } else {
@@ -200,7 +200,7 @@ pub(crate) fn is_simple_multi_histogram(
 struct SimpleMultiHistogramVisitor {
     time_range: (i64, i64),
     index_fields: HashSet<String>,
-    pub simple_multi_histogram: Option<(i64, u64, usize, String)>,
+    pub simple_multi_histogram: Option<(i64, i64, u64, String)>,
 }
 
 impl SimpleMultiHistogramVisitor {
@@ -245,13 +245,10 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                                 let rounding_by = histogram_interval as i64;
                                 let min_value = start_time - start_time % rounding_by;
                                 let max_value = end_time;
-                                let num_buckets =
-                                    ((max_value - min_value) as f64 / histogram_interval as f64)
-                                        .ceil() as usize;
                                 self.simple_multi_histogram = Some((
                                     min_value,
+                                    max_value,
                                     histogram_interval,
-                                    num_buckets,
                                     column_name.to_string(),
                                 ));
                                 return Ok(TreeNodeRecursion::Continue);
@@ -388,8 +385,8 @@ mod tests {
                 "SELECT histogram(_timestamp) as ts, level, count(*) as cnt from t group by ts, level",
                 Some(IndexOptimizeMode::SimpleMultiHistogram(
                     1757401680000000,
+                    1757402594060000,
                     60000000,
-                    16,
                     "level".to_string(),
                 )),
             ),
