@@ -114,6 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @scroll-end="handleScrollEnd"
                   :show-global-filter="false"
                 >
+                  <template #empty>
+                    <NoData />
+                  </template>
                   <template #cell-action_play="{ row }">
                     <OIcon
                       name="play-circle-filled"
@@ -195,6 +198,7 @@ import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import {
