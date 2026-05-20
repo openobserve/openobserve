@@ -424,10 +424,14 @@ export default defineComponent({
       }
       //it is for showing the update page when user refresh the page
       //we are passing the name of the enrichment table to the update page
-      else if(router.currentRoute.value.query.action === "update"){
+      else if(router.currentRoute.value.query.action === "update" && router.currentRoute.value.query.name){
         showAddUpdateFn({
           name: router.currentRoute.value.query.name,
         })
+      }
+      //fallback: if action=update came in without a name, treat it as an add
+      else if(router.currentRoute.value.query.action === "update"){
+        showAddUpdateFn(null)
       }
     })
 

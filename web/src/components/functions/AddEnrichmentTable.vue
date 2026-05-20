@@ -15,208 +15,219 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-    <div class="tw:px-3 tw:py-3 card-container tw:h-[calc(100vh-50px)]">
-      <div class="tw:flex tw:items-center tw:flex-nowrap">
-        <div class="tw:flex tw:flex-col">
-          <div v-if="isUpdating" class="tw:text-xl tw:font-semibold">
-            {{ t("function.updateEnrichmentTable") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold">{{ t("function.addEnrichmentTable") }}</div>
-        </div>
-      </div>
-
-      <OSeparator />
-      <div>
-          <div class="tw:flex">
-            <OInput
-              v-model="formData.name"
-              :label="t('function.name')"
-              class="tw:w-full tw:py-3"
-              :readonly="isUpdating"
-              :disabled="isUpdating"
-              :error="!!nameError"
-              :error-message="nameError"
-              @update:model-value="nameError = ''"
-            />
-
-            <!-- Data Source Selection (only for new tables) -->
-            <div v-if="!isUpdating" class="tw:w-full tw:py-3">
-              <div class="tw:text-gray-500 tw:font-bold tw:mb-2">{{ t('function.dataSource') }}</div>
-              <OOptionGroup
-                v-model="formData.source"
-                :options="sourceOptions"
-                orientation="horizontal"
-              />
-            </div>
-
-            <!-- Upload File Option -->
-            <OFile
-              v-if="!isUpdating && formData.source === 'file'"
-              v-model="formData.file"
-              :label="t('function.uploadCSVFile')"
-              class="tw:w-full tw:py-3"
-              accept=".csv"
-              :error="!!fileError"
-              :error-message="fileError"
-              @update:model-value="fileError = ''"
-            />
-
-            <!-- File Upload for Update Mode (only for file-based tables) -->
-            <OFile
-              v-if="isUpdating && formData.source === 'file'"
-              v-model="formData.file"
-              :label="t('function.uploadCSVFile')"
-              class="tw:w-full tw:py-3"
-              accept=".csv"
-              :error="!!fileError"
-              :error-message="fileError"
-              @update:model-value="fileError = ''"
-            />
-
-            <!-- Append Toggle for File Upload (only when updating file-based tables) -->
-            <div v-if="isUpdating && formData.source === 'file'" class="tw:w-full">
-              <OSwitch
-                class="tw:py-3 lookup-table-append-toggle"
-                v-model="formData.append"
-                :label="t('function.appendData')"
-              />
-            </div>
-
-            <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="tw:w-full tw:py-3">
-              <div class="tw:text-gray-500 tw:font-bold tw:mb-2">Update Mode</div>
-              <OOptionGroup
-                v-model="formData.updateMode"
-                :options="updateModeOptions"
-                orientation="horizontal"
-              />
-            </div>
-
-            <!-- Show existing URLs (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="tw:w-full tw:py-3">
-              <div class="tw:text-gray-500 tw:font-bold tw:mb-2" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
-              <OCard class="tw:p-2" style="background-color: #fafafa;">
-                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="tw:mb-1">
-                  <div class="tw:flex tw:items-center q-gutter-x-xs">
-                    <div class="col-auto">
-                      <span class="text-weight-medium tw:text-gray-400" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
-                    </div>
-                    <div class="col-auto">
-                      <OIcon
-                        :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
-                        size="sm"
-                        :class="[
-                          { 'rotate-animation': job.status === 'processing' },
-                          job.status === 'completed' ? 'tw:text-[var(--o2-positive)]' :
-                          job.status === 'failed' ? 'tw:text-[var(--o2-negative)]' :
-                          job.status === 'processing' ? 'tw:text-[var(--o2-primary)]' :
-                          'tw:text-gray-500'
-                        ]"
-                      />
-                    </div>
-                    <div class="tw:flex tw:flex-col tw:text-gray-500" style="font-size: 13px; word-break: break-all;">
-                      {{ job.url }}
-                    </div>
-                  </div>
-                  <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="tw:my-1" />
-                </div>
-              </OCard>
-            </div>
-
-            <!-- Mode explanation (always show for URL-based tables in edit mode) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="tw:w-full">
-              <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
-                'tw:bg-blue-50': formData.updateMode === 'reload',
-                'tw:bg-green-50': formData.updateMode === 'append',
-                'tw:bg-yellow-50': formData.updateMode === 'replace_failed',
-                'tw:bg-orange-50': formData.updateMode === 'replace'
-              }">
-                <template v-if="formData.updateMode === 'reload'">
-                  <strong>🔄 Reload Mode:</strong> Re-process all existing URLs from scratch. Use this when the CSV file content at the URLs has been updated but the URLs themselves haven't changed.
-                </template>
-                <template v-else-if="formData.updateMode === 'append'">
-                  <strong>➕ Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
-                  <div class="tw:mt-2 tw:text-orange-700">
-                    ⚠️ <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
-                  </div>
-                </template>
-                <template v-else-if="formData.updateMode === 'replace_failed'">
-                  <strong>🔧 Replace Failed URL:</strong> Replace only the failed URL with a new one. All successful URLs and their data will be kept. Use this to fix typos or broken URLs.
-                </template>
-                <template v-else-if="formData.updateMode === 'replace'">
-                  <strong>⚠️ Replace Mode:</strong> Delete all existing URLs and data, then use only the new URL you provide below.
-                </template>
-              </div>
-            </div>
-
-            <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="tw:w-full">
-              <OInput
-                v-model="formData.url"
-                :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
-                class="tw:py-3"
-                placeholder="https://example.com/data.csv"
-                :error="!!urlError"
-                :error-message="urlError"
-                @update:model-value="urlError = ''"
-              >
-                <template v-slot:hint>
-                  <div class="tw:text-xs">
-                    <template v-if="formData.updateMode === 'append'">
-                      Enter a new URL to add to this enrichment table
-                    </template>
-                    <template v-else>
-                      Enter a URL to replace all existing URLs
-                    </template>
-                  </div>
-                </template>
-              </OInput>
-            </div>
-
-            <!-- From URL Option (only for new tables) -->
-            <div v-if="!isUpdating && formData.source === 'url'" class="tw:w-full">
-              <OInput
-                v-model="formData.url"
-                label="CSV File URL"
-                class="tw:py-3"
-                placeholder="https://example.com/data.csv"
-                :error="!!urlError"
-                :error-message="urlError"
-                @update:model-value="urlError = ''"
-              >
-                <template v-slot:hint>
-                  <div class="tw:text-xs">
-                    Must be a publicly accessible CSV file
-                  </div>
-                </template>
-              </OInput>
-            </div>
-          </div>
-
-          <pre v-if="compilationErr" class="tw:py-3 showLabelOnTop tw:font-bold text-h7">{{
-            compilationErr
-          }}</pre>
-
-          <div class="tw:flex tw:justify-start tw:mt-3 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="$emit('cancel:hideform')"
-            >
-              {{ t('function.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="onSubmit"
-            >
-              {{ t('function.save') }}
-            </OButton>
-          </div>
-        </div>
+  <div
+    data-test="add-enrichment-table-page"
+    class="tw:flex tw:flex-col tw:pr-[0.625rem] tw:h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+  >
+    <!-- Header bar -->
+    <div class="card-container tw:mb-2 tw:shrink-0">
+      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
+        <OButton
+          data-test="add-enrichment-table-back-btn"
+          icon-left="chevron-left"
+          variant="outline"
+          size="icon-xs-sq"
+          @click="$emit('cancel:hideform')"
+        />
+        <span
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+          data-test="add-enrichment-table-title"
+        >
+          {{ isUpdating ? t("function.updateEnrichmentTable") : t("function.addEnrichmentTable") }}
+        </span>
       </div>
     </div>
+
+    <!-- Form content -->
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:mb-2 tw:flex tw:flex-col tw:overflow-y-auto tw:p-4">
+      <div class="tw:flex tw:flex-col tw:gap-4 tw:max-w-[40rem]">
+          <OInput
+            v-model="formData.name"
+            :label="t('function.name')"
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
+          />
+
+          <!-- Data Source Selection (only for new tables) -->
+          <div v-if="!isUpdating" class="tw:flex tw:flex-col tw:gap-2">
+            <div class="tw:text-gray-500 tw:font-bold">{{ t('function.dataSource') }}</div>
+            <OOptionGroup
+              v-model="formData.source"
+              :options="sourceOptions"
+              orientation="horizontal"
+            />
+          </div>
+
+          <!-- Upload File Option -->
+          <OFile
+            v-if="!isUpdating && formData.source === 'file'"
+            v-model="formData.file"
+            :label="t('function.uploadCSVFile')"
+            accept=".csv"
+            :error="!!fileError"
+            :error-message="fileError"
+            @update:model-value="fileError = ''"
+          />
+
+          <!-- File Upload for Update Mode (only for file-based tables) -->
+          <OFile
+            v-if="isUpdating && formData.source === 'file'"
+            v-model="formData.file"
+            :label="t('function.uploadCSVFile')"
+            accept=".csv"
+            :error="!!fileError"
+            :error-message="fileError"
+            @update:model-value="fileError = ''"
+          />
+
+          <!-- Append Toggle for File Upload (only when updating file-based tables) -->
+          <OSwitch
+            v-if="isUpdating && formData.source === 'file'"
+            v-model="formData.append"
+            :label="t('function.appendData')"
+          />
+
+          <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
+          <div v-if="isUpdating && formData.source === 'url'" class="tw:flex tw:flex-col tw:gap-2">
+            <div class="tw:text-gray-500 tw:font-bold">Update Mode</div>
+            <OOptionGroup
+              v-model="formData.updateMode"
+              :options="updateModeOptions"
+              orientation="horizontal"
+            />
+          </div>
+
+          <!-- Show existing URLs (only when updating URL-based tables) -->
+          <div
+            v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0"
+            class="tw:flex tw:flex-col tw:gap-2"
+          >
+            <div class="tw:text-gray-500 tw:font-bold tw:text-[0.8125rem]">
+              Existing URLs ({{ formData.urlJobs.length }})
+            </div>
+            <div class="tw:rounded-md tw:border tw:border-[var(--o2-border-color)] tw:bg-gray-50 tw:p-2 tw:flex tw:flex-col tw:gap-1">
+              <div v-for="(job, index) in formData.urlJobs" :key="job.id">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <span class="tw:font-medium tw:text-gray-400 tw:text-xs">{{ Number(index) + 1 }}.</span>
+                  <OIcon
+                    :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
+                    size="sm"
+                    :class="[
+                      { 'rotate-animation': job.status === 'processing' },
+                      job.status === 'completed' ? 'tw:text-[var(--o2-positive)]' :
+                      job.status === 'failed' ? 'tw:text-[var(--o2-negative)]' :
+                      job.status === 'processing' ? 'tw:text-[var(--o2-primary)]' :
+                      'tw:text-gray-500'
+                    ]"
+                  />
+                  <div class="tw:text-gray-500 tw:text-[0.8125rem] tw:break-all">
+                    {{ job.url }}
+                  </div>
+                </div>
+                <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="tw:my-1" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode explanation (always show for URL-based tables in edit mode) -->
+          <div
+            v-if="isUpdating && formData.source === 'url'"
+            class="tw:text-sm tw:text-gray-600 tw:p-3 tw:rounded-lg"
+            :class="{
+              'tw:bg-blue-50': formData.updateMode === 'reload',
+              'tw:bg-green-50': formData.updateMode === 'append',
+              'tw:bg-yellow-50': formData.updateMode === 'replace_failed',
+              'tw:bg-orange-50': formData.updateMode === 'replace'
+            }"
+          >
+            <template v-if="formData.updateMode === 'reload'">
+              <strong>Reload Mode:</strong> Re-process all existing URLs from scratch. Use this when the CSV file content at the URLs has been updated but the URLs themselves haven't changed.
+            </template>
+            <template v-else-if="formData.updateMode === 'append'">
+              <strong>Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
+              <div class="tw:mt-2 tw:text-orange-700">
+                <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
+              </div>
+            </template>
+            <template v-else-if="formData.updateMode === 'replace_failed'">
+              <strong>Replace Failed URL:</strong> Replace only the failed URL with a new one. All successful URLs and their data will be kept. Use this to fix typos or broken URLs.
+            </template>
+            <template v-else-if="formData.updateMode === 'replace'">
+              <strong>Replace Mode:</strong> Delete all existing URLs and data, then use only the new URL you provide below.
+            </template>
+          </div>
+
+          <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
+          <OInput
+            v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')"
+            v-model="formData.url"
+            :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
+            placeholder="https://example.com/data.csv"
+            :error="!!urlError"
+            :error-message="urlError"
+            @update:model-value="urlError = ''"
+          >
+            <template v-slot:hint>
+              <div class="tw:text-xs">
+                <template v-if="formData.updateMode === 'append'">
+                  Enter a new URL to add to this enrichment table
+                </template>
+                <template v-else>
+                  Enter a URL to replace all existing URLs
+                </template>
+              </div>
+            </template>
+          </OInput>
+
+          <!-- From URL Option (only for new tables) -->
+          <OInput
+            v-if="!isUpdating && formData.source === 'url'"
+            v-model="formData.url"
+            label="CSV File URL"
+            placeholder="https://example.com/data.csv"
+            :error="!!urlError"
+            :error-message="urlError"
+            @update:model-value="urlError = ''"
+          >
+            <template v-slot:hint>
+              <div class="tw:text-xs">
+                Must be a publicly accessible CSV file
+              </div>
+            </template>
+          </OInput>
+
+          <pre
+            v-if="compilationErr"
+            class="tw:font-bold tw:text-sm tw:text-red-600 tw:whitespace-pre-wrap"
+          >{{ compilationErr }}</pre>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div
+      class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
+    >
+      <OButton
+        data-test="add-enrichment-table-cancel-btn"
+        variant="outline"
+        size="sm-action"
+        @click="$emit('cancel:hideform')"
+      >
+        {{ t('function.cancel') }}
+      </OButton>
+      <OButton
+        data-test="add-enrichment-table-save-btn"
+        variant="primary"
+        size="sm-action"
+        @click="onSubmit"
+      >
+        {{ t('function.save') }}
+      </OButton>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
