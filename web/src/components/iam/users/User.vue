@@ -361,7 +361,7 @@ export default defineComponent({
         size: 120,
         minSize: 80,
         maxSize: 140,
-        meta: { align: "left" },
+        meta: { align: "center" },
       },
     ];
     const userEmail: any = ref("");

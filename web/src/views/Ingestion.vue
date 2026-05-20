@@ -20,48 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md ingestionPage">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
-        <div class="tw:px-3 tw:pt-3 tw:w-full">
+        <div class="tw:px-3 tw:pt-3 tw:w-full tw:flex tw:items-center tw:gap-2">
           <span class="tw:text-xl tw:font-semibold tw:mr-auto"> {{ t("ingestion.header") }}</span>
           <span
-            v-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-              store.state.organizationData.rumToken.rum_token != ''
-            "
-            class="float-right tw:ml-3 tw:mb-1"
-          >
-            <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
-              {{ t(`ingestion.resetRUMTokenLabel`) }}
-            </OButton>
-          </span>
-          <span
-            v-else-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-              store.state.organizationData.rumToken.rum_token == ''
-            "
-            class="float-right tw:ml-3 tw:mb-1"
-          >
-            <OButton variant="primary" size="sm" @click="generateRUMToken">
-              {{ t(`ingestion.generateRUMTokenLabel`) }}
-            </OButton>
-          </span>
-          <span v-else class="float-right tw:ml-3 tw:mb-1">
-            <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
-              {{ t(`ingestion.resetTokenBtnLabel`) }}
-            </OButton>
-          </span>
-          <OInput
-            v-model="globalSearchQuery"
-            :placeholder="t('common.search')"
-            clearable
-            class="tw:max-w-sm tw:ml-3 tw:mb-1 right float-right indexlist-search-input"
-            data-test="recommended-list-search-input"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="tw:cursor-pointer" />
-            </template>
-          </OInput>
-          <span
-            class="text-subtitle tw:bg-amber-500 float-right tw:p-2 tw:font-bold"
+            class="text-subtitle tw:bg-amber-500 tw:p-2 tw:font-bold"
             v-if="
               store.state.zoConfig.hasOwnProperty(
                 'restricted_routes_on_empty_data',
@@ -72,7 +34,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("ingestion.redirectionIngestionMsg") }}
           </span>
-          <div style="clear: both"></div>
+          <div class="tw:w-50 tw:flex-none">
+            <OInput
+              v-model="globalSearchQuery"
+              :placeholder="t('common.search')"
+              clearable
+              class="tw:w-full indexlist-search-input"
+              data-test="recommended-list-search-input"
+            >
+              <template #icon-left>
+                <OIcon name="search" size="sm" class="tw:cursor-pointer" />
+              </template>
+            </OInput>
+          </div>
+          <span
+            v-if="
+              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              store.state.organizationData.rumToken.rum_token != ''
+            "
+          >
+            <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
+              {{ t(`ingestion.resetRUMTokenLabel`) }}
+            </OButton>
+          </span>
+          <span
+            v-else-if="
+              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              store.state.organizationData.rumToken.rum_token == ''
+            "
+          >
+            <OButton variant="primary" size="sm" @click="generateRUMToken">
+              {{ t(`ingestion.generateRUMTokenLabel`) }}
+            </OButton>
+          </span>
+          <span v-else>
+            <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
+              {{ t(`ingestion.resetTokenBtnLabel`) }}
+            </OButton>
+          </span>
           <ConfirmDialog
             title="Reset Token"
             message="Are you sure you want to update token for this organization?"

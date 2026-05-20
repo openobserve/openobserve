@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="iam-roles-search-input">
             <OInput
               v-model="filterQuery"
-              class="tw:h-[36px]"
+              class="tw:h-9 tw:w-48"
               :placeholder="t('iam.searchRole')"
             >
               <template #icon-left>
