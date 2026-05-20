@@ -36,9 +36,13 @@ const textareaId = computed(() => props.id ?? _fallbackId);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
 // ── Error state ────────────────────────────────────────────────────────────
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+// Error is only shown when `props.error` is true. A static `errorMessage`
+// string alone must not surface the error — otherwise any field with a
+// pre-bound error message renders the error on mount regardless of state.
+const effectiveError = computed(() => {
+  if (!props.error) return null;
+  return props.errorMessage || " ";
+});
 const hasError = computed(() => !!effectiveError.value);
 
 // ── Autogrow ───────────────────────────────────────────────────────────────

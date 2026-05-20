@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-cipher-key-openobserve-secret-input"
         v-model="formData.key.store.local"
         :label="t('cipherKey.secret') + ' *'"
-        class="q-w-lg tw:pb-1"
-        :error="secretTouched && !formData.key.store.local"
-        :error-message="secretTouched && !formData.key.store.local ? 'Secret is required' : ''"
+        class="tw:w-full tw:pb-1"
+        :error="(secretTouched || submitAttempted) && !formData.key.store.local"
+        :error-message="t('cipherKey.secretRequired')"
         @update:model-value="secretTouched = true"
+        @blur="secretTouched = true"
       />
       <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
     </div>
@@ -83,6 +84,12 @@ export default defineComponent({
           },
         },
       }),
+    },
+    // Parent toggles this to true on Continue click. The Secret field's
+    // error displays when either this OR the local touched flag is true.
+    submitAttempted: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props) {

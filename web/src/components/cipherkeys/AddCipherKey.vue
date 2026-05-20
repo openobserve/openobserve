@@ -43,8 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-cipher-form"
     >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
+      <!-- Constrain the whole form to a sensible reading width on wide screens
+           while staying fluid below the breakpoint. Uses Tailwind's design-system
+           max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
+      <div class="tw:w-full tw:max-w-3xl">
       <div class="tw:flex">
-        <div class="tw:w-1/3 o2-input tw:flex tw:mx-3 tw:mt-3">
+        <div class="tw:w-1/3 o2-input tw:flex tw:mx-3 tw:mt-3 tw:mb-4">
           <OInput
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
@@ -60,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="q-mt-md" style="height: calc(100vh -  var(--navbar-height) - 300px);">
+      <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
       <OStepper
         v-model="step"
         orientation="vertical"
@@ -81,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
         >
           <div>
-            <div class="q-w-lg">
+            <div class="tw:w-full">
               <OSelect
                 data-test="add-cipher-key-type-input"
                 v-model="formData.key.store.type"
@@ -98,10 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <add-openobserve-type
               v-if="formData.key.store.type == 'local'"
+              class="tw:mt-2"
+              :submitAttempted="submitAttempted"
               v-model:formData="formData"
             />
             <add-akeyless-type
               v-else-if="formData.key.store.type == 'akeyless'"
+              ref="akeylessTypeRef"
+              class="tw:mt-2"
               v-model:formData="formData"
             />
             <div class="tw:flex tw:gap-2 tw:mt-4">
@@ -137,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OStep>
       </OStepper>
+      </div>
       </div>
     </div>
     <div class="tw:mx-2">
@@ -204,6 +213,9 @@ const store = useStore();
 const addCipherKeyFormRef: any = ref();
 const nameError = ref('');
 const storeTypeError = ref('');
+// Flipped to true the first time the user clicks Continue. Passed down to
+// sub-forms so they can surface "X is required" errors on un-touched fields.
+const submitAttempted = ref(false);
 const isUpdatingCipherKey: any = ref(false);
 const step = ref(1);
 const isSubmitting = ref(false);
@@ -484,10 +496,37 @@ const goToCipherList = () => {
   emit("cancel:hideform");
 };
 
+// Template ref to the Akeyless sub-form so we can call its exposed
+// `validate()` method (which runs all field validators and sets the
+// inline error refs).
+const akeylessTypeRef = ref<any>(null);
+
+const validateStoreSecret = (): boolean => {
+  const type = formData.value.key.store.type;
+  if (type === 'local') {
+    const secret = formData.value.key.store.local;
+    if (!secret || (typeof secret === 'string' && secret.trim() === '')) {
+      return false;
+    }
+  }
+  if (type === 'akeyless') {
+    // Returns false if any required Akeyless field is missing; the child has
+    // already surfaced inline errors for whichever fields failed.
+    const ok = akeylessTypeRef.value?.validate?.();
+    if (ok === false) return false;
+  }
+  return true;
+};
+
 const validateForm = async (stepNumber: number) => {
+  // Flip submitAttempted so child sub-forms surface their inline errors on
+  // un-touched fields. Then run every validator (no short-circuit) so all
+  // missing fields show their errors at once.
+  submitAttempted.value = true;
   const nameValid = validateName();
   const typeValid = validateStoreType();
-  if (nameValid && typeValid) {
+  const secretValid = validateStoreSecret();
+  if (nameValid && typeValid && secretValid) {
     step.value = stepNumber;
   }
 };

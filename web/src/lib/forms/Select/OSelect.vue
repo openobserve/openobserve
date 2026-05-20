@@ -293,9 +293,16 @@ watch(popoverOpen, (open) => {
 });
 
 // ── Error state ────────────────────────────────────────────────────────────
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+// The error message is only shown when `props.error` is true. Previously this
+// computed returned `props.errorMessage || (props.error ? " " : null)`, which
+// meant a static (non-conditional) error-message prop would render the error
+// permanently regardless of `props.error` — so a select with valid defaults
+// still showed "X is required". Now `error` is the single source of truth
+// for whether the error is visible; `errorMessage` only controls the text.
+const effectiveError = computed(() => {
+  if (!props.error) return null;
+  return props.errorMessage || " ";
+});
 const hasError = computed(() => !!effectiveError.value);
 
 const stringValue = computed(() =>
