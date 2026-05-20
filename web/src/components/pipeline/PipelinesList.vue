@@ -17,11 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-list-page"
-    class="tw:flex tw:flex-col"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
     v-if="currentRouteName === 'pipelines'"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
-    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-1">
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
@@ -147,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     </div>
     <div
-      class="tw:flex-1 tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem]"
+      class="tw:flex-1 tw:min-h-0"
     >
       <div class="card-container tw:h-full">
         <OTable
@@ -167,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
             v-model:expanded-ids="expandedId"
             width="100%"
-            style="width: 100%; height: 100%"
+            class="tw:w-full tw:h-full"
           >
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
