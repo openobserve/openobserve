@@ -16,12 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionList from "./FunctionList.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
-
-installQuasar({ plugins: [] });
 
 const {
   mockJsTransformList,
@@ -100,7 +97,6 @@ describe("FunctionList", () => {
   };
 
   const globalStubs = {
-    QTablePagination: true,
     AddFunction: true,
     NoData: true,
     ConfirmDialog: true,
@@ -771,24 +767,6 @@ describe("FunctionList", () => {
       vm.filterQuery = "func1";
       await flushPromises();
       expect(vm.resultTotal).toBe(1);
-    });
-  });
-
-  describe("Pagination", () => {
-    it("should change pagination correctly", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.qTable = { setPagination: vi.fn() };
-
-      vm.changePagination({ label: "50", value: 50 });
-      expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.qTable.setPagination).toHaveBeenCalledWith({ rowsPerPage: 50 });
     });
   });
 

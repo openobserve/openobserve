@@ -169,7 +169,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -203,9 +203,6 @@ const showOperationSelector = ref(false);
 const availableLabels = computed(
   () => props.dashboardData?.meta?.promql?.availableLabels || [],
 );
-
-// State for filtered labels in the select
-const filteredLabels = ref<string[]>([]);
 
 // Search query for filtering operations in the operation selector dialog
 const searchQuery = ref("");
@@ -283,30 +280,6 @@ const removeOperation = (index: number) => {
   const newOperations = props.operations.filter((_, idx) => idx !== index);
   emit("update:operations", newOperations);
 };
-
-// Filter operation labels with autocomplete
-const filterOperationLabels = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      filteredLabels.value = availableLabels.value;
-    } else {
-      // Filter labels based on input
-      const needle = val.toLowerCase();
-      filteredLabels.value = availableLabels.value.filter((label: string) =>
-        label.toLowerCase().includes(needle),
-      );
-    }
-  });
-};
-
-// Initialize filtered labels when available labels change
-watch(
-  availableLabels,
-  (newLabels) => {
-    filteredLabels.value = newLabels;
-  },
-  { immediate: true },
-);
 
 defineExpose({
   availableLabels,

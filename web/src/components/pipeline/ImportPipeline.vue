@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="pipeline"
     :is-importing="isPipelineImporting"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 290px)',
-      fileEditor: 'calc(100vh - 310px)',
+      urlEditor: 'calc(100vh - 285px)',
+      fileEditor: 'calc(100vh - 282px)',
       outputContainer: 'calc(100vh - 132px)',
       errorReport: 'calc(100vh - 132px)',
     }"

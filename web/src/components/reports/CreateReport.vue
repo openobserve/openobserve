@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="input-border"
                   class="showLabelOnTop"
                   v-bind:readonly="isEditingReport"
-                  v-bind:disable="isEditingReport"
+                  :disabled="isEditingReport"
                   :error="!!nameError"
                   :error-message="nameError"
                   help-text="Characters like :, ?, /, #, and spaces are not allowed."
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               data-test="add-report-description-input"
-              class="report-name-input o2-input tw:px-2"
+              class="report-name-input o2-input tw:px-2 tw:pt-3"
             >
               <OInput
                 v-model="formData.description"
@@ -675,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     data-test="add-report-share-recipients-input"
-                    class="report-name-input o2-input"
+                    class="report-name-input o2-input tw:pt-3"
                   >
                     <OInput
                       v-model="emails"
@@ -688,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('user.inviteByEmail')"
                     />
                   </div>
-                  <div data-test="add-report-share-message-section">
+                  <div data-test="add-report-share-message-section" class="tw:pt-3">
                     <div style="font-size: 14px" class="tw:font-bold tw:text-gray-500">
                       Message
                     </div>

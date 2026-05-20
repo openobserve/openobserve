@@ -16,23 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-      dialog: vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() })),
-      dark: { isActive: false },
-    }),
-  };
-});
 
 const mockRouterBack = vi.fn();
 const mockRouterPush = vi.fn();
@@ -140,7 +125,7 @@ function createWrapper() {
         BackfillJobDetails: { template: "<div />" },
         EditBackfillJobDialog: { template: "<div />" },
         NoData: { template: "<div />" },
-        QTablePagination: { template: "<div />" },
+
         ConfirmDialog: { template: "<div />" },
         ODialog: ODialogStub,
       },
@@ -318,7 +303,7 @@ describe("BackfillJobsList – clearFilters", () => {
     vi.mocked(backfillService.listBackfillJobs).mockResolvedValue([]);
   });
 
-  it("resets both status and pipelineId to null", async () => {
+  it("resets both status and pipelineId to undefined", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     (wrapper.vm as any).filters.status = "running";
@@ -326,8 +311,8 @@ describe("BackfillJobsList – clearFilters", () => {
     await nextTick();
     (wrapper.vm as any).clearFilters();
     await nextTick();
-    expect((wrapper.vm as any).filters.status).toBeNull();
-    expect((wrapper.vm as any).filters.pipelineId).toBeNull();
+    expect((wrapper.vm as any).filters.status).toBeUndefined();
+    expect((wrapper.vm as any).filters.pipelineId).toBeUndefined();
   });
 });
 

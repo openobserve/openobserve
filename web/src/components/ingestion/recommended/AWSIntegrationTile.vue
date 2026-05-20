@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="aws-integration-tile"
+    class="aws-integration-tile tw:border tw:border-border tw:h-full"
   >
-    <OCardSection class="tw:pb-2">
+    <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCardSection>
 
-    <OCardActions class="tw:pb-4">
+    <OCardActions align="left" class="tw:px-4 tw:pb-4">
       <!-- Add Source Button -->
       <OButton
         v-if="hasCloudFormation"

@@ -53,14 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="tw:flex tw:gap-3" v-else>
-      <div
+    <div class="integrations-grid" v-else>
+      <AWSIntegrationTile
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="tw:w-full col-sm-6 col-md-4 col-lg-3"
-      >
-        <AWSIntegrationTile :integration="integration" />
-      </div>
+        :integration="integration"
+      />
     </div>
   </div>
 </template>
@@ -150,6 +148,24 @@ export default defineComponent({
 <style scoped lang="scss">
 .aws-integration-grid {
   width: 100%;
+
+  .integrations-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
 
   .empty-state {
     .body--light & {

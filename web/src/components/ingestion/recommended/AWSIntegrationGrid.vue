@@ -53,11 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="tw:flex tw:gap-3" v-else>
+    <div class="tw:grid tw:grid-cols-1 tw:gap-4 sm:tw:grid-cols-2 lg:tw:grid-cols-4" v-else>
       <div
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="tw:w-full col-sm-6 col-md-4 col-lg-3"
       >
         <AWSIntegrationTile :integration="integration" />
       </div>

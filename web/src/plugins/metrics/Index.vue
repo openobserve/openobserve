@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: 48px; overflow-y: auto"
     >
       <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="tw:flex tw:flex-row tw:items-center tw:grow">
+        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">
           <div
             class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold tw:text-xl"
           >
@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.metrics") }}
             </span>
           </div>
-          <syntax-guide-metrics class="tw:mr-2" />
-          <MetricLegends class="tw:mr-2" />
+          <syntax-guide-metrics />
+          <MetricLegends />
         </div>
         <div
           class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center"
