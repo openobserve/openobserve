@@ -92,20 +92,24 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
-const LLM_INT64_FIELDS: [&str; 4] = [
-    "llm_usage_tokens_input",
-    "llm_usage_tokens_output",
-    "llm_usage_tokens_total",
-    "llm_completion_start_time",
+
+// Gen-AI semantic-convention column names produced by the OTEL processor after
+// dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
+// service/db/schema.rs.
+const GEN_AI_INT64_FIELDS: [&str; 3] = [
+    "gen_ai_usage_input_tokens",
+    "gen_ai_usage_output_tokens",
+    "gen_ai_usage_total_tokens",
 ];
-const LLM_FLOAT64_FIELDS: [&str; 3] = [
-    "llm_usage_cost_input",
-    "llm_usage_cost_output",
-    "llm_usage_cost_total",
+const GEN_AI_FLOAT64_FIELDS: [&str; 4] = [
+    "gen_ai_response_time_to_first_chunk",
+    "gen_ai_usage_cost",
+    "gen_ai_usage_cost_input",
+    "gen_ai_usage_cost_output",
 ];
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
-    for field in LLM_INT64_FIELDS {
+    for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && value.as_i64().is_none()
         {
@@ -113,7 +117,7 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
         }
     }
 
-    for field in LLM_FLOAT64_FIELDS {
+    for &field in GEN_AI_FLOAT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && !value.is_f64()
         {
@@ -246,6 +250,19 @@ pub async fn handle_otlp_request(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
+        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+        {
+            log::warn!(
+                "[TRACES:OTLP] Failed to ensure gen_ai schema fields for {}/{}: {e}",
+                org_id,
+                &traces_stream_name
+            );
+        }
     }
 
     // Start retrieving associated pipeline and construct pipeline params
@@ -705,6 +722,19 @@ pub async fn ingest_json(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
+        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+        {
+            log::warn!(
+                "[TRACES:JSON] Failed to ensure gen_ai schema fields for {}/{}: {e}",
+                org_id,
+                traces_stream_name
+            );
+        }
     }
 
     let cfg = get_config();
@@ -1035,7 +1065,10 @@ async fn write_traces(
     // Start write data
     for (timestamp, record_val) in json_data {
         // get service_name
-        let service_name = json::get_string_value(record_val.get("service_name").unwrap());
+        let service_name = record_val
+            .get("service_name")
+            .map(json::get_string_value)
+            .unwrap_or_default();
         // get distinct_value item
         if stream_settings.enable_distinct_fields {
             let mut map = Map::new();
@@ -1173,8 +1206,6 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
         otel::attributes::GenAiAttributes::USAGE_OUTPUT_TOKENS,
         otel::attributes::GenAiAttributes::INPUT_MESSAGES,
         otel::attributes::GenAiAttributes::OUTPUT_MESSAGES,
-        otel::attributes::O2Attributes::INPUT,
-        otel::attributes::O2Attributes::OUTPUT,
         otel::attributes::LangfuseAttributes::INPUT,
         otel::attributes::LangfuseAttributes::OUTPUT,
     ];
@@ -1232,13 +1263,13 @@ mod tests {
     #[test]
     fn test_normalize_llm_field_types() {
         let mut record = json!({
-            "llm_usage_tokens_input": "12",
-            "llm_usage_tokens_output": 34.8,
-            "llm_usage_tokens_total": true,
-            "llm_completion_start_time": "123456789",
-            "llm_usage_cost_input": "0.25",
-            "llm_usage_cost_output": 1,
-            "llm_usage_cost_total": false,
+            "gen_ai_usage_input_tokens": "12",
+            "gen_ai_usage_output_tokens": 34.8,
+            "gen_ai_usage_total_tokens": true,
+            "gen_ai_response_time_to_first_chunk": "123456789",
+            "gen_ai_usage_cost_input": "0.25",
+            "gen_ai_usage_cost_output": 1,
+            "gen_ai_usage_cost": false,
             "unrelated": "value"
         })
         .as_object()
@@ -1249,38 +1280,42 @@ mod tests {
 
         assert_eq!(
             record
-                .get("llm_usage_tokens_input")
+                .get("gen_ai_usage_input_tokens")
                 .and_then(|v| v.as_i64()),
             Some(12)
         );
         assert_eq!(
             record
-                .get("llm_usage_tokens_output")
+                .get("gen_ai_usage_output_tokens")
                 .and_then(|v| v.as_i64()),
             Some(34)
         );
         assert_eq!(
             record
-                .get("llm_usage_tokens_total")
+                .get("gen_ai_usage_total_tokens")
                 .and_then(|v| v.as_i64()),
             Some(1)
         );
         assert_eq!(
             record
-                .get("llm_completion_start_time")
-                .and_then(|v| v.as_i64()),
-            Some(123456789)
+                .get("gen_ai_response_time_to_first_chunk")
+                .and_then(|v| v.as_f64()),
+            Some(123456789.0)
         );
         assert_eq!(
-            record.get("llm_usage_cost_input").and_then(|v| v.as_f64()),
+            record
+                .get("gen_ai_usage_cost_input")
+                .and_then(|v| v.as_f64()),
             Some(0.25)
         );
         assert_eq!(
-            record.get("llm_usage_cost_output").and_then(|v| v.as_f64()),
+            record
+                .get("gen_ai_usage_cost_output")
+                .and_then(|v| v.as_f64()),
             Some(1.0)
         );
         assert_eq!(
-            record.get("llm_usage_cost_total").and_then(|v| v.as_f64()),
+            record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),
             Some(0.0)
         );
         assert_eq!(
@@ -1948,17 +1983,20 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_llm_stream_hashmap_o2_attrs() {
-        use crate::service::traces::otel::attributes::O2Attributes;
+    fn test_detect_llm_stream_hashmap_gen_ai_attrs() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::INPUT.to_string(), json!("prompt"));
+        map.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), json!("prompt"));
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::OUTPUT.to_string(), json!("completion"));
+        map.insert(
+            GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+            json!("completion"),
+        );
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
     }
 
