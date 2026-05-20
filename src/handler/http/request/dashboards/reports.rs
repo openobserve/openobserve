@@ -392,7 +392,11 @@ pub async fn delete_report_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+        if !check_permissions(
+            id, &org_id, &_user_id, "reports", "DELETE", None, false, false, false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -770,7 +774,11 @@ pub async fn delete_report_bulk_v2(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+        if !check_permissions(
+            id, &org_id, &_user_id, "reports", "DELETE", None, false, false, false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -898,7 +906,11 @@ pub async fn move_reports(
 
     #[cfg(feature = "enterprise")]
     for id in &req.report_ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", None).await {
+        if !check_permissions(
+            id, &org_id, &_user_id, "reports", "PUT", None, false, false, false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
