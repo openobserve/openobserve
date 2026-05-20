@@ -1,9 +1,9 @@
 @import "tailwindcss" prefix(tw);
 @import "tw-animate-css";
-@import "../lib/styles/tokens/base.css";
-@import "../lib/styles/tokens/semantic.css";
-@import "../lib/styles/tokens/component.css";
-@import "../lib/styles/tokens/dark.css";
+@import "../lib/styles/tokens/_base.scss";
+@import "../lib/styles/tokens/_semantic.scss";
+@import "../lib/styles/tokens/_component.scss";
+@import "../lib/styles/tokens/_dark.scss";
 
 @plugin "@tailwindcss/typography";
 
@@ -27,20 +27,5 @@
     border-color: #e5e7eb;
   }
 
-  h5 {
-    font-size: 1.5rem;
-    font-weight: 400;
-    line-height: 2rem;
-    letter-spacing: normal;
-    margin: revert;
-  }
-
-  h6 {
-    font-size: 1.25rem;
-    font-weight: 500;
-    line-height: 2rem;
-    letter-spacing: 0.0125em;
-    margin: revert;
-  }
 }
 

@@ -10,7 +10,7 @@
     >
       <template v-slot:before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - var(--navbar-height) - 14px);">
+        <div v-if="showSidebar" class="iam-tabs spitter-container card-container" style="height: calc(100vh - var(--navbar-height) - 14px);">
           <route-tabs
             ref="iamRouteTabsRef"
             dataTest="iam-tabs"
