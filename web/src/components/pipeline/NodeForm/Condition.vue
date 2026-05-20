@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:flex tw:gap-2">
+        <div class="tw:flex tw:gap-2 tw:mt-4">
           <OButton
             v-if="pipelineObj.isEditNode"
             data-test="add-condition-delete-btn"

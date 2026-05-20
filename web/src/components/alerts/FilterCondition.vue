@@ -81,7 +81,7 @@
             :placeholder="t('common.value')"
             :error="!!valueError"
             :error-message="valueError"
-            :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateValue"
           />
