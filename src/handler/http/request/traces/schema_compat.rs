@@ -37,11 +37,11 @@ use config::meta::stream::StreamType;
 use crate::service::traces::otel::attributes::OtelAttributes;
 
 /// Sentinel column whose presence indicates the new `gen_ai_*` schema.
-const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
+pub(crate) const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
 
 /// Required fields for the new (gen_ai_*) schema. If any are missing, the
 /// query is rejected with a clear error.
-const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
+pub(crate) const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
     "gen_ai_usage_input_tokens",
     "gen_ai_usage_output_tokens",
     "gen_ai_usage_cost",
@@ -50,14 +50,14 @@ const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
 
 /// Optional fields for the new (gen_ai_*) schema. Missing optional fields
 /// produce `None` in the API response; the column is omitted from SQL.
-const OPTIONAL_GEN_AI_FIELDS: &[&str] = &[
+pub(crate) const OPTIONAL_GEN_AI_FIELDS: &[&str] = &[
     "gen_ai_input_messages",
     "gen_ai_output_messages",
     "gen_ai_usage_total_tokens",
 ];
 
 /// Required fields for the legacy (llm_*) schema.
-const REQUIRED_LLM_FIELDS: &[&str] = &[
+pub(crate) const REQUIRED_LLM_FIELDS: &[&str] = &[
     "llm_usage_tokens_input",
     "llm_usage_tokens_output",
     "llm_usage_cost_total",
@@ -65,7 +65,7 @@ const REQUIRED_LLM_FIELDS: &[&str] = &[
 ];
 
 /// Optional fields for the legacy (llm_*) schema.
-const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
+pub(crate) const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///

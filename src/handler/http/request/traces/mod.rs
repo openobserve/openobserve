@@ -56,7 +56,7 @@ use crate::{
 };
 
 pub mod dag;
-mod schema_compat;
+pub(crate) mod schema_compat;
 pub mod session;
 pub mod user;
 
