@@ -16,35 +16,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
-    <!-- Info Icon Button -->
+    <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
       class="info-icon-btn"
     >
-      <OButton
-        variant="ghost"
-        size="icon-circle-sm"
-      >
+      <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
-        <OTooltip side="bottom-start">
-          <div style="padding: 8px; font-size: 12px; line-height: 1.6;">
-            <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Graph Legend</div>
-
-            <div style="margin-bottom: 6px;">
-              <span style="color: #ef4444;">●</span> Red = Potential Root Cause
-            </div>
-            <div style="margin-bottom: 6px;">
-              <span style="color: #f97316;">●</span> Orange = High Frequency
-            </div>
-            <div style="margin-bottom: 6px;">
-              <span style="color: #3b82f6;">●</span> Blue = Normal
-            </div>
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">
-              <span style="color: #a78bfa;">→</span> Purple arrows show temporal flow
-            </div>
-          </div>
-        </OTooltip>
       </OButton>
+      <div class="graph-legend" role="tooltip">
+        <div class="graph-legend__title">Graph Legend</div>
+        <div class="graph-legend__row">
+          <span class="graph-legend__dot" style="color: #ef4444;">●</span>
+          Red = Potential Root Cause
+        </div>
+        <div class="graph-legend__row">
+          <span class="graph-legend__dot" style="color: #f97316;">●</span>
+          Orange = High Frequency
+        </div>
+        <div class="graph-legend__row">
+          <span class="graph-legend__dot" style="color: #3b82f6;">●</span>
+          Blue = Normal
+        </div>
+        <div class="graph-legend__divider" />
+        <div class="graph-legend__row">
+          <span class="graph-legend__dot" style="color: #a78bfa;">→</span>
+          Purple arrows show temporal flow
+        </div>
+      </div>
     </span>
 
     <!-- Loading State -->
@@ -94,7 +93,6 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -295,18 +293,28 @@ export default defineComponent({
             borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),
             borderWidth: index === 0 ? 4 : 2,
           },
+          // Node label hidden at rest. Only renders on hover (emphasis state).
+          // Previously it was always visible with full tooltip-style styling
+          // (background pill, shadow), which read as a permanent tooltip
+          // floating below the node — the bug the user was reporting.
           label: {
-            show: true,
-            position: "bottom",
-            distance: 5,
-            fontSize: 11,
-            color: isDarkMode.value ? "#e5e7eb" : "#374151",
-            formatter: `{b}`,
-            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
-            borderRadius: 4,
-            padding: [4, 8],
-            shadowColor: "rgba(0, 0, 0, 0.3)",
-            shadowBlur: 4,
+            show: false,
+          },
+          emphasis: {
+            label: {
+              show: true,
+              position: "bottom",
+              distance: 5,
+              fontSize: 11,
+              fontWeight: 600,
+              color: isDarkMode.value ? "#e5e7eb" : "#374151",
+              formatter: `{b}`,
+              backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+              borderRadius: 4,
+              padding: [4, 8],
+              shadowColor: "rgba(0, 0, 0, 0.3)",
+              shadowBlur: 4,
+            },
           },
           tooltip: {
             formatter: () => {
@@ -468,11 +476,89 @@ export default defineComponent({
   top: 16px;
   right: 16px;
   z-index: 10;
-  transition: all 0.2s ease;
 }
 
-.info-icon-btn:hover {
-  transform: scale(1.1);
+/* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
+   Background/text use explicit colors per theme because `--o2-popover-background`
+   and `--o2-text-primary` both resolve to `#F0F1F2` in dark mode, which gave
+   us a white card with invisible (same-color) text. */
+.graph-legend {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 1px solid var(--o2-border);
+  border-radius: 8px;
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.12),
+    0 3px 6px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Dark-mode overrides — using both signals so it works regardless of which
+   class is currently toggled (theme.ts toggles both `body.body--dark` and
+   `html.dark`). Vue scoped CSS scopes only the rightmost selector. */
+html.dark .graph-legend,
+body.body--dark .graph-legend {
+  color: #e5e7eb;
+  background-color: #1f2937;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.6),
+    0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .graph-legend__divider,
+body.body--dark .graph-legend__divider {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.info-icon-btn:hover .graph-legend,
+.info-icon-btn:focus-within .graph-legend {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.graph-legend__title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.graph-legend__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.graph-legend__dot {
+  font-size: 14px;
+  line-height: 1;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.graph-legend__divider {
+  height: 1px;
+  background-color: var(--o2-border);
+  margin: 8px 0;
 }
 
 /* Light mode */

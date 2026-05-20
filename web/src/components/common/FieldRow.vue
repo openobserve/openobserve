@@ -22,15 +22,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="field.name"
   >
     <div
-      class="field_label tw:w-full tw:flex! tw:items-center! tw:justify-between!"
+      class="field_label tw:flex-1 tw:min-w-0 tw:flex! tw:items-center!"
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="tw:truncate tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:leading-relaxed"
-        style="display: inline-block"
+        class="tw:truncate tw:flex-1 tw:min-w-0 tw:pl-[1.5rem] tw:leading-relaxed"
       >
         {{ field.label || field.name }}
       </div>
+      <OIcon
+        :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+        v-if="showQuickMode && field.name !== timestampColumn"
+        :name="field.isInterestingField ? 'info' : 'info-outline'"
+        size="sm"
+        :title="
+          field.isInterestingField
+            ? 'Remove from interesting fields'
+            : 'Add to interesting fields'
+        "
+        class="tw:cursor-pointer tw:flex-shrink-0"
+        @click.stop="
+          $emit('toggle-interesting', field, field.isInterestingField)
+        "
+      />
     </div>
     <div
       class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem] tw:overflow-hidden"
@@ -66,20 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         title="Remove field from table"
         class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
-      />
-      <OIcon
-        :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-        v-if="showQuickMode && field.name !== timestampColumn"
-        :name="field.isInterestingField ? 'info' : 'info-outline'"
-        size="sm"
-        :title="
-          field.isInterestingField
-            ? 'Remove from interesting fields'
-            : 'Add to interesting fields'
-        "
-        @click.stop="
-          $emit('toggle-interesting', field, field.isInterestingField)
-        "
       />
     </div>
   </div>

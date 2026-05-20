@@ -69,7 +69,6 @@ const loadMetrics = async () => {
   } catch (error) {
     console.error("Error loading metrics:", error);
     metrics.value = [];
-    filteredMetrics.value = [];
   } finally {
     loading.value = false;
   }

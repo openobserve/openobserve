@@ -129,127 +129,133 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:gap-2">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
-                <OInput
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                />
-                <OInput
-                  data-test="storage-settings-region-input"
-                  v-model="formData.region"
-                  label="Region"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode || !!cloudRegion"
-                />
-                <OInput
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                  :error="!!fieldErrors.bucket_name"
-                  :error-message="fieldErrors.bucket_name"
-                />
-                <OInput
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.access_key"
-                  label="Access Key *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :error="!!fieldErrors.access_key"
-                  :error-message="fieldErrors.access_key"
-                />
-                <OInput
-                  data-test="storage-settings-secret-key-input"
-                  v-model="formData.secret_key"
-                  label="Secret Key *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  type="password"
-                  :error="!!fieldErrors.secret_key"
-                  :error-message="fieldErrors.secret_key"
-                />
+                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                  />
+                  <OInput
+                    data-test="storage-settings-region-input"
+                    v-model="formData.region"
+                    label="Region"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode || !!cloudRegion"
+                  />
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.access_key"
+                    label="Access Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.access_key"
+                    :error-message="fieldErrors.access_key"
+                  />
+                  <OInput
+                    data-test="storage-settings-secret-key-input"
+                    v-model="formData.secret_key"
+                    label="Secret Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    type="password"
+                    :error="!!fieldErrors.secret_key"
+                    :error-message="fieldErrors.secret_key"
+                  />
+                </div>
               </template>
 
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
-                <OInput
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.storage_account"
-                  label="Storage Account Name *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                  :error="!!fieldErrors.storage_account"
-                  :error-message="fieldErrors.storage_account"
-                />
-                <OInput
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                  :error="!!fieldErrors.bucket_name"
-                  :error-message="fieldErrors.bucket_name"
-                />
-                <OInput
-                  data-test="storage-settings-secret-key-input"
-                  v-model="formData.secret_key"
-                  label="Secret Key *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  type="password"
-                  :error="!!fieldErrors.secret_key"
-                  :error-message="fieldErrors.secret_key"
-                />
-                <OInput
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                />
+                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.storage_account"
+                    label="Storage Account Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                    :error="!!fieldErrors.storage_account"
+                    :error-message="fieldErrors.storage_account"
+                  />
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-secret-key-input"
+                    v-model="formData.secret_key"
+                    label="Secret Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    type="password"
+                    :error="!!fieldErrors.secret_key"
+                    :error-message="fieldErrors.secret_key"
+                  />
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                  />
+                </div>
               </template>
 
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
-                <OInput
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                  :error="!!fieldErrors.bucket_name"
-                  :error-message="fieldErrors.bucket_name"
-                />
-                <OInput
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.access_key"
-                  label="Access Key *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :error="!!fieldErrors.access_key"
-                  :error-message="fieldErrors.access_key"
-                />
-                <OInput
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                />
+                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.access_key"
+                    label="Access Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.access_key"
+                    :error-message="fieldErrors.access_key"
+                  />
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                  />
+                </div>
               </template>
 
               <!-- AwsRoleArn Fields -->
@@ -270,51 +276,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
-                <OInput
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode"
-                  :error="!!fieldErrors.bucket_name"
-                  :error-message="fieldErrors.bucket_name"
-                />
-                <OInput
-                  data-test="storage-settings-region-input"
-                  v-model="formData.region"
-                  label="Region *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :disable="isEditMode || !!cloudRegion"
-                  :error="!!fieldErrors.region"
-                  :error-message="fieldErrors.region"
-                />
-                <OInput
-                  data-test="storage-settings-role-arn-input"
-                  v-model="formData.role_arn"
-                  label="Role ARN *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :error="!!fieldErrors.role_arn"
-                  :error-message="fieldErrors.role_arn"
-                />
-                <OInput
-                  data-test="storage-settings-role-external-id-input"
-                  v-model="formData.external_id"
-                  label="External Id *"
-                  class="no-border showLabelOnTop"
-                  flat
-                  :error="!!fieldErrors.external_id"
-                  :error-message="fieldErrors.external_id"
-                />
+                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-region-input"
+                    v-model="formData.region"
+                    label="Region *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disable="isEditMode || !!cloudRegion"
+                    :error="!!fieldErrors.region"
+                    :error-message="fieldErrors.region"
+                  />
+                  <OInput
+                    data-test="storage-settings-role-arn-input"
+                    v-model="formData.role_arn"
+                    label="Role ARN *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.role_arn"
+                    :error-message="fieldErrors.role_arn"
+                  />
+                  <OInput
+                    data-test="storage-settings-role-external-id-input"
+                    v-model="formData.external_id"
+                    label="External Id *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.external_id"
+                    :error-message="fieldErrors.external_id"
+                  />
+                </div>
               </template>
             </div>
           </OStep>
         </OStepper>
 
         <!-- Form buttons -->
-        <div class="tw:flex tw:justify-start tw:mb-3">
+        <div class="tw:flex tw:justify-start tw:mt-3">
           <div v-if="step === 1">
             <OButton
               data-test="step1-cancel-btn"

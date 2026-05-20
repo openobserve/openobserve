@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
         <div
-          class="field_label tw:w-full"
+          class="field_label tw:flex-1 tw:min-w-0"
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div class="tw:truncate tw:flex tw:flex-1 tw:min-w-0">
@@ -41,6 +41,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ field.name }}
           </div>
         </div>
+        <OIcon
+          :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+          v-if="showQuickMode"
+          :name="field.isInterestingField ? 'info' : 'info-outline'"
+          size="sm"
+          :title="
+            field.isInterestingField
+              ? 'Remove from interesting fields'
+              : 'Add to interesting fields'
+          "
+          class="tw:cursor-pointer tw:flex-shrink-0"
+          @click.stop="
+            $emit('toggle-interesting', field, field.isInterestingField)
+          "
+        />
         <div class="field_overlay">
           <OButton
             v-if="field.isSchemaField && showFilterIcon"
@@ -66,20 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             title="Remove field from table"
             @click.stop="$emit('toggle-field', field)"
-          />
-          <OIcon
-            :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-            v-if="showQuickMode"
-            :name="field.isInterestingField ? 'info' : 'info-outline'"
-            size="sm"
-            :title="
-              field.isInterestingField
-                ? 'Remove from interesting fields'
-                : 'Add to interesting fields'
-            "
-            @click.stop="
-              $emit('toggle-interesting', field, field.isInterestingField)
-            "
           />
         </div>
       </div>

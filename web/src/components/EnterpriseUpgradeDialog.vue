@@ -1075,7 +1075,8 @@ export default defineComponent({
   flex-direction: column;
   position: relative;
   color: white;
-  overflow: hidden;
+  overflow-y: auto; // independent scroll when content exceeds dialog height
+  min-height: 0;
 
   .hero-content {
     flex: 1;
@@ -1085,6 +1086,7 @@ export default defineComponent({
     align-items: center;
     max-width: 400px;
     width: 100%;
+    margin: auto; // vertically centered when it fits, lets panel scroll when it doesn't
   }
 
   .hero-icon {

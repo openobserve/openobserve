@@ -93,7 +93,7 @@
               />
               <OIcon
                 :name="getTypeIcon(row.type)"
-                size="sm"
+                size="xs"
                 class="o-field-list__type-icon"
               />
               <span class="o-field-list__field-name">{{ row.name }}</span>
@@ -432,17 +432,39 @@ defineExpose({ scrollToTop });
   }
 
   // ---------- group header ----------
+  // Sticky wrapper that keeps the stream name visible while scrolling its
+  // fields. Background MUST be transparent — `--o2-card-background` resolves
+  // to `#F0F1F2` (near-white) in dark mode, which leaked above the inner
+  // band (`.field-group-header`) and showed as a bright white line. Padding
+  // is removed for the same reason — the slot fills the full wrapper area.
   &__group-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.25rem 0 0.125rem;
     font-size: 0.6875rem;
     font-weight: 600;
     color: var(--o2-text-secondary);
     cursor: default;
     user-select: none;
     letter-spacing: 0.01em;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: transparent;
+
+    & + & {
+      // Defensive: two adjacent group headers shouldn't double their separator.
+      margin-top: 0;
+    }
+  }
+
+  // Add a section break above every group header except the first one,
+  // so consecutive streams render as visually distinct sections.
+  // Pure margin — no border-top, because in dark mode the border-color token
+  // resolves to `rgba(255, 255, 255, 0.40)` and renders as a glaring white
+  // line above the header band.
+  &__group-header:not(:first-child) {
+    margin-top: 0.5rem;
   }
 
   // ---------- row ----------
@@ -473,7 +495,7 @@ defineExpose({ scrollToTop });
   &__field-content {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem; // breathing room between drag handle, type icon, and field name
     min-width: 0;
     flex: 1;
   }
@@ -489,13 +511,15 @@ defineExpose({ scrollToTop });
   }
 
   // ---------- type icon ----------
+  // Light + xs to keep the field name as the primary visual anchor; the type icon is metadata.
   &__type-icon {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1rem;
+    width: 0.875rem;
     color: var(--o2-text-muted);
+    opacity: 0.6;
   }
 
   // ---------- drag icon ----------
@@ -529,10 +553,19 @@ defineExpose({ scrollToTop });
   }
 
   // ---------- row actions (overlay on hover) ----------
+  // Renders as a single connected button group with a thin vertical separator
+  // between each adder button (+X | +Y | +B | +F). One outer border wraps
+  // the whole group; inner separators are border-rights on each child except
+  // the last.
+  //
+  // Group background uses `--o2-bg-gray` (light gray in light mode, dark
+  // gray in dark mode — properly theme-aware). This is required so disabled
+  // chips don't render their faded label *on top of* the field name text
+  // beneath the overlay (which happens when the background is transparent
+  // and the field name slides under the chip area on long names).
   &__actions {
     display: flex;
-    align-items: center;
-    gap: 0.125rem;
+    align-items: stretch;
     flex-shrink: 0;
     visibility: hidden;
     opacity: 0;
@@ -543,10 +576,26 @@ defineExpose({ scrollToTop });
     right: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
-    background-color: var(--o2-hover-accent);
-    padding: 0.125rem 0.25rem;
+    // `--o2-border` (light: #E8ECF0, dark: #868A91 — subtle mid-gray) instead
+    // of `--o2-border-color` whose dark value is rgba(255,255,255,0.40) and
+    // renders as a glaring white hairline.
+    border: 1px solid var(--o2-border);
     border-radius: 0.1875rem;
-    box-shadow: 0 0 0 1px var(--o2-border-color);
+    overflow: hidden;
+    background-color: var(--o2-bg-gray);
+
+    // Make each chip flush (no individual border, no rounded corners),
+    // and put a vertical separator between adjacent chips.
+    // `!important` overrides Tailwind utility classes on the OButton root
+    // (`tw:border-0`, `tw:rounded`, etc.) which otherwise win on specificity.
+    :deep(> *) {
+      border: 0 !important;
+      border-radius: 0 !important;
+      background-color: transparent !important;
+    }
+    :deep(> *:not(:first-child)) {
+      border-left: 1px solid var(--o2-border) !important;
+    }
   }
 
   // ---------- expansion panel ----------

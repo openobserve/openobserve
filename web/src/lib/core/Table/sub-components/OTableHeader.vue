@@ -146,7 +146,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + col.id"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.id}`"
-        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-text-secondary tw:text-sm"
+        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-secondary tw:text-sm"
         :style="getPivotRowColStyle(col.id)"
         @click="handleSort(col.id)"
       >
@@ -188,8 +188,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         class="tw:px-2"
         :class="[
           level.isLeaf
-            ? 'pivot-value-header tw:text-text-secondary tw:text-sm'
-            : 'pivot-group-header tw:text-center tw:font-medium tw:text-text-secondary tw:text-sm',
+            ? 'pivot-value-header tw:text-secondary tw:text-sm'
+            : 'pivot-group-header tw:text-center tw:font-medium tw:text-secondary tw:text-sm',
           {
             'tw:border-l tw:border-border-default':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -288,7 +288,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
           'table-head',
           dense ? 'tw:h-6' : 'tw:h-7',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
@@ -369,7 +369,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-close-${header.id}`"
-            class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
+            class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
             <OIcon name="cancel" size="sm" />
@@ -415,7 +415,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
           dense ? 'tw:h-7 tw:group' : 'tw:h-8 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
@@ -488,7 +488,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-close-${header.id}`"
-            class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
+            class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
             <OIcon name="cancel" size="sm" />

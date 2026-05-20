@@ -18,17 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]" :class="headerClass">
-        <div class="tw:flex tw:items-center">
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click="handleBack"
-            :data-test="`${testPrefix}-import-back-btn`"
-          >
-            <OIcon name="arrow-back-ios-new" size="sm" />
-          </OButton>
-          <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
+      <div class="tw:flex tw:px-4 tw:items-center tw:justify-between tw:flex-nowrap tw:h-[68px]" :class="headerClass">
+        <div class="tw:flex tw:flex-col">
+          <div class="tw:flex">
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click="handleBack"
+              :data-test="`${testPrefix}-import-back-btn`"
+            >
+              <OIcon name="arrow-back-ios-new" size="sm" />
+            </OButton>
+            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
+          </div>
         </div>
 
         <!-- Slot for additional header content (e.g., folder dropdown) -->

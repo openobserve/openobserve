@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tabs-selection-container"
                 :tabs="tabs"
                 v-model:active-tab="activeTab"
-                @update:active-tab="() => { invalidateFolderCache(activeFolderId.value); loadReports(activeFolderId.value); }"
+                @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
               />
             </div>
 
@@ -59,12 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OInput>
 
             <!-- All Folders toggle -->
-            <div class="tw:ml-2">
+            <div class="tw:ml-2 tw:whitespace-nowrap">
               <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
                 <OSwitch
                   data-test="report-list-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
                   :label="t('dashboard.allFolders') || 'All Folders'"
+                  class="toolbar-toggle-container"
                 />
               </OTooltip>
             </div>
@@ -72,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="report-list-add-report-btn"
               variant="primary"
-              size="sm-action"
+              size="sm"
               class="tw:ml-2"
               @click="createNewReport"
             >
@@ -749,4 +750,26 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   await loadReports(activeFolderId.value);
 };
 </script>
+
+<style lang="scss" scoped>
+.toolbar-toggle-container {
+  padding: 0.45rem 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--color-button-outline-border); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid var(--color-button-outline-border);
+}
+</style>
 
