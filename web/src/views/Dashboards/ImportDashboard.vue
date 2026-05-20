@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:mx-2 tw:pt-1">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
-        <div class="tw:flex tw:flex-col">
+        <div class="tw:flex tw:flex-col tw:flex-1">
           <div class="tw:flex">
             <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
 
@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="splitterModel"
           style="width: calc(100vw - 100px)"
-          horizontal
         >
           <template #before>
             <div class="tw:w-full tw:h-full">
@@ -80,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="editor-container-url card-container tw:py-1"
               >
                 <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
@@ -88,13 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OInput
                         v-model="url"
-                        :label="t('dashboard.addURL')"
-                        style="padding: 10px"
+                        :placeholder="t('dashboard.addURL')"
                       />
                     </div>
 
                     <div
-                      style="width: calc(30%); position: relative; bottom: 21px"
+                      style="width: calc(30%)"
                       data-test="dashboard-folder-dropdown"
                       class="import-folder-dropdown-container"
                     >
@@ -108,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw:mx-2 tw:mt-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -120,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dashboard-import-json-container card-container tw:py-1"
               >
                 <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
@@ -128,27 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OFile
                         v-model="jsonFiles"
-                        bottom-slots
-                        :label="t('dashboard.dropFileMsg')"
+                        :placeholder="t('dashboard.dropFileMsg')"
                         accept=".json"
                         multiple
-                        :disable="!!isLoading"
-                      >
-                        <template v-slot:prepend>
-                          <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
-                        </template>
-                        <template v-slot:append>
-                          <OIcon
-                            name="close" size="sm"
-                            @click.stop.prevent="jsonFiles = null"
-                            class="tw:cursor-pointer"
-                          />
-                        </template>
-                        <template v-slot:hint> .json files only </template>
-                      </OFile>
+                        dropZone
+                        :disabled="!!isLoading"
+                      />
                     </div>
                     <div
-                      style="width: calc(30%); position: relative; bottom: 21px"
+                      style="width: calc(30%)"
                       class="import-folder-dropdown-container"
                     >
                       <select-folder-dropdown
@@ -175,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw:mx-2 tw:mt-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
