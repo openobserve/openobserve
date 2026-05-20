@@ -27,5 +27,16 @@
     border-color: #e5e7eb;
   }
 
+  /*
+   * Restore antialiased font rendering that Quasar's CSS previously provided.
+   * Without this, macOS uses subpixel antialiasing which makes all text appear
+   * visually heavier / bold. Tailwind v4 Preflight does not include this.
+   */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
 }
 
