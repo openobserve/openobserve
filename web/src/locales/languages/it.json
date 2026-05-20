@@ -3099,7 +3099,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo di negozio",
     "mechanismType": "Tipo di meccanismo",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "providerTypeRequired": "Il tipo di provider è obbligatorio",
+    "algorithmRequired": "L'algoritmo è richiesto",
+    "secretRequired": "Il segreto è obbligatorio"
   },
   "quota": {
     "header": "Quote",

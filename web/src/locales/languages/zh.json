@@ -3094,7 +3094,10 @@
     "algorithm": "算法",
     "storeType": "商店类型",
     "mechanismType": "机制类型",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "提供商类型为必填项",
+    "algorithmRequired": "算法是必需的",
+    "secretRequired": "密钥为必填项"
   },
   "quota": {
     "header": "配额",

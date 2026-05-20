@@ -3088,7 +3088,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo de tienda",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "providerTypeRequired": "El tipo de proveedor es obligatorio",
+    "algorithmRequired": "Se requiere un algoritmo",
+    "secretRequired": "El secreto es obligatorio"
   },
   "quota": {
     "header": "Cuotas",

@@ -3072,7 +3072,10 @@
     "algorithm": "アルゴリズム",
     "storeType": "ストアタイプ",
     "mechanismType": "方式タイプ",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "プロバイダのタイプが必要です",
+    "algorithmRequired": "アルゴリズムが必要です",
+    "secretRequired": "シークレットが必要です"
   },
   "quota": {
     "header": "クォータ",
