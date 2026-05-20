@@ -985,6 +985,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1027,6 +1028,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 2,
@@ -1035,6 +1037,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 3,
@@ -1043,6 +1046,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 4,
@@ -1051,6 +1055,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 5,
@@ -1059,6 +1064,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 6,
@@ -1067,6 +1073,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
         ];
         let index_condition = None;
@@ -1115,6 +1122,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1156,6 +1164,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1198,6 +1207,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
