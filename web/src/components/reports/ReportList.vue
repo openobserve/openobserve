@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tabs-selection-container"
                 :tabs="tabs"
                 v-model:active-tab="activeTab"
-                @update:active-tab="() => { invalidateFolderCache(activeFolderId.value); loadReports(activeFolderId.value); }"
+                @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
               />
             </div>
 
