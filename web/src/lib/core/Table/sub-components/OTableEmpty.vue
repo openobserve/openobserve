@@ -20,7 +20,7 @@ defineSlots<{
     class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:py-8 tw:text-center tw:min-h-[300px]"
   >
     <slot>
-      <div class="tw:text-text-secondary tw:text-sm">
+      <div class="tw:text-secondary tw:text-sm">
         {{ message ?? t("search.noData") }}
       </div>
     </slot>

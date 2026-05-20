@@ -241,10 +241,10 @@ function handleClick() {
         />
         <span
           v-else-if="highlightedHtml"
-          class="tw:text-text-primary tw:text-sm"
+          class="tw:text-primary tw:text-sm"
           v-html="highlightedHtml"
         />
-        <span v-else class="tw:text-text-primary tw:text-sm">
+        <span v-else class="tw:text-primary tw:text-sm">
           {{ displayValue }}
         </span>
       </div>
@@ -261,11 +261,11 @@ function handleClick() {
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
       <span
         v-else-if="highlightedHtml"
-        class="tw:text-text-primary tw:text-sm"
+        class="tw:text-primary tw:text-sm"
         v-html="highlightedHtml"
       />
       <!-- Default: plain text -->
-      <span v-else class="tw:text-text-primary tw:text-sm">
+      <span v-else class="tw:text-primary tw:text-sm">
         {{ displayValue }}
       </span>
     </template>
