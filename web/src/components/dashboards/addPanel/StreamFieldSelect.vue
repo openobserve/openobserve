@@ -5,6 +5,7 @@
       :model-value="selectValue"
       :options="flatOptions"
       label="Select Field"
+      label-position="inside"
       searchable
       data-test="stream-field-select"
       class="o2-custom-select-dashboard"
