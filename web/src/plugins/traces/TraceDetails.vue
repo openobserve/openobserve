@@ -758,7 +758,7 @@ size="sm"
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="tw:flex column tw:items-center tw:justify-center"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center"
       :style="{ height: '100%' }"
     >
       <OSpinner

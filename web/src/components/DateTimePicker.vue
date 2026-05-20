@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
-          <div class="date-time-table tw:relative column">
+          <div class="date-time-table tw:relative tw:flex tw:flex-col">
             <div
               class="relative-row tw:px-3 tw:py-2"
               v-for="(period, index) in relativePeriods"

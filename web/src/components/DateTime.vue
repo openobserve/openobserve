@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator />
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
-            <div class="date-time-table tw:relative column">
+            <div class="date-time-table tw:relative tw:flex tw:flex-col">
               <div
                 class="relative-row tw:pl-3 tw:py-2"
                 v-for="(period, index) in relativePeriods"
