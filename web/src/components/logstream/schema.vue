@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template #cell-index_type="{ row }">
-                        <OSelect
+                        <div
                           v-if="
                             !(
                               row.name ==
@@ -581,22 +581,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               row.name == allFieldsName
                             )
                           "
-                          :model-value="computedIndexType({ row }).value"
-                          :options="indexTypeOptionsForRow(row)"
-                          label-key="label"
-                          value-key="value"
-                          class="mini-select"
-                          multiple
-                          clearable
-                          :data-test="`schema-field-${row.name}-index-type-select`"
-                          style="width: 190px;"
-                          @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                          class="tw:flex tw:items-center tw:gap-1"
                         >
+                          <OSelect
+                            :model-value="computedIndexType({ row }).value"
+                            :options="indexTypeOptionsForRow(row)"
+                            label-key="label"
+                            value-key="value"
+                            class="mini-select"
+                            multiple
+                            clearable
+                            :data-test="`schema-field-${row.name}-index-type-select`"
+                            style="width: 190px;"
+                            @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                          />
                           <OTooltip
                             v-if="row.index_type && row.index_type.length > 0"
                             :content="streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
                           />
-                        </OSelect>
+                        </div>
                       </template>
                       <template #cell-patterns="{ row }">
                         <template
