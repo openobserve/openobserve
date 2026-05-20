@@ -52,7 +52,7 @@
                 <div class="modern-info-banner">
                   <OIcon
                     name="check-circle"
-                    class="text-green-6 tw:mr-2"
+                    class="tw:text-green-600 tw:mr-2"
                     size="md"
                   />
                   <span class="tw:text-sm">{{
@@ -198,7 +198,7 @@
                 <div class="modern-info-banner">
                   <OIcon
                     name="check-circle"
-                    class="text-green-6 tw:mr-2"
+                    class="tw:text-green-600 tw:mr-2"
                     size="md"
                   />
                   <span class="tw:text-sm">{{

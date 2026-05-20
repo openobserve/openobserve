@@ -108,37 +108,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
-                      <OIcon
-                        name="check-circle"
-                        size="sm"
-                       />
-                      <OTooltip>
-                        <template #content>
-                          <div style="max-width: 300px;">
-                            <strong>Status: All Completed</strong><br/>
-                            {{ row.urlJobs.length }} URL job(s) completed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" to see details</em>
-                          </div>
-                        </template>
-                      </OTooltip>
+                      <OIcon name="check-circle" size="sm">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: All Completed</strong><br/>
+                              {{ row.urlJobs.length }} URL job(s) completed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" to see details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon
-                        name="sync"
-                        size="sm"
-                        class="rotate-animation"
-                       />
-                      <OTooltip>
-                        <template #content>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Processing</strong><br/>
-                            One or more jobs are currently processing<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
-                          </div>
-                        </template>
-                      </OTooltip>
+                      <OIcon name="sync" size="sm" class="rotate-animation">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Processing</strong><br/>
+                              One or more jobs are currently processing<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'failed'">
                       <OIcon
@@ -146,33 +141,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         class="tw:cursor-pointer"
                         @click="showUrlJobsDialog(row)"
-                       />
-                      <OTooltip>
-                        <template #content>
-                          <div style="max-width: 350px;">
-                            <strong>Status: Failed</strong><br/>
-                            One or more jobs have failed<br/>
-                            <br/>
-                            Click to see details and retry failed jobs
-                          </div>
-                        </template>
-                      </OTooltip>
+                      >
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 350px;">
+                              <strong>Status: Failed</strong><br/>
+                              One or more jobs have failed<br/>
+                              <br/>
+                              Click to see details and retry failed jobs
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'pending'">
-                      <OIcon
-                        name="schedule"
-                        size="sm"
-                       />
-                      <OTooltip>
-                        <template #content>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Pending</strong><br/>
-                            Job(s) waiting to be processed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" for details</em>
-                          </div>
-                        </template>
-                      </OTooltip>
+                      <OIcon name="schedule" size="sm">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Pending</strong><br/>
+                              Job(s) waiting to be processed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </span>
                   </template>
                 </div>

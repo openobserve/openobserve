@@ -236,17 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-               />
+                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              >
                 <OTooltip
                   side="right"
                   align="center"
                   max-width="300px"
                   :content="t('alerts.anomaly.detectionResolutionTooltip')"
                 />
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -292,17 +290,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 tw:cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-              "
-             />
+              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+            >
               <OTooltip
                 side="right"
                 align="center"
                 max-width="300px"
                 :content="t('alerts.anomaly.detectionResolutionTooltip')"
               />
+            </OIcon>
           </div>
           <div>
             <div class="tw:flex tw:items-center tw:gap-0">
@@ -347,17 +343,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-               />
+                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              >
                 <OTooltip
                   side="right"
                   align="center"
                   max-width="300px"
                   :content="t('alerts.anomaly.checkEveryTooltip')"
                 />
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -399,17 +393,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-               />
+                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              >
                 <OTooltip
                   side="right"
                   align="center"
                   max-width="300px"
                   :content="t('alerts.anomaly.lookBackWindowTooltip')"
                 />
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -456,11 +448,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-               />
+                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              >
                 <OTooltip side="right" align="center" max-width="300px">
                   <template #content><span style="font-size: 14px">
                     How many days of historical data to use for training. Min 1
@@ -468,6 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ≥7 days → hour-of-day + day-of-week.
                   </span></template>
                 </OTooltip>
+              </OIcon>
             </div>
             <div class="tw:flex tw:flex-col">
               <OInput
@@ -500,17 +490,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-               />
+                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              >
                 <OTooltip
                   side="right"
                   align="center"
                   max-width="300px"
                   :content="t('alerts.anomaly.retrainEveryTooltip')"
                 />
+              </OIcon>
             </div>
             <OSelect
               v-model="config.retrain_interval_days"
@@ -534,17 +522,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 tw:cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-              "
-             />
+              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+            >
                 <OTooltip
                   side="right"
                   align="center"
                   max-width="300px"
                   :content="t('alerts.anomaly.sensitivityTooltip')"
                 />
+            </OIcon>
           </div>
           <div style="width: calc(100% - 190px)">
             <!-- Chart + Slider container -->

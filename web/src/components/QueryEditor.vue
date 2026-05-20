@@ -18,11 +18,11 @@
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
+          icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
           class="ai-stop-button"
         >
-          <OIcon name="stop" size="sm" />
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
@@ -43,12 +43,12 @@
         <OButton
           variant="ai-gradient"
           size="icon-xs-sq"
+          icon-left="send"
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
           class="ai-send-button"
         >
-          <OIcon name="send" size="sm" />
           <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
           <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
         </OButton>
@@ -56,11 +56,11 @@
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
+          icon-left="close"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
           class="ai-close-button"
         >
-          <OIcon name="close" size="sm" />
           <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
@@ -120,7 +120,6 @@ import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
 import config from '@/aws-exports';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 

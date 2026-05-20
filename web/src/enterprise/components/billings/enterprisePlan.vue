@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:flex tw:justify-between tw:p-3 tw:mt-[18px]">
-      <OButton variant="primary" size="sm-action" tw:block @click="contactSales">
+      <OButton variant="primary" size="sm-action" class="tw:w-full" @click="contactSales">
         {{ t("billing.contactLabel") }}
       </OButton>
     </div>

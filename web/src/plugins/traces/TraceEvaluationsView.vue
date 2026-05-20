@@ -653,7 +653,7 @@ export default defineComponent({
       groundedness: "verified",
       conciseness: "summarize",
       instruction_following: "rule",
-      accuracy: "check_circle",
+      accuracy: "check-circle",
       trajectory_efficiency: "flash_on",
       completeness: "task_alt",
       safety: "security",
