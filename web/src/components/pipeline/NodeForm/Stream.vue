@@ -79,22 +79,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-if="selectedNodeType == 'output'"
-            class="note-message tw:text-[14px] tw:flex tw:flex-col tw:gap-1"
+            class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
           >
-            <span class="tw:flex tw:items-center">
-              <OIcon name="info" size="sm" class="tw:pr-1" /> Select an existing stream
-              from the list or enter the name to create a new one
-            </span>
-            <span class="tw:flex tw:items-center">
-              <OIcon name="info" size="sm" class="tw:pr-1" /> Enrichment_tables as
-              destination stream is only available for scheduled pipelines
-            </span>
-            <span class="tw:flex">
-              <OIcon name="info" size="sm" class="tw:pr-1 tw:pt-1" /> Use curly braces
-              '{}' to configure stream name dynamically. e.g.
-              static_text_{fieldname}_postfix. Static text before/after {} is
-              optional
-            </span>
+            <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Select an existing stream from the list or enter the name to create a new one
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
+                  <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional
+                </span>
+              </div>
+            </div>
           </div>
 
           <div class="tw:flex tw:gap-2 tw:mt-2">
@@ -490,11 +498,20 @@ defineExpose({
 
 .note-message {
   background-color: #f9f290;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
+}
+
+.note-message .highlight {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.note-message .code {
+  font-family: monospace;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #b30059;
 }
 </style>
