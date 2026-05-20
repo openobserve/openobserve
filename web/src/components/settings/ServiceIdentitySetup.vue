@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="value"
                       searchable
                       :placeholder="t('settings.correlation.selectField')"
-                      style="min-width: 220px"
+                      style="min-width: 220px; max-width: 220px"
                       data-test="service-identity-add-distinguish-btn"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
                     />
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-xs-sq"
                       @click="
                         addingToEnv = '';
-                        addFieldValue = '';
+                        addFieldValue = undefined;
                       "
                     >
                       <svg
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     valueKey="value"
                     searchable
                     :placeholder="t('settings.correlation.selectField')"
-                    style="min-width: 220px"
+                    style="min-width: 220px; max-width: 220px"
                     data-test="service-identity-add-distinguish-btn"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                   />
@@ -491,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="
                       addingToEnv = '';
-                      addFieldValue = '';
+                      addFieldValue = undefined;
                     "
                   >
                     <svg
@@ -680,7 +680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     valueKey="value"
                     searchable
                     placeholder="Select alias group"
-                    style="min-width: 220px"
+                    style="min-width: 220px; max-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
                   />
                   <OButton
@@ -688,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="
                       addingTrackedAlias = false;
-                      addTrackedAliasValue = '';
+                      addTrackedAliasValue = undefined;
                     "
                   >
                     <svg
@@ -1599,9 +1599,9 @@ const dimensionAnalytics = ref<Record<string, DimensionAnalytics>>({});
 
 /** Section 2: pill-based field configuration */
 const addingToEnv = ref<string>("");
-const addFieldValue = ref("");
+const addFieldValue = ref<string | undefined>(undefined);
 const addingTrackedAlias = ref(false);
-const addTrackedAliasValue = ref("");
+const addTrackedAliasValue = ref<string | undefined>(undefined);
 const addTrackedAliasSelectRef = ref<any>(null);
 
 /** All env keys that have at least one configured field, ordered by detected env order */
@@ -1816,7 +1816,7 @@ watch(
 watch(activeEnvironment, () => {
   suggestionDismissed.value = false;
   addingToEnv.value = "";
-  addFieldValue.value = "";
+  addFieldValue.value = undefined;
 });
 
 /** Re-show recommendation when user changes fields away from the suggested config */
@@ -3012,11 +3012,11 @@ const trackedAliasAddOptions = computed(() =>
   ),
 );
 
-function onAddTrackedAlias(value: string) {
-  if (value && !trackedAliasIds.value.includes(value)) {
+function onAddTrackedAlias(value: unknown) {
+  if (value && typeof value === "string" && !trackedAliasIds.value.includes(value)) {
     trackedAliasIds.value = [...trackedAliasIds.value, value];
   }
-  addTrackedAliasValue.value = "";
+  addTrackedAliasValue.value = undefined;
   addingTrackedAlias.value = false;
 }
 
@@ -3335,14 +3335,14 @@ function getAddFieldOptionsForEnv(envKey: string) {
 }
 
 /** Called when user picks a field in the tw:inline select for a specific env */
-function onAddFieldToEnv(envKey: string, val: string) {
-  if (!val) return;
+function onAddFieldToEnv(envKey: string, val: unknown) {
+  if (!val || typeof val !== "string") return;
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
     [envKey]: [...current.filter(Boolean), val],
   };
-  addFieldValue.value = "";
+  addFieldValue.value = undefined;
   addingToEnv.value = "";
 }
 
