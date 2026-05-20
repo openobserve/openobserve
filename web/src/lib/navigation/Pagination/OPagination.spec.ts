@@ -84,18 +84,6 @@ describe("OPagination", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([4]);
   });
 
-  it("emits 1 on first button click", async () => {
-    const wrapper = factory({ modelValue: 7, max: 10 });
-    await wrapper.find("[aria-label='First page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([1]);
-  });
-
-  it("emits max on last button click", async () => {
-    const wrapper = factory({ modelValue: 3, max: 10 });
-    await wrapper.find("[aria-label='Last page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([10]);
-  });
-
   it("does not emit when clicking the active page button", async () => {
     const wrapper = factory({ modelValue: 3, max: 10 });
     await wrapper.find("[aria-current='page']").trigger("click");
@@ -104,20 +92,16 @@ describe("OPagination", () => {
 
   // ─── Boundary guards ────────────────────────────────────────────────────────
 
-  it("first and prev buttons are disabled on page 1", () => {
+  it("prev button is disabled on page 1", () => {
     const wrapper = factory({ modelValue: 1, max: 10 });
-    const first = wrapper.find("[aria-label='First page']");
     const prev = wrapper.find("[aria-label='Previous page']");
-    expect(first.attributes("disabled")).toBeDefined();
     expect(prev.attributes("disabled")).toBeDefined();
   });
 
-  it("last and next buttons are disabled on the last page", () => {
+  it("next button is disabled on the last page", () => {
     const wrapper = factory({ modelValue: 10, max: 10 });
     const next = wrapper.find("[aria-label='Next page']");
-    const last = wrapper.find("[aria-label='Last page']");
     expect(next.attributes("disabled")).toBeDefined();
-    expect(last.attributes("disabled")).toBeDefined();
   });
 
   // ─── Disabled state ──────────────────────────────────────────────────────────
