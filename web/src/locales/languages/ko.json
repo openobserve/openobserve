@@ -3101,7 +3101,10 @@
     "algorithm": "알고리즘",
     "storeType": "스토어 유형",
     "mechanismType": "메커니즘 유형",
-    "actions": "액션"
+    "actions": "액션",
+    "providerTypeRequired": "제공자 유형이 필요합니다.",
+    "algorithmRequired": "알고리즘이 필요합니다",
+    "secretRequired": "비밀이 필요합니다"
   },
   "quota": {
     "header": "할당량",

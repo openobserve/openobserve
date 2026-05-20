@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-akeyless-baseurl-input"
       v-model="formData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
-      class="showLabelOnTop q-w-lg"
+      class="showLabelOnTop tw:w-full"
       :error="!!baseUrlError"
       :error-message="baseUrlError"
       @update:model-value="baseUrlError = ''"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-cipher-key-akeyless-access-id-input"
         v-model="formData.key.store.akeyless.access_id"
         :label="t('cipherKey.accessId') + ' *'"
-        class="showLabelOnTop q-w-lg"
+        class="showLabelOnTop tw:w-full"
         :error="!!accessIdError"
         :error-message="accessIdError"
         @update:model-value="accessIdError = ''"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-auth-method-input"
       v-model="formData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
-      class="showLabelOnTop q-w-lg"
+      class="showLabelOnTop tw:w-full"
       :options="authenticationTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="authTypeError = ''"
     />
     <fieldset
-      class="q-fieldset tw:p-3 q-w-lg"
+      class="q-fieldset tw:p-3 tw:w-full"
       v-if="formData.key.store.akeyless.auth.type != ''"
     >
       <legend class="q-caption tw:px-2">
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-access-key-input"
             v-model="formData.key.store.akeyless.auth.access_key"
             :label="t('cipherKey.accessKey') + ' *'"
-            class="showLabelOnTop q-w-lg"
+            class="showLabelOnTop tw:w-full"
             :error="!!accessKeyError"
             :error-message="accessKeyError"
             @update:model-value="accessKeyError = ''"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-username-input"
             v-model="formData.key.store.akeyless.auth.ldap.username"
             :label="t('cipherKey.ldapUsername') + ' *'"
-            class="showLabelOnTop q-w-lg"
+            class="showLabelOnTop tw:w-full"
             :error="!!ldapUsernameError"
             :error-message="ldapUsernameError"
             @update:model-value="ldapUsernameError = ''"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-password-input"
             v-model="formData.key.store.akeyless.auth.ldap.password"
             :label="t('cipherKey.ldapPassword') + ' *'"
-            class="showLabelOnTop q-w-lg"
+            class="showLabelOnTop tw:w-full"
             type="password"
             autocomplete="new-password"
             :error="!!ldapPasswordError"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-secret-type-input"
       v-model="formData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
-      class="showLabelOnTop q-w-lg"
+      class="showLabelOnTop tw:w-full"
       :options="secretTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="secretTypeError = ''"
     />
     <fieldset
-      class="q-fieldset tw:p-3 q-w-lg"
+      class="q-fieldset tw:p-3 tw:w-full"
       v-if="formData.key.store.akeyless.store.type != ''"
     >
       <legend class="q-caption tw:px-2">
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-static-secret-name-input"
           v-model="formData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
-          class="showLabelOnTop q-w-lg"
+          class="showLabelOnTop tw:w-full"
           :error="!!staticSecretError"
           :error-message="staticSecretError"
           @update:model-value="staticSecretError = ''"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-name-input"
           v-model="formData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
-          class="showLabelOnTop q-w-lg"
+          class="showLabelOnTop tw:w-full"
           :error="!!dfcNameError"
           :error-message="dfcNameError"
           @update:model-value="dfcNameError = ''"
@@ -174,13 +174,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-iv-input"
           v-model="formData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV')"
-          class="showLabelOnTop q-w-lg"
+          class="showLabelOnTop tw:w-full"
         />
         <OTextarea
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
           v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
-          class="showLabelOnTop q-w-lg"
+          class="showLabelOnTop tw:w-full"
           :error="!!dfcEncryptedDataError"
           :error-message="dfcEncryptedDataError"
           @update:model-value="dfcEncryptedDataError = ''"
@@ -272,7 +272,7 @@ export default defineComponent({
       }),
     },
   },
-  setup(props: any, { emit }) {
+  setup(props: any, { emit, expose }) {
     const { t } = useI18n();
     const isUpdateLDAPPass = ref(false);
     const isUpdateLDAPUsername = ref(false);
@@ -323,6 +323,10 @@ export default defineComponent({
         && !secretTypeError.value && !staticSecretError.value && !dfcNameError.value
         && !dfcEncryptedDataError.value;
     };
+
+    // Parent (AddCipherKey) calls validate() from its Continue handler so
+    // every required Akeyless field surfaces its inline error at once.
+    expose({ validate: validateAkeylessFields });
 
     const authenticationTypeOptions = ref([
       { label: "Access Key", value: "access_key" },
@@ -376,6 +380,12 @@ export default defineComponent({
 
 <style lang="scss">
 .cipher-keys-add-akeyless-type {
+  // Small consistent gap between every top-level field (inputs, selects,
+  // fieldsets) so they don't render flush against each other.
+  > * + * {
+    margin-top: 0.5rem;
+  }
+
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0px;
   }

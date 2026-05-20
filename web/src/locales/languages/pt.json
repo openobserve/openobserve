@@ -3090,7 +3090,10 @@
     "algorithm": "algoritmo",
     "storeType": "Tipo de loja",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Ações"
+    "actions": "Ações",
+    "providerTypeRequired": "O tipo de provedor é obrigatório",
+    "algorithmRequired": "O algoritmo é necessário",
+    "secretRequired": "O segredo é obrigatório"
   },
   "quota": {
     "header": "Cotas",

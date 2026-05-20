@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="tw:font-bold">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="tw:text-[var(--o2-text-label)] tw:text-sm">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!fields.length">
@@ -19,123 +19,69 @@
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="tw:flex tw:justify-start tw:items-end tw:gap-2"
-        :data-test="`alert-conditions-${index + 1}`"
+        class="tw:flex tw:flex-wrap tw:items-end tw:gap-2 tw:mt-2"
+        :data-test="`add-stream-field-row-${index}`"
       >
-        <div
-          data-test="add-stream-field-name-input"
-          class="tw:ml-0 o2-input tw:flex tw:items-center"
-        >
+        <div data-test="add-stream-field-name-input" class="tw:flex-1 tw:min-w-[160px]">
           <OInput
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
-            class="tw:py-2"
             :error="!!fieldNameErrors[index]"
             :error-message="fieldNameErrors[index] || ''"
             @update:model-value="fieldNameErrors[index] = ''"
-            @blur="!field.name.trim() && (fieldNameErrors[index as number] = t('logStream.fieldRequired'))"
             tabindex="0"
-            :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
         </div>
-        <!-- <div
-          v-if="visibleInputs.type"
-          data-test="alert-conditions-operator-select"
-          class="tw:ml-0 o2-input"
-        >
-          <OSelect
-            v-model="field.type"
-            :options="fieldTypes"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="tw:py-2"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 120px"
-            @update:model-value="emits('input:update', 'conditions', field)"
-          />
-        </div> -->
         <div
           v-if="visibleInputs.index_type"
-          data-test="add-stream-field-type-select-input"
-          class="tw:ml-0 tw:flex tw:items-end o2-input"
+          data-test="add-stream-field-index-type-select"
+          class="tw:min-w-[140px]"
         >
           <OSelect
             v-model="field.index_type"
-            :options="streamIndexType"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            class="tw:py-2"
+            :options="getIndexTypeOptions(field)"
             multiple
-            :max-values="2"
-            :option-disable="(_option: any) => disableOptions(field, _option)"
-            emit-value
             clearable
-            stack-label
-            borderless
-            dense
-            use-input
-            fill-input
-            style="width: 250px"
-            :placeholder="
-              !isFocused && (!field.index_type || field.index_type.length === 0)
-                ? t('logStream.indexType')
-                : ''
-            "
+            :placeholder="t('logStream.indexType')"
             @update:model-value="emits('input:update', 'conditions', field)"
-            @focus="handleFocus"
-            @blur="handleBlur"
           />
         </div>
         <div
           v-if="visibleInputs.data_type"
-          data-test="add-stream-field-type-select-input"
-          class="tw:ml-0 tw:flex tw:items-end o2-input"
+          data-test="add-stream-field-data-type-select"
+          class="tw:min-w-[100px]"
         >
           <OSelect
             v-model="field.type"
             :options="dataTypes"
-            class="tw:py-2"
             label-key="label"
             value-key="value"
             clearable
-            style="width: 250px"
-            :placeholder="
-              !isDataTypeFocused && (!field.type || field.type.length === 0)
-                ? t('logStream.dataType') + ' *'
-                : ''
-            "
+            :placeholder="t('logStream.dataType') + ' *'"
             :error="!!fieldDataTypeErrors[index]"
             :error-message="fieldDataTypeErrors[index] || ''"
             @update:model-value="fieldDataTypeErrors[index] = ''; emits('input:update', 'conditions', field)"
-            @focus="handleDataTypeFocus"
-            @blur="handleDataTypeBlur(); !field.type && (fieldDataTypeErrors[index] = t('logStream.dataTypeRequired'))"
           />
         </div>
-        <div class="tw:ml-0" style="margin-bottom: 8px">
+        <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
           <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
             variant="outline"
             size="icon-sm"
-            class="tw:ml-1"
-            :disabled="
-              field.name === '' || (fields.length === 1 && field.name == '')
-            "
-            :title="t('alert_templates.edit')"
+            :disabled="!field.name.trim()"
+            :title="t('logStream.addField')"
             icon-left="add"
-            />
+            @click="addApiHeader"
+          />
           <OButton
             data-test="add-stream-delete-field-btn"
             variant="outline-destructive"
             size="icon-sm"
-            class="tw:ml-1"
-            :title="t('alert_templates.edit')"
+            :title="t('logStream.deleteField')"
             icon-left="delete"
-            />
+            @click="deleteApiHeader(field, index)"
+          />
         </div>
       </div>
     </template>
@@ -149,7 +95,6 @@ import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   fields: {
@@ -230,6 +175,13 @@ const deleteApiHeader = (field: any, index: number) => {
 
 const addApiHeader = () => {
   emits("add");
+};
+
+const getIndexTypeOptions = (field: any) => {
+  return streamIndexType.map((option) => ({
+    ...option,
+    disabled: disableOptions(field, option),
+  }));
 };
 
 const disableOptions = (schema: any, option: any) => {
@@ -323,15 +275,5 @@ defineExpose({
 });
 </script>
 
-<style lang="scss">
-.add-field {
-}
 
-.alerts-condition-action {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
-}
-</style>
+

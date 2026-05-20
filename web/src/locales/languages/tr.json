@@ -3101,7 +3101,10 @@
     "algorithm": "Algoritma",
     "storeType": "Mağaza Türü",
     "mechanismType": "Mekanizma Tipi",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "providerTypeRequired": "Sağlayıcı tipi gereklidir",
+    "algorithmRequired": "Algoritma gerekli",
+    "secretRequired": "Sır gerekli"
   },
   "quota": {
     "header": "Kontenjanlar",

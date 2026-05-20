@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><OIcon name="layers" size="xs" class="tw:shrink-0"
+              ><OIcon name="layers" size="sm" class="tw:shrink-0"
             /></template>
             Spans
           </OToggleGroupItem>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
+              ><OIcon name="share" size="sm" class="tw:shrink-0"
             /></template>
             Service Graph
           </OToggleGroupItem>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><OIcon name="menu-book" size="xs" class="tw:shrink-0"
+              ><OIcon name="menu-book" size="sm" class="tw:shrink-0"
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><OIcon name="forum" size="xs" class="tw:shrink-0"
+              ><OIcon name="forum" size="sm" class="tw:shrink-0"
             /></template>
             Sessions
           </OToggleGroupItem>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><OIcon name="auto-awesome" size="xs" class="tw:shrink-0"
+              ><OIcon name="auto-awesome" size="sm" class="tw:shrink-0"
             /></template>
             LLM Insights
           </OToggleGroupItem>
@@ -123,15 +123,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
               size="lg"
             />
-            <img
-              :src="metricsIcon"
-              alt="Metrics"
-              class="tw:w-5 tw:h-5"
+            <OIcon
+              name="bar-chart"
+              size="sm"
+              class="tw:shrink-0"
             />
             <OTooltip :content="t('traces.RedMetrics')" />
+          </div>
+          <!-- Error Only Toggle -->
+          <div
+            class="toolbar-toggle-container element-box-shadow"
+            data-test="traces-toolbar-toggle-container"
+          >
+            <OSwitch
+              data-test="traces-search-bar-error-only-toggle-btn"
+              v-model="searchObj.meta.showErrorOnly"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
+              size="lg"
+              @update:model-value="onErrorOnlyToggle"
+            />
+            <OIcon
+              name="error"
+              size="sm"
+              class="tw:shrink-0 tw:text-[var(--o2-status-error)]"
+            />
+            <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
           <OButton
             data-test="traces-search-bar-reset-filters-btn"
@@ -139,31 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="resetFilters"
           >
-            <OIcon name="restart-alt" size="sm" />
+            <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
             <OTooltip :content="t('search.resetFilters')" />
           </OButton>
-          <!-- Error Only Toggle -->
-          <div
-            class="toolbar-toggle-container element-box-shadow"
-          >
-            <OSwitch
-              data-test="traces-search-bar-error-only-toggle-btn"
-              v-model="searchObj.meta.showErrorOnly"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="lg"
-              @update:model-value="onErrorOnlyToggle"
-            />
-            <OIcon
-              name="error"
-              size="sm"
-              class="tw:mx-1 tw:text-[var(--o2-status-error)]"
-            />
-            <OTooltip :content="t('traces.showErrorOnly')" />
-          </div>
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
-            class="tw:border! tw:border-[var(--color-button-outline-border)]! tw:h-[2rem]! tw:w-[2.25rem]!"
+            class=" tw:h-[2rem]! tw:w-[2.25rem]!"
           />
         </template>
       </div>
@@ -352,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             >
               <template #icon-left
-                ><OIcon name="share" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                ><OIcon name="share" size="sm" class="tw:shrink-0" /></template>
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
@@ -471,7 +472,6 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
-import { getImageURL } from "@/utils/zincutils";
 import {
   applyFilterTerm,
   replaceExistingFieldCondition,
@@ -934,11 +934,6 @@ export default defineComponent({
       dateTimeRef.value?.setDateType("absolute");
     };
 
-    const metricsIcon = computed(() => {
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/bar_chart_histogram_light.svg")
-        : getImageURL("images/common/bar_chart_histogram.svg");
-    });
 
     // Service Graph toolbar controls
     const serviceGraphVisualizationTabs = [
@@ -990,7 +985,6 @@ export default defineComponent({
       resetFilters,
       onErrorOnlyToggle,
       updateNewDateTime,
-      metricsIcon,
       tracesShareURL,
       config,
       applyFilters,
