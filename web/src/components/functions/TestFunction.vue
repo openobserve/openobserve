@@ -761,12 +761,7 @@ defineExpose({
     padding: 2px 8px !important;
     font-size: 11px !important;
     margin: 1px 2px !important;
-
-    .OIcon {
-      margin-right: 4px !important;
-      font-size: 13px;
-    }
-  }
+}
 }
 
 .function-stream-select-input {

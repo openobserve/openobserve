@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBadge
         variant="primary-soft"
         class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
-        style="border-radius: 0px"
       >
         {{ t("billing.discountTag") }}
       </OBadge>

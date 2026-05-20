@@ -175,10 +175,6 @@ const addApiHeader = () => {
 
 <style lang="scss">
 .add-field {
-  .OIcon {
-    margin-right: 4px !important;
-    font-size: 15px !important;
-  }
 }
 
 .alerts-condition-action {

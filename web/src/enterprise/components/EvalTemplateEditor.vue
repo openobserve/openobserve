@@ -345,44 +345,15 @@ onBeforeMount(async () => {
     }
   }
 
-  .q-chip {
-    margin: 0 !important;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
   input {
     min-width: 80px !important;
     flex-shrink: 0 !important;
   }
-
-  .q-field__append {
-    padding-left: 8px;
-    height: 40px !important;
-  }
 }
 
-.body--dark :deep(.dimensions-select) .q-chip {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  color: #e0e0e0 !important;
-
-  .OIcon {
-    color: #e0e0e0 !important;
-    opacity: 0.8;
-    &:hover { opacity: 1; }
-  }
-}
-
-.body--light :deep(.dimensions-select) .q-chip {
-  background-color: rgba(0, 0, 0, 0.08) !important;
-  color: #424242 !important;
-
-  .OIcon {
-    color: #424242 !important;
-    opacity: 0.7;
-    &:hover { opacity: 1; }
-  }
-}
+// NOTE: Dark/light chip styling removed — `.q-chip` and `.body--dark/--light` selectors
+// no longer match post-Quasar removal. Chip-like visuals are now provided by OBadge
+// variants (use `<OBadge variant="default">` for the dimensions-select tag tokens).
 
 // ── Fields ────────────────────────────────────────────────────────────────────
 .field-label-row {

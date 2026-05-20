@@ -2473,12 +2473,7 @@ export default defineComponent({
             rgba(16, 185, 129, 0.02)
           );
           border: 1px solid rgba(16, 185, 129, 0.15);
-
-          .OIcon {
-            color: #10b981;
-          }
-
-          .metric-value {
+.metric-value {
             color: #10b981;
           }
 
@@ -2499,12 +2494,7 @@ export default defineComponent({
             rgba(251, 191, 36, 0.02)
           );
           border: 1px solid rgba(251, 191, 36, 0.15);
-
-          .OIcon {
-            color: #fbbf24;
-          }
-
-          .metric-value {
+.metric-value {
             color: #fbbf24;
           }
 
@@ -2525,12 +2515,7 @@ export default defineComponent({
             rgba(239, 68, 68, 0.02)
           );
           border: 1px solid rgba(239, 68, 68, 0.15);
-
-          .OIcon {
-            color: #ef4444;
-          }
-
-          .metric-value {
+.metric-value {
             color: #ef4444;
           }
 
@@ -2551,12 +2536,7 @@ export default defineComponent({
             rgba(107, 114, 128, 0.02)
           );
           border: 1px solid rgba(107, 114, 128, 0.15);
-
-          .OIcon {
-            color: #6b7280;
-          }
-
-          .metric-value {
+.metric-value {
             color: #9ca3af;
           }
         }
@@ -2677,12 +2657,7 @@ export default defineComponent({
             rgba(16, 185, 129, 0.01)
           );
           border-color: rgba(16, 185, 129, 0.2);
-
-          .OIcon {
-            color: #059669;
-          }
-
-          .metric-value {
+.metric-value {
             color: #059669;
           }
 
@@ -2703,12 +2678,7 @@ export default defineComponent({
             rgba(217, 119, 6, 0.01)
           );
           border-color: rgba(217, 119, 6, 0.2);
-
-          .OIcon {
-            color: #d97706;
-          }
-
-          .metric-value {
+.metric-value {
             color: #d97706;
           }
 
@@ -2729,12 +2699,7 @@ export default defineComponent({
             rgba(220, 38, 38, 0.01)
           );
           border-color: rgba(220, 38, 38, 0.2);
-
-          .OIcon {
-            color: #dc2626;
-          }
-
-          .metric-value {
+.metric-value {
             color: #dc2626;
           }
 
@@ -2755,12 +2720,7 @@ export default defineComponent({
             rgba(107, 114, 128, 0.01)
           );
           border-color: rgba(107, 114, 128, 0.2);
-
-          .OIcon {
-            color: #6b7280;
-          }
-
-          .metric-value {
+.metric-value {
             color: #6b7280;
           }
         }

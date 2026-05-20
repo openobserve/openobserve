@@ -1097,11 +1097,7 @@ export default defineComponent({
     justify-content: center;
     margin-bottom: 24px;
     backdrop-filter: blur(10px);
-
-    .OIcon {
-      color: white;
-    }
-  }
+}
 
   .hero-title {
     font-size: 32px;
@@ -1146,22 +1142,12 @@ export default defineComponent({
       backdrop-filter: blur(10px);
       color: white;
       box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-
-      .OIcon {
-        color: white;
-        font-size: 20px;
-      }
-
-      // Licensed badge styling - neutral white/transparent for users who already have license
+// Licensed badge styling - neutral white/transparent for users who already have license
       &.licensed-badge {
         background: rgba(255, 255, 255, 0.2);
         color: white;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-
-        .OIcon {
-          color: white;
-        }
-      }
+}
     }
   }
 
@@ -1207,11 +1193,7 @@ export default defineComponent({
     font-weight: 500;
     backdrop-filter: blur(10px);
     white-space: nowrap;
-
-    .OIcon {
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
+}
 
   .hero-actions {
     display: flex;
@@ -1363,11 +1345,7 @@ export default defineComponent({
       align-items: center;
       justify-content: center;
       color: var(--q-primary);
-
-      .OIcon {
-        font-size: 15px;
-      }
-    }
+}
 
     .feature-content {
       flex: 1;

@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="planType == planName"
         variant="primary-soft"
         class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
-        style="border-radius: 0px"
       >
         {{ t("billing.subscribed") }}
       </OBadge>
@@ -120,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="subscriptionType === 'external-contract'"
         class="tw:w-full tw:text-center"
       >
-        <OBadge variant="default" icon="description" class="tw:px-3 tw:py-2">
+        <OBadge variant="default" class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1">
+          <OIcon name="description" size="xs" />
           Managed via contract
         </OBadge>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">

@@ -297,11 +297,6 @@ onMounted(async () => {
   &:active {
     transform: scale(1);
   }
-
-  .OIcon {
-    font-size: 18px;
-    font-weight: bold;
-  }
 }
 
 </style>

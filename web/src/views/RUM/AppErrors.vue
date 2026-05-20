@@ -538,12 +538,7 @@ function updateUrlQueryParams() {
     .q-btn__content {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .OIcon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
+}
   }
 }
 </style>

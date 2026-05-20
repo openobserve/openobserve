@@ -289,10 +289,6 @@ q-btn {
   display: flex;
   align-items: center;
   animation: slideDown 0.3s ease-out;
-  
-  .OIcon {
-    color: #3b82f6;
-  }
 }
 
 /* Dark mode styles */
@@ -301,10 +297,6 @@ q-btn {
   color: #f3f4f6;
   border: 1px solid #374151;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  
-  .OIcon {
-    color: #60a5fa;
-  }
 }
 
 @keyframes slideDown {

@@ -25,24 +25,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
-          <OIcon name="language" size="xs" class="tw:pr-1" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
-          <OIcon name="calendar-month" size="xs" class="tw:pr-1" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="calendar-month" size="sm" />
           {{ sessionDetails.date }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
-          <OIcon name="person" size="xs" class="tw:pr-1" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="person" size="sm" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
-          <OIcon name="location-on" size="xs" class="tw:pr-1" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="location-on" size="sm" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
-          <OIcon name="settings" size="xs" class="tw:pr-1" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="settings" size="sm" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div

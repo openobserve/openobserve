@@ -268,18 +268,7 @@ export default defineComponent({
     gap: 0;
     justify-content: flex-start;
     width: 100%;
-
-    .OIcon {
-      font-size: 20px;
-      width: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 0px;
-      margin-left: 0px;
-      height: auto;
-    }
-  }
+}
 
   &:hover {
     background: transparent !important;

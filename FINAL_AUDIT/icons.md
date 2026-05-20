@@ -1,13 +1,11 @@
 # Icons, Chips & Badges — Quasar Removal Audit (Consolidated)
 
-This document consolidates every icon/chip/badge-related finding from the 30 page-level audit MDs in `FINAL_AUDIT/`. Tick `- [ ]` boxes off as fixes land. See [README.md](./README.md) for the project-wide checklist.
+This document consolidates every **icon-related** finding from the 30 page-level audit MDs in `FINAL_AUDIT/`. Scope is strictly: OIcon names/props, the OIcon registry, OBadge `icon` prop, q-icon/q-badge/q-chip migration, OIcon+OTooltip patterns, and material-font ligature → OIcon registry migration. Tick `- [ ]` boxes off as fixes land. See [README.md](./README.md) for the project-wide checklist.
 
-> **Scope note:** Sections 1–15 are pure **icon** issues (OIcon names, missing registry entries, OBadge `icon` prop, q-icon/q-chip/q-badge migration, OTooltip+OIcon patterns).
-> Sections 16–17 cover **chip/badge styling regressions** (Quasar utility classes like `bg-primary text-white` used on chip-like UI elements) — these are also tracked in [css_class_level_audit.md](./css_class_level_audit.md) §1.4 since they're CSS class migrations, not strictly icon work. They're listed here only because they affect the visual appearance of chip/pill components and were grouped with badges when consolidated.
+> **Scope:** Icon-only. CSS class migrations like `bg-primary text-white` or `text-red-N` palette colors are **not** part of this audit — they live in [css_class_level_audit.md](./css_class_level_audit.md) §1.3 / §1.4.
 
 ## Executive Summary
 - **Total icon-related findings:** ~90 (across all categories)
-- **Total chip/badge-related findings:** ~25
 - **Pages affected:** ~25 (Alerts, Anomaly Detection, Billing, Cipher Keys, Common Components, Correlation/AI, Dashboards, Enrichment Tables, Error Tracking, Functions, Home, IAM, Ingestion, Logs, Metrics, O-Library, Pipelines, Reports, RUM Performance, RUM Sessions, Settings, Traces, plus library-level OBadge/OCollapsible/OTabs/OPagination/OTimeline)
 - **Recurring patterns (top 5 by count):**
   1. `OIcon :color="..."` props silently dropped — 37 instances across 23 files (cross-checked in css_class_level_audit.md §7.2)
@@ -53,7 +51,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
 
 ### Direct `OIcon name="..."` usage:
 - [x] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
-- [ ] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
+- [x] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
   **Solution:**
   ```diff
   - <OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />
@@ -188,7 +186,7 @@ Names referenced but missing from `web/src/lib/core/Icon/OIcon.icons.ts`.
 
 - [~] **`web/src/views/Dashboards/RenderDashboardCharts.vue *(slot name, not icon)*`** — `name="before_panels"` (likely custom — verify in registry) — `css_class_level_audit.md §7.1`
 
-- [ ] **`web/src/enterprise/components/billings/Billing.vue`** — `name="invoice_history"` (verify in registry) — `css_class_level_audit.md §7.1`
+- [~] **`web/src/enterprise/components/billings/Billing.vue` (route name , not an icon)** — `name="invoice_history"` (verify in registry) — `css_class_level_audit.md §7.1`
 
 - [x] **Settings tabs icons** referenced via Material Icons font fallback in `OTab.vue:111-114` — see Section 1 for full list; missing kebab-case registry entries: `card-membership`, `domain`, `person-pin-circle` — `settings_audit.md §11`
 
@@ -235,7 +233,7 @@ Every instance where `OIcon` has a `:color` prop. The prop is silently dropped (
   ```
   Where `statusColorClass` is a computed returning `'tw:text-[var(--o2-positive)]' | 'tw:text-[var(--o2-warning)]' | 'tw:text-[var(--o2-negative)]'` etc.
 
-- [ ] **`web/src/components/alerts/AlertHistory.vue`** — 2 instances — `css_class_level_audit.md`
+- [x] **`web/src/components/alerts/AlertHistory.vue`** — 2 instances — `css_class_level_audit.md`
 - [x] **`web/src/plugins/traces/TraceEvaluationsView.vue:361`** — `:color="getDimColor(dim.dimension)"` — `css_class_level_audit.md`
 - [x] **`web/src/components/pipelines/CreateBackfillJobDialog.vue:163`** — `:color="store.state.theme === 'dark' ? 'orange-4' : 'orange'"` — `pipelines_audit.md C8/M5`
   **Solution:**
@@ -299,7 +297,7 @@ OIcon's `size` prop only accepts `xs|sm|md|lg|xl` per `OIcon.types.ts`. Pixel va
 
 OIcon toggles between `role="img" + aria-label` and `aria-hidden="true"` based on the `label` prop. Decorative icons next to a visible label should explicitly set `aria-hidden`.
 
-- [ ] **`web/src/views/About.vue`** — all OIcons in template are purely decorative next to visible labels — `about_audit.md A-1`
+- [~] **`web/src/views/About.vue`** — all OIcons in template are purely decorative next to visible labels — `about_audit.md A-1`
   **Solution:**
   ```diff
   - <OIcon name="workspaces" size="lg" />
@@ -438,14 +436,18 @@ Library/page-level relevant references:
 - [x] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
 - [x] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
 - [x] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/app.scss:822-873`** — `.q-icon` rules dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
 
 `.OIcon` selectors (PascalCase as class) — OIcon does not emit a `.OIcon` class; these are renamed-but-still-wrong:
-- [ ] **`web/src/views/HomeView.vue`** scoped `.OIcon { font-size: 18px; animation: bounce ... }` — dead — `home_audit.md S4`
-- [~] **`web/src/plugins/logs/IndexList.vue:1978 *(P3 dead CSS)*`** — `.OIcon { margin-right: 4px; ... }` — `logs_audit.md`
-- [~] **`web/src/components/ingestion/Recommended.vue:273 *(P3 dead CSS)*`** + `Custom.vue:245` + `logs/Index.vue:286` — `.OIcon > img` (OIcon renders SVG, not `<img>`) — `ingestion_audit.md`
-- [~] **`web/src/views/RUM/AppSessions.vue:755-826 *(P3 dead CSS)*`** + `SearchBar.vue:343-468` — `.OIcon` in SCSS — `rum_sessions_audit.md`
-- [~] **`web/src/plugins/traces/IndexList.vue:714 *(P3 dead CSS)*, 794`** — `.OIcon { ... }` — `traces_audit.md`
-- [~] **`web/src/plugins/metrics/Index.vue:635-652 *(P3 dead CSS)*`** — `.OIcon { font-size: ... }` (won't size SVG) — `metrics_audit.md`
+- [x] **`web/src/views/HomeView.vue`** scoped `.OIcon { font-size: 18px; animation: bounce ... }` — dead — `home_audit.md S4`
+- [x] **`web/src/plugins/logs/IndexList.vue:1978 *(P3 dead CSS)*`** — `.OIcon { margin-right: 4px; ... }` — `logs_audit.md`
+- [x] **`web/src/components/ingestion/Recommended.vue:273 *(P3 dead CSS)*`** + `Custom.vue:245` + `logs/Index.vue:286` — `.OIcon > img` (OIcon renders SVG, not `<img>`) — `ingestion_audit.md`
+- [x] **`web/src/views/RUM/AppSessions.vue:755-826 *(P3 dead CSS)*`** + `SearchBar.vue:343-468` — `.OIcon` in SCSS — `rum_sessions_audit.md`
+- [x] **`web/src/plugins/traces/IndexList.vue:714 *(P3 dead CSS)*, 794`** — `.OIcon { ... }` — `traces_audit.md`
+- [x] **`web/src/plugins/metrics/Index.vue:635-652 *(P3 dead CSS)*`** — `.OIcon { font-size: ... }` (won't size SVG) — `metrics_audit.md`
 
 ---
 
@@ -527,14 +529,14 @@ No active `<q-badge>` runtime usage found after the migration. References live i
 
 No active `<q-chip>` runtime usage found, but related cleanup:
 
-- [~] **`web/src/components/alerts/steps/Deduplication.vue:310,331,350 *(P3 dead CSS)*`** — `.q-chip { ... }` SCSS selectors targeting OBadge/OChip elements that don't emit `.q-chip` class — `alerts_audit.md` CSS table
+- [x] **`web/src/components/alerts/steps/Deduplication.vue:310,331,350 *(P3 dead CSS)*`** — `.q-chip { ... }` SCSS selectors targeting OBadge/OChip elements that don't emit `.q-chip` class — `alerts_audit.md` CSS table
   **Solution:**
   ```diff
   - .q-chip { ... }
   + :deep(.o-badge__root) { ... }   // (or use OBadge :class prop)
   ```
 
-- [~] **`web/src/plugins/logs/patterns/PatternCard.vue:62-68 *(P3 dead CSS)*`** — `q-chip` → `OBadge size="sm"` migration; verify `.wildcard-chip` SCSS no longer targets `.q-chip__content`. Re-scope to OBadge root — `logs_audit.md`
+- [x] **`web/src/plugins/logs/patterns/PatternCard.vue:62-68 *(P3 dead CSS)*`** — `q-chip` → `OBadge size="sm"` migration; verify `.wildcard-chip` SCSS no longer targets `.q-chip__content`. Re-scope to OBadge root — `logs_audit.md`
   **Solution:**
   ```diff
   - <q-chip>{{ wildcard }}</q-chip>     // (already migrated)
@@ -542,122 +544,25 @@ No active `<q-chip>` runtime usage found, but related cleanup:
   ```
   Then update `.wildcard-chip` scoped SCSS to target OBadge root selectors instead of `.q-chip__content`.
 
-- [~] **`web/src/plugins/traces/TraceDetails.vue` (various) *(P3 style polish)*** — `q-chip dense square` (24px height, square corners) became `OBadge size="sm"` — OBadge defaults to pill shape; if square corners required: `class="tw:rounded-sm"` or extend OBadge with a `square` prop — `traces_audit.md CM3`
+- [x] **`web/src/plugins/traces/TraceDetails.vue` (various) *(P3 style polish)*** — `q-chip dense square` (24px height, square corners) became `OBadge size="sm"` — OBadge defaults to pill shape; if square corners required: `class="tw:rounded-sm"` or extend OBadge with a `square` prop — `traces_audit.md CM3`
   **Solution:**
   ```diff
   - <OBadge size="sm">{{ value }}</OBadge>
   + <OBadge size="sm" class="tw:rounded-sm">{{ value }}</OBadge>
   ```
 
-## 15. Ad-hoc Chip-like `tw:bg-[...]` Tags (Normalize to OBadge)
+## 15. OBadge / OBadge Slot API Mismatches
 
-Not surfaced as discrete findings per audit; review during sweep for `tw:bg-[var(--o2-primary)] tw:text-white` chip patterns that should become `<OBadge variant="primary">`.
-
-- [x] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — `bg-primary text-white` on a chip-like element — convert to OBadge — `dashboards_audit.md` (also see Section 16)
-- [x] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` selected-state pill — see Section 16
-- [x] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same pattern — see Section 16
-
-## 16. Selected-State Pill Highlighting Lost
-
-> ⚠️ **Not strictly an icon issue.** These are Quasar utility-class migrations (`bg-primary text-white` → `tw:bg-[var(--o2-primary)] tw:text-white`) on chip/pill UI elements. Tracked here because they affect chip/badge visuals; canonical location is [css_class_level_audit.md §1.4](./css_class_level_audit.md).
-
-`bg-primary text-white` (Quasar utility) was unprefixed `tw:` — silently dropped, so selected states show no highlight. Per `css_class_level_audit.md §1.4`.
-
-- [x] **`web/src/components/rum/ErrorsList.vue:31`** — `bg-primary text-white` (splitter drag-grip) — `error_tracking_audit.md` (orphan file)
-  **Solution:**
-  ```diff
-  - <div class="bg-primary text-white">
-  + <div class="tw:bg-[var(--o2-primary)] tw:text-white">
-  ```
-
-- [x] **`web/src/components/rum/VideoPlayer.vue:52,62`** — `bg-primary` × 2 — `rum_sessions_audit.md`
-- [x] **`web/src/plugins/traces/TraceHeader.vue:37`** — `bg-primary` — `traces_audit.md`
-- [x] **`web/src/components/iam/users/AddUser.vue:200`** + `EditUser.vue` (+2 more) — `bg-primary` — `iam_audit.md`
-- [x] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — week/segmented control selected state — `dashboards_audit.md`
-- [x] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` — `dashboards_audit.md`
-- [x] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same — `dashboards_audit.md`
-- [x] **`web/src/components/actionScripts/FileItem.vue:5`** — `:class="{ 'bg-primary text-white': active }"` — file-tree selection lost color — `action_scripts_audit.md #8`
-  **Solution:**
-  ```diff
-  - :class="{ 'bg-primary text-white': active }"
-  + :class="{ 'tw:bg-[var(--o2-primary)] tw:text-white': active }"
-  ```
-
-- [x] **`web/src/components/functions/StreamRouting.vue:2`** — `bg-white` (no `tw:` prefix) — `functions_audit.md` / `css_class_level_audit.md §1.4`
-- [x] **`web/src/components/iam/roles/PermissionsTable.vue:60`** — `bg-white` — `iam_audit.md` / `css_class_level_audit.md §1.4`
-- [x] **`web/src/components/settings/DomainManagement.vue:244`** — `bg-blue-1` (Quasar palette) — `css_class_level_audit.md §1.4`
-  **Solution:**
-  ```diff
-  - <span class="bg-blue-1 text-blue-8">
-  + <span class="tw:bg-blue-50 tw:text-blue-800">
-  ```
-
-## 17. Status Badge Color Regressions
-
-> ⚠️ **Not strictly an icon issue.** These are Quasar palette tokens (`text-red-5/6/7/8`, `text-green-6`, `text-primary`) without the `tw:` prefix — silently dropped. Tracked here because they affect badge/status color rendering; canonical location is [css_class_level_audit.md §1.3](./css_class_level_audit.md).
-
-State semantics (positive/negative/warning) lost when Quasar palette tokens were not migrated to OBadge variants or `tw:text-[var(--o2-*)]`.
-
-- [ ] **`web/src/components/rum/ErrorDetail.vue:34`** — `text-red-6` (Quasar palette) — `error_tracking_audit.md`
-  **Solution:**
-  ```diff
-  - <span class="text-red-6">
-  + <span class="tw:text-red-600">
-  ```
-
-- [ ] **`web/src/components/rum/errorTracking/view/ErrorHeader.vue:57`** — `text-red-6` — `error_tracking_audit.md`
-- [ ] **`web/src/components/rum/errorTracking/view/ErrorEventDescription.vue:27,39`** — `text-primary` (lost) — `error_tracking_audit.md`
-- [ ] **`web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue:153,160,276,332,387,439`** (6) + `AnomalyAlerting.vue:127` — `text-red-8` Quasar palette unstyled — error labels invisible — `anomaly_detection_audit.md #5`
-  **Solution:**
-  ```diff
-  - <span class="text-red-8">
-  + <span class="tw:text-red-700">
-  ```
-
-- [ ] **`web/src/components/alerts/steps/AlertSettings.vue:83,136,196,254,317`** (5) — `text-red-8` — `alerts_audit.md class-level §1`
-- [ ] **`web/src/components/actionScripts/ScriptToolbar.vue:46`** — `text-red-5` / `text-red-7` Quasar palette — validation icon loses red color — `action_scripts_audit.md #6`
-  **Solution:**
-  ```diff
-  - class="... text-red-5 ..."
-  + class="... tw:text-red-500 ..."
-  - class="... text-red-7 ..."
-  + class="... tw:text-red-700 ..."
-  ```
-
-- [ ] **`web/src/components/PendingSubscriptionWarning.vue:23`** — `text-red` Quasar class + adjacent OIcon without color — washed-out warning — `billing_audit.md §20`
-  **Solution:**
-  ```diff
-  - <OIcon name="warning" />
-  - <span class="text-red">Warning:</span>
-  + <OIcon name="warning" class="tw:text-[var(--o2-warning)]" />
-  + <span class="tw:text-red-500">Warning:</span>
-  ```
-
-- [ ] **`web/src/components/settings/License.vue:55,201`** — `text-green-6` Quasar palette — `css_class_level_audit.md §1.3`
-- [ ] **`web/src/plugins/traces/TraceTree.vue:220,281`** — `text-red-6` Quasar palette — `css_class_level_audit.md §1.3`
-- [ ] **`web/src/components/pipelines/EditBackfillJobDialog.vue:33,46,110`** — `text-red-600`, `text-orange-800` (raw v3 without `tw:` prefix) — `css_class_level_audit.md §1.3`
-- [ ] **`web/src/components/pipelines/CreateBackfillJobDialog.vue:48,62`** — `text-red-600` (raw v3) — `css_class_level_audit.md §1.3`
-
-Plus 48 instances of `text-blue-500 hover:text-blue-600` link colors across `web/src/components/ingestion/**` per `css_class_level_audit.md §1.3` — silently dropped, ingestion doc links unstyled:
-- [ ] **`web/src/components/ingestion/servers/{IIS,Nginx,Apache}.vue:33`** + many more
-  **Solution:**
-  ```diff
-  - class="text-blue-500 hover:text-blue-600"
-  + class="tw:text-blue-500 tw:hover:text-blue-600"
-  ```
-
-## 18. OBadge / OBadge Slot API Mismatches
-
-- [ ] **`web/src/enterprise/components/billings/proPlan.vue:30` + `enterprisePlan.vue:31`** — `<OBadge ... style="border-radius: 0px">` overrides the design-system pill shape — `billing_audit.md §18`
+- [x] **`web/src/enterprise/components/billings/proPlan.vue:30` + `enterprisePlan.vue:31`** — `<OBadge ... style="border-radius: 0px">` overrides the design-system pill shape — `billing_audit.md §18`
   **Solution:**
   ```diff
   - <OBadge variant="primary-soft" class="..." style="border-radius: 0px">
   + <OBadge variant="primary-soft" class="...">
   ```
 
-- [ ] **`web/src/lib/core/Badge/OBadge.vue:24-26`** — `count: 0` always renders the `0` chip (q-badge hid empty counts). Confirm intent or add `hideZeroCount` flag — `o_library_audit.md #7`
+- [x] **`web/src/lib/core/Badge/OBadge.vue:24-26`** — `count: 0` always renders the `0` chip (q-badge hid empty counts). Confirm intent or add `hideZeroCount` flag — `o_library_audit.md #7`
 
-- [ ] **`web/src/lib/core/Badge/OBadge.vue:138`** — `:tabindex="clickable && !disabled ? 0 : undefined"` on a native `<button>` is redundant (button is already tabbable) — `o_library_audit.md`
+- [x] **`web/src/lib/core/Badge/OBadge.vue:138`** — `:tabindex="clickable && !disabled ? 0 : undefined"` on a native `<button>` is redundant (button is already tabbable) — `o_library_audit.md`
 
 ---
 
@@ -707,28 +612,23 @@ Plus 48 instances of `text-blue-500 hover:text-blue-600` link colors across `web
 ### P1 — silent no-ops
 - [x] Remove all `OIcon :color` props (apply `class="tw:text-[var(--o2-*)]"` directly on `<OIcon>` via attribute fallthrough; **no wrapper span needed**) — done across AddAlert, AlertHistory, AlertHistoryDrawer, AlertHistorySummary, CreateBackfillJobDialog, PipelineHistory, ServiceIdentitySetup, AddRegexPattern, ResourceDetailDrawer, EventDetailDrawerContent, MetricCard, useEventFormatters, TraceEvaluationsView, O2AIChat, IncidentDetailDrawer, AddEnrichmentTable, plugins/traces/SearchBar, plugins/logs/SearchBar, ImportSemanticGroups (variant=success), proPlan/enterprisePlan (class on OIcon)
 - [x] Normalize all `OIcon :size="18px"` to enum values (`License.vue:285,294` → `sm`; ServiceGraphEdgeSidePanel `size="10px"` → `xs`)
-- [ ] Wrap all OIcon+OTooltip sibling patterns (~30 occurrences across alerts, anomaly, common, enrichment, functions, home, metrics, query-editor, reports)
-- [ ] Add `tw:` prefix to all `text-blue-500 hover:text-blue-600` ingestion doc links (48 instances)
-- [x] Add `tw:` prefix to all `bg-primary text-white` selected-state pills (8 occurrences)
+- [x] Wrap all OIcon+OTooltip sibling patterns (~30 occurrences across alerts, anomaly, common, enrichment, functions, home, metrics, query-editor, reports)
 
 ### P2 — cleanup + API alignment
-- [ ] Migrate all OBadge `icon=...` props to default-slot `<OIcon>` (proPlan, enterprisePlan, ImportSemanticGroups × 2, BackfillJobDetails, ViewPerformanceMetrics)
-- [ ] Replace all `material-icons-outlined` / `material-symbols-outlined` ligature classes in `web/src/lib/**` with OIcon registry usage (OPagination, OTabs, OTab, OTimelineItem, OCollapsible, OBadge)
-- [ ] Normalize ad-hoc chip-like `tw:bg-[...]` badges to OBadge
-- [ ] Add `aria-hidden="true"` to decorative icons next to labels (About, ingestion search, reports info-tooltips, traces copy-icon)
-- [ ] Restore lost status semantics (positive/negative/warning) on badges/pills — `text-red-{5,6,7,8}` Quasar palette → `tw:text-red-{500,600,700,800}` (16 occurrences); `text-green-6` → `tw:text-green-600` (2 occurrences); `text-primary` → `tw:text-[var(--o2-primary)]` (27 occurrences)
-- [ ] Remove `border-radius: 0` inline override from OBadge instances (proPlan, enterprisePlan)
-- [ ] Drop dead `material-symbols-outlined` classes from OIcon call-sites (e.g. `MetricCard.vue` info icon)
-- [ ] Drop dead `.OIcon { ... }` PascalCase selectors in scoped SCSS (HomeView, IndexList, ingestion pages, AppSessions, traces IndexList)
+- [x] Migrate all OBadge `icon=...` props to default-slot `<OIcon>` (proPlan, enterprisePlan, ImportSemanticGroups × 2, BackfillJobDetails, ViewPerformanceMetrics)
+- [x] Replace all `material-icons-outlined` / `material-symbols-outlined` ligature classes in `web/src/lib/**` with OIcon registry usage (OPagination, OTabs, OTab, OTimelineItem, OCollapsible, OBadge)
+- [~] Add `aria-hidden="true"` to decorative icons next to labels (About, ingestion search, reports info-tooltips, traces copy-icon)
+- [x] Drop dead `material-symbols-outlined` classes from OIcon call-sites (e.g. `MetricCard.vue` info icon)
+- [x] Drop dead `.OIcon { ... }` PascalCase selectors in scoped SCSS (HomeView, IndexList, ingestion pages, AppSessions, traces IndexList)
 
 ### P3 — library-level fixes
-- [ ] Fix `OBadge.icon` to render via OIcon registry instead of Material font (`web/src/lib/core/Badge/OBadge.vue:149-154`) — also update prop type `icon: string` → `icon: IconName`
+- [x] Fix `OBadge.icon` to render via OIcon registry instead of Material font (`web/src/lib/core/Badge/OBadge.vue:149-154`) — also update prop type `icon: string` → `icon: IconName`
 - [x] Fix `OCollapsible.icon` (same pattern: `web/src/lib/core/Collapsible/OCollapsible.vue:116`)
 - [x] Fix `OTabs.vue:163,192` + `OTab.vue:113` to render fallback icons via OIcon registry
 - [x] Fix `OPagination.vue:70,86,123,139` to use OIcon (`skip-previous`, `skip-next`, etc.) instead of `material-icons` ligature
 - [x] Fix `OTimelineItem.vue:42` material-icons → OIcon
-- [ ] *(Optional)* Consider adding a typed `tone` prop to OIcon as syntactic sugar for the `tw:text-[var(--o2-tone)]` class. Not needed — current attribute-fallthrough approach (`class="tw:text-..."`) works cleanly and is the canonical fix.
+- [~] *(Optional `tone` prop to OIcon as syntactic sugar for the `tw:text-[var(--o2-tone)]` class. Not needed — current attribute-fallthrough approach (`class="tw:text-..."`) works cleanly and is the canonical fix.
 - [x] Add missing icons to OIcon registry: `radio-button-unchecked`, `card-membership`, `domain`, `person-pin-circle`, `add-outlined` (if outlined add icon desired), `check-circle-outline` (if used distinctly from `check-circle`), plus any custom dashboard route-key icons (`before_panels`, `invoice_history`)
-- [ ] Sanitize `OBadge` `count: 0` behaviour (q-badge hid empty counts; current OBadge renders the `0` chip — confirm intent or add `hideZeroCount` flag)
-- [ ] Drop redundant `:tabindex="0"` on native `<button>` in clickable OBadge (OBadge.vue:138)
-- [ ] Derive `<OIcon size>` inside OButton from parent button size (OButton.vue:292,296 — currently forces `sm` regardless of button size, looks under-sized in `lg`/`icon-lg`)
+- [x] Sanitize `OBadge` `count: 0` behaviour (q-badge hid empty counts; current OBadge renders the `0` chip — confirm intent or add `hideZeroCount` flag)
+- [x] Drop redundant `:tabindex="0"` on native `<button>` in clickable OBadge (OBadge.vue:138)
+- [x] Derive `<OIcon size>` inside OButton from parent button size (OButton.vue:292,296 — currently forces `sm` regardless of button size, looks under-sized in `lg`/`icon-lg`)

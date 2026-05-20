@@ -2987,11 +2987,7 @@ $traceChartCollapseHeight: 42px;
   &:hover {
     background-color: var(--o2-primary-btn-bg);
     color: #ffffff;
-
-    .OIcon {
-      color: #ffffff !important;
-    }
-  }
+}
 }
 
 .log-stream-search-input {
@@ -3116,11 +3112,7 @@ html:has(.trace-details) {
   }
 
   .visual-selection-btn {
-    .OIcon {
-      padding-right: 5px;
-      font-size: 15px;
-    }
-  }
+}
 
   .visual-selector-container {
     backdrop-filter: blur(0.625rem);
@@ -3239,11 +3231,7 @@ html:has(.trace-details) {
 
       .q-field__marginal {
         height: 1.875rem !important;
-
-        .OIcon {
-          font-size: 1.125rem;
-        }
-      }
+}
     }
 
     &.q-field--dark .q-field__control {
@@ -3341,12 +3329,7 @@ html:has(.trace-details) {
       padding: 0;
       border-radius: 0.125rem;
       transition: all 0.2s ease;
-
-      .OIcon {
-        font-size: 1.125rem;
-      }
-
-      &:hover:not(:disabled) {
+&:hover:not(:disabled) {
         background-color: var(--o2-hover-accent);
       }
 

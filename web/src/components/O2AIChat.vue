@@ -6579,12 +6579,6 @@ export default defineComponent({
   &:active {
     transform: scale(1);
   }
-
-  .OIcon {
-    font-size: 18px;
-    animation: bounce 2s infinite;
-    font-weight: bold;
-  }
 }
 
 // Bounce animation for the arrow icon

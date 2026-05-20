@@ -1161,12 +1161,7 @@ export default defineComponent({
       background: $secondary;
       border-radius: 3px 3px 3px 3px;
       padding: 0px 5px;
-
-      .OIcon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
+}
   }
 
   .download-logs-btn {
@@ -1192,11 +1187,7 @@ export default defineComponent({
   .reset-filters {
     width: 30px;
     height: 30px;
-
-    .OIcon {
-      margin-right: 0;
-    }
-  }
+}
 }
 
 .o2-run-query-button {

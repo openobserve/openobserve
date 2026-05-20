@@ -1978,11 +1978,6 @@ export default defineComponent({
     padding-top: 8px !important;
   }
 
-  .OIcon {
-    height: 16px;
-    width: 16px;
-    margin-right: 10px;
-  }
 }
 </style>
 

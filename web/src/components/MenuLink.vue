@@ -242,15 +242,7 @@ export default defineComponent({
   &:hover:not(.nav-menu-item--active) {
     transform: translateZ(0);
     // background-color: rgba(30, 41, 59, 0.6);
-
-    .OIcon {
-      color: var(--o2-menu-color);
-      // 3D pop-out effect with slight rotation
-      transform: translateZ(20px) scale(1.15) rotateY(5deg);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-    }
-
-    .nav-menu-item-label {
+.nav-menu-item-label {
       color: var(--o2-menu-color);
       transform: translateY(-2px);
     }
@@ -278,14 +270,7 @@ export default defineComponent({
     // Subtle inner highlight for depth
     position: relative;
     backdrop-filter: blur(8px) !important;
-
-    .OIcon {
-      // Minimal icon glow
-      filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: var(--o2-menu-color); // Lighter purple for better visibility
-    }
-
-    .nav-menu-item-label {
+.nav-menu-item-label {
       font-weight: 500;
       color: var(--o2-menu-color); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
@@ -336,10 +321,7 @@ export default defineComponent({
   }
 
   &[aria-label="Billing"] {
-    .OIcon {
-      font-size: 1.3rem;
-    }
-  }
+}
 }
 
 // Phase 3: Enhanced icon container with 3D effects and spring bounce-back
@@ -348,14 +330,6 @@ export default defineComponent({
   padding: 0;
   min-width: 40px;
   perspective: 1000px; // Enable 3D space
-
-  .OIcon {
-    padding: 4px;
-    border-radius: 12px;
-    // Spring bounce-back effect: overshoots and bounces back
-    transition: all 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    transform-style: preserve-3d;
-  }
 }
 
 // Add spring bounce-back transition to label
@@ -452,24 +426,14 @@ export default defineComponent({
 
       body.body--light & {
         color: var(--o2-menu-color) !important;
-
-        .OIcon {
-          color: #19191e !important;
-        }
-
-        .nav-menu-item-label {
+.nav-menu-item-label {
           color: #19191e !important;
         }
       }
 
       body.body--dark & {
         color: var(--o2-menu-color) !important;
-
-        .OIcon {
-          color: #ffffff !important;
-        }
-
-        .nav-menu-item-label {
+.nav-menu-item-label {
           color: #ffffff !important;
         }
       }

@@ -2322,41 +2322,24 @@ export default defineComponent({
 
     &.service-chip {
       border-left: 3px solid #0d6efd;
-      .OIcon {
-        color: #0d6efd;
-      }
-    }
+}
 
     &.duration-chip {
       border-left: 3px solid #6610f2;
-      .OIcon {
-        color: #6610f2;
-      }
-    }
+}
 
     &.ttft-chip {
       border-left: 3px solid #6f42c1;
-      .OIcon {
-        color: #6f42c1;
-      }
-    }
+}
 
     &.time-chip {
       border-left: 3px solid #d63384;
-      .OIcon {
-        color: #d63384;
-      }
-    }
+}
 
     &.span-id-chip {
       border-left: 3px solid #20c997;
       cursor: pointer;
-
-      .OIcon {
-        color: #20c997;
-      }
-
-      .copy-icon {
+.copy-icon {
         opacity: 0.6;
         transition: opacity 0.2s;
       }
@@ -2419,12 +2402,7 @@ export default defineComponent({
 
     &.model-chip {
       border-left: 3px solid #ab47bc;
-
-      .OIcon {
-        color: #7b1fa2;
-      }
-
-      .chip-value {
+.chip-value {
         color: #4a148c;
         font-weight: 600;
       }
@@ -2463,12 +2441,7 @@ export default defineComponent({
 
     &.cost-chip {
       border-left: 3px solid #ef6c00;
-
-      .OIcon {
-        color: #ef6c00;
-      }
-
-      .chip-value {
+.chip-value {
         color: #e65100;
         font-weight: 600;
       }
@@ -2553,12 +2526,7 @@ body.body--dark {
 
       &.model-chip {
         border-left: 3px solid #ab47bc;
-
-        .OIcon {
-          color: #ce93d8;
-        }
-
-        .chip-value {
+.chip-value {
           color: #e9d8fd;
         }
       }
@@ -2587,12 +2555,7 @@ body.body--dark {
 
       &.cost-chip {
         border-left: 3px solid #ef6c00;
-
-        .OIcon {
-          color: #ffcc80;
-        }
-
-        .chip-value {
+.chip-value {
           color: #fed7aa;
         }
       }
@@ -2755,13 +2718,7 @@ body.body--dark {
     display: flex;
     align-items: center;
     font-size: 12px;
-
-    .OIcon {
-      margin-right: 2px !important;
-      font-size: 14px;
-      margin-bottom: 1px;
-    }
-  }
+}
 }
 .highlight {
   background-color: yellow; /* Adjust background color as desired */

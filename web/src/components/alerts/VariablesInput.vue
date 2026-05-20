@@ -130,10 +130,6 @@ const addVariable = () => {
 
 <style lang="scss">
 .add-variable {
-  .OIcon {
-    margin-right: 4px !important;
-    font-size: 15px !important;
-  }
 }
 
 .variables-input {

@@ -678,13 +678,7 @@ export default defineComponent({
       visibility: hidden;
       display: flex;
       align-items: center;
-
-      .OIcon {
-        cursor: pointer;
-        opacity: 0;
-        margin: 0 1px;
-      }
-    }
+}
 
     &.selected {
       .field_overlay {
@@ -736,11 +730,7 @@ export default defineComponent({
       &:hover {
         .field_overlay {
           visibility: visible;
-
-          .OIcon {
-            opacity: 1;
-          }
-        }
+}
       }
 
     }
@@ -749,11 +739,7 @@ export default defineComponent({
       &:hover {
         .field_overlay {
           visibility: visible;
-
-          .OIcon {
-            opacity: 1;
-          }
-        }
+}
       }
     }
 

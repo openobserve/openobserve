@@ -309,12 +309,6 @@ export default defineComponent({
     }
   }
 
-  .q-chip {
-    margin: 0 !important;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
   // Ensure the input field stays visible and accessible
   input {
     min-width: 100px !important;
@@ -327,41 +321,8 @@ export default defineComponent({
   }
 }
 
-// Dark mode chip styling
-.dark-mode {
-  :deep(.fingerprint-select) {
-    .q-chip {
-      background-color: rgba(255, 255, 255, 0.1) !important;
-      color: #e0e0e0 !important;
-
-      .OIcon {
-        color: #e0e0e0 !important;
-        opacity: 0.8;
-
-        &:hover {
-          opacity: 1;
-        }
-      }
-    }
-  }
-}
-
-// Light mode chip styling
-.light-mode {
-  :deep(.fingerprint-select) {
-    .q-chip {
-      background-color: rgba(0, 0, 0, 0.08) !important;
-      color: #424242 !important;
-
-      .OIcon {
-        color: #424242 !important;
-        opacity: 0.7;
-
-        &:hover {
-          opacity: 1;
-        }
-      }
-    }
-  }
-}
+// NOTE: Dark/light fingerprint chip styling moved to OBadge variants since the
+// `q-chip` element no longer renders post-Quasar removal. If chip-specific
+// visual tweaks are needed, use `<OBadge variant="default">` and rely on its
+// built-in light/dark token-driven background.
 </style>
