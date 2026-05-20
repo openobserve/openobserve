@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   :data-test="`toc-level1-icon-${item.id}`"
                   :name="item.children.length > 0 ? 'folder' : 'article'"
-                  size="14px"
+                  size="sm"
                   class="tw:opacity-60 tw:flex-shrink-0"
                 />
                 <!-- Text in the middle - clickable to scroll -->

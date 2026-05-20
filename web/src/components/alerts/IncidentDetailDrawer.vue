@@ -1002,7 +1002,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Logs Tab Content -->
-        <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
+        <div v-if="activeTab === 'logs'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
@@ -1029,7 +1029,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden tw:h-full">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden tw:h-full">
             <CorrelatedLogsTable
               :service-name="correlationData.serviceName"
               :matched-dimensions="actualMatchedDimensions"
@@ -1050,11 +1050,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Metrics Tab Content -->
-        <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
+        <div v-if="activeTab === 'metrics'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-full">
             <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
-            <div class="tw-text-base">Loading correlated metrics...</div>
+            <div class="tw:text-base">Loading correlated metrics...</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -1078,7 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden">
             <TelemetryCorrelationDashboard
               mode="embedded-tabs"
               :externalActiveTab="'metrics'"
@@ -1095,10 +1095,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Traces Tab Content -->
-        <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
+        <div v-if="activeTab === 'traces'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:gap-2">
+            <span class="tw:text-xs">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -1108,9 +1108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-full">
             <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
-            <div class="tw-text-base">Loading correlated traces...</div>
+            <div class="tw:text-base">Loading correlated traces...</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -1134,7 +1134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden">
             <TelemetryCorrelationDashboard
               mode="embedded-tabs"
               :externalActiveTab="'traces'"
