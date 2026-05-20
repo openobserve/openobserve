@@ -250,7 +250,7 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 
 <style scoped lang="scss">
 .field-type-container {
-  width: 1.25rem;
+  width: 0.55rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -270,6 +270,10 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
   padding-left: 0 !important;
   padding-right: 0 !important;
   min-height: 24px !important;
+}
+
+:deep(.field-expansion-item button:hover) {
+  background-color: var(--o2-hover-accent);
 }
 
 :deep(.field-expansion-item button[data-state="open"]) {
