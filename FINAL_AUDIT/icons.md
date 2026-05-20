@@ -688,17 +688,17 @@ Plus 48 instances of `text-blue-500 hover:text-blue-600` link colors across `web
 ## Recommended Sweep Order
 
 ### P0 — visible regressions
-- [ ] Fix all `name="tw:block"` sed-regression icon names (3 files: AlertHistory, OrganizationManagement, settings)
-- [ ] Fix all underscored `OIcon name="check_circle"` (registry mismatch — icons render blank) — see Section 1 (~10 files)
-- [ ] Fix OBadge empty labels in `FrustrationBadge.vue` + `FrustrationEventBadge.vue` (count never renders)
-- [ ] Fix `OIcon name=""` (empty string) in `proPlan.vue:65` + `enterprisePlan.vue:66`
-- [ ] Fix `name="bar_chart"`/`"pin"` in `MetricLegends.vue` (icons missing in metric legend table)
-- [ ] Fix `arrow_upward`/`arrow_downward` in `ServiceGraphEdgeSidePanel.vue` (3 occurrences)
-- [ ] Add `radio-button-unchecked` to `OIcon.icons.ts` (Auto Navigation toggle off-state)
+- [x] Fix all `name="tw:block"` sed-regression icon names (3 files: AlertHistory, OrganizationManagement, SortByBtnGrp)
+- [x] Fix all underscored `OIcon name="check_circle"` (registry mismatch — icons render blank) — see Section 1 (~10 files)
+- [x] Fix OBadge empty labels in `FrustrationBadge.vue` + `FrustrationEventBadge.vue` (count never renders)
+- [x] Fix `OIcon name=""` (empty string) in `proPlan.vue:65` + `enterprisePlan.vue:66`
+- [x] Fix `name="bar_chart"`/`"pin"` in `MetricLegends.vue` (icons missing in metric legend table)
+- [x] Fix `arrow_upward`/`arrow_downward` in `ServiceGraphEdgeSidePanel.vue` (3 occurrences)
+- [x] Add `radio-button-unchecked` to `OIcon.icons.ts` (Auto Navigation toggle off-state); also added `radio-button-checked`, `touch-app`, `network-check`, `cloud-download`, `call-made`, `call-received`, `inbox`, `star-rate`
 
 ### P1 — silent no-ops
-- [ ] Remove all `OIcon :color` props (37 instances across 23 files — apply `class="tw:text-[var(--o2-*)]"` directly on `<OIcon>` via attribute fallthrough; **no wrapper span needed**)
-- [ ] Normalize all `OIcon :size="18px"` to enum values (`License.vue:285,294`)
+- [x] Remove all `OIcon :color` props (apply `class="tw:text-[var(--o2-*)]"` directly on `<OIcon>` via attribute fallthrough; **no wrapper span needed**) — done across AddAlert, AlertHistory, AlertHistoryDrawer, AlertHistorySummary, CreateBackfillJobDialog, PipelineHistory, ServiceIdentitySetup, AddRegexPattern, ResourceDetailDrawer, EventDetailDrawerContent, MetricCard, useEventFormatters, TraceEvaluationsView, O2AIChat, IncidentDetailDrawer, AddEnrichmentTable, plugins/traces/SearchBar, plugins/logs/SearchBar, ImportSemanticGroups (variant=success), proPlan/enterprisePlan (class on OIcon)
+- [x] Normalize all `OIcon :size="18px"` to enum values (`License.vue:285,294` → `sm`; ServiceGraphEdgeSidePanel `size="10px"` → `xs`)
 - [ ] Wrap all OIcon+OTooltip sibling patterns (~30 occurrences across alerts, anomaly, common, enrichment, functions, home, metrics, query-editor, reports)
 - [ ] Add `tw:` prefix to all `text-blue-500 hover:text-blue-600` ingestion doc links (48 instances)
 - [ ] Add `tw:` prefix to all `bg-primary text-white` selected-state pills (8 occurrences)

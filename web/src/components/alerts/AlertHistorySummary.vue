@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-2">
           <OIcon
             :name="getStateIcon(row.current_state)"
-            :color="getStateColor(row.current_state)"
+            :class="getStateColorClass(row.current_state)"
             size="sm"
           />
           <span>{{ row.current_state }}</span>
@@ -151,22 +151,22 @@ const getStateIcon = (state: string) => {
       return "error";
     case "ok":
     case "completed":
-      return "check_circle";
+      return "check-circle";
     default:
       return "info";
   }
 };
 
-const getStateColor = (state: string) => {
+const getStateColorClass = (state: string) => {
   switch (state.toLowerCase()) {
     case "firing":
     case "error":
-      return "negative";
+      return "tw:text-[var(--o2-negative)]";
     case "ok":
     case "completed":
-      return "positive";
+      return "tw:text-[var(--o2-positive)]";
     default:
-      return "grey";
+      return "tw:text-gray-500";
   }
 };
 

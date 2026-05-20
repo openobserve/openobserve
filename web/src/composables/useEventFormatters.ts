@@ -31,22 +31,22 @@ export function useEventFormatters() {
    * Get status icon based on HTTP status code
    */
   const getStatusIcon = (statusCode: number): string => {
-    if (!statusCode) return "help";
-    if (statusCode >= 200 && statusCode < 300) return "check_circle";
+    if (!statusCode) return "help-outline";
+    if (statusCode >= 200 && statusCode < 300) return "check-circle";
     if (statusCode >= 300 && statusCode < 400) return "info";
     if (statusCode >= 400 && statusCode < 500) return "warning";
     return "error";
   };
 
   /**
-   * Get status color based on HTTP status code
+   * Get status color class (Tailwind text-color) based on HTTP status code
    */
-  const getStatusColor = (statusCode: number): string => {
-    if (!statusCode) return "grey";
-    if (statusCode >= 200 && statusCode < 300) return "positive";
-    if (statusCode >= 300 && statusCode < 400) return "info";
-    if (statusCode >= 400 && statusCode < 500) return "warning";
-    return "negative";
+  const getStatusColorClass = (statusCode: number): string => {
+    if (!statusCode) return "tw:text-gray-500";
+    if (statusCode >= 200 && statusCode < 300) return "tw:text-[var(--o2-positive)]";
+    if (statusCode >= 300 && statusCode < 400) return "tw:text-[var(--o2-info)]";
+    if (statusCode >= 400 && statusCode < 500) return "tw:text-[var(--o2-warning)]";
+    return "tw:text-[var(--o2-negative)]";
   };
 
   /**
@@ -81,7 +81,7 @@ export function useEventFormatters() {
     formatTimestamp,
     formatId,
     getStatusIcon,
-    getStatusColor,
+    getStatusColorClass,
     formatResourceDuration,
     getEventTypeClass,
   };

@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(row)"
             >
-              <OIcon name="tw:block" size="xs" />
+              <OIcon name="block" size="xs" />
               <OTooltip content="Revoke" />
             </OButton>
             <OButton

@@ -284,6 +284,15 @@ import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
 import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
+import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
+import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
+import TouchApp from "~icons/material-symbols/touch-app";
+import NetworkCheck from "~icons/material-symbols/network-check";
+import CloudDownload from "~icons/material-symbols/cloud-download";
+import CallMade from "~icons/material-symbols/call-made";
+import CallReceived from "~icons/material-symbols/call-received";
+import Inbox from "~icons/material-symbols/inbox-outline";
+import StarRate from "~icons/material-symbols/star-rate-outline";
 
 import type { Component } from "vue";
 
@@ -562,6 +571,15 @@ export const iconRegistry = {
   "volume-up": VolumeUpIcon,
   "warning-amber": WarningAmberIcon,
   "wrap-text": WrapTextIcon,
+  "radio-button-unchecked": RadioButtonUnchecked,
+  "radio-button-checked": RadioButtonChecked,
+  "touch-app": TouchApp,
+  "network-check": NetworkCheck,
+  "cloud-download": CloudDownload,
+  "call-made": CallMade,
+  "call-received": CallReceived,
+  "inbox": Inbox,
+  "star-rate": StarRate,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

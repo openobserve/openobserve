@@ -282,7 +282,7 @@
                           limitBreachAllowedCount
                       "
                       name="warning"
-                      size="18px"
+                      size="sm"
                       class="tw:text-red-500 tw:flex-shrink-0"
                     />
                     <OIcon
@@ -290,8 +290,8 @@
                         licenseData?.ingestion_exceeded &&
                         licenseData?.ingestion_exceeded > 0
                       "
-                      name="check_circle"
-                      size="18px"
+                      name="check-circle"
+                      size="sm"
                       class="tw:text-amber-500 tw:flex-shrink-0"
                     />
                     <OIcon

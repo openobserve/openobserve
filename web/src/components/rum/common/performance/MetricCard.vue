@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="icon"
           :name="icon"
           size="sm"
-          :color="statusColor"
+          :class="statusColorClass"
         />
         <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
           {{ label }}
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="status"
         :name="statusIcon"
         size="sm"
-        :color="statusColor"
+        :class="statusColorClass"
       />
     </div>
 
@@ -143,7 +143,7 @@ const statusIcon = computed(() => {
   if (!props.status) return "";
 
   const icons = {
-    good: "check_circle",
+    good: "check-circle",
     "needs-improvement": "warning",
     poor: "error",
   };
@@ -151,16 +151,16 @@ const statusIcon = computed(() => {
   return icons[props.status] || "";
 });
 
-const statusColor = computed(() => {
-  if (!props.status) return "grey";
+const statusColorClass = computed(() => {
+  if (!props.status) return "tw:text-gray-500";
 
-  const colors = {
-    good: "positive",
-    "needs-improvement": "warning",
-    poor: "negative",
+  const classes = {
+    good: "tw:text-[var(--o2-positive)]",
+    "needs-improvement": "tw:text-[var(--o2-warning)]",
+    poor: "tw:text-[var(--o2-negative)]",
   };
 
-  return colors[props.status] || "grey";
+  return classes[props.status] || "tw:text-gray-500";
 });
 
 const progressValue = computed(() => {

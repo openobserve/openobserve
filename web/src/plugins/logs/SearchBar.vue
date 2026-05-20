@@ -1147,7 +1147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
                       size="sm"
-                      :color="searchObj.meta.liveMode ? 'primary' : ''"
+                      :class="searchObj.meta.liveMode ? 'tw:text-[var(--o2-primary)]' : ''"
                     />
                   </template>
                   <span>

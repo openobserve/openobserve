@@ -9,7 +9,7 @@
       data-test="dashboard-sort-by-item-clear"
     >
       <template #icon-left
-        ><OIcon name="tw:block" size="sm" style="font-size: 16px"
+        ><OIcon name="block" size="sm"
       /></template>
     </OButton>
     <OButton

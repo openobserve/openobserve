@@ -472,6 +472,13 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-span-kind-internal-text: #{$o2-gray-900};
   --o2-span-kind-internal-bg: #{$o2-gray-300};
 
+  // Semantic status colors (replaces Quasar --q-positive/negative/warning/info)
+  --o2-positive: #{$o2-green-800};
+  --o2-negative: #{$o2-red-800};
+  --o2-warning: #{$o2-yellow-800};
+  --o2-info: #{$o2-blue-800};
+  --o2-gray: #{$o2-gray-800};
+
   // Service-health indicator colors — intentionally theme-invariant (match ServiceGraph node colors)
   --o2-service-health-healthy: #52c41a;
   --o2-service-health-degraded: #faad14;
@@ -625,6 +632,13 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-span-kind-consumer-bg: #{$o2-dark-teal-100};
   --o2-span-kind-internal-text: #{$o2-dark-gray-900};
   --o2-span-kind-internal-bg: #{$o2-dark-gray-200};
+
+  // Semantic status colors (replaces Quasar --q-positive/negative/warning/info)
+  --o2-positive: #{$o2-dark-green-800};
+  --o2-negative: #{$o2-dark-red-700};
+  --o2-warning: #{$o2-dark-yellow-700};
+  --o2-info: #{$o2-dark-blue-700};
+  --o2-gray: #{$o2-dark-gray-800};
 
   // Service-health indicator colors — intentionally theme-invariant (match ServiceGraph node colors)
   --o2-service-health-healthy: #52c41a;

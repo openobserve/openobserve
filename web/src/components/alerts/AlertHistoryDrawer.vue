@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="history-toggle-off"
                   size="lg"
-                  :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                 />
               </div>
               <div

@@ -1012,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
             <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
@@ -1061,7 +1061,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
             <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
@@ -1117,7 +1117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'" style="width: 4rem; height: 4rem;" />
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
             <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>
