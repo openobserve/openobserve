@@ -55,7 +55,7 @@
     <div
       :class="[
         'o-splitter__after',
-        'tw:overflow-hidden tw:flex-1',
+        'tw:overflow-hidden tw:flex-1 tw:relative tw:z-0',
         horizontal ? 'tw:w-full' : 'tw:h-full'
       ]"
     >
