@@ -184,3 +184,64 @@ export async function deleteDashboard(page, dashboardName) {
   // Ensure the dashboard row is removed from the table
   // await expect(dashboardRow).not.toBeVisible({ timeout: 5000 });
 }
+
+/**
+ * Create a minimal v8 dashboard via API for use as a report source.
+ * Uses the apiCleanup instance for authenticated requests.
+ * @param {Object} api - apiCleanup instance
+ * @param {string} dashboardName - Unique name for the dashboard
+ * @param {string} folderId - Folder ID (defaults to "default")
+ * @returns {Promise<Object>} { success, dashboard, error }
+ */
+export async function createDashboardViaApi(api, dashboardName, folderId = 'default') {
+    testLogger.info('Creating dashboard via API', { dashboardName, folderId });
+
+    try {
+        const payload = {
+            version: 8,
+            title: dashboardName,
+            description: 'Auto-created for E2E test',
+            tabs: [{
+                tabId: 'default',
+                name: 'Default',
+                panels: []
+            }]
+        };
+
+        const response = await api._fetch(
+            `${api.baseUrl}/api/${api.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': api.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            testLogger.error('Failed to create dashboard via API', { dashboardName, status: response.status, body: errorBody });
+            return { success: false, error: `HTTP ${response.status}: ${errorBody}` };
+        }
+
+        const result = await response.json();
+        // MetaDashboard nests the actual data under the version key (e.g., "v8")
+        const inner = result[`v${result.version}`] || result;
+        const tabs = (inner.tabs || [{ tabId: 'default', name: 'Default' }]).map(t => ({
+            tab_id: t.tabId || t.tab_id || 'default'
+        }));
+        const dashboard = {
+            dashboard_id: inner.dashboardId || inner.dashboard_id,
+            title: inner.title,
+            tabs
+        };
+
+        testLogger.info('Dashboard created via API', { dashboardName, dashboardId: dashboard.dashboard_id });
+        return { success: true, dashboard };
+    } catch (error) {
+        testLogger.error('Failed to create dashboard via API', { dashboardName, error: error.message });
+        return { success: false, error: error.message };
+    }
+}
