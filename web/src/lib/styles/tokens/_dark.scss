@@ -115,15 +115,16 @@
     --color-collapsible-trigger-active-bg: var(--color-primary-800);
 
     /* Badge — tokens that change on dark backgrounds */
-    /* default: invert to dark surface + light text */
-    --color-badge-default-solid-bg: var(--color-grey-700);
+    /* default: brighten bg for contrast against dark panel backgrounds (grey-700 blends into grey-900) */
+    --color-badge-default-solid-bg: var(--color-grey-500);
     --color-badge-default-solid-text: var(--color-grey-100);
     --color-badge-default-ol-border: var(--color-grey-500);
     --color-badge-default-ol-text: var(--color-grey-300);
     --color-badge-default-soft-bg: var(--color-grey-800);
     --color-badge-default-soft-text: var(--color-grey-300);
 
-    /* primary: solid unchanged (primary-600 + white is fine on dark); outline text lighter */
+    /* primary: brighten solid bg in dark mode — primary-600 on primary-800 (active tab) has near-zero contrast */
+    --color-badge-primary-solid-bg: var(--color-primary-400);
     --color-badge-primary-ol-text: var(--color-primary-300);
     --color-badge-primary-soft-bg: var(--color-primary-900);
     --color-badge-primary-soft-text: var(--color-primary-300);

@@ -282,10 +282,14 @@ const updateActiveTab = (tab: string) => {
 }
 
 .splitter-icon-collapse {
+  position: absolute !important;
+  top: 0.25rem !important;
   left: 0 !important;
 }
 
 .splitter-icon-expand {
+  position: absolute !important;
+  top: 0.25rem !important;
   left: 0 !important;
 }
 </style>
