@@ -200,6 +200,9 @@ export default defineComponent({
     FieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
+    GroupedFieldListPagination: defineAsyncComponent(
+      () => import("@/components/common/FieldListPagination.vue"),
+    ),
     FieldExpansion: defineAsyncComponent(
       () => import("@/components/common/FieldExpansion.vue"),
     ),

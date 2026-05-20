@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-start!">
       <div
-        class="float-right tw:flex tw:flex-col tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
+        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
       >
         <!-- View Mode Toggle Group -->
         <OToggleGroup
@@ -213,7 +213,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:truncate tw:text-sm tw:min-w-0"
                           :title="row.view_name"
                           @click.stop="applySavedView(row)"
-                          v-close-popup
                         >
                           {{ row.view_name }}
                         </div>
@@ -330,7 +329,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:truncate tw:text-sm tw:min-w-0"
                           :title="row.view_name"
                           @click.stop="applySavedView(row)"
-                          v-close-popup
                         >
                           {{ row.view_name }}
                         </div>
@@ -2055,6 +2053,7 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTree,
+    OTable,
   },
   emits: [
     "searchdata",
