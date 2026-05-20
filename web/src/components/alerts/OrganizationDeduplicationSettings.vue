@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="localConfig.time_window_minutes"
           type="number"
           min="1"
+          width="md"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
           :class="
             store.state.theme === 'dark'
