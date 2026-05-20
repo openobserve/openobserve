@@ -62,6 +62,7 @@ use crate::service::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
     tantivy::puffin_directory::{
+        PROP_ROW_GROUP_SIZE,
         caching_directory::CachingDirectory,
         footer_cache::FooterCache,
         reader::{PuffinDirReader, warm_up_terms},
@@ -620,7 +621,7 @@ pub async fn tantivy_search(
                         continue;
                     }
                     match result {
-                        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+                        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
                             if num_rows == 0 {
                                 // if the bitmap is empty then we remove the file from the list
                                 file_list_map.remove(&file_name);
@@ -628,7 +629,7 @@ pub async fn tantivy_search(
                                 // Replace the segment IDs in the existing `FileKey` with the found
                                 tantivy_result_builder.add_row_nums(num_rows as u64);
                                 let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_segment_ids(bitvec);
+                                file.with_segment_ids(bitvec, row_group_size);
                             }
                         }
                         TantivyResult::Count(count) => {
@@ -767,6 +768,12 @@ async fn search_tantivy_index(
         )
         .await?,
     );
+    // Read the row group size that the writer used when this tantivy index was
+    // built. Old .ttv files predate this property — None falls back to the
+    // legacy assumption in the access-plan code.
+    let row_group_size = puffin_dir
+        .get_property(PROP_ROW_GROUP_SIZE)
+        .and_then(|s| s.parse::<u32>().ok());
     let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
     let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
@@ -932,7 +939,11 @@ async fn search_tantivy_index(
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY), false));
+                return Ok((
+                    key,
+                    TantivyResult::RowIdsBitVec(BitVec::EMPTY, 0, row_group_size),
+                    false,
+                ));
             }
             // return early if the number of matched docs is too large
             let skip_threshold = cfg.limit.inverted_index_skip_threshold;
@@ -945,7 +956,11 @@ async fn search_tantivy_index(
                 );
                 return Ok((
                     "".to_string(),
-                    TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
+                    TantivyResult::RowIdsBitVec(
+                        BitVec::EMPTY,
+                        row_ids_percent as usize,
+                        row_group_size,
+                    ),
                     true,
                 ));
             }
@@ -963,7 +978,7 @@ async fn search_tantivy_index(
             for id in row_ids {
                 res.set(id as usize, true);
             }
-            TantivyResult::RowIdsBitVec(num_rows, res)
+            TantivyResult::RowIdsBitVec(res, num_rows, row_group_size)
         }
         TantivyResult::RowIdsBitVec(..) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
@@ -1109,7 +1124,7 @@ fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> V
 
 fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
     match tantivy_result {
-        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
             // if the percent is less than 1.0, we use roaring bitmap to store the row ids
             // otherwise, we use bitvec to store the row ids.
             // because the bitvec is not efficient for small percent, and the roaring bitmap is not
@@ -1121,9 +1136,9 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: us
                         roaring.insert(i as u32);
                     }
                 }
-                CacheEntry::RowIdsRoaring(num_rows, roaring, parquet_rows)
+                CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size)
             } else {
-                CacheEntry::RowIdsBitVec(num_rows, bitvec)
+                CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size)
             }
         }
         TantivyResult::Count(count) => CacheEntry::Count(count),
@@ -1550,13 +1565,13 @@ mod tests {
         let mut bitvec = BitVec::repeat(false, 4);
         bitvec.set(0, true);
         bitvec.set(2, true);
-        let result = TantivyResult::RowIdsBitVec(2, bitvec);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 2, None);
         let percent = 0.5; // Less than 1.0, should use roaring bitmap
         let parquet_rows = 4;
 
         let entry = get_cache_entry(result, percent, parquet_rows);
         match entry {
-            tantivy_result_cache::CacheEntry::RowIdsRoaring(num_rows, roaring, rows) => {
+            tantivy_result_cache::CacheEntry::RowIdsRoaring(roaring, num_rows, rows, _) => {
                 assert_eq!(num_rows, 2);
                 assert_eq!(rows, 4);
                 assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
@@ -1573,13 +1588,13 @@ mod tests {
         bitvec.set(0, true);
         bitvec.set(1, true);
         bitvec.set(3, true);
-        let result = TantivyResult::RowIdsBitVec(3, bitvec);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 3, None);
         let percent = 2.0; // Greater than 1.0, should use bitvec
         let parquet_rows = 4;
 
         let entry = get_cache_entry(result, percent, parquet_rows);
         match entry {
-            tantivy_result_cache::CacheEntry::RowIdsBitVec(num_rows, returned_bitvec) => {
+            tantivy_result_cache::CacheEntry::RowIdsBitVec(returned_bitvec, num_rows, _) => {
                 assert_eq!(num_rows, 3);
                 assert_eq!(returned_bitvec.len(), 4);
                 assert_eq!(returned_bitvec.get(0).unwrap(), true);

@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, SchemaRef};
-use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME, meta::bitvec::BitVec};
+use config::{FileFormat, TIMESTAMP_COL_NAME, meta::bitvec::BitVec};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
@@ -37,15 +37,21 @@ use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
+/// Row group size used by writers before the `row_group_size` puffin property
+/// existed. Any .ttv file without the property was produced with this value.
+const LEGACY_ROW_GROUP_SIZE: usize = 1024 * 1024;
+
 pub fn generate_access_plan(
     file: &PartitionedFile,
 ) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-    let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let info = storage::file_list::get_segment_info(file.path().as_ref())?;
     let file_format = FileFormat::from_extension(file.path().as_ref())?;
     match file_format {
-        FileFormat::Parquet => generate_parquet_access_plan(file, segment_ids),
+        FileFormat::Parquet => {
+            generate_parquet_access_plan(file, info.segment_ids, info.row_group_size)
+        }
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
-        FileFormat::Vortex => generate_vortex_access_plan(segment_ids),
+        FileFormat::Vortex => generate_vortex_access_plan(info.segment_ids),
         #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
         FileFormat::Vortex => None,
     }
@@ -54,12 +60,19 @@ pub fn generate_access_plan(
 fn generate_parquet_access_plan(
     file: &PartitionedFile,
     segment_ids: Arc<BitVec>,
+    row_group_size: Option<u32>,
 ) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
-    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
+    // Use the row group size recorded in the tantivy index when it was built.
+    // Fall back to PARQUET_MAX_ROW_GROUP_SIZE for legacy .ttv files that
+    // predate this property (those were always written with the 1M default).
+    let row_group_size = row_group_size
+        .map(|v| v as usize)
+        .unwrap_or(LEGACY_ROW_GROUP_SIZE);
+    let row_group_count = num_rows.div_ceil(row_group_size);
 
     // Determine sampling mode based on BitVec size:
     // - If BitVec size == row_group_count: row-group-level sampling (enterprise feature)
@@ -77,15 +90,12 @@ fn generate_parquet_access_plan(
     }
 
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    for (row_group_id, chunk) in segment_ids.chunks(PARQUET_MAX_ROW_GROUP_SIZE).enumerate() {
+    for (row_group_id, chunk) in segment_ids.chunks(row_group_size).enumerate() {
         let mut selection = Vec::new();
         let mut current_count = 0;
         let mut current_select = false;
 
-        for val in chunk
-            .iter()
-            .take(num_rows - row_group_id * PARQUET_MAX_ROW_GROUP_SIZE)
-        {
+        for val in chunk.iter().take(num_rows - row_group_id * row_group_size) {
             if *val == current_select {
                 current_count += 1;
             } else {

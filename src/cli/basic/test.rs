@@ -147,6 +147,7 @@ mod tests {
             },
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

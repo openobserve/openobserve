@@ -39,19 +39,19 @@ use crate::service::search::index::IndexCondition;
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(HashSet<u32>),
-    RowIdsBitVec(usize, BitVec),
-    Count(usize),                            // simple count optimization
-    Histogram(Vec<u64>),                     // simple histogram optimization
-    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
-    TopN(Vec<(String, u64)>),                // simple top n optimization
-    Distinct(HashSet<String>),               // simple distinct optimization
+    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
+    RowIdsBitVec(BitVec, usize, Option<u32>),
+    Count(usize),              // simple count optimization
+    Histogram(Vec<u64>),       // simple histogram optimization
+    TopN(Vec<(String, u64)>),  // simple top n optimization
+    Distinct(HashSet<String>), // simple distinct optimization
 }
 
 impl TantivyResult {
     // used for skip tantivy search
     pub fn percent(&self) -> usize {
         match self {
-            Self::RowIdsBitVec(percent, _) => *percent,
+            Self::RowIdsBitVec(_, percent, _) => *percent,
             _ => 0,
         }
     }
@@ -62,7 +62,7 @@ impl TantivyResult {
                 row_ids.capacity() * std::mem::size_of::<u32>()
                     + std::mem::size_of::<HashSet<u32>>()
             }
-            Self::RowIdsBitVec(_, bitvec) => {
+            Self::RowIdsBitVec(bitvec, ..) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
             }
             Self::Count(_) => std::mem::size_of::<usize>(),
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_percent() {
-        let result = TantivyResult::RowIdsBitVec(75, BitVec::repeat(false, 100));
+        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
         assert_eq!(result.percent(), 75);
 
         let result = TantivyResult::RowIds(HashSet::new());
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn test_tantivy_result_get_memory_size_bitvec() {
         let bitvec = BitVec::repeat(false, 1000);
-        let result = TantivyResult::RowIdsBitVec(50, bitvec);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 50, None);
         let memory_size = result.get_memory_size();
 
         // Should include BitVec overhead + bit capacity / 8
