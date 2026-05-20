@@ -16,11 +16,8 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
 
 // Must be hoisted before any imports that reference the mocked modules
 const mockRouterPush = vi.fn();
@@ -91,6 +88,14 @@ vi.mock("@/components/DateTime.vue", () => ({
     emits: ["on:date-change"],
     methods: {
       setCustomDate: vi.fn(),
+    },
+    mounted() {
+      // Simulate DateTime's auto-fire on mount so PipelineHistory calls fetchPipelineHistory
+      this.$emit("on:date-change", {
+        startTime: 1700000000000000,
+        endTime: 1700003600000000,
+        relativeTimePeriod: "15m",
+      });
     },
   },
 }));
@@ -495,7 +500,7 @@ describe("PipelineHistory", () => {
       await nextTick();
 
       expect(vm.searchQuery).toBe("");
-      expect(vm.selectedPipeline).toBeNull();
+      expect(vm.selectedPipeline).toBeUndefined();
     });
   });
 
@@ -631,51 +636,50 @@ describe("PipelineHistory", () => {
       });
     });
 
-    describe("getStatusColor", () => {
-      it("returns 'positive' for 'success'", async () => {
+    describe("getStatusVariant", () => {
+      it("returns 'success-outline' for 'success'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("success")).toBe("positive");
+        expect(vm.getStatusVariant("success")).toBe("success-outline");
       });
 
-      it("returns 'positive' for 'ok' and 'completed'", async () => {
+      it("returns 'success-outline' for 'ok' and 'completed'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("ok")).toBe("positive");
-        expect(vm.getStatusColor("completed")).toBe("positive");
+        expect(vm.getStatusVariant("ok")).toBe("success-outline");
+        expect(vm.getStatusVariant("completed")).toBe("success-outline");
       });
 
-      it("returns 'negative' for 'error' and 'failed'", async () => {
+      it("returns 'error-outline' for 'error' and 'failed'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("error")).toBe("negative");
-        expect(vm.getStatusColor("failed")).toBe("negative");
+        expect(vm.getStatusVariant("error")).toBe("error-outline");
+        expect(vm.getStatusVariant("failed")).toBe("error-outline");
       });
 
-      it("returns 'warning' for 'warning'", async () => {
+      it("returns 'warning-outline' for 'warning'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("warning")).toBe("warning");
+        expect(vm.getStatusVariant("warning")).toBe("warning-outline");
       });
 
-      it("returns 'info' for 'pending' and 'running'", async () => {
+      it("returns 'primary-outline' for 'pending' and 'running'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("pending")).toBe("info");
-        expect(vm.getStatusColor("running")).toBe("info");
+        expect(vm.getStatusVariant("pending")).toBe("primary-outline");
+        expect(vm.getStatusVariant("running")).toBe("primary-outline");
       });
 
-      it("returns theme-based fallback for unknown status", async () => {
+      it("returns 'default-outline' for unknown status", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        const color = vm.getStatusColor("some-unknown-status");
-        expect(["white", "black"]).toContain(color);
+        expect(vm.getStatusVariant("some-unknown-status")).toBe("default-outline");
       });
     });
   });
@@ -714,7 +718,7 @@ describe("PipelineHistory", () => {
     it("selectedPipeline is null initially", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.selectedPipeline).toBeNull();
+      expect(vm.selectedPipeline).toBeUndefined();
     });
 
     it("pagination has correct default values", () => {
@@ -738,8 +742,9 @@ describe("PipelineHistory", () => {
       expect(vm.relativeTime).toBe("15m");
     });
 
-    it("loading is false initially", () => {
+    it("loading is false initially", async () => {
       const wrapper = createWrapper();
+      await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.loading).toBe(false);
     });
@@ -755,16 +760,15 @@ describe("PipelineHistory", () => {
     it("filteredPipelineOptions is empty when no match, which triggers no-option slot", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      // Quasar renders the no-option slot only when the dropdown is open and
-      // filteredPipelineOptions is empty. In jsdom the slot is not injected into
-      // the static DOM without dropdown focus. We verify the state condition
+      // Empty filter drives no-option slot. In jsdom the slot is not injected
+      // into the static DOM without dropdown focus. We verify the state condition
       // that drives the no-option slot display.
       const vm = wrapper.vm as any;
       const updateFn = vi.fn((cb: () => void) => cb());
       vm.filterPipelineOptions("zzz-no-match", updateFn);
       await nextTick();
-      // Empty filtered options is the condition that causes Quasar to render
-      // the no-option slot with "No pipelines found"
+      // Empty filtered options is the condition that causes the no-option slot
+      // to render with "No pipelines found"
       expect(vm.filteredPipelineOptions).toHaveLength(0);
     });
   });
