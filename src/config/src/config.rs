@@ -67,7 +67,10 @@ pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
-pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
+// The current value is recorded in each tantivy index file (puffin `row_group_size`
+// property) so it can be changed safely without breaking row_id → row_group mapping
+// for older files.
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
