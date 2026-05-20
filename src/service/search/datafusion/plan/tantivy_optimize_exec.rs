@@ -211,19 +211,10 @@ async fn adapt_tantivy_result(
             )?]
         }
         IndexOptimizeMode::SimpleMultiHistogram(..) => {
-            let multi_histogram = result.multi_histogram();
-            if multi_histogram.is_empty() {
-                vec![vec![
-                    create_empty_timestamp_array(&schema)?,
-                    create_empty_string_array(&schema)?,
-                    create_empty_count_array(&schema)?,
-                ]]
-            } else {
-                vec![create_multi_histogram_arrow_array(
-                    &schema,
-                    &multi_histogram,
-                )?]
-            }
+            vec![create_multi_histogram_arrow_array(
+                &schema,
+                &result.multi_histogram(),
+            )?]
         }
         IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
             create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
@@ -455,34 +446,6 @@ fn create_multi_histogram_arrow_array(
     };
 
     Ok(vec![timestamp_array, breakdown_array, count_array])
-}
-
-fn create_empty_timestamp_array(schema: &SchemaRef) -> Result<Arc<dyn Array>, DataFusionError> {
-    let field = &schema.fields()[0];
-    match field.data_type() {
-        arrow_schema::DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, _) => {
-            Ok(Arc::new(TimestampMicrosecondArray::from(Vec::<i64>::new())) as Arc<dyn Array>)
-        }
-        arrow_schema::DataType::Timestamp(arrow_schema::TimeUnit::Nanosecond, _) => {
-            Ok(Arc::new(TimestampNanosecondArray::from(Vec::<i64>::new())) as Arc<dyn Array>)
-        }
-        _ => Err(DataFusionError::Internal(format!(
-            "Unexpected timestamp type: {:?}",
-            field.data_type()
-        ))),
-    }
-}
-
-fn create_empty_string_array(schema: &SchemaRef) -> Result<Arc<dyn Array>, DataFusionError> {
-    let field = &schema.fields()[1];
-    let empty: Vec<String> = vec![];
-    create_field_array(field, empty)
-}
-
-fn create_empty_count_array(schema: &SchemaRef) -> Result<Arc<dyn Array>, DataFusionError> {
-    let field = &schema.fields()[2];
-    let empty: Vec<u64> = vec![];
-    create_count_array(field, empty)
 }
 
 fn create_top_n_arrow_array(
