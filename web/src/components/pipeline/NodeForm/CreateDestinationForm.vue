@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Connection Details
           </div>
 
-          <div class="tw:gap-2">
+          <div class="tw:flex tw:flex-col tw:gap-4">
             <OFormInput
               data-test="add-destination-name-input"
               v-model="formData.name"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="tw:flex tw:gap-1 tw:mt-1 tw:ml-1"
+              class="tw:flex tw:gap-4"
             >
               <div class="tw:w-1/2">
                 <OFormInput
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="tw:gap-2 tw:mt-3">
+          <div v-if="showMetadataFields" class="tw:flex tw:flex-col tw:gap-4 tw:mt-4">
             <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
               Metadata Configuration
             </div>
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <div class="tw:gap-2">
+          <div class="tw:flex tw:flex-col tw:gap-3">
             <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
               Headers
             </div>

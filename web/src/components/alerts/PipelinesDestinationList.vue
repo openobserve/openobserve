@@ -39,8 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="pipeline-destination-list-add-btn"
             variant="primary"
-            size="sm-action"
-            class="tw:ml-2"
+            size="sm"
             @click="editDestination(null)"
             >{{ t(`alert_destinations.add`) }}</OButton
           >
