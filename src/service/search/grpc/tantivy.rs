@@ -167,6 +167,7 @@ impl TantivyResult {
         breakdown_field: &str,
     ) -> anyhow::Result<Self> {
         let limit = config::get_config().limit.query_default_limit;
+        // this value should be zero
         let offset = (min_value % bucket_width as i64) as f64;
         let histogram_agg = Aggregation {
             agg: AggregationVariants::Histogram(HistogramAggregation {

@@ -719,7 +719,10 @@ async fn update_index_updated_at(
     let ttv_timestamp_updated_at = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
     let index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
 
-    if matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleTopN(..))) {
+    if matches!(
+        idx_optimize_rule,
+        Some(IndexOptimizeMode::SimpleTopN(..)) | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
+    ) {
         let ttv_secondary_index_updated_at =
             db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
         return index_updated_at.max(ttv_secondary_index_updated_at);
