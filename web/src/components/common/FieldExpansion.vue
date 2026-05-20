@@ -57,24 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <div class="field_overlay">
-          <span
+          <OButton
             v-if="field.isSchemaField && showFilterIcon"
-            style="margin-right: 0.375rem"
+            :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+            variant="ghost"
+            size="icon-xs-circle"
+            @click.stop="$emit('add-to-filter', `${field.name}=''`)"
           >
-            <OButton
-              :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-              variant="ghost"
-              size="icon-xs-circle"
-              @click.stop="$emit('add-to-filter', `${field.name}=''`)"
-            >
-              <OIcon name="add" size="xs" />
-            </OButton>
-          </span>
+            <OIcon name="add" size="xs" />
+          </OButton>
           <OIcon
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
             name="visibility"
-            style="margin-right: 0.375rem"
             size="sm"
             title="Add field to table"
             @click.stop="$emit('toggle-field', field)"
@@ -83,9 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             name="visibility-off"
-            style="margin-right: 0.375rem"
-            title="Remove field from table"
             size="sm"
+            title="Remove field from table"
             @click.stop="$emit('toggle-field', field)"
           />
           <OIcon
@@ -298,6 +292,7 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
   display: none;
   align-items: center;
   padding: 0 0.25rem;
+  gap: 0.375rem;
   background-color: var(--o2-hover-accent);
 }
 

@@ -541,8 +541,10 @@ const resumePipelineDialogMeta: any = ref({
 const { pipelineObj } = useDragAndDrop();
 
 watch(
-  () => router.currentRoute.value,
-  async () => {
+  () => router.currentRoute.value.name,
+  async (newName, oldName) => {
+    // Only re-fetch when we land back on the list itself
+    if (newName !== "pipelines" || newName === oldName) return;
     await getPipelines();
     updateActiveTab();
   },

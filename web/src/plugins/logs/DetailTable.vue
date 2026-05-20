@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Single Tab Row -->
     <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
-      <div class="tw:flex tw:flex-col tw:flex tw:items-center tw:gap-2">
+      <div class="tw:flex tw:items-center tw:gap-2">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('correlation.correlatedTraces')"
           />
         </OTabs>
-        <!-- o2 ai context add button outside OTabs for proper alignment -->
         <O2AIContextAddBtn
+          data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
       </div>
@@ -352,26 +352,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="tw:flex tw:flex-col tw:flex tw:justify-center align-center tw:gap-2"
+          class="tw:flex tw:items-center tw:gap-2"
         >
-          <div class="tw:leading-10 tw:font-bold">
-            {{ t("common.noOfRecords") }}
-          </div>
-          <div class="tw:min-w-[70px]">
-            <OSelect
-              v-model="selectedRelativeValue"
-              :options="recordSizeOptions"
-              class="select-noof-records"
-            ></OSelect>
-          </div>
-          <div class="">
-            <OButton
-              data-test="logs-detail-table-search-around-btn"
-              variant="outline"
-              size="sm-action"
-              @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-            >{{ t('common.searchAround') }}</OButton>
-          </div>
+          <label class="tw:font-bold tw:whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
+          <OSelect
+            v-model="selectedRelativeValue"
+            :options="recordSizeOptions"
+            size="md"
+            class="select-noof-records"
+          />
+          <OButton
+            data-test="logs-detail-table-search-around-btn"
+            variant="outline"
+            size="sm-action"
+            @click="searchTimeBoxed(rowData, selectedRelativeValue)"
+          >{{ t('common.searchAround') }}</OButton>
         </div>
         <div class="tw:w-1/12 tw:items-end" style="display: contents;">
           <OButton
@@ -409,6 +404,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -432,7 +428,7 @@ export default defineComponent({
   name: "SearchDetail",
   components: {
     OSeparator, OCardSection,
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, OSelect, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
     OIcon,
     OTable,
   },
@@ -517,8 +513,16 @@ export default defineComponent({
     const store = useStore();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
-    const selectedRelativeValue = ref("10");
-    const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
+    const selectedRelativeValue = ref<number>(10);
+    const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "200", value: 200 },
+      { label: "500", value: 500 },
+      { label: "1000", value: 1000 },
+    ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
     const {fnParsedSQL, hasAggregation} = logsUtils();

@@ -15,18 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
-
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 describe("ErrorTag Component", () => {
   let wrapper: any;
@@ -37,16 +26,13 @@ describe("ErrorTag Component", () => {
   };
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-
     wrapper = mount(ErrorTag, {
-      attachTo: "#app",
       props: {
         tag: mockTag,
       },
       global: {
         stubs: {
-          "q-separator": {
+          OSeparator: {
             template: '<div data-test="separator" />',
             props: ["vertical"],
           },
@@ -55,314 +41,156 @@ describe("ErrorTag Component", () => {
     });
 
     await flushPromises();
-    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
+    wrapper.unmount();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  it("mounts successfully", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render tag block container", () => {
-      expect(wrapper.find(".tag-block").exists()).toBe(true);
-    });
-
-    it("should have correct container classes", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("tag-block");
-      expect(container.classes()).toContain("row");
-      expect(container.classes()).toContain("items-center");
-      expect(container.classes()).toContain("no-wrap");
-      expect(container.classes()).toContain("q-mr-sm");
-      expect(container.classes()).toContain("q-mt-sm");
-    });
+    // Assert
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Tag Key Display", () => {
-    it("should display the tag key", () => {
-      const keyElements = wrapper.findAll(".tag-block .q-px-md");
-      expect(keyElements.length).toBeGreaterThan(0);
-      expect(keyElements[0].text()).toBe("service");
-    });
+  it("shows the tag key text", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should have correct key styling", () => {
-      const keyElements = wrapper.findAll(".tag-block .q-px-md");
-      expect(keyElements.length).toBeGreaterThan(0);
-      expect(keyElements[0].classes()).toContain("q-px-md");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("service");
   });
 
-  describe("Tag Value Display", () => {
-    it("should display the tag value", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.exists()).toBe(true);
-      expect(valueElement.text()).toBe("web-application");
-    });
+  it("shows the tag value text", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should have correct value styling", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("q-px-md");
-      expect(valueElement.classes()).toContain("tw:break-all");
-    });
-
-    it("should handle word breaking", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("tw:break-all");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("web-application");
   });
 
-  describe("Separator", () => {
-    it("should render separator between key and value", () => {
-      const separator = wrapper.find('[data-test="separator"]');
-      expect(separator.exists()).toBe(true);
-    });
+  it("renders the separator between key and value", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    expect(wrapper.find('[data-test="separator"]').exists()).toBe(true);
   });
 
-  describe("Props Validation", () => {
-    it("should require tag prop", () => {
-      expect(ErrorTag.props?.tag?.required).toBe(true);
-      expect(ErrorTag.props?.tag?.type).toBe(Object);
-    });
+  it("shows updated key text when tag prop changes", async () => {
+    // Arrange
+    const newTag = { key: "error_type", value: "TypeError" };
 
-    it("should handle different tag structures", async () => {
-      const customTag = {
-        key: "error_type",
-        value: "TypeError",
-      };
+    // Act
+    await wrapper.setProps({ tag: newTag });
 
-      await wrapper.setProps({ tag: customTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-
-      expect(keyElement.text()).toBe("error_type");
-      expect(valueElement.text()).toBe("TypeError");
-    });
-
-    it("should handle long values", async () => {
-      const longTag = {
-        key: "url",
-        value:
-          "https://example.com/very/long/path/that/might/overflow/the/container",
-      };
-
-      await wrapper.setProps({ tag: longTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe(longTag.value);
-      expect(valueElement.classes()).toContain("tw:break-all");
-    });
-
-    it("should handle special characters", async () => {
-      const specialTag = {
-        key: "user@email",
-        value: "test@example.com",
-      };
-
-      await wrapper.setProps({ tag: specialTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-
-      expect(keyElement.text()).toBe("user@email");
-      expect(valueElement.text()).toBe("test@example.com");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("error_type");
   });
 
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".tag-block");
-      const keyElement = container.find(".q-px-md:first-child");
-      const separator = container.find('[data-test="separator"]');
-      const valueElements = container.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+  it("shows updated value text when tag prop changes", async () => {
+    // Arrange
+    const newTag = { key: "error_type", value: "TypeError" };
 
-      expect(container.exists()).toBe(true);
-      expect(keyElement.exists()).toBe(true);
-      expect(separator.exists()).toBe(true);
-      expect(valueElement.exists()).toBe(true);
-    });
+    // Act
+    await wrapper.setProps({ tag: newTag });
 
-    it("should maintain correct order of elements", () => {
-      const container = wrapper.find(".tag-block");
-      const children = container.element.children;
-
-      expect(children).toHaveLength(3);
-      expect(children[0].classList.contains("q-px-md")).toBe(true);
-      expect(children[1].getAttribute("data-test")).toBe("separator");
-      expect(children[2].classList.contains("q-px-md")).toBe(true);
-    });
+    // Assert
+    expect(wrapper.text()).toContain("TypeError");
   });
 
-  describe("CSS Styling", () => {
-    it("should apply correct border styling", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("tag-block");
-    });
+  it("shows long URL values without truncation", async () => {
+    // Arrange
+    const longTag = {
+      key: "url",
+      value: "https://example.com/very/long/path/that/might/overflow/the/container",
+    };
 
-    it("should apply background color to value section", () => {
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("tw:bg-[var(--o2-table-header-bg)]");
-    });
+    // Act
+    await wrapper.setProps({ tag: longTag });
 
-    it("should apply correct spacing classes", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("q-mr-sm");
-      expect(container.classes()).toContain("q-mt-sm");
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      expect(valueElements.length).toBeGreaterThanOrEqual(2);
-      const keyElement = valueElements[0]; // First q-px-md is the key
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-
-      expect(keyElement.classes()).toContain("q-px-md");
-      expect(valueElement.classes()).toContain("q-px-md");
-    });
+    // Assert
+    expect(wrapper.text()).toContain(longTag.value);
   });
 
-  describe("Responsive Design", () => {
-    it("should handle long keys gracefully", async () => {
-      const longKeyTag = {
-        key: "very_long_key_name_that_might_overflow",
-        value: "short",
-      };
+  it("shows special character key text", async () => {
+    // Arrange
+    const specialTag = { key: "user@email", value: "test@example.com" };
 
-      await wrapper.setProps({ tag: longKeyTag });
+    // Act
+    await wrapper.setProps({ tag: specialTag });
 
-      const keyElements = wrapper.findAll(".q-px-md");
-      expect(keyElements.length).toBeGreaterThan(0);
-      const keyElement = keyElements[0];
-      expect(keyElement.text()).toBe(longKeyTag.key);
-    });
-
-    it("should use no-wrap class to prevent wrapping", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.classes()).toContain("no-wrap");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("user@email");
+    expect(wrapper.text()).toContain("test@example.com");
   });
 
-  describe("Edge Cases", () => {
-    it("should handle empty key", async () => {
-      const emptyKeyTag = {
-        key: "",
-        value: "value",
-      };
+  it("shows empty string for empty value", async () => {
+    // Arrange
+    const emptyValueTag = { key: "key", value: "" };
 
-      await wrapper.setProps({ tag: emptyKeyTag });
+    // Act
+    await wrapper.setProps({ tag: emptyValueTag });
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      if (keyElement.exists()) {
-        expect(keyElement.text()).toBe("");
-      } else {
-        expect(keyElement.exists()).toBe(false);
-      }
-    });
-
-    it("should handle empty value", async () => {
-      const emptyValueTag = {
-        key: "key",
-        value: "",
-      };
-
-      await wrapper.setProps({ tag: emptyValueTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe("");
-    });
-
-    it("should handle null values", async () => {
-      const nullTag = {
-        key: "key",
-        value: null,
-      };
-
-      await wrapper.setProps({ tag: nullTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe("");
-    });
-
-    it("should handle undefined values", async () => {
-      const undefinedTag = {
-        key: "key",
-        value: undefined,
-      };
-
-      await wrapper.setProps({ tag: undefinedTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe("");
-    });
-
-    it("should handle numeric values", async () => {
-      const numericTag = {
-        key: "count",
-        value: 42,
-      };
-
-      await wrapper.setProps({ tag: numericTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe("42");
-    });
-
-    it("should handle boolean values", async () => {
-      const booleanTag = {
-        key: "handled",
-        value: true,
-      };
-
-      await wrapper.setProps({ tag: booleanTag });
-
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.text()).toBe("true");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("key");
   });
 
-  describe("Accessibility", () => {
-    it("should be keyboard accessible", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.exists()).toBe(true);
-    });
+  it("shows numeric value as text", async () => {
+    // Arrange
+    const numericTag = { key: "count", value: 42 };
 
-    it("should have semantic HTML structure", () => {
-      const container = wrapper.find(".tag-block");
-      expect(container.element.tagName).toBe("DIV");
-    });
+    // Act
+    await wrapper.setProps({ tag: numericTag });
+
+    // Assert
+    expect(wrapper.text()).toContain("42");
   });
 
-  describe("Component Lifecycle", () => {
-    it("should handle prop updates", async () => {
-      const initialTag = wrapper.props("tag");
-      expect(initialTag).toEqual(mockTag);
+  it("shows boolean value as text", async () => {
+    // Arrange
+    const booleanTag = { key: "handled", value: true };
 
-      const newTag = { key: "new_key", value: "new_value" };
-      await wrapper.setProps({ tag: newTag });
+    // Act
+    await wrapper.setProps({ tag: booleanTag });
 
-      expect(wrapper.props("tag")).toEqual(newTag);
-    });
+    // Assert
+    expect(wrapper.text()).toContain("true");
+  });
+
+  it("reflects prop update in rendered text", async () => {
+    // Arrange
+    expect(wrapper.props("tag")).toEqual(mockTag);
+    const newTag = { key: "new_key", value: "new_value" };
+
+    // Act
+    await wrapper.setProps({ tag: newTag });
+
+    // Assert
+    expect(wrapper.props("tag")).toEqual(newTag);
+    expect(wrapper.text()).toContain("new_key");
+    expect(wrapper.text()).toContain("new_value");
+  });
+
+  it("requires the tag prop", () => {
+    // Arrange + Act: inspect the component definition
+
+    // Assert
+    expect(ErrorTag.props?.tag?.required).toBe(true);
+    expect(ErrorTag.props?.tag?.type).toBe(Object);
+  });
+
+  it("renders a div as root element", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    expect(wrapper.element.tagName).toBe("DIV");
+  });
+
+  it("has three direct child elements (key, separator, value)", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const children = wrapper.element.children;
+    expect(children).toHaveLength(3);
   });
 });

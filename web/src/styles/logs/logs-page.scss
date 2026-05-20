@@ -1168,10 +1168,11 @@
   }
 
   .select-noof-records {
-    padding-left: 0.56rem;
-    border-radius: 0.375rem;
-    height: 2.55rem;
+    width: 5rem;
 
+    button[type="button"] {
+      height: 2.25rem;
+    }
   }
 }
 

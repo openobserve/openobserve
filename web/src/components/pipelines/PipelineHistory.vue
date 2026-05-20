@@ -15,11 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="pipeline-history-page" class="tw:p-0 tw:flex">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+  <div
+    data-test="pipeline-history-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-2 tw:h-[68px]"
         >
           <div class="tw:flex tw:items-center">
             <OButton
@@ -36,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t(`pipeline.history`) }}
               <OIcon name="info" size="sm" />
-                <OTooltip
-                  content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
-                  side="top"
-                />
+              <OTooltip
+                content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
+                side="top"
+              />
             </div>
           </div>
-          <div class="tw:flex tw:ml-auto tw:items-center">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <div class="tw:mr-2">
               <DateTime
                 ref="dateTimeRef"
@@ -68,8 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t(`pipeline.searchHistory`) || 'Select or search pipeline...'
               "
               data-test="pipeline-history-search-select"
-              class="o2-search-input tw:mr-2"
-              style="min-width: 250px"
+              class="tw:mr-2 tw:min-w-[250px]"
               clearable
             >
               <template #empty>
@@ -104,15 +106,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+    <div class="tw:flex-1 tw:min-h-0">
       <div
         data-test="pipeline-history-table"
-        class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]"
+        class="pipeline-history-table card-container tw:h-full"
       >
         <OTable
           :data="rows"
           :columns="columns"
           row-key="id"
+          width="100%"
+          class="tw:w-full tw:h-full"
           pagination="server"
           :current-page="pagination.page"
           :page-size="pagination.rowsPerPage"
@@ -228,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="{ totalRows }">
             <div
-              class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
+              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
             >
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -487,7 +491,7 @@ import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { formatDate } from "@/utils/date";
+import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -510,7 +514,7 @@ const router = useRouter();
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedPipeline = ref<any>(null);
+const selectedPipeline = ref<any>();
 const allPipelines = ref<any[]>([]);
 const filteredPipelineOptions = ref<any[]>([]);
 const pagination = ref({
@@ -569,7 +573,7 @@ const columns = ref([
     header: "Type",
     accessorKey: "is_realtime",
     sortable: true,
-    size: 37,
+    size: 90,
     meta: { align: "center" as const },
   },
   {
@@ -577,7 +581,7 @@ const columns = ref([
     header: "Is Silenced",
     accessorKey: "is_silenced",
     sortable: true,
-    size: 37,
+    size: 130,
     meta: { align: "center" as const },
   },
   {
@@ -609,7 +613,7 @@ const columns = ref([
     header: "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    size: 50,
+    size: 110,
     meta: { align: "right" as const },
   },
   {
@@ -707,7 +711,7 @@ const onPipelineSelected = (val: any) => {
 
 const clearSearch = () => {
   searchQuery.value = "";
-  selectedPipeline.value = null;
+  selectedPipeline.value = undefined;
 };
 
 const manualSearch = () => {
@@ -841,7 +845,7 @@ const formatDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);
-  return formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
+  return dateUtils.formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
 };
 
 const formatDuration = (microseconds: number) => {
@@ -905,21 +909,19 @@ const goBack = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch pipelines list for dropdown
+  // Fetch pipelines list for the dropdown.
+  // The history fetch is triggered by <DateTime>'s on-mount @on:date-change event,
+  // so we don't call fetchPipelineHistory() here to avoid a duplicate request.
   await fetchPipelinesList();
-  // Fetch initial pipeline history
-  fetchPipelineHistory();
 });
 
-// Watch for organization change
+// Watch for organization change (skip the initial firing — onMounted already fetched)
 watch(
   () => store.state.selectedOrganization.identifier,
-  async () => {
-    // Re-fetch pipelines list when organization changes
+  async (newId, oldId) => {
+    if (!oldId || newId === oldId) return;
     await fetchPipelinesList();
-    // Reset search
     clearSearch();
-    // Fetch history for new organization
     fetchPipelineHistory();
   },
 );

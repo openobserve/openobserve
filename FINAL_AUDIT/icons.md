@@ -436,6 +436,10 @@ Library/page-level relevant references:
 - [x] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
 - [x] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
 - [x] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/app.scss:822-873`** — `.q-icon` rules dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
 
 `.OIcon` selectors (PascalCase as class) — OIcon does not emit a `.OIcon` class; these are renamed-but-still-wrong:
 - [x] **`web/src/views/HomeView.vue`** scoped `.OIcon { font-size: 18px; animation: bounce ... }` — dead — `home_audit.md S4`

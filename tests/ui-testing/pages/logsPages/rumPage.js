@@ -12,7 +12,9 @@ export class RumPage {
         this.runQueryButton = '[data-test="metrics-explorer-run-query-button"]';
         this.errorTrackingTab = 'text=Error Tracking';
         this.errorsTab = 'text=Errors';
-        this.appTableContainer = '.app-table-container';
+        this.appTableContainer = '[data-test="rum-app-errors-table"]';
+        this.tableBody = '[data-test="o2-table-body"]';
+        this.tableRow = '[data-test^="o2-table-row-"]';
         this.errorViewerContainer = '.error-viewer-container';
         this.errorStacksSection = '.error-stacks';
 
@@ -101,17 +103,17 @@ export class RumPage {
     }
 
     async expectErrorTableVisible() {
-        await this.page.waitForSelector(this.appTableContainer, { timeout: 10000 }).catch(() => {});
+        await this.page.waitForSelector(this.tableBody, { timeout: 10000 }).catch(() => {});
     }
 
     async getErrorRowCount() {
-        const rows = this.page.locator(`${this.appTableContainer} tbody tr`);
+        const rows = this.page.locator(this.tableRow);
         return await rows.count();
     }
 
     async clickFirstErrorRow() {
         // Wait for first data row to be visible
-        await this.page.waitForSelector(`${this.appTableContainer} .q-tr.cursor-pointer`, { state: 'visible', timeout: 10000 });
+        await this.page.waitForSelector(this.tableRow, { state: 'visible', timeout: 10000 });
 
         // Workaround: Playwright clicks don't trigger Vue @click handlers (known Vue 3 + Playwright limitation)
         // Navigate to error detail by constructing URL from captured API response data
@@ -165,13 +167,13 @@ export class RumPage {
     }
 
     async hasErrorRows() {
-        await this.page.waitForSelector(`${this.appTableContainer} tbody tr`, { timeout: 10000 }).catch(() => {});
-        const rows = this.page.locator(`${this.appTableContainer} tbody tr`);
+        await this.page.waitForSelector(this.tableRow, { timeout: 10000 }).catch(() => {});
+        const rows = this.page.locator(this.tableRow);
         return (await rows.count()) > 0;
     }
 
     async getFirstErrorRowText() {
-        const firstRow = this.page.locator(this.appTableContainer).locator('tbody tr').first();
+        const firstRow = this.page.locator(this.tableRow).first();
         return await firstRow.textContent();
     }
 

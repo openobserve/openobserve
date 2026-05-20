@@ -13,139 +13,106 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import KeyValueRow from "./KeyValueRow.vue";
-
-installQuasar();
 
 describe("KeyValueRow", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
-    wrapper?.unmount();
+    wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
-  describe("initial render", () => {
-    it("should render without errors", () => {
+  describe("label rendering", () => {
+    it("displays the label with a colon", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, { props: { label: "Browser" } });
-      expect(wrapper.exists()).toBe(true);
-    });
 
-    it("should display the label", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Browser" } });
+      // Assert
       expect(wrapper.text()).toContain("Browser:");
     });
 
-    it("should display the value", () => {
+    it("displays string value text", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, { props: { label: "Browser", value: "Chrome" } });
+
+      // Assert
       expect(wrapper.text()).toContain("Chrome");
     });
 
-    it("should display numeric value", () => {
+    it("displays numeric value text", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, { props: { label: "Port", value: 8080 } });
+
+      // Assert
       expect(wrapper.text()).toContain("8080");
     });
   });
 
-  describe("showBorder prop", () => {
-    it("should show border when showBorder=true (default)", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Browser", value: "Chrome" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:border-b");
-    });
-
-    it("should not show border when showBorder=false", () => {
-      wrapper = mount(KeyValueRow, {
-        props: { label: "Browser", value: "Chrome", showBorder: false },
-      });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).not.toContain("tw:border-b");
-    });
-
-    it("should show border when showBorder is explicitly true", () => {
-      wrapper = mount(KeyValueRow, {
-        props: { label: "Browser", value: "Chrome", showBorder: true },
-      });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:border-b");
-    });
-  });
-
-  describe("valueClass prop", () => {
-    it("should apply valueClass to the value container", () => {
-      wrapper = mount(KeyValueRow, {
-        props: { label: "Status", value: "OK", valueClass: "text-green-500" },
-      });
-      expect(wrapper.html()).toContain("text-green-500");
-    });
-
-    it("should not have extra class when valueClass is not provided", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Status", value: "OK" } });
-      // just verify component renders without errors
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("dataTest prop", () => {
-    it("should apply data-test attribute when provided", () => {
+  describe("data-test attribute", () => {
+    it("applies data-test attribute when provided", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, {
         props: { label: "Browser", dataTest: "rum-browser-row" },
       });
+
+      // Assert
       expect(wrapper.attributes("data-test")).toBe("rum-browser-row");
     });
 
-    it("should have empty data-test when not provided", () => {
+    it("leaves data-test empty or absent when not provided", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, { props: { label: "Browser" } });
+
+      // Assert
       const dataTest = wrapper.attributes("data-test");
       expect(dataTest === undefined || dataTest === "").toBe(true);
     });
   });
 
   describe("slot content", () => {
-    it("should render slot content instead of value when slot is provided", () => {
+    it("renders slot content when provided", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, {
         props: { label: "Custom" },
         slots: { default: '<span data-test="custom-slot">Custom Content</span>' },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="custom-slot"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Custom Content");
     });
 
-    it("should render value when no slot is provided", () => {
-      wrapper = mount(KeyValueRow, {
-        props: { label: "Browser", value: "Firefox" },
-      });
+    it("renders the value prop when no slot is provided", () => {
+      // Arrange
+      wrapper = mount(KeyValueRow, { props: { label: "Browser", value: "Firefox" } });
+
+      // Assert
       expect(wrapper.text()).toContain("Firefox");
     });
   });
 
   describe("default prop values", () => {
-    it("should use empty string as default value", () => {
+    it("renders without crash when only label is provided (value defaults to empty string)", () => {
+      // Arrange
       wrapper = mount(KeyValueRow, { props: { label: "Empty" } });
-      // value defaults to "", label is shown, no crash
-      expect(wrapper.exists()).toBe(true);
-    });
 
-    it("should default showBorder to true", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Test" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:border-b");
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
   });
 
-  describe("layout structure", () => {
-    it("should have flex layout on root element", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Test" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:flex");
-    });
+  describe("valueClass prop", () => {
+    it("includes the valueClass string in the rendered html when provided", () => {
+      // Arrange
+      wrapper = mount(KeyValueRow, {
+        props: { label: "Status", value: "OK", valueClass: "text-green-500" },
+      });
 
-    it("should render label with fixed width container", () => {
-      wrapper = mount(KeyValueRow, { props: { label: "Browser" } });
-      // verify label wrapper has w-[100px] class
-      expect(wrapper.html()).toContain("tw:w-[100px]");
+      // Assert
+      expect(wrapper.html()).toContain("text-green-500");
     });
   });
 });

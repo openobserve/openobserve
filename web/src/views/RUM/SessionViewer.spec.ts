@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SessionViewer from './SessionViewer.vue';
-
-installQuasar({});
 
 describe('SessionViewer.vue', () => {
   let router: any;
@@ -105,9 +102,10 @@ describe('SessionViewer.vue', () => {
   it('should display browser and os information', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, ],
+        plugins: [router, i18n],
         stubs: {
           QIcon: true,
+          OIcon: true,
           VideoPlayer: true,
           PlayerEventsSidebar: true,
           QSeparator: true,
@@ -115,16 +113,17 @@ describe('SessionViewer.vue', () => {
       },
     });
 
-    // Component renders the structure for browser/os display
+    // Component renders OIcon with name="settings" for browser/os display
     expect(wrapper.find('[name="settings"]').exists()).toBe(true);
   });
 
   it('should display location information', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, ],
+        plugins: [router, i18n],
         stubs: {
           QIcon: true,
+          OIcon: true,
           VideoPlayer: true,
           PlayerEventsSidebar: true,
           QSeparator: true,
@@ -132,8 +131,8 @@ describe('SessionViewer.vue', () => {
       },
     });
 
-    // Component renders the structure for location display
-    expect(wrapper.find('[name="location_on"]').exists()).toBe(true);
+    // Component renders OIcon with name="location-on" for location display
+    expect(wrapper.find('[name="location-on"]').exists()).toBe(true);
   });
 
   describe('Frustration Signals', () => {
