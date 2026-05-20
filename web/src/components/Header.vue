@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div><!-- end left side -->
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0">
+    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
       class="headerMenu tw:flex tw:items-center tw:gap-1"
@@ -380,7 +380,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <OIcon name="settings" size="md" class="header-icon" />
+        <OIcon name="settings" size="md" class="header-icon tw:opacity-70" />
         <OTooltip side="top" align="center" :content="t('menu.settings')" />
       </OButton>
 
