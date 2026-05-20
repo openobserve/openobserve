@@ -50,7 +50,11 @@ const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
 
 /// Optional fields for the new (gen_ai_*) schema. Missing optional fields
 /// produce `None` in the API response; the column is omitted from SQL.
-const OPTIONAL_GEN_AI_FIELDS: &[&str] = &["gen_ai_input_messages", "gen_ai_output_messages"];
+const OPTIONAL_GEN_AI_FIELDS: &[&str] = &[
+    "gen_ai_input_messages",
+    "gen_ai_output_messages",
+    "gen_ai_usage_total_tokens",
+];
 
 /// Required fields for the legacy (llm_*) schema.
 const REQUIRED_LLM_FIELDS: &[&str] = &[
@@ -61,7 +65,7 @@ const REQUIRED_LLM_FIELDS: &[&str] = &[
 ];
 
 /// Optional fields for the legacy (llm_*) schema.
-const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output"];
+const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///
@@ -143,6 +147,7 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_input_messages: bool,
     #[allow(dead_code)]
     pub(super) has_output_messages: bool,
+    pub(super) has_total_tokens: bool,
 }
 
 impl ValidatedLlmSchema {
@@ -160,6 +165,7 @@ impl ValidatedLlmSchema {
             },
             has_input_messages: false,
             has_output_messages: false,
+            has_total_tokens: false,
         }
     }
 }
@@ -208,6 +214,7 @@ pub(super) fn validate_llm_schema(
 
     let has_input_messages = schema.field_with_name(optional_fields[0]).is_ok();
     let has_output_messages = schema.field_with_name(optional_fields[1]).is_ok();
+    let has_total_tokens = schema.field_with_name(optional_fields[2]).is_ok();
 
     Ok(ValidatedLlmSchema {
         has_gen_ai,
@@ -218,6 +225,7 @@ pub(super) fn validate_llm_schema(
         },
         has_input_messages,
         has_output_messages,
+        has_total_tokens,
     })
 }
 

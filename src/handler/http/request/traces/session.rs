@@ -378,6 +378,11 @@ pub async fn get_latest_sessions(
         } else {
             "''".to_string()
         };
+        let total_tokens_expr = if validated.has_total_tokens {
+            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
+        } else {
+            "0 as gen_ai_usage_details_total"
+        };
         format!(
             "SELECT trace_id, \
             max(user_id) as user_id,
@@ -385,7 +390,7 @@ pub async fn get_latest_sessions(
             max(end_time) as trace_end_time, \
             sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
             {first_msg_clause} as gen_ai_input_messages \
@@ -399,6 +404,11 @@ pub async fn get_latest_sessions(
         } else {
             "''".to_string()
         };
+        let total_tokens_expr = if validated.has_total_tokens {
+            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
+        } else {
+            "0 as gen_ai_usage_details_total"
+        };
         format!(
             "SELECT trace_id, \
             max(llm_user_id) as user_id,
@@ -406,7 +416,7 @@ pub async fn get_latest_sessions(
             max(end_time) as trace_end_time, \
             sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
             sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            {total_tokens_expr}, \
             sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
             {first_msg_clause} as gen_ai_input_messages \
