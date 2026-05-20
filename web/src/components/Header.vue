@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-nowrap tw:items-center tw:min-h-10 tw:w-full">
     <!-- LEFT SIDE: Logo -->
-    <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0">
+    <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -214,16 +214,17 @@ size="xs" class="warning" />{{
         >
           <template #trigger>
             <OButton
-              variant="ghost"
+              variant="outline"
               size="sm"
               style="max-width: 250px"
-              class="tw:text-ellipsis tw:overflow-hidden"
+              class="org-selector-trigger tw:text-ellipsis tw:overflow-hidden"
             >
-              <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
-                <div class="tw:flex tw:flex-col tw:truncate">
+              <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full tw:gap-2">
+                <OIcon name="workspaces" size="sm" class="tw:opacity-70 tw:shrink-0" />
+                <div class="tw:flex tw:flex-col tw:truncate tw:text-left">
                   {{ userClickedOrg?.label || "" }}
                 </div>
-                <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
+                <OIcon name="arrow-drop-down" size="sm" class="tw:ml-auto tw:opacity-70 tw:shrink-0" />
               </div>
             </OButton>
           </template>

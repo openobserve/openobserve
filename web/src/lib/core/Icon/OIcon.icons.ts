@@ -70,6 +70,7 @@ import ExpandLess from "~icons/material-symbols/expand-less";
 import Inventory2 from "~icons/material-symbols/inventory-2-outline";
 import LightMode from "~icons/material-symbols/light-mode-outline";
 import Schema from "~icons/material-symbols/schema-outline";
+import Wifi from "~icons/material-symbols/wifi";
 import Window from "~icons/material-symbols/window-outline";
 import Javascript from "~icons/material-symbols/javascript";
 import KeyboardArrowDown from "~icons/material-symbols/keyboard-arrow-down";
@@ -366,6 +367,7 @@ export const iconRegistry = {
   "inventory-2": Inventory2,
   "light-mode": LightMode,
   "schema": Schema,
+  "wifi": Wifi,
   "window": Window,
   "javascript": Javascript,
   "keyboard-arrow-down": KeyboardArrowDown,
