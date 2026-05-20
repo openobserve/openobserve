@@ -3468,6 +3468,9 @@
     "dfcEncryptedData": "DFC Encrypted Data",
     "providerType": "Type",
     "algorithm": "Algorithm",
+    "providerTypeRequired": "Provider type is required",
+    "algorithmRequired": "Algorithm is required",
+    "secretRequired": "Secret is required",
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
