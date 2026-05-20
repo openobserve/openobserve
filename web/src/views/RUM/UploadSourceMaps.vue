@@ -363,9 +363,6 @@ const uploadSourceMaps = async () => {
 }
 
 .file-info {
-  .OIcon {
-    flex-shrink: 0;
-  }
 }
 
 :deep(.q-dark) {

@@ -996,10 +996,7 @@ export default defineComponent({
         border: 1px solid transparent;
         transition: all 0.2s ease;
         cursor: default;
-
-        .OIcon { opacity: 0.8; }
-
-        .traffic-label {
+.traffic-label {
           font-size: 9px;
           font-weight: 700;
           text-transform: uppercase;

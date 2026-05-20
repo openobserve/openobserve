@@ -2788,12 +2788,7 @@ defineExpose({
     background: $secondary;
     border-radius: 3px 3px 3px 3px;
     padding: 0px 5px;
-
-    .OIcon {
-      font-size: 15px;
-      color: #ffffff;
-    }
-  }
+}
 }
 .o2-custom-splitter {
   > .o-splitter__separator {

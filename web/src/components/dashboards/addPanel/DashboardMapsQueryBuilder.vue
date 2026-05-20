@@ -758,11 +758,7 @@ export default defineComponent({
         z-index: 3;
         opacity: 0;
         right: 0;
-
-        .OIcon {
-          cursor: pointer;
-        }
-      }
+}
 
       .field_label {
         pointer-events: none;

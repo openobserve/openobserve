@@ -419,13 +419,7 @@ function getSuggestedFix(result: TestResult): string | null {
       font-size: 11px;
       color: var(--q-text);
       line-height: 1.4;
-
-      .OIcon {
-        color: var(--q-warning);
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-    }
+}
 
     .error-expansion {
       margin-top: 8px;
@@ -497,13 +491,7 @@ function getSuggestedFix(result: TestResult): string | null {
     border-radius: 4px;
     background-color: rgba(0, 0, 0, 0.02);
     border: 1px solid rgba(0, 0, 0, 0.08);
-
-    .OIcon {
-      color: var(--q-text-secondary);
-      opacity: 0.7;
-    }
-
-    .idle-text {
+.idle-text {
       font-size: 11px;
       color: var(--q-text-secondary);
       line-height: 1.4;

@@ -642,10 +642,6 @@ export default defineComponent({
     &:hover {
       background-color: var(--o2-hover-accent);
     }
-
-    .OIcon {
-      font-size: 1.125rem; // 18px
-    }
-  }
+}
 }
 </style>
