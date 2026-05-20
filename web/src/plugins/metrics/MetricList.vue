@@ -510,7 +510,6 @@ export default defineComponent({
       addLabelToEditor(`${label}${operator}"${value}"`);
     };
     return {
-      quasar,
       t,
       store,
       router,
