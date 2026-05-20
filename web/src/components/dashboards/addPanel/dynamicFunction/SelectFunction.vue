@@ -1,14 +1,15 @@
 <template>
-  <div class="tw:flex">
+  <div class="tw:flex" :class="isChild ? 'tw:flex-col' : ''">
     <OSelect
       v-model="fields.functionName"
       label="Select Function"
+      label-position="inside"
       :options="filteredFunctions"
       data-test="dashboard-function-dropdown"
-      class="tw:w-72"
+      :class="isChild ? 'tw:w-52' : 'tw:w-72'"
       @search="onFunctionSearch"
     />
-    <div class="tw:w-full tw:p-3 tw:flex tw:gap-2">
+    <div :class="isChild ? 'tw:w-full' : 'tw:w-full tw:p-3 tw:flex tw:gap-2'">
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="tw:w-full">
         <div
@@ -18,9 +19,7 @@
         >
           <div
             class="tw:flex"
-            :style="{
-              marginLeft: isChild ? '-60px' : '0px',
-            }"
+            :style="{ marginLeft: isChild ? '-60px' : '0px' }"
           >
             <div class="tw:mr-2 tw:relative" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
@@ -41,13 +40,20 @@
               </div>
             </div>
 
-            <div>
+            <div class="tw:flex tw:flex-col">
               <div class="tw:flex tw:items-center tw:gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex">
+              <div
+                :class="[
+                  'tw:flex',
+                  fields.args[argIndex]?.type === 'function'
+                    ? 'tw:items-start'
+                    : 'tw:items-end',
+                ]"
+              >
                 <!-- type selector -->
                 <OSelect
                   v-model="fields.args[argIndex].type"
@@ -59,15 +65,18 @@
                     )
                   "
                   icon-key="icon"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
+                  label-position="inside"
+                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-auto"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
                     <OIcon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm"
+                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
+                      size="sm"
                     />
                   </template>
+                  <template #trigger><!-- icon-only --></template>
                 </OSelect>
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
@@ -99,14 +108,6 @@
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
-                <SelectFunction
-                  v-if="fields.args[argIndex]?.type === 'function'"
-                  v-model="fields.args[argIndex].value"
-                  :allowAggregation="allowAggregation"
-                  :isChild="true"
-                  :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
-                />
-
                 <!-- histogram interval for sql queries -->
                 <HistogramIntervalDropDown
                   v-if="fields.args[argIndex]?.type === 'histogramInterval'"
@@ -118,6 +119,15 @@
                   "
                   class="tw:w-52"
                   :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                />
+
+                <!-- Nested function inline with type selector -->
+                <SelectFunction
+                  v-if="fields.args[argIndex]?.type === 'function'"
+                  v-model="fields.args[argIndex].value"
+                  :allowAggregation="allowAggregation"
+                  :isChild="true"
+                  :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
                 />
 
                 <!-- Remove argument button -->
@@ -173,6 +183,7 @@ export default {
     OButton,
     OSelect,
     OInput,
+    OIcon,
   },
   props: {
     modelValue: {
@@ -537,39 +548,14 @@ export default {
 
 <style lang="scss" scoped>
 .arg-type-select {
-  :deep(.q-field__control) {
-    background-color: transparent !important;
-    border: 1px solid var(--o2-border-color) !important;
-    border-radius: 4px !important;
-    align-items: center !important;
-  }
-
-  :deep(.q-field__control):before,
-  :deep(.q-field__control):after {
+  // Make the trigger compact - only show the icon + chevron (no label text)
+  :deep(span[class~="tw:flex-1"][class~="tw:truncate"]) {
     display: none !important;
   }
 
-  :deep(.q-field):before,
-  :deep(.q-field):after {
-    display: none !important;
-  }
-
-  :deep(.q-field__append) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__prepend) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__append .OIcon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
-  }
-
-  :deep(.q-field__prepend .OIcon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
+  :deep(button[type="button"]) {
+    min-width: 2.5rem;
+    padding-inline-end: 1.5rem !important;
   }
 }
 </style>
