@@ -65,7 +65,8 @@ pub(crate) const REQUIRED_LLM_FIELDS: &[&str] = &[
 ];
 
 /// Optional fields for the legacy (llm_*) schema.
-pub(crate) const OPTIONAL_LLM_FIELDS: &[&str] = &["llm_input", "llm_output", "llm_usage_tokens_total"];
+pub(crate) const OPTIONAL_LLM_FIELDS: &[&str] =
+    &["llm_input", "llm_output", "llm_usage_tokens_total"];
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///

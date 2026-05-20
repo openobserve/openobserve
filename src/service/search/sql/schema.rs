@@ -232,9 +232,7 @@ pub fn generate_quick_mode_fields(
                 REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
             };
 
-            let field_lists: &[&[&str]] = if schema
-                .field_with_name(GEN_AI_SENTINEL_COLUMN)
-                .is_ok()
+            let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok()
             {
                 &[
                     REQUIRED_GEN_AI_FIELDS,
