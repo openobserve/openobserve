@@ -208,9 +208,23 @@
         {
           "key": "apiKey",
           "label": "Opsgenie API Key",
-          "type": "text",
+          "type": "password",
           "required": true,
-          "hint": "Your Opsgenie API key with alert creation permissions"
+          "hint": "Get your API key from Opsgenie integration settings"
+        },
+        {
+          "key": "euRegion",
+          "label": "EU Region",
+          "type": "toggle",
+          "required": false,
+          "hint": "Enable for EU-based Opsgenie instances"
+        },
+        {
+          "key": "priority",
+          "label": "Default Priority",
+          "type": "select",
+          "required": false,
+          "hint": "Select the default priority for Opsgenie alerts"
         }
       ],
       "metadata": {
@@ -247,14 +261,28 @@
           "label": "ServiceNow Instance URL",
           "type": "text",
           "required": true,
-          "hint": "Your ServiceNow instance URL (e.g., https://instance.service-now.com)"
+          "hint": "https://your-instance.service-now.com/api/now/table/incident"
         },
         {
-          "key": "authToken",
-          "label": "Authentication Token",
+          "key": "username",
+          "label": "Username",
           "type": "text",
           "required": true,
-          "hint": "Base64 encoded username:password or OAuth token"
+          "hint": "ServiceNow username with incident creation permissions"
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true,
+          "hint": "ServiceNow password or API token"
+        },
+        {
+          "key": "assignmentGroup",
+          "label": "Assignment Group (optional)",
+          "type": "text",
+          "required": false,
+          "hint": "Group to assign incidents to (e.g., IT Operations)"
         }
       ],
       "metadata": {
