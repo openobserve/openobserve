@@ -47,11 +47,15 @@ const slots = useSlots();
   <div
     v-else
     data-test="o2-table-loading"
-    :class="overlay ? 'tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70' : ''"
+    :class="
+      overlay
+        ? 'tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70'
+        : 'tw:flex-1 tw:min-h-0 tw:flex tw:flex-col'
+    "
   >
     <div
       data-test="o2-table-skeleton-rows"
-      class="tw:flex tw:flex-col tw:gap-1 tw:p-2"
+      class="tw:flex tw:flex-col tw:gap-1 tw:p-2 tw:flex-1 tw:min-h-0 tw:overflow-hidden"
       role="status"
       aria-label="Loading data"
       aria-live="polite"
@@ -59,14 +63,14 @@ const slots = useSlots();
       <div
         v-for="i in (skeletonRows ?? 5)"
         :key="`skel-row-${i}`"
-        class="tw:flex tw:gap-2"
+        class="tw:flex tw:gap-2 tw:flex-1 tw:min-h-0"
       >
         <OSkeleton
           v-for="j in (skeletonCols ?? 4)"
           :key="`skel-cell-${i}-${j}`"
           type="rect"
           animation="pulse"
-          class="tw:h-5 tw:flex-1"
+          class="tw:h-full tw:flex-1"
         />
       </div>
     </div>
