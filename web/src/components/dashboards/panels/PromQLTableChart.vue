@@ -314,13 +314,13 @@ export default defineComponent({
   // Support for multiple sticky columns - each subsequent column should be offset
   :deep(thead tr th.sticky-column:nth-child(2)),
   :deep(tbody tr td.sticky-column:nth-child(2)) {
-    left: var(--sticky-tw:w-1/12-width, 150px) !important;
+    left: var(--sticky-col-1-width, 150px) !important;
   }
 
   :deep(thead tr th.sticky-column:nth-child(3)),
   :deep(tbody tr td.sticky-column:nth-child(3)) {
     left: calc(
-      var(--sticky-tw:w-1/12-width, 150px) + var(--sticky-tw:w-1/6-width, 150px)
+      var(--sticky-col-1-width, 150px) + var(--sticky-col-2-width, 150px)
     ) !important;
   }
 }
