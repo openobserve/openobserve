@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
         >
-          <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
+          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">

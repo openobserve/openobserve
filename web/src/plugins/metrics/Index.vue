@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:w-full tw:h-full tw:flex">
         <div class="tw:flex tw:flex-row tw:items-center tw:grow">
           <div
-            class="tw:flex tw:items-center q-table__title tw:mx-3 tw:font-semibold tw:text-xl"
+            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold tw:text-xl"
           >
             <span>
               {{ t("search.metrics") }}

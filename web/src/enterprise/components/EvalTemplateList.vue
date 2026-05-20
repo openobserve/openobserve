@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px] tw:items-center"
       >
         <div
-          class="q-table__title tw:font-[600]"
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
           data-test="eval-template-list-title"
         >
           {{ t("evalTemplate.header") }}

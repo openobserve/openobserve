@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="position: sticky; top: 0; z-index: 1000;"
       >
         <div
-          class="q-table__title tw:font-[600]"
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
           data-test="model-pricing-list-title"
         >
           {{ t("modelPricing.header") }}

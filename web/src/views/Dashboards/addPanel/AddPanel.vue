@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center"
           :class="!store.state.isAiChatEnabled ? 'tw:mr-3' : 'tw:mr-2'"
         >
-          <span class="q-table__title">
+          <span class="tw:text-xl tw:tracking-[0.005em]">
             {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
           </span>
           <div>

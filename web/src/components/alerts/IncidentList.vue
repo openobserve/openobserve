@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Header with title and search -->
       <div class="card-container tw:mb-[0.625rem]">
         <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="incidents-list-title">
+          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="incidents-list-title">
             {{ t("alerts.incidents.title") }}
           </div>
 

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
 
-          <div class="q-table__title">{{ t("dashboard.header") }}</div>
+          <div class="tw:text-xl tw:tracking-[0.005em]">{{ t("dashboard.header") }}</div>
 
           <div
             class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center"

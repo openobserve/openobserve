@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
         >
-          <div class="q-table__title tw:font-[600]" data-test="report-list-title">
+          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
           </div>
 

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
           <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
-            <div class="q-table__title tw:font-[600]" data-test="enrichment-tables-list-title">
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
             <div class="tw:flex tw:items-center tw:ml-auto">

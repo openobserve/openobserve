@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
-              class="q-table__title tw:font-[600]"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
               data-test="alert-list-title"
             >
               {{ t("alerts.header") }}
