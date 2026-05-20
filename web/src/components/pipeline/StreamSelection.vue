@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="full-height"
+    class="tw:h-full"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div>
