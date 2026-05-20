@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="tw:flex tw:m-0! tw:p-[0.375rem]">
-      <div class="float-right tw:flex tw:flex-col tw:flex tw:items-center tw:gap-[0.375rem]">
+      <div class="float-right tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
