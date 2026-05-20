@@ -39,7 +39,7 @@
       data-test="dashboard-config-panel-drilldown-name"
     />
     <div
-      style="display: flex; flex-direction: row; gap: 10px; align-items: center"
+      style="display: flex; flex-direction: row; gap: 10px; align-items: center; margin-top: 0.75rem"
     >
       {{ t("dashboard.goTo") }}
       <OToggleGroup

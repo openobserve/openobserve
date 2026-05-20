@@ -31,29 +31,19 @@
                   <!-- Label Selection -->
                   <OSelect
                     v-model="label.label"
-                    :options="filteredLabelOptions"
+                    :options="availableLabelOptions"
                     label="Label"
                     class="label-filter-label-select showLabelOnTop tw:normal-case! tw:mb-2"
-                    input-class="tw:normal-case!"
-                    use-input
-                    fill-input
-                    hide-selected
-                    input-debounce="300"
-                    :loading="loadingLabels"
+                    searchable
                     clearable
-                    @filter="(val, update) => filterLabels(val, update, index)"
                     data-test="promql-label-select"
                   >
-                    <template v-slot:no-option>
-                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                        <div class="tw:text-gray-500 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                          {{
-                            loadingLabels
-                              ? "Loading labels..."
-                              : "No labels found"
-                          }}
-                        </div>
-                      </li>
+                    <template #empty>
+                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                        loadingLabels
+                          ? "Loading labels..."
+                          : "No labels found"
+                      }}</span>
                     </template>
                   </OSelect>
 
@@ -72,50 +62,19 @@
                     :options="getLabelValueOptions(label.label)"
                     label="Value"
                     class="label-filter-value-select showLabelOnTop"
-                    input-class="tw:normal-case!"
-                    use-input
-                    fill-input
-                    hide-selected
-                    input-debounce="300"
-                    value-key="value"
-                    label-key="label"
-                    @filter="
-                      (val, update) =>
-                        filterLabelValues(val, update, label.label)
-                    "
-                    :disable="!label.label"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :disabled="!label.label"
+                    searchable
                     clearable
                     data-test="promql-value-select"
                   >
-                    <template v-slot:no-option>
-                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                        <div class="tw:text-gray-500 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                          {{
-                            !label.label
-                              ? "Select a label first"
-                              : "No values found"
-                          }}
-                        </div>
-                      </li>
-                    </template>
-                    <template v-slot:option="scope">
-                      <div
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-                        @click="scope.toggleOption(scope.opt)"
-                      >
-                        <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                          <span class="tw:text-sm">{{ scope.opt.label }}</span>
-                          <span
-                            v-if="scope.opt.isVariable"
-                            class="tw:block tw:text-xs tw:text-muted-foreground tw:text-gray-400"
-                          >
-                            Variable
-                          </span>
-                        </div>
-                      </div>
-                    </template>
-                    <template v-slot:hint>
-                      {{ getOperatorHint(label.op) }}
+                    <template #empty>
+                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                        !label.label
+                          ? 'Select a label first'
+                          : 'No values found'
+                      }}</span>
                     </template>
                   </OSelect>
                 </div>
@@ -149,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, inject } from "vue";
+import { computed, inject, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -193,15 +152,13 @@ const loadingLabels = computed(
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 
-const availableLabelOptions = ref([]);
-const filteredLabelOptions = ref([...availableLabelOptions.value]);
-
-const filterLabelOptions = () => {
+// Computed: available labels minus ones already selected in other rows
+const availableLabelOptions = computed(() => {
   const selectedLabels = props.labels.map((l) => l.label);
-  availableLabelOptions.value = availableLabels.value.filter(
+  return availableLabels.value.filter(
     (label) => !selectedLabels.includes(label),
   );
-};
+});
 
 const computedLabel = (label: QueryBuilderLabelFilter): string => {
   if (!label.label) {
@@ -213,24 +170,12 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-watch(
-  () => props.labels,
-  async () => {
-    filterLabelOptions();
-  },
-  {
-    deep: true,
-    immediate: true,
-  },
-);
-
 // Watch for metric changes to fetch available labels
 watch(
   () => props.metric,
   async (newMetric) => {
     if (newMetric) {
       await fetchPromQLLabels(newMetric);
-      filterLabelOptions();
     }
     // When metric is cleared, the computed properties will handle empty state
     // No need to mutate props.dashboardData
@@ -285,42 +230,6 @@ const getLabelValueOptions = (labelKey: string) => {
   });
 
   return options;
-};
-
-// Filter labels with autocomplete
-const filterLabels = (val: string, update: any, currentIndex: number) => {
-  update(() => {
-    const options = availableLabelOptions.value;
-    if (val === "") {
-      filteredLabelOptions.value = options;
-    } else {
-      const needle = val.toLowerCase();
-      filteredLabelOptions.value = options.filter((v) =>
-        v.toLowerCase().includes(needle),
-      );
-    }
-  });
-};
-
-// Filter label values with autocomplete
-const filterLabelValues = (val: string, update: any, labelKey: string) => {
-  if (!labelKey) {
-    update(() => {});
-    return;
-  }
-
-  const allOptions = getLabelValueOptions(labelKey);
-
-  update(() => {
-    if (val === "") {
-      return allOptions;
-    }
-    // Filter options based on input
-    const needle = val.toLowerCase();
-    return allOptions.filter((opt: any) =>
-      opt.label.toLowerCase().includes(needle),
-    );
-  });
 };
 
 const getOperatorHint = (op: string): string => {
