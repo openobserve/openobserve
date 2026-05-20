@@ -159,6 +159,7 @@ import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "TabsSettings",

@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
         <div class="tw:flex tw:w-full tw:pt-2 tw:flex tw:items-center tw:shrink-0">
           <div
-            class="tw:flex tw:flex-col q-table__title tw:items-start"
+            class="tw:flex tw:flex-col tw:text-xl tw:tracking-[0.005em] tw:items-start"
             data-test="cipher-keys-list-title"
           >
             {{ t("nodes.header") }}

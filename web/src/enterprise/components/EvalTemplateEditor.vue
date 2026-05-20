@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="cancel"
         />
-        <span class="q-table__title tw:font-[600]" data-test="eval-template-editor-title">
+        <span class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="eval-template-editor-title">
           {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
         </span>
       </div>

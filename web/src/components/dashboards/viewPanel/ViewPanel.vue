@@ -17,7 +17,7 @@
 <template>
   <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
     <div class="tw:flex tw:justify-between tw:items-center tw:p-3">
-      <div class="tw:flex tw:items-center q-table__title tw:mr-3">
+      <div class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mr-3">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>

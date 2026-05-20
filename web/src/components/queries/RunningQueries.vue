@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="position: sticky; top: 0; z-index: 1000;"
         >
           <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="q-table__title tw:font-[600]" data-test="log-stream-title-text">
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="log-stream-title-text">
               {{ t("queries.runningQueries") }}
             </div>
             <span class="tw:text-xs tw:opacity-60">

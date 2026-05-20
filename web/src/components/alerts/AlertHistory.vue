@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="q-table__title tw:font-[600] tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2"
               data-test="alerts-history-title"
             >
               {{ t(`alerts.history`) }}

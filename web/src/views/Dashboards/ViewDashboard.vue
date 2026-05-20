@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               /></template>
             </OButton>
             <span
-              class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               data-test="dashboard-view-folder-breadcrumb"
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
@@ -69,11 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
             <OIcon
-              class="q-table__title tw:text-gray-400 tw:mt-1"
+              class="tw:text-gray-400 tw:mt-1"
               name="chevron-right" size="sm"
              />
             <span
-              class="q-table__title tw:mx-2 tw:truncate tw:flex-1"
+              class="tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
             >
               {{ currentDashboardData.data?.title }}

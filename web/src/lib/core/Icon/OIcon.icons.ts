@@ -287,6 +287,8 @@ import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
 import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
+import DataArray from "~icons/material-symbols/data-array";
+import Tab from "~icons/material-symbols/tab";
 
 import type { Component } from "vue";
 
@@ -568,6 +570,8 @@ export const iconRegistry = {
   "volume-up": VolumeUpIcon,
   "warning-amber": WarningAmberIcon,
   "wrap-text": WrapTextIcon,
+  "data-array": DataArray,
+  "tab": Tab,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

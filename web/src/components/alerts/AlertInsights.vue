@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
-            <div class="q-table__title tw:font-[600] tw:ml-2">{{ t("alerts.insights.title") }}</div>
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">{{ t("alerts.insights.title") }}</div>
           </div>
 
           <div class="tw:flex tw:items-center">
