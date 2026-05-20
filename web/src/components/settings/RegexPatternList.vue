@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <template v-if="!showImportRegexPatternDialog">
     <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0">
-      <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
+      <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="regex-pattern-list-title">
         {{ t("regex_patterns.title") }}
       </div>
       <OInput
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <div v-if="!listLoading && filterQuery == ''" class="tw:w-full column flex-center tw:mt-1 full-height" style="font-size: 1.5rem">
+        <div v-if="!listLoading && filterQuery == ''" class="tw:w-full tw:flex tw:flex-col flex-center tw:mt-1 tw:h-full" style="font-size: 1.5rem">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
         </div>
         <NoData v-else-if="!listLoading && filterQuery != ''" />

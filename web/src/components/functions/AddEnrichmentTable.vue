@@ -105,9 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="col-auto">
                       <OIcon
                         :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
-                        :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'"
                         size="sm"
-                        :class="{'rotate-animation': job.status === 'processing'}"
+                        :class="[
+                          { 'rotate-animation': job.status === 'processing' },
+                          job.status === 'completed' ? 'tw:text-[var(--o2-positive)]' :
+                          job.status === 'failed' ? 'tw:text-[var(--o2-negative)]' :
+                          job.status === 'processing' ? 'tw:text-[var(--o2-primary)]' :
+                          'tw:text-gray-500'
+                        ]"
                       />
                     </div>
                     <div class="tw:flex tw:flex-col tw:text-gray-500" style="font-size: 13px; word-break: break-all;">

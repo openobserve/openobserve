@@ -15,35 +15,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md" v-if="currentRouteName === 'pipelines'">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+  <div
+    data-test="pipeline-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    v-if="currentRouteName === 'pipelines'"
+  >
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div
-            class="q-table__title tw:font-[600]"
+            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
             data-test="pipeline-list-title"
           >
             {{ t("pipeline.header") }}
           </div>
-          <div class="tw:flex tw:items-center tw:ml-auto">
-            <app-tabs
-              data-test="pipeline-list-tabs"
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
               class="tw:mr-2"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-            />
+              data-test="pipeline-list-tabs"
+            >
+              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                <template #icon-left
+                  ><OIcon name="format-list-bulleted" size="sm"
+                /></template>
+                {{ t("pipeline_list.tab_all") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                {{ t("pipeline_list.tab_scheduled") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
+                <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                {{ t("pipeline_list.tab_realtime") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
 
             <OInput
               data-test="pipeline-list-search-input"
               v-model="filterQuery"
-              class="no-border o2-search-input"
+              class="tw:ml-2 tw:w-[200px]"
               :placeholder="t('pipeline.search')"
             >
               <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
             <!-- Full buttons visible at wide widths -->
@@ -52,15 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-list-history-btn"
                 class="tw:ml-2"
                 variant="outline"
-                size="sm-action"
+                size="sm"
+                icon-left="history"
                 @click="goToPipelineHistory"
               >
-                <template #icon-left
-                  ><OIcon
-                    name="history"
-                    size="sm"
-                    class="tw:size-3.5 tw:shrink-0"
-                /></template>
                 {{ t(`pipeline.history`) }}
               </OButton>
               <OButton
@@ -68,30 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-list-backfill-btn"
                 class="tw:ml-2"
                 variant="outline"
-                size="sm-action"
+                size="sm"
+                icon-left="refresh"
                 @click="goToBackfillJobs"
               >
-                <template #icon-left
-                  ><OIcon
-                    name="refresh"
-                    size="sm"
-                    class="tw:size-3.5 tw:shrink-0"
-                /></template>
                 {{ t("pipeline.backfill") }}
               </OButton>
               <OButton
                 data-test="pipeline-list-import-pipeline-btn"
                 class="tw:ml-2"
                 variant="outline"
-                size="sm-action"
+                size="sm"
+                icon-left="upload-file"
                 @click="routeToImportPipeline"
               >
-                <template #icon-left
-                  ><OIcon
-                    name="upload"
-                    size="sm"
-                    class="tw:size-3.5 tw:shrink-0"
-                /></template>
                 {{ t(`pipeline.import`) }}
               </OButton>
             </template>
@@ -100,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-add-pipeline-btn"
               class="tw:ml-2"
               variant="primary"
-              size="sm-action"
+              size="sm"
               @click="routeToAddPipeline"
             >
               {{ t(`pipeline.addPipeline`) }}
@@ -112,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   class="tw:ml-2"
                   variant="outline"
-                  size="sm-action"
+                  size="sm"
                   data-test="pipeline-list-overflow-menu-btn"
                   icon-left="menu"
                 />
@@ -141,9 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
-          <OTable
+    </div>
+    <div
+      class="tw:flex-1 tw:min-h-0"
+    >
+      <div class="card-container tw:h-full">
+        <OTable
             :key="activeTab"
             data-test="pipeline-list-table"
             :data="filteredPipelines"
@@ -159,13 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
             :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
             v-model:expanded-ids="expandedId"
-
-            style="
-              width: 100%;
-              height: calc(100vh - var(--navbar-height) - 77px);
-            "
-            @row-click="handleRowClick"
-
+            width="100%"
+            class="tw:w-full tw:h-full"
           >
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
@@ -302,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #bottom="bottomProps">
               <div class="bottom-btn tw:py-2">
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-4"
                 >
                   {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
                 </div>
@@ -352,7 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTable>
         </div>
       </div>
-    </div>
   </div>
 
   <router-view v-else />
@@ -467,8 +467,6 @@ import {
   onBeforeMount,
   computed,
   watch,
-  reactive,
-  onActivated,
   onMounted,
   onUnmounted,
 } from "vue";
@@ -484,7 +482,8 @@ import NoData from "../shared/grid/NoData.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -497,10 +496,7 @@ import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
-import { filter, update } from "lodash-es";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
@@ -560,24 +556,6 @@ const activeTab = ref("all");
 const filteredPipelines: any = ref([]);
 const columns: any = ref([]);
 
-const tabs = reactive([
-  {
-    label: t("pipeline_list.tab_all"),
-    value: "all",
-    icon: "format-list-bulleted",
-  },
-  {
-    label: t("pipeline_list.tab_scheduled"),
-    value: "scheduled",
-    icon: "schedule",
-  },
-  {
-    label: t("pipeline_list.tab_realtime"),
-    value: "realtime",
-    icon: "bolt",
-  },
-]);
-
 const selectedPipelineIds = ref<string[]>([]);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) =>
@@ -603,6 +581,7 @@ const currentRouteName = computed(() => {
 });
 
 const otableColumns = computed(() => columns.value);
+
 
 const updateActiveTab = () => {
   expandedId.value = [];
@@ -934,7 +913,7 @@ const deletePipeline = async () => {
       }
     })
     .finally(async () => {
-      selectedPipelines.value = [];
+      selectedPipelineIds.value = [];
       await getPipelines();
       updateActiveTab();
       dismiss();
@@ -1010,7 +989,7 @@ const exportBulkPipelines = () => {
 
   URL.revokeObjectURL(url);
 
-  selectedPipelines.value = [];
+  selectedPipelineIds.value = [];
   toast({
     message: `${pipelinesToExport.length} pipelines exported successfully`,
     position: "bottom-center",
@@ -1103,7 +1082,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       });
     }
 
-    selectedPipelines.value = [];
+    selectedPipelineIds.value = [];
     await getPipelines();
     updateActiveTab();
   } catch (error) {
@@ -1192,7 +1171,7 @@ const bulkDeletePipelines = async () => {
       });
     }
 
-    selectedPipelines.value = [];
+    selectedPipelineIds.value = [];
     await getPipelines();
     updateActiveTab();
   } catch (error: any) {
@@ -1233,29 +1212,6 @@ const onBackfillSuccess = (jobId: string) => {
 };
 </script>
 <style lang="scss" scoped>
-.dark-mode {
-  background-color: $dark-page;
-
-  .report-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-}
-
 .expanded-content {
   padding: 0 3rem;
   max-height: 100vh; /* Set a fixed height for the container */
@@ -1285,57 +1241,8 @@ const onBackfillSuccess = (jobId: string) => {
   align-items: center;
 }
 
-// Glassmorphic Error Dialog
-.pipeline-error-dialog {
-  min-width: 600px;
-  max-width: 800px;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.pipeline-error-dialog-light {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
-
-.pipeline-error-dialog-dark {
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.pipeline-error-header {
-  padding: 20px 24px 16px;
-
-  .error-icon {
-    color: #ef4444;
-  }
-
-  .pipeline-name {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .error-timestamp {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin-left: 36px;
-  }
-
-  .close-btn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
+.error-icon {
+  color: #ef4444;
 }
 
 .pipeline-error-content {
@@ -1422,39 +1329,4 @@ const onBackfillSuccess = (jobId: string) => {
   color: #991b1b;
 }
 
-.pipeline-error-actions {
-  padding: 16px 24px;
-  justify-content: flex-end;
-}
-
-// Dark mode overrides
-.dark-mode {
-  .pipeline-error-dialog-dark {
-    .error-summary-box {
-      background: rgba(239, 68, 68, 0.12);
-      border-color: rgba(239, 68, 68, 0.3);
-      color: #fca5a5;
-    }
-
-    .node-error-item {
-      background: rgba(255, 255, 255, 0.03);
-      border-color: rgba(255, 255, 255, 0.1);
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
-    }
-
-    .node-type {
-      background: rgba(99, 102, 241, 0.15);
-      color: #a5b4fc;
-    }
-
-    .error-message {
-      background: rgba(239, 68, 68, 0.1);
-      border-left-color: #fca5a5;
-      color: #fecaca;
-    }
-  }
-}
 </style>

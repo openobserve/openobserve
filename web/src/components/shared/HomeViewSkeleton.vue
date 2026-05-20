@@ -25,7 +25,7 @@
       <div class="tiles-grid">
         <div v-for="n in 5" :key="n" class="tile">
           <div
-            class="tile-content tw:rounded tw:text-center column tw:justify-between"
+            class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
@@ -33,7 +33,7 @@
             "
           >
             <!-- Top Section (60%) -->
-            <div class="column tw:justify-between">
+            <div class="tw:flex tw:flex-col tw:justify-between">
               <!-- Title row -->
               <div class="tw:flex tw:justify-between">
                 <SkeletonBox variant="text" width="100px" height="20px" />
@@ -57,14 +57,14 @@
         <!-- Functions tile -->
         <div class="tile-wrapper">
           <div
-            class="feature-card tw:rounded tw:text-center column tw:justify-between"
+            class="feature-card tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
                 : 'light-tile-content'
             "
           >
-            <div class="column tw:justify-between">
+            <div class="tw:flex tw:flex-col tw:justify-between">
               <div
                 class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
               >
@@ -82,14 +82,14 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper">
           <div
-            class="feature-card tw:rounded tw:text-center column tw:justify-between"
+            class="feature-card tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
                 : 'light-tile-content'
             "
           >
-            <div class="column tw:justify-between">
+            <div class="tw:flex tw:flex-col tw:justify-between">
               <div
                 class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
               >
@@ -125,7 +125,7 @@
           </div>
           <!-- Stats row -->
           <div class="tw:flex tw:pt-2" style="gap: 16px">
-            <div class="column">
+            <div class="tw:flex tw:flex-col">
               <SkeletonBox
                 variant="text"
                 width="100px"
@@ -135,7 +135,7 @@
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
             <OSeparator vertical />
-            <div class="column">
+            <div class="tw:flex tw:flex-col">
               <SkeletonBox
                 variant="text"
                 width="80px"
@@ -177,7 +177,7 @@
           </div>
           <!-- Stats row -->
           <div class="tw:flex tw:pt-2" style="gap: 16px">
-            <div class="column">
+            <div class="tw:flex tw:flex-col">
               <SkeletonBox
                 variant="text"
                 width="120px"
@@ -187,7 +187,7 @@
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
             <OSeparator vertical />
-            <div class="column">
+            <div class="tw:flex tw:flex-col">
               <SkeletonBox
                 variant="text"
                 width="100px"

@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
       <div class="feature-card">
-        <div class="tile-content tw:text-center column tw:justify-between">
-          <div class="column tw:justify-between">
+        <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between">
+          <div class="tw:flex tw:flex-col tw:justify-between">
             <div class="tw:flex tw:justify-between tw:items-center">
               <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
               <div style="opacity: 0.8;">

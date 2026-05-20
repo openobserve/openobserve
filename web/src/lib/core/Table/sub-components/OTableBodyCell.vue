@@ -279,7 +279,7 @@ function handleClick() {
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >
-      <OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />
+      <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
     </button>
   </td>
 </template>

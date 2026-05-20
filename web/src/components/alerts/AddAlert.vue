@@ -40,18 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="q-table__title alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
-            <OIcon name="chevron-right" size="sm" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+            <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
             <template v-if="!isAnomalyMode">
-              <span class="q-table__title tw:truncate tw:max-w-[200px]">
+              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
                 {{ formData.name }}
                 <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
               </span>
             </template>
             <template v-else>
-              <span class="q-table__title tw:truncate tw:max-w-[200px]">
+              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
@@ -345,8 +345,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="sm" />
-              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
+              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
               <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
@@ -989,7 +989,7 @@ body.body--dark .query-mode-tabs {
   background-color: var(--o2-tab-bg) !important;
 }
 
-// Folder breadcrumb select — matches q-table__title sizing/weight
+// Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight
 .topbar-folder-select {
   min-width: 60px;
   max-width: 140px;

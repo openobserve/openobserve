@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="backfill-jobs-back-btn"
               icon-left="chevron-left"
             />
-            <div class="q-table__title tw:font-[600] tw:ml-2">
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">
               Backfill Jobs
             </div>
           </div>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div>
-    <div v-if="isAddVariable" class="column full-height">
+    <div v-if="isAddVariable" class="tw:flex tw:flex-col full-height">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="column full-height">
+    <div v-else class="tw:flex tw:flex-col full-height">
       <DashboardHeader title="Variables">
         <template #right>
           <div class="tw:flex tw:gap-2">

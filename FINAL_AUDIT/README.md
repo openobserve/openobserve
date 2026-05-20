@@ -100,6 +100,7 @@ Tick the page off only when **all** of its Critical + Logical + Class-Level find
 - [ ] **O-Library Core** — [o_library_audit.md](./o_library_audit.md) — Stale `--q-primary` in OTable tree connectors; 3 specs in `core/` call `installQuasar`; OButton has no spinner for `loading`; OBadge/OCollapsible still use Material font ligature instead of OIcon registry
 - [ ] **Global CSS Architecture** — [global_css_architecture_audit.md](./global_css_architecture_audit.md) — Dark-mode `--o2-*` block (170 lines) silently dead — gated on `body--dark` which is no longer applied anywhere; "Nunito Sans" `@font-face` deleted but 5 files still reference it; `.o2-input` rules deleted but 15+ files still use the class
 - [ ] **CSS Class-Level Registry** — [css_class_level_audit.md](./css_class_level_audit.md) — Project-wide 1,037-line catalog with file:line for every problematic class. Use as the single source of truth when sweeping.
+- [ ] **Icons / Chips / Badges** — [icons.md](./icons.md) — Cross-page consolidation of every OIcon/OBadge/q-icon/q-chip/q-badge finding with solution diffs. 722 lines, 18 sections, P0→P3 sweep order.
 
 ## Cross-Cutting Patterns (apply once, fixes many)
 

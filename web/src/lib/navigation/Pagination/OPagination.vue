@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PaginationProps, PaginationEmits } from "./OPagination.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -54,22 +55,6 @@ const navigate = (page: number) => {
     aria-label="Pagination"
     v-bind="$attrs"
   >
-    <!-- First page -->
-    <button
-      type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
-      :class="[
-        isFirst || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
-      ]"
-      :disabled="isFirst || disable"
-      aria-label="First page"
-      @click="navigate(1)"
-    >
-      <span class="material-icons tw:text-base tw:leading-none">skip_previous</span>
-    </button>
-
     <!-- Previous page -->
     <button
       type="button"
@@ -83,7 +68,7 @@ const navigate = (page: number) => {
       aria-label="Previous page"
       @click="navigate(modelValue - 1)"
     >
-      <span class="material-icons tw:text-base tw:leading-none">fast_rewind</span>
+      <OIcon name="fast-rewind" size="sm" />
     </button>
 
     <!-- Page number buttons -->
@@ -120,23 +105,8 @@ const navigate = (page: number) => {
       aria-label="Next page"
       @click="navigate(modelValue + 1)"
     >
-      <span class="material-icons tw:text-base tw:leading-none">fast_forward</span>
+      <OIcon name="fast-forward" size="sm" />
     </button>
 
-    <!-- Last page -->
-    <button
-      type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
-      :class="[
-        isLast || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
-      ]"
-      :disabled="isLast || disable"
-      aria-label="Last page"
-      @click="navigate(max)"
-    >
-      <span class="material-icons tw:text-base tw:leading-none">skip_next</span>
-    </button>
   </div>
 </template>

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
       </div>
-      <div class="tw:flex tw:flex-col">
+      <div class="tw:flex tw:flex-col tw:flex-1">
         <div class="tw:text-xl tw:font-semibold">
           {{ title }}
         </div>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardHeader",

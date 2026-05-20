@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
         <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
           <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="q-table__title tw:font-[600]" data-test="inspector-title">
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="inspector-title">
               Search Job Inspector
             </div>
             <div

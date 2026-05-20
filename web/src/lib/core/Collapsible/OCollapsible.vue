@@ -12,6 +12,7 @@ import {
 } from "reka-ui";
 import { ref, computed, watch, useSlots } from "vue";
 import OIcon from "../Icon/OIcon.vue";
+import { iconRegistry } from "../Icon/OIcon.icons";
 
 const props = withDefaults(defineProps<OCollapsibleProps>(), {
   defaultOpen: false,
@@ -23,6 +24,11 @@ defineSlots<OCollapsibleSlots>();
 
 const slots = useSlots();
 const hasCustomTrigger = computed(() => !!slots.trigger);
+
+/** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
+const isOIcon = computed<boolean>(() =>
+  Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
+);
 
 // ΓöÇΓöÇ Open state management ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
@@ -92,7 +98,7 @@ watch(
         'tw:focus-visible:ring-2 tw:focus-visible:ring-collapsible-trigger-focus-ring tw:focus-visible:ring-offset-1',
         variant === 'sidebar'
           ? 'tw:px-3 tw:py-0 tw:min-h-[36px] tw:rounded-none'
-          : 'tw:px-4 tw:py-2 tw:rounded-md',
+          : 'tw:px-2 tw:py-2 tw:rounded-md',
       ]"
     >
       <!-- Sidebar: left-side chevron (always before slot or label) -->
@@ -111,8 +117,16 @@ watch(
 
       <!-- Default trigger ΓÇö label / icon / caption / chevron -->
       <template v-else>
+        <!-- OIcon registry name (kebab-case SVG icon) -->
+        <OIcon
+          v-if="icon && isOIcon"
+          :name="(icon as any)"
+          size="md"
+          class="tw:text-collapsible-icon tw:shrink-0"
+        />
+        <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
-          v-if="icon"
+          v-else-if="icon"
           class="material-icons-outlined tw:text-icon-md tw:text-collapsible-icon tw:shrink-0"
           aria-hidden="true"
           >{{ icon }}</span

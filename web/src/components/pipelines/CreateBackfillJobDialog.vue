@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <OIcon name="warning" :color="store.state.theme === 'dark' ? 'orange-4' : 'orange'" size="md" class="tw:mt-0.5" />
+                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 dark:tw:text-orange-400" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
                       <div :class="['tw:text-xs tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">

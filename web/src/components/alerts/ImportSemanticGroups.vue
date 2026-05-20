@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCollapsible
                 v-model="unchangedOpen"
                 :label="`Unchanged (${diffData.unchanged.length})`"
-                icon="check_circle"
+                icon="check-circle"
               >
                 <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
                   <li
@@ -314,8 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :color="isNewField(field) ? 'positive' : 'grey-4'"
-            :text-color="isNewField(field) ? 'white' : 'black'"
+            :variant="isNewField(field) ? 'success' : 'default'"
             size="sm"
             class="tw:m-1"
           >

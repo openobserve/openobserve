@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column tw:flex-nowrap searchdetaildialog"
+    class="tw:flex tw:flex-col tw:flex-nowrap searchdetaildialog"
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->

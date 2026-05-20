@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container full-height tw:p-2">
+  <div class="player-container tw:h-full tw:p-2">
     <div
       v-if="isLoading"
       class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
@@ -45,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
       <div
         ref="playbackBarRef"
-        class="playback_bar tw:mt-2 tw:mb-3 relative-position tw:cursor-pointer"
+        class="playback_bar tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime bg-primary tw:absolute"
+          class="progressTime progress-fill tw:absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime bg-primary tw:absolute"
+          class="progressTime progress-fill tw:absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:items-center">
           <OSwitch
-            class="tw:mr-3"
+            class="tw:mr-3 tw:whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"
@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="speed-selector"
             v-model="playerState.speed"
             :options="speedOptions"
+            :searchable="false"
             @update:model-value="setSpeed"
           />
         </div>
@@ -225,10 +226,7 @@ const playerState = ref({
   isPlaying: false,
   time: "00.00",
   duration: "00.00", // in ms
-  speed: {
-    label: "4x",
-    value: 4,
-  },
+  speed: 4,
   progressWidth: 0,
   playBackEvents: {
     views: true,
@@ -389,7 +387,7 @@ const setupSession = async () => {
       width: playerWidth,
       height: playerHeight,
       mutateChildNodes: true,
-      speed: playerState.value.speed.value,
+      speed: playerState.value.speed,
       skipInactive: playerState.value.skipInactivity,
     },
   });
@@ -441,9 +439,9 @@ const getEventMarkerClass = (event: any) => {
     return "bg-frustration-marker";
   }
   if (event.type === "error") {
-    return "bg-red-5";
+    return "bg-event-error";
   }
-  return "bg-secondary";
+  return "bg-event-default";
 };
 
 const getEventTooltip = (event: any) => {
@@ -527,8 +525,8 @@ const pause = () => {
   player.value?.pause();
 };
 
-const setSpeed = (speed: { label: string; value: number }) => {
-  player.value?.setSpeed(speed.value);
+const setSpeed = (speed: number) => {
+  player.value?.setSpeed(speed);
 };
 const toggleSkipInactive = () => {
   player.value?.toggleSkipInactive();
@@ -613,6 +611,18 @@ defineExpose({
 .bg-frustration-marker {
   background-color: #fb923c !important;
   box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
+}
+
+.bg-event-error {
+  background-color: #ef4444 !important;
+}
+
+.bg-event-default {
+  background-color: #14b8a6 !important;
+}
+
+.progress-fill {
+  background-color: var(--o2-primary-btn-bg) !important;
 }
 </style>
 

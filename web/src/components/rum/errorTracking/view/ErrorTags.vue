@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex tw:items-center wrap tw:mt-3">
+    <div class="tw:flex tw:items-center tw:flex-wrap tw:mt-3">
       <template v-for="(value, tag) in getTags" :key="tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>

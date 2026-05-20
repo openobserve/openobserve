@@ -74,13 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-bind:disable="isEditingReport"
                   :error="!!nameError"
                   :error-message="nameError"
+                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
                   @update:model-value="nameError = ''"
                   tabindex="0"
                   style="width: 330px"
                 >
-                  <template v-slot:hint>
-                    Characters like :, ?, /, #, and spaces are not allowed.
-                  </template>
                 </OInput>
               </div>
 
@@ -156,8 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :data-test="`add-report-dashboard-${index}`"
-                    class="tw:my-2 tw:px-2 tw:flex tw:items-center tw:justify-start"
+                    class="tw:my-2 tw:px-2 tw:flex tw:flex-col"
                   >
+                    <div class="tw:flex tw:items-center tw:justify-start">
                     <div
                       data-test="add-report-folder-select"
                       class="o2-input tw:mr-2"
@@ -205,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="tabError = ''"
                         style="min-width: 250px !important; width: 100% !important;"
                       />
+                    </div>
                     </div>
 
                     <div

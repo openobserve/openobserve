@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="frustration-badge"
       :data-test="`frustration-badge-${severity}`"
     >
+      {{ count }}
     </OBadge>
     <span v-else class="tw:text-gray-400" data-test="frustration-badge-none">—</span>
   </div>

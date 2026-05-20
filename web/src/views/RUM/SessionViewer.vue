@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex qp-2 tw:h-full tw:px-[0.625rem]">
+  <div class="tw:flex tw:flex-col qp-2 tw:h-full tw:px-[0.625rem]">
     <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
       <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
@@ -70,9 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
+      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]!"
     >
-      <div class="tw:w-3/4 full-height">
+      <div class="tw:w-3/4 tw:h-full">
         <VideoPlayer
           ref="videoPlayerRef"
           :events="segmentEvents"

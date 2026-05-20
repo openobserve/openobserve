@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              icon="data_object"
+              icon="data-object"
               label="Curl"
             />
             <ORouteTab

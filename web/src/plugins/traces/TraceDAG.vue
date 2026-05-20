@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-dag-container">
-    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center column tw:p-6 loading-container">
+    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 loading-container">
       <OSpinner size="lg" />
       <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
     </div>
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center column tw:p-6 empty-container">
+    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 empty-container">
       <OIcon name="info" style="width: 48px; height: 48px;" />
       <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div
-            class="q-table__title tw:font-[600]"
+            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
             data-test="log-stream-title-text"
           >
             {{ t("logStream.header") }}

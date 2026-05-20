@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="fullscreen"
             size="xs"
-            :color="isFullScreen ? 'primary' : undefined"
+            :class="isFullScreen ? 'tw:text-[var(--o2-primary)]' : ''"
           />
         </OButton>
       </div>

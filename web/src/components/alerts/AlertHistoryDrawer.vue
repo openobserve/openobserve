@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="history-toggle-off"
                   size="lg"
-                  :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                 />
               </div>
               <div
@@ -710,17 +710,17 @@ const getStatusChipIcon = (status: string) => {
     case "firing":
     case "error":
     case "anomaly":
-      return "error_outline";
+      return "error-outline";
     case "ok":
     case "success":
     case "normal":
-      return "check_circle_outline";
+      return "check-circle-outline";
     case "skipped":
       return "block";
     case "pending":
       return "schedule";
     default:
-      return "help_outline";
+      return "help-outline";
   }
 };
 

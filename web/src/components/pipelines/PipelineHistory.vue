@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="chevron-left"
             />
             <div
-              class="q-table__title tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
-                :color="row.is_realtime ? 'positive' : 'grey'"
+                :class="row.is_realtime ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
                 size="xs"
               />
             </OTooltip>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-                :color="row.is_silenced ? 'grey' : 'positive'"
+                :class="row.is_silenced ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
                 size="md"
               />
             </OTooltip>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.is_partial !== undefined
               "
               :name="row.is_partial ? 'warning' : 'check-circle'"
-              :color="row.is_partial ? 'warning' : 'positive'"
+              :class="row.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]'"
               size="xs"
             >
               <OTooltip
@@ -378,9 +378,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
-                      :color="selectedRow.is_partial ? 'warning' : 'positive'"
+                      :class="['tw:mr-1', selectedRow.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]']"
                       size="xs"
-                      class="tw:mr-1"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}
                   </div>

@@ -457,6 +457,7 @@ defineExpose({ scrollToTop });
     border-radius: 0.1875rem;
     font-size: 0.75rem;
     transition: background-color 0.1s ease;
+    line-height: 0.8rem;
 
     &:hover {
       background-color: var(--o2-hover-accent);
