@@ -289,25 +289,10 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-secondary-background: #{$o2-iris-200}; // Light iris background
   --o2-muted-background: #{$o2-gray-300};    // Subtle gray background
   
-  // Text Colors — grey-based semantic hierarchy (Datadog/Grafana pattern)
-  --o2-text-heading:     #{$o2-gray-1400};      // h1-h6 headings, modal titles
-  --o2-text-primary:     var(--o2-text-heading); // alias — backward compat
-  --o2-text-body:        #{$o2-gray-1200};      // paragraphs, default body text
-  --o2-text-secondary:   #{$o2-gray-1000};      // supporting text, descriptions
-  --o2-text-caption:     #{$o2-gray-900};       // captions, footnotes, timestamps
-  --o2-text-label:       #{$o2-gray-800};       // form labels, metadata, badges
-  --o2-text-muted:       #{$o2-gray-700};       // disabled, placeholder, de-emphasized
-  --o2-text-placeholder: #{$o2-gray-700};       // input placeholders
-  --o2-text-link:        #{$o2-iris-1000};      // clickable links
-  --o2-text-link-hover:  #{$o2-iris-1100};      // link hover state
-  --o2-text-code:        #{$o2-gray-1000};      // inline code, monospace
-  --o2-text-inverse:     #{$o2-gray-100};       // text on dark/colored backgrounds
-
-  // Backward compat — old numbered tokens map to new semantic tokens
-  --o2-text-4: var(--o2-text-heading);
-  --o2-text-2: var(--o2-text-secondary);
-  --o2-text-1: var(--o2-text-caption);
-  --o2-text-3: var(--o2-text-label);
+  // Text Colors
+  --o2-text-primary: #{$o2-gray-1400};      // Main text color
+  --o2-text-secondary: #{$o2-gray-1000};    // Less prominent text
+  --o2-text-muted: #{$o2-gray-900};         // Muted text
   
   // Component Colors
   --o2-card-background: #{$o2-gray-100};    // Card background
@@ -398,6 +383,11 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-section-header-bg: color-mix(in srgb, var(--o2-theme-color) 3%, rgb(247, 247, 247));
 
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #64748B;
+  --o2-text-2: #475569;
+  --o2-text-4: #334155;
+
   --o2-tag-grey-1: #E2E8F0;
   --o2-tag-grey-2: #eaebec;
 
@@ -417,9 +407,6 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-wildcard-bar-orange: #{$o2-orange-600};
   --o2-wildcard-bar-purple: #{$o2-purple-600};
   --o2-wildcard-bar-grey: #{$o2-gray-800};
-
-  // Dashboard
-  --o2-dashboard-placeholder-bg: #{$o2-iris-700};
 
   // Field Type Badge Colors
   --o2-field-type-string-bg: oklch(95% 0.052 163.051);
@@ -487,25 +474,10 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-secondary-background: #{$o2-dark-gray-1300}; // Secondary background
   --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
   
-  // Text Colors — grey-based semantic hierarchy (Datadog/Grafana pattern)
-  --o2-text-heading:     #{$o2-dark-gray-1300};   // h1-h6 headings, modal titles
-  --o2-text-primary:     var(--o2-text-heading);   // alias — backward compat
-  --o2-text-body:        #{$o2-dark-gray-1100};    // paragraphs, default body text
-  --o2-text-secondary:   #{$o2-dark-gray-1000};    // supporting text, descriptions
-  --o2-text-caption:     #{$o2-dark-gray-900};     // captions, footnotes, timestamps
-  --o2-text-label:       #{$o2-dark-gray-800};     // form labels, metadata, badges
-  --o2-text-muted:       #{$o2-dark-gray-700};     // disabled, de-emphasized
-  --o2-text-placeholder: #{$o2-dark-gray-700};     // input placeholders
-  --o2-text-link:        #{$o2-dark-iris-800};     // clickable links
-  --o2-text-link-hover:  #{$o2-dark-iris-700};     // link hover state
-  --o2-text-code:        #{$o2-dark-gray-1000};    // inline code, monospace
-  --o2-text-inverse:     #{$o2-dark-gray-200};     // text on dark/colored backgrounds
-
-  // Backward compat — old numbered tokens map to new semantic tokens
-  --o2-text-4: var(--o2-text-heading);
-  --o2-text-2: var(--o2-text-secondary);
-  --o2-text-1: var(--o2-text-caption);
-  --o2-text-3: var(--o2-text-label);
+  // Text Colors
+  --o2-text-primary: #D3D3D3;    // Main text in dark mode
+  --o2-text-secondary: #D3D3D3;  // Secondary text
+  --o2-text-muted: #{$o2-dark-gray-900};      // Muted text
   
   // Component Colors
   --o2-card-background: #{$o2-dark-gray-1300}; // Card background
@@ -637,6 +609,11 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-section-header-bg: #28292a;
   
+
+  --o2-text-3: #94A3B8;
+  --o2-text-1: #94A3B8;
+  --o2-text-2: #a5b2c5;
+  --o2-text-4: #bacce6;
 
   --o2-tag-grey-1: #565b60;
   --o2-tag-grey-2: #313234;

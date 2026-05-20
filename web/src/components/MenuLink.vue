@@ -217,6 +217,7 @@ export default defineComponent({
   padding: 1px 8px;
   margin: 0px;
   border-radius: 6px;
+  flex-shrink: 0;
 
   /* Always have a border to prevent layout shift when active */
   border: 1px solid transparent;
@@ -285,7 +286,7 @@ export default defineComponent({
     }
 
     .nav-menu-item-label {
-      font-weight: 700;
+      font-weight: 500;
       color: var(--o2-menu-color); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
     }
@@ -434,7 +435,7 @@ export default defineComponent({
     .nav-menu-item-label {
       padding-bottom: 0.25rem;
       font-size: 0.75rem;
-      font-weight: 600;
+      font-weight: 400;
       color: var(--o2-text-secondary);
     }
 

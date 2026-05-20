@@ -1,0 +1,143 @@
+/* ============================================================
+   BASE TOKENS — raw palette, spacing, radius, shadows, fonts
+   These are NEVER referenced directly in components.
+   Components use semantic or component tokens only.
+   ============================================================ */
+
+:root {
+  /* --- Font family tokens --- */
+  --font-sans: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+
+  /* --- Font size scale --- */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.8125rem; /* 13px */
+  --text-base: 0.875rem;  /* 14px */
+  --text-md:   1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+
+  /* --- Line-height scale --- */
+  --leading-xs:    1rem;      /* 16px */
+  --leading-sm:    1.125rem;  /* 18px */
+  --leading-base:  1.25rem;   /* 20px */
+  --leading-md:    1.375rem;  /* 22px */
+  --leading-lg:    1.5rem;    /* 24px */
+  --leading-xl:    1.75rem;   /* 28px */
+  --leading-2xl:   2rem;      /* 32px */
+  --leading-3xl:   2.25rem;   /* 36px */
+  --leading-4xl:   2.5rem;    /* 40px */
+
+  /* --- Letter-spacing scale --- */
+  --tracking-tighter: -0.05em;
+  --tracking-tight:   -0.025em;
+  --tracking-normal:   0;
+  --tracking-wide:     0.025em;
+
+  /* --- Font weight scale --- */
+  --font-normal: normal;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-black: 900;
+  /* --- Primary palette — brand color #3F7994 (HSL 199°, 40%, 41%) --- */
+  --color-primary-50:  #f5f8f9;
+  --color-primary-100: #e4edf1;
+  --color-primary-200: #bad3de;
+  --color-primary-300: #8eb9cc;
+  --color-primary-400: #629fbc;
+  --color-primary-500: #4b8faf;
+  --color-primary-600: #3f7994;
+  --color-primary-700: #316177;
+  --color-primary-800: #224758;
+  --color-primary-900: #16303c;
+
+  /* --- Grey palette --- */
+  --color-grey-0:   #ffffff;
+  --color-grey-50:  #f9fafb;
+  --color-grey-100: #f3f4f6;
+  --color-grey-200: #e5e7eb;
+  --color-grey-300: #d1d5db;
+  --color-grey-400: #9ca3af;
+  --color-grey-500: #6b7280;
+  --color-grey-600: #4b5563;
+  --color-grey-700: #374151;
+  --color-grey-800: #1f2937;
+  --color-grey-850: #17212e;
+  --color-grey-900: #111827;
+  --color-grey-950: #030712;
+
+  /* --- Error palette --- */
+  --color-error-50:  #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+
+  /* --- Success palette --- */
+  --color-success-50:  #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-500: #22c55e;
+  --color-success-700: #15803d;
+  --color-success-900: #14532d;
+
+  /* --- Warning palette (Tailwind yellow scale) --- */
+  --color-warning-50:  #fefce8;
+  --color-warning-100: #fef9c3;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #facc15;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
+  --color-warning-700: #a16207;
+  --color-warning-900: #78350f;
+
+  /* --- Info palette (blue, used by OBanner info variant) --- */
+  --color-info-50:  #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e3a8a;
+  --color-info-900: #1e3a5f;
+
+  /* --- Note container palette (pipeline guideline cards) --- */
+  --color-note-light-bg:        #f9f290;
+  --color-note-light-border:    #f5a623;
+  --color-note-light-text:      #865300;
+  --color-note-dark-border:     #b45309;
+  --color-note-dark-text:       #fef3c7;
+  --color-note-highlight-light: #007bff;
+  --color-note-highlight-dark:  #93c5fd;
+  --color-note-code-light:      #d63384;
+  --color-note-code-dark:       #f9a8d4;
+
+  /* --- White / Black --- */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* --- Spacing scale --- */
+  --spacing-px:  1px;
+  --spacing-3:   0.75rem;   /* 12px */
+  --spacing-4:   1rem;      /* 16px */
+  --spacing-5:   1.25rem;   /* 20px */
+  --spacing-6:   1.5rem;    /* 24px */
+  --spacing-8:   2rem;      /* 32px */
+  --spacing-10:  2.5rem;    /* 40px */
+
+  /* --- Radius scale --- */
+  --radius-sm:   0.25rem;   /* 4px  */
+  --radius-md:   0.375rem;  /* 6px  */
+  --radius-lg:   0.5rem;    /* 8px  */
+  --radius-xl:   0.75rem;   /* 12px */
+  --radius-full: 9999px;
+
+  /* --- Shadow scale --- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}

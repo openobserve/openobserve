@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </header>
 
-    <div class="o2-app-body tw:flex-1 tw:flex tw:min-h-0">
+    <div class="tw:flex-1 tw:flex tw:min-h-0">
       <ONavbar
         :links-list="linksList"
         :mini-mode="miniMode"
@@ -1203,29 +1203,5 @@ export default defineComponent({
   .o2-app-header {
     display: none;
   }
-
-  .left-drawer {
-    display: none;
-  }
-
-  .o2-app-body {
-    padding-left: 0;
-  }
-}
-
-// Always show left drawer on screens above 500px
-@media (min-width: 501px) {
-  .left-drawer {
-    display: flex !important;
-    flex-direction: column;
-  }
-}
-
-.o2-app-header {
-  color: unset;
-}
-
-.left-drawer {
-  margin-bottom: 0.675rem;
 }
 </style>

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCard class="tw:flex tw:flex-col o2-card-wrapper">
     <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
-        <div class="o2-card-title tw:pt-2">{{ t("billing.proPlanLabel") }}</div>
+        <div class="tw:pt-2">{{ t("billing.proPlanLabel") }}</div>
         <div class="o2-card-subtitle tw:mt-2">
           {{ t("billing.proPlanSubtitle") }}
         </div>
