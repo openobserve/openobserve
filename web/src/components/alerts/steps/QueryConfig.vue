@@ -457,11 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
-                          class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
+                          class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                       view the alert query
                       <OTooltip :delay="200" side="bottom">
-                        <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                        <template #content>
+                          <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                        </template>
                       </OTooltip>
                     </span>
                   </div>
@@ -533,11 +535,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
-                      class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
+                      class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                   view the alert query
                   <OTooltip :delay="200" side="bottom">
-                    <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                    <template #content>
+                      <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                    </template>
                   </OTooltip>
                 </span>
               </div>
