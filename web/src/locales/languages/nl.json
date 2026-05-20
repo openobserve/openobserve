@@ -3101,7 +3101,10 @@
     "algorithm": "Algoritme",
     "storeType": "Soort winkel",
     "mechanismType": "Soort mechanisme",
-    "actions": "Acties"
+    "actions": "Acties",
+    "providerTypeRequired": "Het type provider is vereist",
+    "algorithmRequired": "Algoritme is vereist",
+    "secretRequired": "Geheim is vereist"
   },
   "quota": {
     "header": "Quota",

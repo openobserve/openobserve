@@ -3090,7 +3090,10 @@
     "algorithm": "Algorithmus",
     "storeType": "Typ speichern",
     "mechanismType": "Art des Mechanismus",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "providerTypeRequired": "Anbietertyp ist erforderlich",
+    "algorithmRequired": "Algorithmus ist erforderlich",
+    "secretRequired": "Geheimnis ist erforderlich"
   },
   "quota": {
     "header": "Kontingente",
