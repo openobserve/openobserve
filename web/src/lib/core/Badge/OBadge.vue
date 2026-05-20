@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { BadgeProps, BadgeEmits, BadgeSlots } from "./OBadge.types";
 import { computed, useSlots } from "vue";
+import OIcon from "../Icon/OIcon.vue";
+import { iconRegistry } from "../Icon/OIcon.icons";
 
 defineOptions({ inheritAttrs: false });
 
@@ -19,6 +21,11 @@ const slots = useSlots();
 
 /** True when the left icon area should render (slot OR icon prop). */
 const hasIcon = computed(() => !!slots.icon || !!props.icon);
+
+/** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
+const isOIcon = computed<boolean>(() =>
+  Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
+);
 
 /** True when the right trailing area should render (slot OR count prop). */
 const hasTrailing = computed(
@@ -147,7 +154,16 @@ function handleKeydown(e: KeyboardEvent): void {
     -->
     <template v-if="hasIcon">
       <slot name="icon">
+        <!-- OIcon registry name (kebab-case SVG icon) -->
+        <OIcon
+          v-if="icon && isOIcon"
+          :name="(icon as any)"
+          size="xs"
+          class="tw:shrink-0"
+        />
+        <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
+          v-else
           class="material-icons-outlined tw:text-[1em] tw:leading-none tw:shrink-0"
           aria-hidden="true"
         >{{ icon }}</span>

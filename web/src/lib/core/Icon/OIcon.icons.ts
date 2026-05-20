@@ -293,6 +293,15 @@ import CallMade from "~icons/material-symbols/call-made";
 import CallReceived from "~icons/material-symbols/call-received";
 import Inbox from "~icons/material-symbols/inbox-outline";
 import StarRate from "~icons/material-symbols/star-rate-outline";
+import CardMembership from "~icons/material-symbols/card-membership-outline";
+import PersonPinCircle from "~icons/material-symbols/person-pin-circle-outline";
+import Domain from "~icons/material-symbols/domain";
+import DataArray from "~icons/material-symbols/data-array";
+import Mouse from "~icons/material-symbols/mouse-outline";
+import Plagiarism from "~icons/material-symbols/plagiarism-outline";
+import Redo from "~icons/material-symbols/redo";
+import Tab from "~icons/material-symbols/tab-outline";
+import Web from "~icons/material-symbols/web";
 
 import type { Component } from "vue";
 
@@ -580,6 +589,15 @@ export const iconRegistry = {
   "call-received": CallReceived,
   "inbox": Inbox,
   "star-rate": StarRate,
+  "card-membership": CardMembership,
+  "person-pin-circle": PersonPinCircle,
+  "domain": Domain,
+  "data-array": DataArray,
+  "mouse": Mouse,
+  "plagiarism": Plagiarism,
+  "redo": Redo,
+  "tab": Tab,
+  "web": Web,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:is-expanded="isExpanded"
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
-          icon="filter_alt"
+          icon="filter-alt"
           class="tw:w-full tw:w-full tw:pl-4 tw:pr-2 tw:py-2"
           :iconClass="'tw:mt-[2px]'"
         />

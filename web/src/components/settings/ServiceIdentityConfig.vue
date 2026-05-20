@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- How it works explanation -->
       <OCollapsible
         v-model="howItWorksOpen"
-        icon="help_outline"
+        icon="help-outline"
         :label="t('settings.correlation.howItWorksTitle')"
         class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="

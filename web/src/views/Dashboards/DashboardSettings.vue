@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTab
               name="variableSettings"
-              icon="data_array"
+              icon="data-array"
               :label="t('dashboard.variableSettings')"
               data-test="dashboard-settings-variable-tab"
             />

@@ -94,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="loading"
               class="tw:mr-2"
             >
-              <OIcon name="search" size="sm" />
               <OTooltip :content="t('common.search') || 'Search'" />
             </OButton>
             <OButton
@@ -105,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
-              <OIcon name="refresh" size="sm" />
               <OTooltip :content="t('common.refresh') || 'Refresh'" />
             </OButton>
           </div>

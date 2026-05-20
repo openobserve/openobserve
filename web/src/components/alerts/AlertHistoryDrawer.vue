@@ -710,17 +710,17 @@ const getStatusChipIcon = (status: string) => {
     case "firing":
     case "error":
     case "anomaly":
-      return "error_outline";
+      return "error-outline";
     case "ok":
     case "success":
     case "normal":
-      return "check_circle_outline";
+      return "check-circle-outline";
     case "skipped":
       return "block";
     case "pending":
       return "schedule";
     default:
-      return "help_outline";
+      return "help-outline";
   }
 };
 

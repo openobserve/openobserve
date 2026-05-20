@@ -505,7 +505,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />
@@ -609,7 +609,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />
@@ -694,7 +694,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />
@@ -767,7 +767,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />
@@ -840,7 +840,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />
@@ -914,7 +914,7 @@ function getIcon(data, ioType) {
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <OIcon
-          :name="getIcon(data, io - type)"
+          :name="getIcon(data, io_type)"
           size="md"
           class="tw:my-2 tw:mr-2"
         />

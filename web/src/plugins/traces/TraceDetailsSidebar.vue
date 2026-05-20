@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cost Chip -->
           <OBadge
             size="sm"
-            icon="attach_money"
+            icon="attach-money"
             class="llm-chip cost-chip"
             title="Total Cost"
           >

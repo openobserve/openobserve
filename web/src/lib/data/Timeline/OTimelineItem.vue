@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { TimelineItemProps, TimelineItemSlots, TimelineItemVariant } from "./OTimelineItem.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 
 const props = withDefaults(defineProps<TimelineItemProps>(), {
   variant: "primary",
@@ -25,6 +27,11 @@ const dotStyle = computed(() => ({
   backgroundColor: dotColorMap[props.variant],
   color: "var(--color-timeline-dot-fg)",
 }));
+
+/** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
+const isOIcon = computed<boolean>(() =>
+  Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
+);
 </script>
 
 <template>
@@ -37,8 +44,13 @@ const dotStyle = computed(() => ({
         :style="dotStyle"
         aria-hidden="true"
       >
+        <OIcon
+          v-if="icon && isOIcon"
+          :name="(icon as any)"
+          size="xs"
+        />
         <span
-          v-if="icon"
+          v-else-if="icon"
           class="material-icons tw:text-[14px] tw:leading-none tw:text-timeline-dot-fg tw:select-none"
         >{{ icon }}</span>
       </div>

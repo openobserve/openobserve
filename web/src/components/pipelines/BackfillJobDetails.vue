@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTimelineItem
                 title="Job Created"
                 :subtitle="formatTimestampFull(job.created_at)"
-                icon="add_circle"
+                icon="add-circle"
               />
               <OTimelineItem
                 v-if="job.deletion_status && job.deletion_status !== 'not_required'"
@@ -167,20 +167,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="job.progress_percent > 20 || (job.deletion_status === 'completed')"
                 title="Backfill Started"
                 :subtitle="getBackfillStartTime"
-                icon="play_arrow"
+                icon="play-arrow"
               />
               <OTimelineItem
                 v-if="job.status === 'running'"
                 :title="`Processing Chunk ${job.chunks_completed || 0}/${job.chunks_total || 'N/A'}`"
                 subtitle="In Progress"
-                icon="hourglass_empty"
+                icon="hourglass-empty"
                 variant="info"
               />
               <OTimelineItem
                 v-if="job.status === 'completed'"
                 title="Job Completed"
                 subtitle="All data processed successfully"
-                icon="check_circle"
+                icon="check-circle"
                 variant="success"
               />
               <OTimelineItem
@@ -406,7 +406,7 @@ const getDeletionTimelineSubtitle = computed(() => {
 const getDeletionTimelineIcon = computed(() => {
   if (!job.value?.deletion_status) return "delete";
 
-  if (job.value.deletion_status === "completed") return "delete_sweep";
+  if (job.value.deletion_status === "completed") return "delete-sweep";
   if (job.value.deletion_status === "in_progress") return "delete";
   if (job.value.deletion_status === "pending") return "schedule";
   return "error";

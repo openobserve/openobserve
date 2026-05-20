@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <!-- Assistant Response -->
                 <OCollapsible
                   v-if="record.gen_ai_output_messages"
-                  icon="smart_toy"
+                  icon="smart-toy"
                   :model-value="true"
                   :label="$t('traces.evaluations.assistantResponse')"
                 >
