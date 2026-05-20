@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div>
-        <div v-if="!createNewStream" class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-3">
+        <div v-if="!createNewStream" class="tw:p-4 tw:flex tw:flex-col tw:gap-3">
           <div data-test="input-node-stream-type-select" class="tw:w-full">
             <OSelect
               v-model="stream_type"
