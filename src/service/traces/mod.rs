@@ -1067,7 +1067,7 @@ async fn write_traces(
         // get service_name
         let service_name = record_val
             .get("service_name")
-            .map(|v| json::get_string_value(v))
+            .map(json::get_string_value)
             .unwrap_or_default();
         // get distinct_value item
         if stream_settings.enable_distinct_fields {

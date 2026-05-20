@@ -225,35 +225,34 @@ pub fn generate_quick_mode_fields(
     }
 
     // include gen AI fields for LLM streams
-    if let Some(settings) = unwrap_stream_settings(schema) {
-        if settings.is_llm_stream {
-            use crate::handler::http::request::traces::schema_compat::{
-                GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-                REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
-            };
+    if let Some(settings) = unwrap_stream_settings(schema)
+        && settings.is_llm_stream
+    {
+        use crate::handler::http::request::traces::schema_compat::{
+            GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
+            REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
+        };
 
-            let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok()
-            {
-                &[
-                    REQUIRED_GEN_AI_FIELDS,
-                    OPTIONAL_GEN_AI_FIELDS,
-                    &["trace_id", "gen_ai_conversation_id", "user_id"],
-                ]
-            } else {
-                &[
-                    REQUIRED_LLM_FIELDS,
-                    OPTIONAL_LLM_FIELDS,
-                    &["trace_id", "llm_session_id", "llm_user_id"],
-                ]
-            };
-            for list in field_lists {
-                for field_name in *list {
-                    if !fields_name.contains(*field_name)
-                        && let Ok(field) = schema.field_with_name(field_name)
-                    {
-                        fields.push(Arc::new(field.clone()));
-                        fields_name.insert(field_name.to_string());
-                    }
+        let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok() {
+            &[
+                REQUIRED_GEN_AI_FIELDS,
+                OPTIONAL_GEN_AI_FIELDS,
+                &["trace_id", "gen_ai_conversation_id", "user_id"],
+            ]
+        } else {
+            &[
+                REQUIRED_LLM_FIELDS,
+                OPTIONAL_LLM_FIELDS,
+                &["trace_id", "llm_session_id", "llm_user_id"],
+            ]
+        };
+        for list in field_lists {
+            for field_name in *list {
+                if !fields_name.contains(*field_name)
+                    && let Ok(field) = schema.field_with_name(field_name)
+                {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(field_name.to_string());
                 }
             }
         }
