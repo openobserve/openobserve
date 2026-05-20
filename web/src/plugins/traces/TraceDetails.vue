@@ -207,6 +207,7 @@ size="xs"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
+              buttonClass="tw:mr-1!"
               size="icon-xs"
             />
 

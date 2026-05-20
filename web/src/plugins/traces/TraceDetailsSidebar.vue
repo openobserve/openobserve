@@ -358,7 +358,7 @@ class="tw:h-full tw:overflow-y-auto">
                   class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Input</div>
-                  <div class="tw:flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -369,11 +369,11 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="sm"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy input"
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
@@ -425,7 +425,7 @@ class="tw:h-full tw:overflow-y-auto">
                   class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Output</div>
-                  <div class="tw:flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -436,11 +436,11 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="sm"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy output"
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
@@ -870,7 +870,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
-import { toggleFullscreen } from "@/utils/dom";
+import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1881,7 +1881,7 @@ export default defineComponent({
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
-        toggleFullscreen(ioContainerRef.value)
+        domToggleFullScreen(ioContainerRef.value)
           .then(() => {
             // Check if this specific element is now fullscreen
             nextTick(() => {
