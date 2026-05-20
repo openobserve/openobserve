@@ -102,23 +102,19 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #bottom>
-      <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md">
-        {{ data.length }} {{ t("iam.roles") }}
-      </div>
-      <div class="tw:flex tw:items-center tw:gap-2">
-        <OButton
-          v-if="(selectedIds?.length ?? 0) > 0"
-          data-test="iam-roles-bulk-delete-btn"
-          variant="outline"
-          size="sm"
-          @click="emit('bulk-delete')"
-        >
-          <template #icon-left>
-            <OIcon name="delete" size="sm" />
-          </template>
-          {{ t("common.delete") }}
-        </OButton>
-      </div>
+      <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ data.length }} {{ t("iam.roles") }}</span>
+      <OButton
+        v-if="(selectedIds?.length ?? 0) > 0"
+        data-test="iam-roles-bulk-delete-btn"
+        variant="outline"
+        size="sm"
+        @click="emit('bulk-delete')"
+      >
+        <template #icon-left>
+          <OIcon name="delete" size="sm" />
+        </template>
+        {{ t("common.delete") }}
+      </OButton>
     </template>
   </OTable>
 </template>

@@ -126,8 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </template>
 
-            <template v-if="selectedAccounts.length > 0" #bottom>
+            <template #bottom>
+              <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
+                v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
                 variant="outline"
                 size="sm"
