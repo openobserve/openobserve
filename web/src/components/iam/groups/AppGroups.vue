@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
         <div
           data-test="iam-groups-section-title"
-          class="q-table__title tw:font-[600]"
+          class="q-table__title tw:font-[600] tw:text-xl"
         >
           {{ t("iam.groups") }}
         </div>

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div
-          class="q-table__title tw:font-[600]"
+          class="q-table__title tw:font-[600] tw:text-xl"
           data-test="user-title-text"
         >
           {{ t("iam.basicUsers") }}
@@ -361,7 +361,7 @@ export default defineComponent({
         size: 120,
         minSize: 80,
         maxSize: 140,
-        meta: { align: "left" },
+        meta: { align: "center" },
       },
     ];
     const userEmail: any = ref("");

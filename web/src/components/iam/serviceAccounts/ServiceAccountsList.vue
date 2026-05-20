@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
 
         <div
-            class="q-table__title tw:w-full tw:font-[600]"
+            class="q-table__title tw:font-[600] tw:text-xl"
             data-test="service-accounts-title-text"
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="tw:w-full tw:flex tw:justify-end tw:gap-3">
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
             <OInput
                 v-model="filterQuery"
                 class="tw:h-[36px] tw:w-[200px]"

@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
-    style="min-height: inherit; height: 100%; overflow: hidden;"
+    style="min-height: inherit; height: calc(100vh - var(--navbar-height) - 14px); overflow: hidden;"
   >
     <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:h-full">
       <div class="card-container tw:mb-[0.625rem]">
         <div class="tw:px-3 tw:py-2">
           <div
-            class="q-table__title tw:w-full tw:pb-2"
+            class="q-table__title tw:w-full tw:pb-2 tw:font-[600] tw:text-xl"
             data-test="user-title-text"
           >
             {{ t("quota.header") }}
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                class="no-border input-width o2-search-input"
+                style="width: 200px"
                 :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                 :placeholder="
                   {
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         :show-global-filter="false"
       >
-        <template #empty />
+        <template #empty><NoData /></template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
           <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
-          <template #empty />
+          <template #empty><NoData /></template>
           <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
@@ -292,20 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <NoOrganizationSelected />
       </div>
-      <div
-        v-else-if="
-          activeTab == 'api-limits' && !loading && !apiLimitsRows.length && !isApiLimitsLoading
-        "
-      >
-        <NoData />
-      </div>
-      <div
-        v-else-if="
-          activeTab == 'role-limits' && !loading && !rolesLimitRows.length && !isRolesLoading
-        "
-      >
-        <NoData />
-      </div>
+
       <div
         class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
         v-if="editTable && activeType == 'table'"
