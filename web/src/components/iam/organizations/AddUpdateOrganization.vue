@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
     :primaryButtonLabel="t('organization.save')"
     :secondaryButtonLabel="t('organization.cancel')"
-    :primaryButtonDisabled="organizationData.name === '' && !proPlanRequired"
+    :primaryButtonDisabled="(!organizationData.name || !isValidOrgName) && !proPlanRequired"
     @click:primary="onSubmit"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model.trim="organizationData.name"
             :label="t('organization.name') + '*'"
             class="showLabelOnTop tw:mt-2"
-            :error="!!nameError"
-            :error-message="nameError"
-            @update:model-value="nameError = ''"
+            :error="showNameError"
+            :error-message="nameErrorMessage"
+            @update:model-value="showNameError = false"
             data-test="org-name"
             maxlength="100"
           />
@@ -100,7 +100,7 @@ export default defineComponent({
   },
   data() {
     return {
-      nameError: '' as string,
+      showNameError: false as boolean,
       proPlanRequired: false,
       proPlanMsg: "",
       newOrgIdentifier: "",
@@ -122,6 +122,12 @@ export default defineComponent({
       const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
       return orgNameRegex.test(organizationData.value.name);
     });
+
+    const nameErrorMessage = computed(() =>
+      !organizationData.value.name
+        ? t('organization.nameRequired')
+        : `Use alphanumeric characters, space and underscore only.`
+    );
 
     watch(
       () => props.modelValue,
@@ -154,6 +160,7 @@ export default defineComponent({
       isValidIdentifier,
       track,
       isValidOrgName,
+      nameErrorMessage,
     };
   },
 
@@ -172,15 +179,11 @@ export default defineComponent({
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
-      if (!this.organizationData.name) {
-        this.nameError = this.t('organization.nameRequired');
+      if (!this.organizationData.name || !this.isValidOrgName) {
+        this.showNameError = true;
         return;
       }
-      if (!this.isValidOrgName) {
-        this.nameError = 'Use alphanumeric characters, space and underscore only.';
-        return;
-      }
-      this.nameError = '';
+      this.showNameError = false;
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",

@@ -50,6 +50,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
 
 ### Direct `OIcon name="..."` usage:
 - [x] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
+- [ ] **`web/src/lib/core/Table/sub-components/OTableBodyCell.vue:279`** — `<OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />` — `content_copy` not in registry — `css_class_level_audit.md`
   **Solution:**
   ```diff
   - <OIcon :name="copied ? 'check' : 'content_copy'" size="xs" />

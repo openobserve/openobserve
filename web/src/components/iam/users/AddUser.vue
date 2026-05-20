@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop"
               data-test="user-password-field"
             >
-              <template v-slot:append>
+              <template #icon-right>
                 <OIcon
                   :name="isPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="tw:cursor-pointer"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop tw:mt-2"
               data-test="user-old-passoword-field"
             >
-              <template v-slot:append>
+              <template #icon-right>
                 <OIcon
                   :name="isOldPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="tw:cursor-pointer"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop tw:mt-2"
               data-test="user-new-password-field"
             >
-              <template v-slot:append>
+              <template #icon-right>
                 <OIcon
                   :name="isNewPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="tw:cursor-pointer"

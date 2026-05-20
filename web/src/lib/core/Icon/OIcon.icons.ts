@@ -251,6 +251,7 @@ import TaskAltIcon from "~icons/material-symbols/task-alt";
 import TextFieldsIcon from "~icons/material-symbols/text-fields";
 import ThumbDownOffAltIcon from "~icons/material-symbols/thumb-down-outline";
 import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
+import PersonPinCircleIcon from "~icons/material-symbols/person-pin-circle-outline";
 import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
@@ -576,6 +577,9 @@ export const iconRegistry = {
   "text-fields": TextFieldsIcon,
   "thumb-down-off-alt": ThumbDownOffAltIcon,
   "thumb-up-off-alt": ThumbUpOffAltIcon,
+  // "location-on": LocationOnIcon,
+  "person-pin-circle": PersonPinCircleIcon,
+  // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
   "troubleshoot": TroubleshootIcon,
