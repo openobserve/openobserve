@@ -92,7 +92,7 @@ watch(
         'tw:focus-visible:ring-2 tw:focus-visible:ring-collapsible-trigger-focus-ring tw:focus-visible:ring-offset-1',
         variant === 'sidebar'
           ? 'tw:px-3 tw:py-0 tw:min-h-[36px] tw:rounded-none'
-          : 'tw:px-4 tw:py-2 tw:rounded-md',
+          : 'tw:px-2 tw:py-2 tw:rounded-md',
       ]"
     >
       <!-- Sidebar: left-side chevron (always before slot or label) -->
