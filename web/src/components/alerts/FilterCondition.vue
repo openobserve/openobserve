@@ -1,5 +1,5 @@
 <template>
-    <div class="condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
+    <div class="filter-condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
       <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
@@ -43,6 +43,7 @@
             :searchDebounce="400"
             labelKey="label"
             valueKey="value"
+            width="xs"
             :placeholder="t('alerts.column')"
             :creatable="props.allowCustomColumns"
             :class="[inputWidth ? inputWidth : '']"
@@ -64,6 +65,7 @@
             :dropdownStyle="{ textTransform: 'capitalize' }"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
             :error="!!operatorError"
+            :searchable="'false'"
             :error-message="operatorError"
             @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateOperator"
@@ -77,9 +79,9 @@
           <OInput
             v-model="condition.value"
             :placeholder="t('common.value')"
-            :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             :error="!!valueError"
             :error-message="valueError"
+            :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateValue"
           />
@@ -142,7 +144,7 @@
     },
     });
 
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -159,7 +161,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 ]);
 const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
 
-const filteredFields = ref(props.streamFields);
+const filteredFields = ref<any[]>(props.streamFields as any[]);
+
+watch(
+  () => props.streamFields,
+  (newFields) => {
+    filteredFields.value = newFields as any[];
+  },
+);
 
 const store = useStore();
 
@@ -256,7 +265,7 @@ const filterColumns = (val: string) => {
   background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
 }
 
-.condition-row:has(.q-field--error) {
+.filter-condition-row:has(.q-field--error) {
   padding-bottom: 20px;
 }
 </style>

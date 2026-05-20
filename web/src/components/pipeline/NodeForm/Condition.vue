@@ -58,50 +58,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
-          <OCard class="note-container">
-            <OCardSection class="tw:p-2">
-              <div class="note-heading">Condition value Guidelines:</div>
-              <OBanner variant="warning" dense>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
-                  <span
-                    >To check for an empty value, use
-                    <span class="highlight">""</span>. Example:
-                    <span class="code">app_name != ""</span>
-                  </span>
-                </div>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
-                  <span
-                    >To check for an Null value, use
-                    <span class="highlight">null</span>. Example:
-                    <span class="code">app_name != null</span>
-                  </span>
-                </div>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="info" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-amber-500" />
-                  <span
-                    >To add a custom column, type column name and press
-                    <span class="highlight">Enter</span>.</span
-                  >
-                </div>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="warning" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-red-500" />
-                  <span
-                    >If conditions are not met, the record will be
-                    dropped.</span
-                  >
-                </div>
-                <div class="tw:flex tw:items-start">
-                  <OIcon name="warning" size="sm" class="tw:mr-2 tw:shrink-0 tw:text-red-500" />
-                  <span
-                    >If the record does not have the specified field, it will be
-                    dropped.</span
-                  >
-                </div>
-              </OBanner>
-            </OCardSection>
-          </OCard>
+          <div class="note-container tw:rounded-md tw:p-3 tw:mt-3 tw:flex tw:flex-col tw:gap-2">
+            <div class="tw:text-sm tw:text-gray-800">
+              Condition value Guidelines:
+            </div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To check for an empty value, use
+                  <span class="highlight">""</span>. Example:
+                  <span class="code">app_name != ""</span>
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To check for an Null value, use
+                  <span class="highlight">null</span>. Example:
+                  <span class="code">app_name != null</span>
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To add a custom column, type column name and press
+                  <span class="highlight">Enter</span>.
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+                <span>If conditions are not met, the record will be dropped.</span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+                <span>If the record does not have the specified field, it will be dropped.</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="tw:flex tw:gap-2">
@@ -159,10 +153,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -791,35 +782,22 @@ const validateSqlQuery = () => {
 }
 
 .note-container {
-  background-color: var(--color-note-bg);
-  border-radius: 4px;
-  border: 1px solid var(--color-note-border);
-  color: var(--color-note-text);
-  font-weight: normal !important;
+  background-color: #f9f290;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
-  margin-top: 10px;
 }
 
 .note-container .highlight {
   font-weight: bold;
-  color: var(--color-note-highlight);
-}
-
-.note-container .emphasis {
-  font-style: italic;
-  color: var(--color-note-emphasis);
+  color: #007bff;
 }
 
 .note-container .code {
   font-family: monospace;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 3px;
-  color: var(--color-note-code);
-}
-
-.note-heading {
-  font-size: medium;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #b30059;
 }
 
 
@@ -870,12 +848,6 @@ const validateSqlQuery = () => {
   max-width: calc(100% - 20px);
 }
 
-/* Ensure buttons are clickable and prevent form submission */
-.pipeline-filter-group-wrapper :deep(.q-btn) {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 1;
-}
 
 /* Prevent FilterGroup buttons from triggering form submit */
 .pipeline-filter-group-wrapper :deep(.q-btn:not([type="submit"])) {
