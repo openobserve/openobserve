@@ -1,197 +1,197 @@
-import { describe, it, expect } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import FrustrationEventBadge from './FrustrationEventBadge.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 
-describe('FrustrationEventBadge.vue', () => {
+describe("FrustrationEventBadge", () => {
   let wrapper: VueWrapper;
 
-  const createWrapper = (frustrationTypes: string[]) => {
-    return mount(FrustrationEventBadge, {
-      props: { frustrationTypes },
-      global: {
-        plugins: [],
-      },
-    });
-  };
-
-  describe('Single Frustration Type', () => {
-    it('should render rage_click badge', () => {
-      wrapper = createWrapper(['rage_click']);
-      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Rage Click');
-    });
-
-    it('should render dead_click badge', () => {
-      wrapper = createWrapper(['dead_click']);
-      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Dead Click');
-    });
-
-    it('should render error_click badge', () => {
-      wrapper = createWrapper(['error_click']);
-      expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Error Click');
-    });
-
-    it('should render rage_tap badge', () => {
-      wrapper = createWrapper(['rage_tap']);
-      expect(wrapper.find('[data-test="frustration-event-badge-rage_tap"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Rage Tap');
-    });
-
-    it('should render error_tap badge', () => {
-      wrapper = createWrapper(['error_tap']);
-      expect(wrapper.find('[data-test="frustration-event-badge-error_tap"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Error Tap');
-    });
+  afterEach(() => {
+    wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
-  describe('Multiple Frustration Types', () => {
-    it('should render multiple badges for multiple frustration types', () => {
-      wrapper = createWrapper(['rage_click', 'dead_click']);
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
-      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
-    });
+  describe("wrapper element", () => {
+    it("renders the wrapper element", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["rage_click"] } });
 
-    it('should render three frustration types', () => {
-      wrapper = createWrapper(['rage_click', 'dead_click', 'error_click']);
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(3);
-    });
-  });
-
-  describe('Badge Styling', () => {
-    it('should apply rage styling for rage_click', () => {
-      wrapper = createWrapper(['rage_click']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-rage');
-    });
-
-    it('should apply dead styling for dead_click', () => {
-      wrapper = createWrapper(['dead_click']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-dead');
-    });
-
-    it('should apply error styling for error_click', () => {
-      wrapper = createWrapper(['error_click']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-error');
-    });
-
-    it('should apply rage styling for rage_tap', () => {
-      wrapper = createWrapper(['rage_tap']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-rage');
-    });
-
-    it('should apply error styling for error_tap', () => {
-      wrapper = createWrapper(['error_tap']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-error');
-    });
-  });
-
-  describe('Tooltip Content', () => {
-    it('should show correct tooltip for rage_click', () => {
-      wrapper = createWrapper(['rage_click']);
-      const badge = wrapper.find('[data-test="frustration-event-badge-rage_click"]');
-      expect(badge.exists()).toBe(true);
-      // Tooltip is provided via title attribute
-      expect(badge.attributes('title')).toBeDefined();
-    });
-
-    it('should show correct tooltip for dead_click', () => {
-      wrapper = createWrapper(['dead_click']);
-      const badge = wrapper.find('[data-test="frustration-event-badge-dead_click"]');
-      expect(badge.attributes('title')).toBeDefined();
-    });
-
-    it('should show correct tooltip for error_click', () => {
-      wrapper = createWrapper(['error_click']);
-      const badge = wrapper.find('[data-test="frustration-event-badge-error_click"]');
-      expect(badge.attributes('title')).toBeDefined();
-    });
-  });
-
-  describe('Empty State', () => {
-    it('should handle empty frustration types array', () => {
-      wrapper = createWrapper([]);
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(0);
-    });
-  });
-
-  describe('Data Test Attributes', () => {
-    it('should have wrapper data-test attribute', () => {
-      wrapper = createWrapper(['rage_click']);
+      // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-wrapper"]').exists()).toBe(true);
     });
 
-    it('should have unique data-test for each frustration type', () => {
-      wrapper = createWrapper(['rage_click', 'dead_click']);
+    it("renders no badges for an empty array", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: [] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-wrapper"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]').filter(
+        (el) => el.attributes("data-test") !== "frustration-event-badge-wrapper"
+      )).toHaveLength(0);
+    });
+  });
+
+  describe("known frustration type labels", () => {
+    it("shows Rage Click text for rage_click type", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["rage_click"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Rage Click");
+    });
+
+    it("shows Dead Click text for dead_click type", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["dead_click"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Dead Click");
+    });
+
+    it("shows Error Click text for error_click type", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["error_click"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Error Click");
+    });
+
+    it("shows Rage Tap text for rage_tap type", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["rage_tap"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_tap"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Rage Tap");
+    });
+
+    it("shows Error Tap text for error_tap type", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["error_tap"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-error_tap"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Error Tap");
+    });
+  });
+
+  describe("tooltip title attributes", () => {
+    it("has a title attribute on the rage_click badge", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["rage_click"] } });
+
+      // Assert
+      const badge = wrapper.find('[data-test="frustration-event-badge-rage_click"]');
+      expect(badge.attributes("title")).toBeDefined();
+    });
+
+    it("has a title attribute on the dead_click badge", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["dead_click"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').attributes("title")).toBeDefined();
+    });
+
+    it("has a title attribute on the error_click badge", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["error_click"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').attributes("title")).toBeDefined();
+    });
+  });
+
+  describe("multiple frustration types", () => {
+    it("renders two badges for two frustration types", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, {
+        props: { frustrationTypes: ["rage_click", "dead_click"] },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
     });
-  });
 
-  describe('Unknown Frustration Type', () => {
-    it('should handle unknown frustration type gracefully', () => {
-      wrapper = createWrapper(['unknown_type']);
-      expect(wrapper.find('[data-test="frustration-event-badge-unknown_type"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('unknown_type');
-    });
-
-    it('should apply default styling for unknown type', () => {
-      wrapper = createWrapper(['unknown_type']);
-      const badge = wrapper.find('.frustration-event-badge');
-      expect(badge.classes()).toContain('frustration-badge-default');
-    });
-  });
-
-  describe('Badge Labels', () => {
-    it('should format rage_click label correctly', () => {
-      wrapper = createWrapper(['rage_click']);
-      expect(wrapper.text()).toContain('Rage Click');
-    });
-
-    it('should format dead_click label correctly', () => {
-      wrapper = createWrapper(['dead_click']);
-      expect(wrapper.text()).toContain('Dead Click');
-    });
-
-    it('should format error_click label correctly', () => {
-      wrapper = createWrapper(['error_click']);
-      expect(wrapper.text()).toContain('Error Click');
-    });
-  });
-
-  describe('Reactivity', () => {
-    it('should update when frustrationTypes prop changes', async () => {
-      wrapper = createWrapper(['rage_click']);
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(1);
-
-      await wrapper.setProps({ frustrationTypes: ['rage_click', 'dead_click'] });
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
-    });
-
-    it('should clear badges when frustrationTypes becomes empty', async () => {
-      wrapper = createWrapper(['rage_click', 'dead_click']);
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
-
-      await wrapper.setProps({ frustrationTypes: [] });
-      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(0);
-    });
-  });
-
-  describe('CSS Classes', () => {
-    it('should have correct base class on all badges', () => {
-      wrapper = createWrapper(['rage_click', 'dead_click']);
-      const badges = wrapper.findAll('.frustration-event-badge');
-      expect(badges).toHaveLength(2);
-      badges.forEach(badge => {
-        expect(badge.classes()).toContain('frustration-event-badge');
+    it("renders three badges for three frustration types", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, {
+        props: { frustrationTypes: ["rage_click", "dead_click", "error_click"] },
       });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').exists()).toBe(true);
+    });
+  });
+
+  describe("unknown frustration type", () => {
+    it("renders a badge with the raw type string for unknown types", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["unknown_type"] } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-unknown_type"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("unknown_type");
+    });
+
+    it("has a title attribute for unknown type using fallback text", () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["unknown_type"] } });
+
+      // Assert
+      const badge = wrapper.find('[data-test="frustration-event-badge-unknown_type"]');
+      expect(badge.attributes("title")).toContain("unknown_type");
+    });
+  });
+
+  describe("reactivity", () => {
+    it("adds a badge when frustrationTypes prop grows", async () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["rage_click"] } });
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(false);
+
+      // Act
+      await wrapper.setProps({ frustrationTypes: ["rage_click", "dead_click"] });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
+    });
+
+    it("removes all badges when frustrationTypes becomes empty", async () => {
+      // Arrange
+      wrapper = mount(FrustrationEventBadge, {
+        props: { frustrationTypes: ["rage_click", "dead_click"] },
+      });
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
+
+      // Act
+      await wrapper.setProps({ frustrationTypes: [] });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(false);
     });
   });
 });

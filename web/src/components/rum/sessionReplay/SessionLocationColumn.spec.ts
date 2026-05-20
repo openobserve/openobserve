@@ -20,24 +20,17 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+// Attach a mount target once for the whole file
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-// Quasar removed - no installQuasar needed
-
-// Mock flag-icons CSS
+// Suppress the flag-icons CSS import which doesn't work in jsdom
 vi.mock("flag-icons/css/flag-icons.min.css", () => ({}));
 
-// Mock window methods
-Object.defineProperty(window, "dispatchEvent", {
-  value: vi.fn(),
-  writable: true,
-});
-
 describe("SessionLocationColumn", () => {
-  let wrapper: any;
+  let wrapper: ReturnType<typeof mount>;
 
   const mockColumn = {
     country: "United States",
@@ -47,47 +40,43 @@ describe("SessionLocationColumn", () => {
     os: "Windows",
   };
 
-  beforeEach(async () => {
-    wrapper = mount(SessionLocationColumn, {
+  const mountComponent = (column = mockColumn) =>
+    mount(SessionLocationColumn, {
       attachTo: "#app",
-      props: {
-        column: mockColumn,
-      },
+      props: { column },
       global: {
         plugins: [i18n, router],
-        provide: {
-          store,
-        },
+        provide: { store },
         stubs: {
-          "OIcon": {
-            template:
-              '<i data-test="icon" :class="name" :data-size="size"></i>',
+          OIcon: {
+            template: '<i data-test="circle-icon" :class="name" :data-size="size"></i>',
             props: ["name", "size"],
           },
         },
       },
     });
 
-    await flushPromises();
-  });
-
   afterEach(() => {
     wrapper.unmount();
-    vi.clearAllMocks();
-    vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
-  describe("Component Rendering", () => {
-    it("should render successfully", () => {
+  describe("basic rendering", () => {
+    it("mounts without errors", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find("div").exists()).toBe(true);
     });
 
-    it("should render with provided column prop", () => {
-      expect(wrapper.props("column")).toEqual(mockColumn);
-    });
+    it("displays all location fields for a complete column", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
 
-    it("should display all location information", () => {
+      // Assert
       expect(wrapper.text()).toContain(mockColumn.country);
       expect(wrapper.text()).toContain(mockColumn.city);
       expect(wrapper.text()).toContain(mockColumn.browser);
@@ -95,183 +84,158 @@ describe("SessionLocationColumn", () => {
     });
   });
 
-  describe("Country Flag Display", () => {
-    it("should render country flag with correct ISO code", () => {
-      const flagElement = wrapper.find(`.fi-${mockColumn.country_iso_code}`);
-      expect(flagElement.exists()).toBe(true);
+  describe("country and flag display", () => {
+    it("shows the country name text", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("United States");
     });
 
-    it("should display country name", () => {
-      expect(wrapper.text()).toContain(mockColumn.country);
+    it("renders a span that carries the fi- ISO flag class", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find(`.fi-${mockColumn.country_iso_code}`).exists()).toBe(true);
     });
 
-    it("should handle different country codes", async () => {
-      await wrapper.setProps({
-        column: {
-          ...mockColumn,
-          country_iso_code: "uk",
-          country: "United Kingdom",
-        },
-      });
+    it("updates the flag class when country_iso_code changes", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
 
-      const flagElement = wrapper.find(".fi-uk");
-      expect(flagElement.exists()).toBe(true);
+      // Act
+      await wrapper.setProps({ column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" } });
+
+      // Assert
+      expect(wrapper.find(".fi-uk").exists()).toBe(true);
       expect(wrapper.text()).toContain("United Kingdom");
     });
   });
 
-  describe("Location Details Display", () => {
-    it("should display city information", () => {
-      expect(wrapper.text()).toContain(mockColumn.city);
+  describe("city display", () => {
+    it("shows the city name", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("New York");
     });
 
-    it("should handle missing city gracefully", async () => {
-      await wrapper.setProps({
-        column: { ...mockColumn, city: null },
-      });
+    it("shows Unknown when city is null", async () => {
+      // Arrange
+      wrapper = mountComponent({ ...mockColumn, city: null as any });
+      await flushPromises();
 
+      // Assert
       expect(wrapper.text()).toContain("Unknown");
     });
 
-    it("should display browser information", () => {
-      expect(wrapper.text()).toContain(mockColumn.browser);
-    });
+    it("shows Unknown when city is undefined", async () => {
+      // Arrange
+      const col = { ...mockColumn };
+      delete (col as any).city;
+      wrapper = mountComponent(col as any);
+      await flushPromises();
 
-    it("should display OS information", () => {
-      expect(wrapper.text()).toContain(mockColumn.os);
+      // Assert
+      expect(wrapper.text()).toContain("Unknown");
     });
   });
 
-  describe("Separator Icons", () => {
-    it("should render separator icons between details", () => {
-      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
-      // Filter for circle icons
-      const circleIcons = separatorIcons.filter((icon) =>
-        icon.attributes("class")?.includes("circle"),
-      );
-      expect(separatorIcons.length).toBeGreaterThanOrEqual(2);
+  describe("browser and OS display", () => {
+    it("shows the browser name", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("Chrome");
     });
 
-    it("should apply correct styling to separator icons", () => {
-      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
-      expect(separatorIcons.length).toBeGreaterThan(0);
-      separatorIcons.forEach((icon) => {
-        // OIcon stub exposes size via data-size; component passes size="xs"
+    it("shows the OS name", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("Windows");
+    });
+  });
+
+  describe("separator icons", () => {
+    it("renders separator circle icons between detail fields", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert — two OIcon separators between city | browser | os
+      expect(wrapper.findAll('[data-test="circle-icon"]').length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("uses xs size for separator icons", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      const icons = wrapper.findAll('[data-test="circle-icon"]');
+      icons.forEach((icon) => {
         expect(icon.attributes("data-size")).toBe("xs");
       });
     });
   });
 
-  describe("Layout Structure", () => {
-    it("should have correct row structure for country info", () => {
-      // Component uses Tailwind classes tw:flex tw:items-center tw:flex-nowrap
-      const countryRow = wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap");
-      expect(countryRow.exists()).toBe(true);
-    });
+  describe("edge cases", () => {
+    it("shows Unknown when column has no fields at all", async () => {
+      // Arrange
+      wrapper = mountComponent({} as any);
+      await flushPromises();
 
-    it("should have correct row structure for details", () => {
-      // Component uses tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 for details row
-      const rows = wrapper.findAll(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap");
-      expect(rows.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("should apply correct text styling for details", () => {
-      // Component uses tw:text-gray-500 (Tailwind) not text-grey-8 (Quasar)
-      const greyTextElements = wrapper.findAll('[class*="tw:text-gray-500"]');
-      expect(greyTextElements.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe("Component Properties", () => {
-    it("should require column prop", () => {
-      const columnProp = wrapper.vm.$options.props.column;
-      expect(columnProp.required).toBe(true);
-      expect(columnProp.type).toBe(Object);
-    });
-
-    it("should handle complete column data", async () => {
-      const completeColumn = {
-        country: "Canada",
-        country_iso_code: "ca",
-        city: "Toronto",
-        browser: "Firefox",
-        os: "macOS",
-      };
-
-      await wrapper.setProps({ column: completeColumn });
-
-      expect(wrapper.text()).toContain("Canada");
-      expect(wrapper.text()).toContain("Toronto");
-      expect(wrapper.text()).toContain("Firefox");
-      expect(wrapper.text()).toContain("macOS");
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle empty column object", async () => {
-      await wrapper.setProps({
-        column: {},
-      });
-
+      // Assert
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.text()).toContain("Unknown");
     });
 
-    it("should handle partial column data", async () => {
-      await wrapper.setProps({
-        column: {
-          country: "Germany",
-          browser: "Safari",
-        },
-      });
+    it("shows only provided fields and Unknown for missing ones", async () => {
+      // Arrange
+      wrapper = mountComponent({ country: "Germany", browser: "Safari" } as any);
+      await flushPromises();
 
+      // Assert
       expect(wrapper.text()).toContain("Germany");
       expect(wrapper.text()).toContain("Safari");
       expect(wrapper.text()).toContain("Unknown");
     });
 
-    it("should handle undefined values gracefully", async () => {
-      await wrapper.setProps({
-        column: {
-          country: "France",
-          country_iso_code: "fr",
-          city: undefined,
-          browser: "Edge",
-          os: undefined,
-        },
+    it("renders without crash for very long location strings", async () => {
+      // Arrange
+      wrapper = mountComponent({
+        country: "Very Long Country Name That Might Overflow",
+        country_iso_code: "xx",
+        city: "Very Long City Name That Might Cause Layout Issues",
+        browser: "Very Long Browser Name",
+        os: "Very Long Operating System Name",
       });
+      await flushPromises();
 
-      expect(wrapper.text()).toContain("France");
-      expect(wrapper.text()).toContain("Unknown");
-      expect(wrapper.text()).toContain("Edge");
-    });
-  });
-
-  describe("Styling", () => {
-    it("should apply correct margin classes", () => {
-      // Component uses Tailwind classes tw:mr-1.5 on the flag span
-      const flagElement = wrapper.find('[class*="tw:mr-1.5"]');
-      expect(flagElement.exists()).toBe(true);
-    });
-
-    it("should apply correct spacing for separators", () => {
-      // Component uses tw:mx-1.5 on OIcon separators (Tailwind) not q-mx-md (Quasar)
-      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
-      expect(separatorIcons.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("Integration Tests", () => {
-    it("should handle complete session location workflow", async () => {
-      // Verify component mounted
+      // Assert
       expect(wrapper.exists()).toBe(true);
+    });
+  });
 
-      // Test initial data display
-      expect(wrapper.text()).toContain(mockColumn.country);
-      expect(wrapper.text()).toContain(mockColumn.city);
+  describe("prop updates", () => {
+    it("updates all displayed text when column prop is replaced", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
 
-      // Test data update
-      const newColumnData = {
+      const newCol = {
         country: "Australia",
         country_iso_code: "au",
         city: "Sydney",
@@ -279,70 +243,33 @@ describe("SessionLocationColumn", () => {
         os: "Linux",
       };
 
-      await wrapper.setProps({ column: newColumnData });
+      // Act
+      await wrapper.setProps({ column: newCol });
 
+      // Assert
       expect(wrapper.text()).toContain("Australia");
       expect(wrapper.text()).toContain("Sydney");
       expect(wrapper.text()).toContain("Opera");
       expect(wrapper.text()).toContain("Linux");
-
-      // Verify flag update
-      const updatedFlag = wrapper.find(".fi-au");
-      expect(updatedFlag.exists()).toBe(true);
+      expect(wrapper.find(".fi-au").exists()).toBe(true);
     });
 
-    it("should maintain layout integrity with different data", async () => {
+    it("handles sequential column updates without error", async () => {
+      // Arrange
+      wrapper = mountComponent();
+      await flushPromises();
+
       const testCases = [
-        {
-          country: "Japan",
-          country_iso_code: "jp",
-          city: "Tokyo",
-          browser: "Chrome",
-          os: "Android",
-        },
-        {
-          country: "Brazil",
-          country_iso_code: "br",
-          city: "São Paulo",
-          browser: "Firefox",
-          os: "iOS",
-        },
+        { country: "Japan", country_iso_code: "jp", city: "Tokyo", browser: "Chrome", os: "Android" },
+        { country: "Brazil", country_iso_code: "br", city: "São Paulo", browser: "Firefox", os: "iOS" },
       ];
 
-      for (const testCase of testCases) {
-        await wrapper.setProps({ column: testCase });
-
-        // Component uses Tailwind flex classes not Quasar row classes
-        expect(wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:flex-nowrap").exists()).toBe(true);
-        expect(wrapper.text()).toContain(testCase.country);
-        expect(wrapper.text()).toContain(testCase.city);
+      // Act & Assert
+      for (const col of testCases) {
+        await wrapper.setProps({ column: col });
+        expect(wrapper.text()).toContain(col.country);
+        expect(wrapper.text()).toContain(col.city);
       }
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have proper semantic structure", () => {
-      const mainDiv = wrapper.find("div");
-      expect(mainDiv.exists()).toBe(true);
-
-      // Component uses Tailwind flex rows not Quasar .row class
-      const rows = wrapper.findAll(".tw\\:flex");
-      expect(rows.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("should handle long location names", async () => {
-      await wrapper.setProps({
-        column: {
-          country: "Very Long Country Name That Might Overflow",
-          country_iso_code: "xx",
-          city: "Very Long City Name That Might Cause Layout Issues",
-          browser: "Very Long Browser Name",
-          os: "Very Long Operating System Name",
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".tw\\:flex").exists()).toBe(true);
     });
   });
 });

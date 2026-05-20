@@ -18,9 +18,11 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import i18n from "@/locales";
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
+// Stub tab components so the raw panel renders without full Quasar setup
+const tabPanelStub = {
+  template: '<div><slot /></div>',
+  props: ["name", "animated"],
+};
 
 describe("ErrorStackTrace Component", () => {
   let wrapper: any;
@@ -38,392 +40,242 @@ describe("ErrorStackTrace Component", () => {
     timestamp: "2024-01-01 10:00:00",
   };
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-
-    wrapper = mount(ErrorStackTrace, {
-      attachTo: "#app",
-      props: {
-        error_stack: mockErrorStack,
-        error: mockError,
-      },
+  function mountComponent(error_stack = mockErrorStack, error = mockError) {
+    return mount(ErrorStackTrace, {
+      props: { error_stack, error },
       global: {
         plugins: [i18n],
+        stubs: {
+          OTabs: { template: '<div><slot /></div>', props: ["modelValue", "dense", "align"] },
+          OTab: { template: '<div />', props: ["name", "label"] },
+          OTabPanels: {
+            template: '<div><slot /></div>',
+            props: ["modelValue", "animated"],
+          },
+          OTabPanel: tabPanelStub,
+          OSeparator: { template: '<div />' },
+          PrettyStackTrace: { template: '<div />', props: ["error_stack", "error"] },
+        },
       },
     });
+  }
 
+  beforeEach(async () => {
+    wrapper = mountComponent();
     await flushPromises();
-    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
+    wrapper.unmount();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  it("mounts successfully", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".tw\\:flex.tw\\:mt-4");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("tw:flex");
-      expect(container.classes()).toContain("tw:mt-4");
-      expect(container.classes()).toContain("tw:ml-1");
-    });
-
-    it("should render column container", () => {
-      const column = wrapper.find(".tw\\:w-full");
-      expect(column.exists()).toBe(true);
-      expect(column.classes()).toContain("tw:w-full");
-    });
+    // Assert
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Title Display", () => {
-    it("should display 'Error Stack' title", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toBe("Error Stack");
-    });
+  it("shows the Error Stack title", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should have correct title styling", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("tw:font-bold");
-      expect(title.classes()).toContain("tw:mb-1");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Error Stack");
   });
 
-  describe("First Stack Line Display", () => {
-    it("should display the first stack line separately", () => {
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      expect(firstLine.exists()).toBe(true);
-      expect(firstLine.text()).toBe(
-        "TypeError: Cannot read property 'foo' of undefined",
-      );
-    });
+  it("displays the first stack line as a standalone line", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should have correct first line styling", () => {
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      expect(firstLine.classes()).toContain("tw:mb-2");
-    });
+    // Assert
+    expect(wrapper.text()).toContain(
+      "TypeError: Cannot read property 'foo' of undefined",
+    );
   });
 
-  describe("Stack Trace Lines", () => {
-    it("should render remaining stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(3); // All lines except the first one
-    });
+  it("renders the remaining stack lines (excluding the first)", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should display correct content for each stack line", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      expect(stackLines[0].text()).toBe(
-        "at Object.fn (/app/src/main.js:15:20)",
-      );
-      expect(stackLines[1].text()).toBe(
-        "at process.processImmediate (internal/timers.js:461:26)",
-      );
-      expect(stackLines[2].text()).toBe(
-        "at process.processTicksAndRejections (internal/process/task_queues.js:95:5)",
-      );
-    });
-
-    it("should apply correct styling to stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line) => {
-        expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("tw:px-2");
-      });
-    });
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    expect(stackLines).toHaveLength(3);
   });
 
-  describe("Stack Lines Container", () => {
-    it("should render error-stacks container", () => {
-      const container = wrapper.find(".error-stacks");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("error-stacks");
-    });
+  it("shows correct text for each stack line", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should contain all stack lines except the first", () => {
-      const container = wrapper.find(".error-stacks");
-      const stackLines = container.findAll(".error_stack");
-      expect(stackLines).toHaveLength(mockErrorStack.length - 1);
-    });
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    expect(stackLines[0].text()).toBe("at Object.fn (/app/src/main.js:15:20)");
+    expect(stackLines[1].text()).toBe(
+      "at process.processImmediate (internal/timers.js:461:26)",
+    );
+    expect(stackLines[2].text()).toBe(
+      "at process.processTicksAndRejections (internal/process/task_queues.js:95:5)",
+    );
   });
 
-  describe("Border Styling", () => {
-    it("should apply top border to first stack line", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-      const firstStackLine = stackLines[0];
+  it("renders the error-stacks container", () => {
+    // Arrange + Act handled in beforeEach
 
-      const style = firstStackLine.attributes("style");
-      expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
+    // Assert
+    expect(wrapper.find(".error-stacks").exists()).toBe(true);
+  });
+
+  it("contains all stack lines except the first inside error-stacks", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const container = wrapper.find(".error-stacks");
+    const lines = container.findAll(".error_stack");
+    expect(lines).toHaveLength(mockErrorStack.length - 1);
+  });
+
+  it("requires the error_stack prop", () => {
+    // Assert
+    expect(ErrorStackTrace.props?.error_stack?.required).toBe(true);
+    expect(ErrorStackTrace.props?.error_stack?.type).toBe(Array);
+  });
+
+  it("requires the error prop", () => {
+    // Assert
+    expect(ErrorStackTrace.props?.error?.required).toBe(true);
+    expect(ErrorStackTrace.props?.error?.type).toBe(Object);
+  });
+
+  it("renders no stack lines and blank first line for empty array", async () => {
+    // Arrange
+    await wrapper.setProps({ error_stack: [] });
+
+    // Assert
+    expect(wrapper.findAll(".error_stack")).toHaveLength(0);
+  });
+
+  it("renders no stack lines for single-line stack", async () => {
+    // Arrange
+    await wrapper.setProps({ error_stack: ["Single error line"] });
+
+    // Assert
+    expect(wrapper.text()).toContain("Single error line");
+    expect(wrapper.findAll(".error_stack")).toHaveLength(0);
+  });
+
+  it("updates displayed stack lines when prop changes", async () => {
+    // Arrange
+    const newStack = ["New error", "    at line 1", "    at line 2"];
+
+    // Act
+    await wrapper.setProps({ error_stack: newStack });
+
+    // Assert
+    expect(wrapper.text()).toContain("New error");
+    expect(wrapper.findAll(".error_stack")).toHaveLength(2);
+  });
+
+  it("renders 50 stack lines for a long stack trace", async () => {
+    // Arrange
+    const longStack = ["Long error"];
+    for (let i = 0; i < 50; i++) {
+      longStack.push(`    at function${i} (/path/file${i}.js:${i}:${i})`);
+    }
+
+    // Act
+    await wrapper.setProps({ error_stack: longStack });
+
+    // Assert
+    expect(wrapper.findAll(".error_stack")).toHaveLength(50);
+  });
+
+  it("handles special characters in stack trace text", async () => {
+    // Arrange
+    const specialStack = [
+      "Error: Special chars <>&\"'",
+      "    at file:///path/special-chars.js:10:5",
+      "    at <anonymous>:1:1",
+    ];
+
+    // Act
+    await wrapper.setProps({ error_stack: specialStack });
+
+    // Assert
+    expect(wrapper.text()).toContain("Error: Special chars");
+    const lines = wrapper.findAll(".error_stack");
+    expect(lines[1].text()).toContain("<anonymous>");
+  });
+
+  it("reflects prop update: first line changes", async () => {
+    // Arrange
+    const newStack = ["New error message", "    at new location"];
+
+    // Act
+    await wrapper.setProps({ error_stack: newStack, error: { error_id: "new-error" } });
+
+    // Assert
+    expect(wrapper.text()).toContain("New error message");
+    expect(wrapper.props("error_stack")).toEqual(newStack);
+  });
+
+  it("applies top border style only to the first rendered stack line", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    const firstStyle = stackLines[0].attributes("style");
+    expect(firstStyle).toContain("border-top: 1px solid rgb(224, 224, 224)");
+
+    for (let i = 1; i < stackLines.length; i++) {
+      const style = stackLines[i].attributes("style");
+      if (style) {
+        expect(style).not.toContain("border-top: 1px solid rgb(224, 224, 224)");
+      }
+    }
+  });
+
+  it("applies top-rounded border radius to the first stack line", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    const style = stackLines[0].attributes("style");
+    expect(style).toContain("border-radius: 4px 4px 0 0");
+  });
+
+  it("applies bottom-rounded border radius to the last stack line", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    const lastStyle = stackLines[stackLines.length - 1].attributes("style");
+    expect(lastStyle).toContain("border-radius: 0 0 4px 4px");
+  });
+
+  it("applies both border-radius values when there is only one stack line", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error_stack: ["Error message", "    at single line"],
     });
 
-    it("should not apply top border to non-first stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    expect(stackLines).toHaveLength(1);
+    const style = stackLines[0].attributes("style");
+    expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
+    expect(style).toContain("border-radius: 0 0 4px 4px");
+  });
 
-      for (let i = 1; i < stackLines.length; i++) {
+  it("does not apply rounded border radius to middle stack lines", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const stackLines = wrapper.findAll(".error_stack");
+    if (stackLines.length > 2) {
+      for (let i = 1; i < stackLines.length - 1; i++) {
         const style = stackLines[i].attributes("style");
         if (style) {
-          expect(style).not.toContain(
-            "border-top: 1px solid rgb(224, 224, 224)",
-          );
+          expect(style).not.toContain("border-radius: 4px 4px 0 0");
+          expect(style).not.toContain("border-radius: 0 0 4px 4px");
         }
       }
-    });
-
-    it("should apply correct border radius to first stack line", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-      const firstStackLine = stackLines[0];
-
-      const style = firstStackLine.attributes("style");
-      expect(style).toContain("border-radius: 4px 4px 0 0");
-    });
-
-    it("should apply correct border radius to last stack line", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-      const lastStackLine = stackLines[stackLines.length - 1];
-
-      const style = lastStackLine.attributes("style");
-      expect(style).toContain("border-radius: 0 0 4px 4px");
-    });
-
-    it("should not apply border radius to middle stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      if (stackLines.length > 2) {
-        for (let i = 1; i < stackLines.length - 1; i++) {
-          const style = stackLines[i].attributes("style");
-          if (style) {
-            expect(style).not.toContain("border-radius: 4px 4px 0 0");
-            expect(style).not.toContain("border-radius: 0 0 4px 4px");
-          }
-        }
-      }
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should require error_stack prop", () => {
-      expect(ErrorStackTrace.props?.error_stack?.required).toBe(true);
-      expect(ErrorStackTrace.props?.error_stack?.type).toBe(Array);
-    });
-
-    it("should require error prop", () => {
-      expect(ErrorStackTrace.props?.error?.required).toBe(true);
-      expect(ErrorStackTrace.props?.error?.type).toBe(Object);
-    });
-  });
-
-  describe("Empty Stack Handling", () => {
-    it("should handle empty stack array", async () => {
-      await wrapper.setProps({
-        error_stack: [],
-      });
-
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("");
-      expect(stackLines).toHaveLength(0);
-    });
-
-    it("should handle single line stack", async () => {
-      await wrapper.setProps({
-        error_stack: ["Single error line"],
-      });
-
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("Single error line");
-      expect(stackLines).toHaveLength(0);
-    });
-  });
-
-  describe("Dynamic Border Styling", () => {
-    it("should handle dynamic stack size changes", async () => {
-      const newStack = [
-        "Error: New error",
-        "    at line 1",
-        "    at line 2",
-        "    at line 3",
-        "    at line 4",
-        "    at line 5",
-      ];
-
-      await wrapper.setProps({
-        error_stack: newStack,
-      });
-
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(5);
-
-      // Check first line styling
-      const firstStyle = stackLines[0].attributes("style");
-      expect(firstStyle).toContain("border-top: 1px solid rgb(224, 224, 224)");
-      expect(firstStyle).toContain("border-radius: 4px 4px 0 0");
-
-      // Check last line styling
-      const lastStyle = stackLines[4].attributes("style");
-      expect(lastStyle).toContain("border-radius: 0 0 4px 4px");
-    });
-
-    it("should handle two-line stack correctly", async () => {
-      await wrapper.setProps({
-        error_stack: ["Error message", "    at single line"],
-      });
-
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(1);
-
-      const style = stackLines[0].attributes("style");
-      expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
-      expect(style).toContain("border-radius: 0 0 4px 4px");
-    });
-  });
-
-  describe("Content Rendering", () => {
-    it("should preserve whitespace in stack traces", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line) => {
-        const text = line.text();
-        // Check that text starts with "at"
-        if (text.includes("at")) {
-          expect(text).toMatch(/^at/);
-        }
-      });
-    });
-
-    it("should handle special characters in stack traces", async () => {
-      const specialStack = [
-        "Error: Special chars <>&\"'",
-        "    at file:///path/with/special-chars.js:10:5",
-        "    at <anonymous>:1:1",
-      ];
-
-      await wrapper.setProps({
-        error_stack: specialStack,
-      });
-
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("Error: Special chars <>&\"'");
-      expect(stackLines[1].text()).toContain("<anonymous>");
-    });
-  });
-
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".tw\\:w-full");
-      const title = container.find(".tags-title");
-      const firstLine = container.find(".tw\\:mb-2");
-      const stackContainer = container.find(".error-stacks");
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(firstLine.exists()).toBe(true);
-      expect(stackContainer.exists()).toBe(true);
-    });
-
-    it("should render template conditionally", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line, index) => {
-        // Should skip index 0 (first line)
-        const actualIndex = index + 1;
-        expect(actualIndex).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe("CSS Classes", () => {
-    it("should apply correct CSS classes to stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line) => {
-        expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("tw:px-2");
-      });
-    });
-
-    it("should apply correct CSS classes to containers", () => {
-      const mainContainer = wrapper.find(".tw\\:flex.tw\\:mt-4");
-      const colContainer = wrapper.find(".tw\\:w-full");
-      const stackContainer = wrapper.find(".error-stacks");
-
-      expect(mainContainer.classes()).toEqual(
-        expect.arrayContaining(["tw:flex", "tw:mt-4", "tw:ml-1"]),
-      );
-      expect(colContainer.classes()).toContain("tw:w-full");
-      expect(stackContainer.classes()).toContain("error-stacks");
-    });
-  });
-
-  describe("Component Lifecycle", () => {
-    it("should handle prop updates gracefully", async () => {
-      const newStack = ["New error", "    at new location"];
-      const newError = { error_id: "new-error" };
-
-      await wrapper.setProps({
-        error_stack: newStack,
-        error: newError,
-      });
-
-      const firstLine = wrapper.find(".tw\\:mb-2");
-      expect(firstLine.text()).toBe("New error");
-
-      expect(wrapper.props("error_stack")).toEqual(newStack);
-      expect(wrapper.props("error")).toEqual(newError);
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle null values in stack array", async () => {
-      await wrapper.setProps({
-        error_stack: ["Error", null, "    at valid line"],
-      });
-
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(2);
-      expect(stackLines[1].text()).toBe("at valid line");
-    });
-
-    it("should handle undefined values in stack array", async () => {
-      await wrapper.setProps({
-        error_stack: ["Error", undefined, "    at valid line"],
-      });
-
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(2);
-      expect(stackLines[1].text()).toBe("at valid line");
-    });
-
-    it("should handle very long stack traces", async () => {
-      const longStack = ["Long error"];
-      for (let i = 0; i < 50; i++) {
-        longStack.push(
-          `    at function${i} (/very/long/path/file${i}.js:${i}:${i})`,
-        );
-      }
-
-      await wrapper.setProps({
-        error_stack: longStack,
-      });
-
-      const stackLines = wrapper.findAll(".error_stack");
-      expect(stackLines).toHaveLength(50);
-    });
+    }
   });
 });

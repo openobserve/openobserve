@@ -1,18 +1,3 @@
-// Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
@@ -21,7 +6,10 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick, ref } from "vue";
 
-// Mock clipboard utility used by the component
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (text: string) => {
     navigator.clipboard.writeText(text);
@@ -29,13 +17,10 @@ vi.mock("@/utils/clipboard", () => ({
   },
 }));
 
-// ============================================================================
-// TEST DATA FACTORIES
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Test data factories
+// ---------------------------------------------------------------------------
 
-/**
- * Factory to create mock correlation data
- */
 function createMockCorrelationData(overrides: Record<string, any> = {}) {
   return {
     trace_id: "test-trace-id-123456789",
@@ -53,9 +38,6 @@ function createMockCorrelationData(overrides: Record<string, any> = {}) {
   };
 }
 
-/**
- * Factory to create mock performance data
- */
 function createMockPerformanceData(overrides: Record<string, any> = {}) {
   return {
     total_duration_ms: 500,
@@ -66,36 +48,34 @@ function createMockPerformanceData(overrides: Record<string, any> = {}) {
   };
 }
 
-// ============================================================================
-// TEST SETUP
-// ============================================================================
+// ---------------------------------------------------------------------------
+// DOM node for attachTo
+// ---------------------------------------------------------------------------
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-// Quasar removed - no installQuasar needed
+// ---------------------------------------------------------------------------
+// Mock clipboard
+// ---------------------------------------------------------------------------
 
-// Mock clipboard API
 Object.assign(navigator, {
-  clipboard: {
-    writeText: vi.fn().mockResolvedValue(undefined),
-  },
+  clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
 });
 
-// Mock useTraceCorrelation composable
-const mockFetchCorrelation = vi.fn();
-const mockCorrelationData = createMockCorrelationData();
+// ---------------------------------------------------------------------------
+// Mock useTraceCorrelation — mutable refs
+// ---------------------------------------------------------------------------
 
-// Mutable mock return values - using actual Vue refs
+const mockFetchCorrelation = vi.fn();
 let mockIsLoading = ref(false);
-let mockCorrelationDataRef = ref(mockCorrelationData);
+let mockCorrelationDataRef = ref<any>(createMockCorrelationData());
 let mockHasBackendTrace = ref(true);
 let mockBackendSpanCount = ref(2);
-let mockPerformanceData = ref(mockCorrelationData.performance_breakdown);
+let mockPerformanceData = ref<any>(createMockPerformanceData());
 
-// Mock at module level - this gets hoisted
 vi.mock("@/composables/rum/useTraceCorrelation", () => ({
   default: () => ({
     correlationData: mockCorrelationDataRef,
@@ -107,17 +87,32 @@ vi.mock("@/composables/rum/useTraceCorrelation", () => ({
   }),
 }));
 
-// ============================================================================
-// TEST HELPERS
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Stubs for O* components that import heavy deps
+// ---------------------------------------------------------------------------
+
+const globalStubs = {
+  OButton: {
+    name: "OButton",
+    template: '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot /></button>',
+    props: ["variant", "size", "disabled", "iconLeft"],
+    emits: ["click", "keydown"],
+    inheritAttrs: false,
+  },
+  OSpinner: { template: '<div data-test="spinner" />' },
+  OIcon: { name: "OIcon", template: '<span />', props: ["name", "size"] },
+  OTooltip: { template: '<span />', props: ["content"] },
+  OSeparator: { template: '<hr />' },
+};
+
+// ---------------------------------------------------------------------------
+// Mount helper
+// ---------------------------------------------------------------------------
 
 interface MountOptions {
   props?: Record<string, any>;
 }
 
-/**
- * Helper to mount component with default configuration
- */
 function mountComponent(options: MountOptions = {}) {
   const defaultProps = {
     traceId: "test-trace-id-123456789",
@@ -132,48 +127,40 @@ function mountComponent(options: MountOptions = {}) {
     global: {
       plugins: [i18n, router],
       provide: { store },
+      stubs: globalStubs,
     },
   });
 }
 
-/**
- * Helper to find button by text content
- */
+// ---------------------------------------------------------------------------
+// Helper finders
+// ---------------------------------------------------------------------------
+
 function findButtonByText(wrapper: VueWrapper, text: string) {
   const buttons = wrapper.findAll("button");
   return buttons.find((btn: any) => btn.text().includes(text));
 }
 
-/**
- * Helper to find button by icon (checks html for icon name or finds icon-only buttons)
- */
-function findButtonByIcon(wrapper: VueWrapper, icon: string) {
+function findCopyButton(wrapper: VueWrapper) {
+  // Copy button is an icon-only button (no visible text) near the trace-id-text
   const buttons = wrapper.findAll("button");
-  // First try to find by icon name in html (legacy OIcon approach)
-  const byName = buttons.find((btn: any) => btn.html().includes(icon));
-  if (byName) return byName;
-  // Fallback: find the first icon-only button (no visible text) when looking for "content_copy"
-  if (icon === "content_copy") {
-    return buttons.find((btn: any) => btn.text().trim() === "");
-  }
-  return undefined;
+  // First look for a button with no text content inside the trace-id section
+  const iconOnly = buttons.find((btn: any) => btn.text().trim() === "");
+  return iconOnly;
 }
 
-// ============================================================================
-// TEST SUITE
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe("TraceCorrelationCard", () => {
   let wrapper: VueWrapper;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    // Reset mock function implementation to default
     mockFetchCorrelation.mockReset();
     mockFetchCorrelation.mockResolvedValue(undefined);
 
-    // Reset to default mock state
     mockIsLoading.value = false;
     mockCorrelationDataRef.value = createMockCorrelationData();
     mockHasBackendTrace.value = true;
@@ -185,280 +172,459 @@ describe("TraceCorrelationCard", () => {
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
     vi.clearAllTimers();
     vi.restoreAllMocks();
   });
 
-  // ==========================================================================
-  // COMPONENT RENDERING
-  // ==========================================================================
+  // =========================================================================
+  // Component rendering
+  // =========================================================================
 
-  describe("Component rendering", () => {
-    it("should mount TraceCorrelationCard component", () => {
+  describe("component rendering", () => {
+    it("mounts TraceCorrelationCard without errors", () => {
+      // Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".trace-correlation-card").exists()).toBe(true);
     });
 
-    it("should display title", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toBe("Distributed Trace");
+    it("displays 'Distributed Trace' as the card title", () => {
+      // Assert
+      expect(wrapper.text()).toContain("Distributed Trace");
     });
 
-    it("should display trace ID section when traceId is provided", () => {
+    it("displays trace ID section when traceId is provided", () => {
+      // Assert
       expect(wrapper.text()).toContain("Trace ID:");
+    });
+
+    it("renders trace-id-text element when traceId is provided", () => {
+      // Assert
       expect(wrapper.find(".trace-id-text").exists()).toBe(true);
     });
 
-    it("should display span ID section when spanId is provided", () => {
+    it("displays span ID section when spanId is provided", () => {
+      // Assert
       expect(wrapper.text()).toContain("Span ID:");
+    });
+
+    it("renders span-id-text element when spanId is provided", () => {
+      // Assert
       expect(wrapper.find(".span-id-text").exists()).toBe(true);
     });
   });
 
-  // ==========================================================================
-  // LOADING STATE
-  // ==========================================================================
+  // =========================================================================
+  // Loading state
+  // =========================================================================
 
-  describe("Loading state", () => {
-    it("should show loading spinner when isLoading is true", async () => {
+  describe("loading state", () => {
+    it("shows loading text when isLoading is true", async () => {
+      // Arrange
       wrapper.unmount();
-
       mockIsLoading.value = true;
       mockCorrelationDataRef.value = null;
       mockHasBackendTrace.value = false;
       mockBackendSpanCount.value = 0;
       mockPerformanceData.value = null;
-
       mockFetchCorrelation.mockImplementation(() => {
         mockIsLoading.value = true;
         return new Promise(() => {});
       });
 
+      // Act
       wrapper = mountComponent();
       await nextTick();
       await nextTick();
 
+      // Assert
       expect(wrapper.text()).toContain("Loading trace data...");
 
       mockIsLoading.value = false;
     });
   });
 
-  // ==========================================================================
-  // NO TRACE ID STATE
-  // ==========================================================================
+  // =========================================================================
+  // No trace ID state
+  // =========================================================================
 
-  describe("No trace ID state", () => {
-    it("should show no trace message when traceId is empty", async () => {
+  describe("no trace ID state", () => {
+    it("shows 'no trace information' message when traceId is empty", async () => {
+      // Arrange
       wrapper.unmount();
-
       mockIsLoading.value = false;
       mockCorrelationDataRef.value = null;
       mockHasBackendTrace.value = false;
       mockBackendSpanCount.value = 0;
       mockPerformanceData.value = null;
 
+      // Act
       wrapper = mountComponent({ props: { traceId: "" } });
       await flushPromises();
 
-      expect(wrapper.text()).toContain(
-        "No trace information available for this event",
-      );
+      // Assert
+      expect(wrapper.text()).toContain("No trace information available for this event");
     });
   });
 
-  // ==========================================================================
-  // TRACE ID FORMATTING
-  // ==========================================================================
+  // =========================================================================
+  // Trace ID formatting
+  // =========================================================================
 
-  describe("Trace ID formatting", () => {
-    it("should format long trace ID correctly", () => {
+  describe("trace ID formatting", () => {
+    it("truncates long trace ID to start...end format", () => {
+      // Act
       const traceIdText = wrapper.find(".trace-id-text");
-      expect(traceIdText.exists()).toBe(true);
+
+      // Assert
       expect(traceIdText.text()).toMatch(/^test-tra\.\.\.23456789$/);
     });
 
-    it("should not truncate short trace ID", async () => {
+    it("does not truncate short trace ID", async () => {
+      // Arrange
       wrapper.unmount();
+
+      // Act
       wrapper = mountComponent({ props: { traceId: "short-id" } });
       await flushPromises();
 
-      const traceIdText = wrapper.find(".trace-id-text");
-      expect(traceIdText.text()).toBe("short-id");
+      // Assert
+      expect(wrapper.find(".trace-id-text").text()).toBe("short-id");
     });
   });
 
-  // ==========================================================================
-  // SPAN HIERARCHY
-  // ==========================================================================
+  // =========================================================================
+  // Span hierarchy
+  // =========================================================================
 
-  describe("Span hierarchy", () => {
-    it("should display span hierarchy when backend trace exists", () => {
+  describe("span hierarchy", () => {
+    it("displays 'Span Hierarchy:' when backend trace exists", () => {
+      // Assert
       expect(wrapper.text()).toContain("Span Hierarchy:");
+    });
+
+    it("displays Application Span label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Application Span");
+    });
+
+    it("displays Browser SDK Span label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Browser SDK Span");
+    });
+
+    it("displays Backend Spans label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Backend Spans");
     });
 
-    it("should display backend span count", () => {
+    it("displays backend span count in parentheses", () => {
+      // Assert
       expect(wrapper.text()).toContain("Backend Spans (2)");
     });
   });
 
-  // ==========================================================================
-  // PERFORMANCE BREAKDOWN
-  // ==========================================================================
+  // =========================================================================
+  // Performance breakdown
+  // =========================================================================
 
-  describe("Performance breakdown", () => {
-    it("should display performance breakdown when data is available", () => {
+  describe("performance breakdown", () => {
+    it("displays 'Performance Breakdown:' heading", () => {
+      // Assert
       expect(wrapper.text()).toContain("Performance Breakdown:");
+    });
+
+    it("displays 'Total Duration:' label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Total Duration:");
+    });
+
+    it("displays total duration value in ms", () => {
+      // Assert
       expect(wrapper.text()).toContain("500ms");
     });
 
-    it("should display browser duration with percentage", () => {
+    it("displays browser duration label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Browser:");
+    });
+
+    it("displays browser duration value", () => {
+      // Assert
       expect(wrapper.text()).toContain("200ms");
+    });
+
+    it("displays browser duration percentage", () => {
+      // Assert
       expect(wrapper.text()).toContain("40%");
     });
 
-    it("should display network latency with percentage", () => {
+    it("displays network latency label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Network:");
+    });
+
+    it("displays network latency value", () => {
+      // Assert
       expect(wrapper.text()).toContain("50ms");
+    });
+
+    it("displays network latency percentage", () => {
+      // Assert
       expect(wrapper.text()).toContain("10%");
     });
 
-    it("should display backend duration with percentage", () => {
+    it("displays backend duration label", () => {
+      // Assert
       expect(wrapper.text()).toContain("Backend:");
+    });
+
+    it("displays backend duration value", () => {
+      // Assert
       expect(wrapper.text()).toContain("250ms");
+    });
+
+    it("displays backend duration percentage", () => {
+      // Assert
       expect(wrapper.text()).toContain("50%");
     });
   });
 
-  // ==========================================================================
-  // USER INTERACTIONS
-  // ==========================================================================
+  // =========================================================================
+  // Copy trace ID
+  // =========================================================================
 
-  describe("Copy trace ID functionality", () => {
-    it("should copy trace ID to clipboard when copy button is clicked", async () => {
-      const copyBtn = findButtonByIcon(wrapper, "content_copy");
+  describe("copy trace ID functionality", () => {
+    it("copies trace ID to clipboard when copy button is clicked", async () => {
+      // Arrange
+      const copyBtn = findCopyButton(wrapper);
       expect(copyBtn).toBeDefined();
-      expect(copyBtn?.exists()).toBe(true);
 
+      // Act
       await copyBtn?.trigger("click");
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "test-trace-id-123456789",
-      );
+      // Assert
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-trace-id-123456789");
     });
 
-    it("should show success message after copying", async () => {
-      const copyBtn = findButtonByIcon(wrapper, "content_copy");
+    it("clipboard.writeText is called on copy button click", async () => {
+      // Arrange
+      const copyBtn = findCopyButton(wrapper);
+
+      // Act
       await copyBtn?.trigger("click");
       await flushPromises();
 
-      // Notification is shown (tested via spy in next test)
+      // Assert
       expect(navigator.clipboard.writeText).toHaveBeenCalled();
     });
   });
 
-  describe("Action buttons", () => {
-    it("should display View Trace Details button", () => {
+  // =========================================================================
+  // Action buttons
+  // =========================================================================
+
+  describe("action buttons", () => {
+    it("displays View Trace Details button", () => {
+      // Act
       const viewBtn = findButtonByText(wrapper, "View Trace Details");
+
+      // Assert
       expect(viewBtn).toBeDefined();
       expect(viewBtn?.exists()).toBe(true);
     });
 
-    it("should enable View Trace Details button when backend trace exists", () => {
+    it("enables View Trace Details button when backend trace exists", () => {
+      // Act
       const viewBtn = findButtonByText(wrapper, "View Trace Details");
+
+      // Assert
       expect(viewBtn?.attributes("disabled")).toBeUndefined();
     });
 
-    it("should disable View Trace Details button when no backend trace", async () => {
+    it("disables View Trace Details button when no backend trace", async () => {
+      // Arrange
       wrapper.unmount();
-
       mockIsLoading.value = false;
       mockCorrelationDataRef.value = createMockCorrelationData();
       mockHasBackendTrace.value = false;
       mockBackendSpanCount.value = 0;
       mockPerformanceData.value = null;
 
+      // Act
       wrapper = mountComponent();
       await flushPromises();
-
       const viewBtn = findButtonByText(wrapper, "View Trace Details");
+
+      // Assert
       expect(viewBtn?.attributes("disabled")).toBeDefined();
     });
 
-    it("should display Refresh button", () => {
+    it("displays Refresh button", () => {
+      // Act
       const refreshBtn = findButtonByText(wrapper, "Refresh");
+
+      // Assert
       expect(refreshBtn).toBeDefined();
       expect(refreshBtn?.exists()).toBe(true);
     });
 
-    it("should call fetchCorrelation when Refresh button is clicked", async () => {
+    it("calls fetchCorrelation when Refresh button is clicked", async () => {
+      // Arrange
       const refreshBtn = findButtonByText(wrapper, "Refresh");
+
+      // Act
       await refreshBtn?.trigger("click");
 
+      // Assert
       expect(mockFetchCorrelation).toHaveBeenCalled();
     });
   });
 
-  // ==========================================================================
-  // ACCESSIBILITY
-  // ==========================================================================
+  // =========================================================================
+  // Missing trace notice
+  // =========================================================================
 
-  describe("Accessibility", () => {
-    it("should be keyboard accessible - copy button with Enter", async () => {
-      const copyBtn = findButtonByIcon(wrapper, "content_copy");
-      // In real browsers, Enter on a button triggers a click event
-      await copyBtn?.trigger("keydown.enter");
-      await copyBtn?.trigger("click");
+  describe("missing trace notice", () => {
+    it("shows 'Backend trace data not yet available' when no backend trace", async () => {
+      // Arrange
+      wrapper.unmount();
+      mockIsLoading.value = false;
+      mockCorrelationDataRef.value = createMockCorrelationData();
+      mockHasBackendTrace.value = false;
+      mockBackendSpanCount.value = 0;
+      mockPerformanceData.value = null;
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "test-trace-id-123456789",
-      );
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("Backend trace data not yet available");
     });
 
-    it("should be keyboard accessible - copy button with Space", async () => {
-      const copyBtn = findButtonByIcon(wrapper, "content_copy");
-      // In real browsers, Space on a button triggers a click event
-      await copyBtn?.trigger("keydown.space");
-      await copyBtn?.trigger("click");
+    it("shows ingestion delay message when no backend trace", async () => {
+      // Arrange
+      wrapper.unmount();
+      mockHasBackendTrace.value = false;
+      mockBackendSpanCount.value = 0;
+      mockPerformanceData.value = null;
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "test-trace-id-123456789",
-      );
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.text()).toContain("Trace data may take up to 30 seconds to be ingested");
     });
+  });
 
-    it("should be keyboard accessible - refresh button", async () => {
-      const refreshBtn = findButtonByText(wrapper, "Refresh");
-      await refreshBtn?.trigger("keydown.enter");
+  // =========================================================================
+  // Component lifecycle
+  // =========================================================================
 
+  describe("component lifecycle", () => {
+    it("fetches correlation data on mount when traceId is provided", () => {
+      // Assert
       expect(mockFetchCorrelation).toHaveBeenCalled();
     });
 
-    it("should be keyboard accessible - view details button", async () => {
+    it("fetches correlation data when traceId prop changes", async () => {
+      // Arrange
+      mockFetchCorrelation.mockClear();
+
+      // Act
+      await wrapper.setProps({ traceId: "new-trace-id" });
+      await flushPromises();
+
+      // Assert
+      expect(mockFetchCorrelation).toHaveBeenCalled();
+    });
+
+    it("does not fetch correlation data when traceId is empty on mount", async () => {
+      // Arrange
+      wrapper.unmount();
+      mockFetchCorrelation.mockClear();
+
+      // Act
+      wrapper = mountComponent({ props: { traceId: "" } });
+      await flushPromises();
+
+      // Assert
+      expect(mockFetchCorrelation).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // Accessibility
+  // =========================================================================
+
+  describe("accessibility", () => {
+    it("copy button responds to click after Enter keydown", async () => {
+      // Arrange
+      const copyBtn = findCopyButton(wrapper);
+
+      // Act — Enter does not auto-trigger click in jsdom; trigger click explicitly
+      await copyBtn?.trigger("keydown.enter");
+      await copyBtn?.trigger("click");
+
+      // Assert
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-trace-id-123456789");
+    });
+
+    it("copy button responds to click after Space keydown", async () => {
+      // Arrange
+      const copyBtn = findCopyButton(wrapper);
+
+      // Act
+      await copyBtn?.trigger("keydown.space");
+      await copyBtn?.trigger("click");
+
+      // Assert
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-trace-id-123456789");
+    });
+
+    it("refresh button responds to Enter keydown (calls fetchCorrelation)", async () => {
+      // Arrange
+      const refreshBtn = findButtonByText(wrapper, "Refresh");
+
+      // Act
+      await refreshBtn?.trigger("keydown.enter");
+
+      // Assert
+      expect(mockFetchCorrelation).toHaveBeenCalled();
+    });
+
+    it("View Trace Details button is reachable via keyboard (Enter keydown)", async () => {
+      // Arrange
       const viewBtn = findButtonByText(wrapper, "View Trace Details");
+
+      // Act — trigger Enter keydown (button remains accessible)
       await viewBtn?.trigger("keydown.enter");
       await flushPromises();
 
-      // Button click should work
+      // Assert — button still exists and is a valid element
       expect(viewBtn?.exists()).toBe(true);
     });
 
-    it("should have accessible button labels", () => {
+    it("all buttons are valid button elements", () => {
+      // Act
       const buttons = wrapper.findAll("button");
-      // Check that buttons have either text content or an aria-label
+
+      // Assert
+      buttons.forEach((btn: any) => {
+        expect(btn.element.tagName.toLowerCase()).toBe("button");
+      });
+    });
+
+    it("buttons with text content or aria-label have non-empty labels", () => {
+      // Act
+      const buttons = wrapper.findAll("button");
+
+      // Assert — each button either has text or aria-label
       buttons.forEach((btn: any) => {
         const ariaLabel = btn.attributes("aria-label");
         const text = btn.text().trim();
-        // Icon-only buttons may have neither (acceptable if they have tooltip)
-        // At minimum each button must be a valid button element
+        // Icon-only buttons may have neither (they use tooltip); all must be <button> elements
         expect(btn.element.tagName.toLowerCase()).toBe("button");
         if (text || ariaLabel) {
           expect((text || ariaLabel).length).toBeGreaterThan(0);
@@ -467,126 +633,135 @@ describe("TraceCorrelationCard", () => {
     });
   });
 
-  // ==========================================================================
-  // MISSING TRACE NOTICE
-  // ==========================================================================
+  // =========================================================================
+  // Data formatting utilities
+  // =========================================================================
 
-  describe("Missing trace notice", () => {
-    it("should show missing trace notice when no backend trace", async () => {
-      wrapper.unmount();
+  describe("calculatePercentage utility", () => {
+    it("calculates percentage correctly for 200 of 500", () => {
+      // Act
+      const result = wrapper.vm.calculatePercentage(200, 500);
 
-      mockIsLoading.value = false;
-      mockCorrelationDataRef.value = createMockCorrelationData();
-      mockHasBackendTrace.value = false;
-      mockBackendSpanCount.value = 0;
-      mockPerformanceData.value = null;
+      // Assert
+      expect(result).toBe(40);
+    });
 
-      wrapper = mountComponent();
-      await flushPromises();
+    it("returns 0 when total is 0", () => {
+      // Act
+      const result = wrapper.vm.calculatePercentage(100, 0);
 
-      expect(wrapper.text()).toContain("Backend trace data not yet available");
-      expect(wrapper.text()).toContain(
-        "Trace data may take up to 30 seconds to be ingested",
-      );
+      // Assert
+      expect(result).toBe(0);
+    });
+
+    it("handles whole number results", () => {
+      // Act
+      const result = wrapper.vm.calculatePercentage(33, 100);
+
+      // Assert
+      expect(result).toBe(33);
     });
   });
 
-  // ==========================================================================
-  // COMPONENT LIFECYCLE
-  // ==========================================================================
+  describe("formatSpanId utility", () => {
+    it("truncates long span ID to start...end format", () => {
+      // Act
+      const result = wrapper.vm.formatSpanId("test-span-id-123");
 
-  describe("Component lifecycle", () => {
-    it("should fetch correlation data on mount when traceId is provided", () => {
-      expect(mockFetchCorrelation).toHaveBeenCalled();
+      // Assert
+      expect(result).toBe("test-s...id-123");
     });
 
-    it("should fetch correlation data when traceId prop changes", async () => {
-      mockFetchCorrelation.mockClear();
+    it("does not truncate short span ID", () => {
+      // Act
+      const result = wrapper.vm.formatSpanId("short");
 
-      await wrapper.setProps({ traceId: "new-trace-id" });
-      await flushPromises();
-
-      expect(mockFetchCorrelation).toHaveBeenCalled();
+      // Assert
+      expect(result).toBe("short");
     });
 
-    it("should not fetch correlation data when traceId is empty", async () => {
-      wrapper.unmount();
-      mockFetchCorrelation.mockClear();
+    it("returns empty string for empty input", () => {
+      // Act
+      const result = wrapper.vm.formatSpanId("");
 
-      wrapper = mountComponent({ props: { traceId: "" } });
-      await flushPromises();
-
-      expect(mockFetchCorrelation).not.toHaveBeenCalled();
+      // Assert
+      expect(result).toBe("");
     });
   });
 
-  // ==========================================================================
-  // PROPS VALIDATION
-  // ==========================================================================
+  // =========================================================================
+  // Props validation
+  // =========================================================================
 
-  describe("Props validation", () => {
-    it("should display trace ID when provided", () => {
+  describe("props validation", () => {
+    it("displays formatted trace ID in the trace-id-text element", () => {
+      // Assert
       expect(wrapper.text()).toContain("test-tra...23456789");
     });
 
-    it("should display span ID when provided", () => {
-      expect(wrapper.text()).toContain("Span ID:");
-    });
-
-    it("should work with minimal props", async () => {
+    it("renders successfully with minimal props (traceId only)", async () => {
+      // Arrange + Act
       const w = mountComponent({ props: { traceId: "test-only" } });
       await flushPromises();
 
+      // Assert
       expect(w.exists()).toBe(true);
       expect(w.text()).toContain("Distributed Trace");
       w.unmount();
     });
 
-    it("should react to traceId prop changes", async () => {
+    it("re-fetches when traceId prop changes", async () => {
+      // Arrange
       mockFetchCorrelation.mockClear();
+
+      // Act
       await wrapper.setProps({ traceId: "new-trace-id" });
       await flushPromises();
 
+      // Assert
       expect(mockFetchCorrelation).toHaveBeenCalled();
-    });
-
-    it("should accept all props without errors", () => {
-      // Component mounted successfully in beforeEach with all props
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.text()).toContain("Distributed Trace");
     });
   });
 
-  // ==========================================================================
-  // EDGE CASES
-  // ==========================================================================
+  // =========================================================================
+  // Edge cases
+  // =========================================================================
 
-  describe("Edge cases", () => {
-    it("should handle null correlationData", async () => {
+  describe("edge cases", () => {
+    it("handles null correlationData without crashing", async () => {
+      // Act
       mockCorrelationDataRef.value = null;
       await nextTick();
 
+      // Assert
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.html()).not.toThrow();
     });
 
-    it("should handle undefined traceId", async () => {
+    it("handles undefined traceId without crashing", async () => {
+      // Act
       await wrapper.setProps({ traceId: undefined });
       await flushPromises();
 
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle extremely long trace ID", async () => {
+    it("truncates extremely long trace ID", async () => {
+      // Arrange
       const longId = "a".repeat(1000);
+
+      // Act
       await wrapper.setProps({ traceId: longId });
       await flushPromises();
 
+      // Assert
       const traceIdText = wrapper.find(".trace-id-text");
       expect(traceIdText.text().length).toBeLessThan(50);
     });
 
-    it("should handle zero duration", async () => {
+    it("displays 0ms for zero duration", async () => {
+      // Act
       mockPerformanceData.value = createMockPerformanceData({
         total_duration_ms: 0,
         browser_duration_ms: 0,
@@ -595,121 +770,88 @@ describe("TraceCorrelationCard", () => {
       });
       await nextTick();
 
+      // Assert
       expect(wrapper.text()).toContain("0ms");
     });
 
-    it("should handle negative duration gracefully", async () => {
-      mockPerformanceData.value = createMockPerformanceData({
-        total_duration_ms: -100,
-      });
+    it("does not crash for negative duration", async () => {
+      // Act
+      mockPerformanceData.value = createMockPerformanceData({ total_duration_ms: -100 });
       await nextTick();
 
+      // Assert
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.html()).not.toThrow();
     });
 
-    it("should handle missing performance data", async () => {
+    it("does not crash when performanceData is null", async () => {
+      // Act
       mockPerformanceData.value = null;
       await nextTick();
 
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle empty backend spans array", async () => {
-      mockCorrelationDataRef.value = createMockCorrelationData({
-        backend_spans: [],
-        has_backend_trace: false,
-      });
+    it("shows missing trace notice when backend_spans is empty", async () => {
+      // Arrange
+      mockCorrelationDataRef.value = createMockCorrelationData({ backend_spans: [], has_backend_trace: false });
       mockBackendSpanCount.value = 0;
       mockHasBackendTrace.value = false;
       await nextTick();
 
+      // Assert
       expect(wrapper.text()).toContain("Backend trace data not yet available");
     });
 
-    it("should handle special characters in trace ID", async () => {
-      await wrapper.setProps({
-        traceId: "<script>alert('xss')</script>",
-      });
+    it("does not render script tags for XSS input in traceId", async () => {
+      // Act
+      await wrapper.setProps({ traceId: "<script>alert('xss')</script>" });
       await flushPromises();
 
+      // Assert
       expect(wrapper.html()).not.toContain("<script>");
     });
   });
 
-  // ==========================================================================
-  // DATA FORMATTING
-  // ==========================================================================
+  // =========================================================================
+  // Integration scenarios
+  // =========================================================================
 
-  describe("Data formatting utilities", () => {
-    describe("Percentage calculation", () => {
-      it("should calculate percentage correctly", () => {
-        const result = wrapper.vm.calculatePercentage(200, 500);
-        expect(result).toBe(40);
-      });
-
-      it("should return 0 when total is 0", () => {
-        const result = wrapper.vm.calculatePercentage(100, 0);
-        expect(result).toBe(0);
-      });
-
-      it("should handle decimal results", () => {
-        const result = wrapper.vm.calculatePercentage(33, 100);
-        expect(result).toBe(33);
-      });
-    });
-
-    describe("Span ID formatting", () => {
-      it("should format long span ID correctly", () => {
-        const result = wrapper.vm.formatSpanId("test-span-id-123");
-        expect(result).toBe("test-s...id-123");
-      });
-
-      it("should not truncate short span ID", () => {
-        const result = wrapper.vm.formatSpanId("short");
-        expect(result).toBe("short");
-      });
-
-      it("should handle empty span ID", () => {
-        const result = wrapper.vm.formatSpanId("");
-        expect(result).toBe("");
-      });
-    });
-  });
-
-  // ==========================================================================
-  // INTEGRATION SCENARIOS
-  // ==========================================================================
-
-  describe("Integration scenarios", () => {
-    it("should handle complete trace correlation flow", async () => {
-      // 1. Component mounts with trace data
+  describe("integration scenarios", () => {
+    it("handles complete trace correlation flow", async () => {
+      // Arrange: component mounted with trace data
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.text()).toContain("Distributed Trace");
 
-      // 2. Shows trace information
+      // Act: verify trace info is shown
       expect(wrapper.text()).toContain("test-tra...23456789");
       expect(wrapper.text()).toContain("Backend Spans (2)");
 
-      // 3. User copies trace ID
-      const copyBtn = findButtonByIcon(wrapper, "content_copy");
+      // Act: copy trace ID
+      const copyBtn = findCopyButton(wrapper);
       await copyBtn?.trigger("click");
       expect(navigator.clipboard.writeText).toHaveBeenCalled();
 
-      // 4. User refreshes data
+      // Act: refresh data
       mockFetchCorrelation.mockClear();
       const refreshBtn = findButtonByText(wrapper, "Refresh");
       await refreshBtn?.trigger("click");
+
+      // Assert
       expect(mockFetchCorrelation).toHaveBeenCalled();
     });
 
-    it("should handle no backend trace scenario", async () => {
+    it("handles no backend trace scenario end to end", async () => {
+      // Arrange
       mockHasBackendTrace.value = false;
       mockBackendSpanCount.value = 0;
       await nextTick();
 
+      // Assert: missing trace notice is shown
       expect(wrapper.text()).toContain("Backend trace data not yet available");
 
+      // Assert: View Trace Details button is disabled
       const viewBtn = findButtonByText(wrapper, "View Trace Details");
       expect(viewBtn?.attributes("disabled")).toBeDefined();
     });

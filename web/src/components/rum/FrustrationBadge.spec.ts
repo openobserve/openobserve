@@ -1,183 +1,207 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import FrustrationBadge from './FrustrationBadge.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import FrustrationBadge from "./FrustrationBadge.vue";
 
-describe('FrustrationBadge.vue', () => {
+describe("FrustrationBadge", () => {
   let wrapper: VueWrapper;
 
-  beforeEach(() => {
-    // Create #app element for Quasar tooltips to attach to
-    const app = document.createElement('div');
-    app.id = 'app';
-    document.body.appendChild(app);
-  });
-
   afterEach(() => {
-    // Clean up wrapper and DOM
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    const app = document.getElementById('app');
-    if (app) {
-      document.body.removeChild(app);
-    }
+    wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
-  const createWrapper = (count: number) => {
-    return mount(FrustrationBadge, {
-      props: { count },
-      global: {
-        plugins: [],
-      },
-      attachTo: '#app',
-    });
-  };
+  describe("count = 0 renders the none placeholder", () => {
+    it("shows the em-dash placeholder when count is 0", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 0 } });
 
-  describe('Severity Levels', () => {
-    it('should render "—" when count is 0', () => {
-      wrapper = createWrapper(0);
+      // Act — nothing, static render
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-none"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="frustration-badge-none"]').text()).toBe('—');
-      expect(wrapper.find('.frustration-badge').exists()).toBe(false);
+      expect(wrapper.find('[data-test="frustration-badge-none"]').text()).toBe("—");
     });
 
-    it('should render low severity badge for count 1-3', () => {
-      wrapper = createWrapper(2);
+    it("does not render a severity badge when count is 0", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 0 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-low"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="frustration-badge-high"]').exists()).toBe(false);
+    });
+  });
+
+  describe("low severity (count 1–3)", () => {
+    it("shows a low-severity badge for count 1", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 1 } });
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-low"]').exists()).toBe(true);
-      expect(wrapper.find('.frustration-badge-low').exists()).toBe(true);
-      expect(wrapper.text()).toContain('2');
+      expect(wrapper.text()).toContain("1");
     });
 
-    it('should render medium severity badge for count 4-7', () => {
-      wrapper = createWrapper(5);
+    it("shows a low-severity badge for count 3 (boundary)", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 3 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-low"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("3");
+    });
+
+    it("has singular tooltip text for count 1", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 1 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-low"]').attributes("title")).toBe(
+        "1 frustration signal detected"
+      );
+    });
+  });
+
+  describe("medium severity (count 4–7)", () => {
+    it("shows a medium-severity badge for count 5", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 5 } });
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
-      expect(wrapper.find('.frustration-badge-medium').exists()).toBe(true);
-      expect(wrapper.text()).toContain('5');
+      expect(wrapper.text()).toContain("5");
     });
 
-    it('should render high severity badge for count 8+', () => {
-      wrapper = createWrapper(12);
+    it("shows a medium-severity badge for count 4 (lower boundary)", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 4 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
+    });
+
+    it("shows a medium-severity badge for count 7 (upper boundary)", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 7 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
+    });
+
+    it("has correct plural tooltip with medium severity label", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 5 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').attributes("title")).toBe(
+        "5 frustration signals (Medium severity)"
+      );
+    });
+  });
+
+  describe("high severity (count 8+)", () => {
+    it("shows a high-severity badge for count 8 (boundary)", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 8 } });
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-high"]').exists()).toBe(true);
-      expect(wrapper.find('.frustration-badge-high').exists()).toBe(true);
-      expect(wrapper.text()).toContain('12');
+    });
+
+    it("shows a high-severity badge for count 12", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 12 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-high"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("12");
+    });
+
+    it("has correct tooltip with high severity warning for count 10", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 10 } });
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-high"]').attributes("title")).toBe(
+        "10 frustration signals (High severity - requires attention)"
+      );
     });
   });
 
-  describe('Boundary Cases', () => {
-    it('should handle boundary at 3 (low)', () => {
-      wrapper = createWrapper(3);
-      expect(wrapper.find('.frustration-badge-low').exists()).toBe(true);
-    });
+  describe("container data-test attribute", () => {
+    it("always renders the container element", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 5 } });
 
-    it('should handle boundary at 4 (medium)', () => {
-      wrapper = createWrapper(4);
-      expect(wrapper.find('.frustration-badge-medium').exists()).toBe(true);
-    });
-
-    it('should handle boundary at 7 (medium)', () => {
-      wrapper = createWrapper(7);
-      expect(wrapper.find('.frustration-badge-medium').exists()).toBe(true);
-    });
-
-    it('should handle boundary at 8 (high)', () => {
-      wrapper = createWrapper(8);
-      expect(wrapper.find('.frustration-badge-high').exists()).toBe(true);
-    });
-  });
-
-  describe('Tooltip Text', () => {
-    it('should show "No frustration signals detected" for count 0', () => {
-      wrapper = createWrapper(0);
-      const badge = wrapper.find('[data-test="frustration-badge-none"]');
-      expect(badge.exists()).toBe(true);
-    });
-
-    it('should show singular text for count 1', () => {
-      wrapper = createWrapper(1);
-      const badge = wrapper.find('[data-test="frustration-badge-low"]');
-      expect(badge.attributes('title')).toBe('1 frustration signal detected');
-    });
-
-    it('should show plural text with severity for count > 1', () => {
-      wrapper = createWrapper(5);
-      const badge = wrapper.find('[data-test="frustration-badge-medium"]');
-      expect(badge.attributes('title')).toBe('5 frustration signals (Medium severity)');
-    });
-
-    it('should show high severity warning for count 8+', () => {
-      wrapper = createWrapper(10);
-      const badge = wrapper.find('[data-test="frustration-badge-high"]');
-      expect(badge.attributes('title')).toBe('10 frustration signals (High severity - requires attention)');
-    });
-  });
-
-  describe('Visual Styling', () => {
-    it('should apply correct CSS classes for low severity', () => {
-      wrapper = createWrapper(2);
-      const badge = wrapper.find('.frustration-badge');
-      expect(badge.classes()).toContain('frustration-badge-low');
-    });
-
-    it('should apply correct CSS classes for medium severity', () => {
-      wrapper = createWrapper(6);
-      const badge = wrapper.find('.frustration-badge');
-      expect(badge.classes()).toContain('frustration-badge-medium');
-    });
-
-    it('should apply correct CSS classes for high severity', () => {
-      wrapper = createWrapper(15);
-      const badge = wrapper.find('.frustration-badge');
-      expect(badge.classes()).toContain('frustration-badge-high');
-    });
-  });
-
-  describe('Data Test Attributes', () => {
-    it('should have correct data-test attribute for container', () => {
-      wrapper = createWrapper(5);
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-container"]').exists()).toBe(true);
     });
+  });
 
-    it('should have correct data-test attribute for severity level', () => {
-      wrapper = createWrapper(5);
-      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
-    });
+  describe("tooltip attribute is present on severity badges", () => {
+    it("has a title attribute containing frustration signals text", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 5 } });
 
-    it('should have tooltip title attribute on badge', () => {
-      wrapper = createWrapper(5);
-      const badge = wrapper.find('[data-test="frustration-badge-medium"]');
-      // Tooltip is provided via title attribute
-      expect(badge.attributes('title')).toBeDefined();
-      expect(badge.attributes('title')).toContain('frustration signals');
+      // Assert
+      const title = wrapper.find('[data-test="frustration-badge-medium"]').attributes("title");
+      expect(title).toBeDefined();
+      expect(title).toContain("frustration signals");
     });
   });
 
-  describe('Reactivity', () => {
-    it('should update when count prop changes', async () => {
-      wrapper = createWrapper(2);
-      expect(wrapper.find('.frustration-badge-low').exists()).toBe(true);
+  describe("reactivity", () => {
+    it("updates from low to high severity when count prop changes", async () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 2 } });
+      expect(wrapper.find('[data-test="frustration-badge-low"]').exists()).toBe(true);
 
+      // Act
       await wrapper.setProps({ count: 10 });
-      expect(wrapper.find('.frustration-badge-high').exists()).toBe(true);
-      expect(wrapper.find('.frustration-badge-low').exists()).toBe(false);
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-high"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="frustration-badge-low"]').exists()).toBe(false);
     });
 
-    it('should toggle between badge and placeholder when count changes', async () => {
-      wrapper = createWrapper(5);
-      expect(wrapper.find('.frustration-badge').exists()).toBe(true);
-      expect(wrapper.find('[data-test="frustration-badge-none"]').exists()).toBe(false);
+    it("switches from badge to placeholder when count changes to 0", async () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 5 } });
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
 
+      // Act
       await wrapper.setProps({ count: 0 });
-      expect(wrapper.find('.frustration-badge').exists()).toBe(false);
+
+      // Assert
+      expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="frustration-badge-none"]').exists()).toBe(true);
     });
   });
 
-  describe('Large Numbers', () => {
-    it('should handle large frustration counts', () => {
-      wrapper = createWrapper(999);
+  describe("large numbers", () => {
+    it("handles count 999 as high severity and displays the number", () => {
+      // Arrange
+      wrapper = mount(FrustrationBadge, { props: { count: 999 } });
+
+      // Assert
       expect(wrapper.find('[data-test="frustration-badge-high"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('999');
+      expect(wrapper.text()).toContain("999");
     });
   });
 });
