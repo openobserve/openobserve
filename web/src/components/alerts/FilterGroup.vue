@@ -36,7 +36,7 @@
             v-for="tab in tabOptions"
             :key="tab.value"
             :value="tab.value"
-            size="xs"
+            size="sm"
           >
             <template #icon-left>
               <OIcon v-if="tab.value === 'or'" name="git-branch" size="xs" />

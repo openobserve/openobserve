@@ -43,6 +43,12 @@ export interface TextareaProps {
    * @see FieldWidth
    */
   width?: FieldWidth;
+  /**
+   * When true, the textarea stretches to fill its parent's height
+   * (instead of being sized by `rows`). Useful when the textarea lives
+   * inside a flex container that has a bounded height.
+   */
+  fill?: boolean;
 }
 
 export interface TextareaEmits {

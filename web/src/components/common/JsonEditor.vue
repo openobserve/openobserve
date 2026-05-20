@@ -1,60 +1,62 @@
 <template>
-  <div :class="store.state.theme === 'dark' ? 'dark-mode' : ''">
-    <div class="tw:h-[calc(100vh-65px)] tw:flex">
-      <div class="tw:flex common-json-editor column tw:h-[calc(100vh-65px)]"
-      :class="store.state.isAiChatEnabled ? 'tw:w-[64.5vw]' : 'tw:w-[90vw]'"
-      >
+  <div
+    class="tw:h-[calc(100vh-3.75rem)] tw:flex tw:min-h-0"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+  >
+    <div class="common-json-editor tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
+      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+        <query-editor
+          data-test="common-json-editor"
+          ref="queryEditorRef"
+          editor-id="common-json-editor"
+          class="monaco-editor tw:flex-1 tw:min-h-0"
+          :debounceTime="300"
+          v-model:query="jsonContent"
+          language="json"
+          @update:query="handleEditorChange"
+        />
+      </div>
 
-      <div class="tw:flex tw:flex-col tw:p-0">
-      <query-editor
-        data-test="common-json-editor"
-        ref="queryEditorRef"
-        editor-id="common-json-editor"
-        class="monaco-editor"
-        :debounceTime="300"
-        v-model:query="jsonContent"
-        language="json"
-        @update:query="handleEditorChange"
+      <!-- Display validation errors -->
+      <div
+        v-if="validationErrors.length > 0"
+        class="tw:p-3 tw:text-red-500 validation-errors tw:shrink-0"
+      >
+        <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
+        <ul class="tw:ml-3">
+          <li v-for="(error, index) in validationErrors" :key="index">
+            {{ error }}
+          </li>
+        </ul>
+      </div>
+
+      <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3 tw:shrink-0">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="$emit('close')"
+          data-test="json-editor-cancel"
+        >{{ t('common.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="saveChanges"
+          data-test="json-editor-save"
+        >{{ t('common.save') }}</OButton>
+      </div>
+    </div>
+    <!-- o2aichat enabled -->
+    <div
+      v-if="store.state.isAiChatEnabled"
+      class="tw:ml-2 tw:w-[25vw] tw:h-full"
+      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+    >
+      <O2AIChat
+        class="tw:h-full"
+        :is-open="store.state.isAiChatEnabled"
+        @close="store.state.isAiChatEnabled = false"
       />
     </div>
-
-    <!-- Display validation errors -->
-    <div
-      v-if="validationErrors.length > 0"
-      class="tw:p-3 tw:text-red-500 validation-errors"
-    >
-      <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
-      <ul class="tw:ml-3">
-        <li v-for="(error, index) in validationErrors" :key="index">
-          {{ error }}
-        </li>
-      </ul>
-    </div>
-
-    <div class="tw:flex-1" />
-
-    <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="$emit('close')"
-        data-test="json-editor-cancel"
-      >{{ t('common.cancel') }}</OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="saveChanges"
-        data-test="json-editor-save"
-      >{{ t('common.save') }}</OButton>
-    </div>
-    </div>
-    <!-- o2aichat enableddd -->
-
-    <div  class="tw:ml-2 tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-            <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
-          </div>
-    </div>
-
   </div>
 </template>
 

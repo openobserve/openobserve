@@ -193,15 +193,22 @@ watch(
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 // md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
+// Height applied to the wrapper (so border is included in the box, matching OSelect).
+// The inner input fills the wrapper via h-full.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
-  sm: "tw:h-8 tw:text-sm",
-  md: "tw:h-8 tw:text-sm",
+  sm: "tw:h-8",
+  md: "tw:h-8",
+};
+const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
+  sm: "tw:text-sm",
+  md: "tw:text-sm",
 };
 
 const wrapperClasses = computed(() => [
   "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
   "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-input-bg",
+  !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
   hasError.value
     ? "tw:border-input-border-error"
     : "tw:border-input-border tw:hover:border-input-border-hover",
@@ -301,7 +308,8 @@ const wrapperClasses = computed(() => [
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none tw:rounded-[inherit]',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
-          heightClasses[size ?? 'md'],
+          'tw:h-full',
+          textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"
