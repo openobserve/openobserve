@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </template>
-    <div class="tw:flex tw:h-screen tw:overflow-hidden editor-dialog-card">
+    <div class="tw:flex tw:h-[calc(100vh-3.5rem)] tw:overflow-hidden editor-dialog-card">
       <div
         class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
       >
@@ -405,16 +405,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="tw:ml-2"
+        class="tw:ml-2 tw:w-[24.5vw] tw:max-w-full tw:min-w-[75px]"
         v-if="store.state.isAiChatEnabled"
-        style="width: 24.5vw; max-width: 100%; min-width: 75px;"
         :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
       >
         <O2AIChat
           :header-height="48"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
-          style="height: calc(100vh - 0px) !important;"
+          class="tw:h-[calc(100vh-3.5rem)]!"
         />
       </div>
     </div>
