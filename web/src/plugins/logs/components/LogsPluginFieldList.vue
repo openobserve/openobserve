@@ -179,6 +179,7 @@ import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/feedback/Badge/OBadge.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 

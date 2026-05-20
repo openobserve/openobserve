@@ -370,6 +370,33 @@ describe("TenstackTable", () => {
       wrapper.vm.setSorting(() => []);
       expect(wrapper.vm.sorting).toEqual([]);
     });
+
+    it("handles multi-column sorting", () => {
+      const wrapper = mountComponent();
+      wrapper.vm.setSorting(() => [
+        { id: "_timestamp", desc: true },
+        { id: "level", desc: false },
+      ]);
+      expect(wrapper.vm.sorting).toEqual([
+        { id: "_timestamp", desc: true },
+        { id: "level", desc: false },
+      ]);
+    });
+
+    it("toggles sort direction on same column", () => {
+      const wrapper = mountComponent();
+      wrapper.vm.setSorting(() => [{ id: "message", desc: false }]);
+      wrapper.vm.setSorting(() => [{ id: "message", desc: true }]);
+      expect(wrapper.vm.sorting).toEqual([{ id: "message", desc: true }]);
+    });
+
+    it("swaps sort column", () => {
+      const wrapper = mountComponent();
+      wrapper.vm.setSorting(() => [{ id: "field_a", desc: false }]);
+      wrapper.vm.setSorting(() => [{ id: "field_b", desc: true }]);
+      expect(wrapper.vm.sorting).toEqual([{ id: "field_b", desc: true }]);
+      expect(wrapper.vm.sorting.length).toBe(1);
+    });
   });
 
   // ── selectedStreamFtsKeys computed ────────────────────────────────────────────
