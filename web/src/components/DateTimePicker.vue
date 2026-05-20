@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OButton
                   :class="
-                    data.selectedDate.tab == 'tw:relative' &&
+                    data.selectedDate.tab == 'relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
                       ? 'rp-selector-selected'
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative-row tw:px-3 tw:py-2">
               <div class="relative-period-name">Custom</div>
 
-              <div class="tw:flex tw:gap-2">
-                <div class="tw:flex tw:flex-col">
+              <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
+                <div class="tw:flex tw:flex-col tw:w-20">
                   <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @change="calculateMaxValue"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col">
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                   <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
@@ -404,7 +404,7 @@ export default defineComponent({
 }
 
 .date-time-dialog {
-  width: 341px;
+  width: 325px;
 
   .tab-button {
     &.q-btn {
@@ -421,12 +421,11 @@ export default defineComponent({
   }
 }
 
-.date-time-table.relative {
+.date-time-table {
   display: flex;
 
   .relative-row {
     display: flex;
-    flex: 1;
     align-items: center;
     border-bottom: 1px solid $border-color;
 

@@ -43,10 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /></template>
         </OButton>
       </template>
-      <div
-        id="date-time-menu"
-        class="date-time-dialog"
-      >
+      <div id="date-time-menu" class="date-time-dialog">
         <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
@@ -92,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     :class="
-                      selectedType == 'tw:relative' &&
+                      selectedType == 'relative' &&
                       relativePeriod == period.value &&
                       relativeValue == item
                         ? 'rp-selector-selected'
@@ -129,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="queryRangeRestrictionMsg"
                 />
 
-                <div class="tw:flex tw:gap-2">
-                  <div class="tw:flex tw:flex-col">
+                <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
+                  <div class="tw:flex tw:flex-col tw:w-20">
                     <OInput
                       v-model.number="relativeValue"
                       type="number"
@@ -144,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onCustomPeriodSelect"
                     />
                   </div>
-                  <div class="tw:flex tw:flex-col">
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                     <OSelect
                       v-model="relativePeriod"
                       :options="relativePeriodsSelect"
@@ -220,26 +217,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
         </OTabPanels>
-        <OSelect
-          v-if="!hideRelativeTimezone"
-          data-test="datetime-timezone-select"
-          v-model="timezone"
-          :options="timezoneSelectOptions"
-          searchable
-          :label="t('logStream.timezone')"
-          @update:model-value="onTimezoneChange"
-          @open="isTimezoneSelectOpen = true"
-          @close="isTimezoneSelectOpen = false"
-          class="timezone-select"
-        />
+        <div v-if="!hideRelativeTimezone" class="tw:pr-3">
+          <OSelect
+            data-test="datetime-timezone-select"
+            v-model="timezone"
+            :options="timezoneSelectOptions"
+            searchable
+            :label="t('logStream.timezone')"
+            @update:model-value="onTimezoneChange"
+            @open="isTimezoneSelectOpen = true"
+            @close="isTimezoneSelectOpen = false"
+            class="timezone-select"
+          />
+        </div>
         <div v-if="!autoApply" class="tw:flex tw:justify-end tw:py-2 tw:px-3">
-          <OSeparator class="tw:my-2" />
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"
             size="xs"
             class="element-box-shadow"
-            @click="saveDate(null); menuOpen = false"
+            @click="
+              saveDate(null);
+              menuOpen = false;
+            "
           >
             {{ t("common.apply") }}
           </OButton>
@@ -1162,9 +1162,8 @@ export default defineComponent({
 }
 
 .date-time-dialog {
-  width: 341px;
+  width: 325px;
   z-index: 10001;
-  max-height: 600px;
 
   .tab-button {
     &.q-btn {
@@ -1181,13 +1180,12 @@ export default defineComponent({
   }
 }
 
-.date-time-table.relative {
+.date-time-table {
   display: flex;
   flex-direction: column;
 
   .relative-row {
     display: flex;
-    flex: 1;
     align-items: center;
     border-bottom: 1px solid $border-color;
 
