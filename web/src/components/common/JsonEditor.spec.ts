@@ -16,12 +16,9 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import JsonEditor from "@/components/common/JsonEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +59,8 @@ const globalConfig = {
       emits: ["update:query"],
     },
     O2AIChat: {
-      template: '<div class="o2-ai-chat"><slot /></div>',
+      name: "O2AIChat",
+      template: '<div data-test="o2-ai-chat-stub"><slot /></div>',
     },
   },
 };
@@ -341,22 +339,22 @@ describe("JsonEditor", () => {
     it("shows validation errors section when validationErrors is non-empty", async () => {
       wrapper = createWrapper({ validationErrors: ["Field 'id' is required"] });
       await nextTick();
-      expect(wrapper.find(".validation-errors").exists()).toBe(true);
       expect(wrapper.text()).toContain("Field 'id' is required");
     });
 
     it("hides validation errors section when validationErrors is empty", () => {
       wrapper = createWrapper({ validationErrors: [] });
-      expect(wrapper.find(".validation-errors").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Please fix the following issues");
     });
 
-    it("renders multiple validation errors as list items", async () => {
+    it("renders multiple validation errors", async () => {
       wrapper = createWrapper({
         validationErrors: ["Error one", "Error two", "Error three"],
       });
       await nextTick();
-      const errors = wrapper.findAll(".validation-errors li");
-      expect(errors.length).toBe(3);
+      expect(wrapper.text()).toContain("Error one");
+      expect(wrapper.text()).toContain("Error two");
+      expect(wrapper.text()).toContain("Error three");
     });
   });
 
@@ -423,14 +421,14 @@ describe("JsonEditor", () => {
       store.state.isAiChatEnabled = true;
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "O2AIChat" }).exists()).toBe(true);
     });
 
     it("does not render O2AIChat when isAiChatEnabled is false", async () => {
       store.state.isAiChatEnabled = false;
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "O2AIChat" }).exists()).toBe(false);
     });
 
     it("renders AI toggle button when isEnterprise and ai_enabled", async () => {

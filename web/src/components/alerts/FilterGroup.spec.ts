@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FilterGroup from './FilterGroup.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -31,8 +30,6 @@ const mockI18n = createI18n({
     },
   },
 });
-
-installQuasar();
 
 describe('FilterGroup.vue Comprehensive Coverage', () => {
   const defaultProps = {
@@ -1188,7 +1185,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should handle tab change for toggle label', async () => {
+    it('should toggle label when toggleLabel is called directly', async () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -1202,12 +1199,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const tabs = wrapper.findComponent({ name: 'q-tabs' });
-      if (tabs.exists()) {
-        await tabs.vm.$emit('update:model-value', 'or');
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('input:update')).toBeTruthy();
-      }
+      wrapper.vm.toggleLabel('or');
+      expect(wrapper.emitted('add-group')).toBeTruthy();
+      expect(wrapper.emitted('input:update')).toBeTruthy();
     });
   });
 

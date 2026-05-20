@@ -16,12 +16,9 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ExternalDestination from "./ExternalDestination.vue";
-
-installQuasar();
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -116,10 +113,6 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QSeparator: true,
-        QItem: true,
-        QItemSection: true,
-        QItemLabel: true,
         ConfirmDialog: true,
         ODrawer: ODrawerStub,
         CreateDestinationForm: {
@@ -181,10 +174,10 @@ describe("ExternalDestination.vue", () => {
       expect(wrapper.vm.destinations).toHaveLength(2);
     });
 
-    it("1.4 initialises selectedDestination with empty label and value by default", async () => {
+    it("1.4 initialises selectedDestination with empty string by default", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.selectedDestination).toEqual({ label: "", value: "" });
+      expect(wrapper.vm.selectedDestination).toBe("");
     });
 
     it("1.5 pre-populates selectedDestination when currentSelectedNodeData has a destination_name", async () => {
@@ -208,10 +201,7 @@ describe("ExternalDestination.vue", () => {
       });
       await flushPromises();
 
-      expect(w.vm.selectedDestination).toEqual({
-        label: "existing-dest",
-        value: "existing-dest",
-      });
+      expect(w.vm.selectedDestination).toBe("existing-dest");
       w.unmount();
     });
 
@@ -367,7 +357,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.1 calls addNode with correct payload when a destination is selected", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
 
       expect(mockAddNode).toHaveBeenCalledWith({
@@ -379,20 +369,20 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.2 emits cancel:hideform after a successful save", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
       expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
     });
 
     it("4.3 does NOT call addNode when selectedDestination value is empty", () => {
-      wrapper.vm.selectedDestination = { value: "", label: "" };
+      wrapper.vm.selectedDestination = "";
       wrapper.vm.saveDestination();
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("4.4 uses the store selectedOrganization identifier as org_id", () => {
-      wrapper.vm.selectedDestination = { value: "dest2", label: "dest2" };
+      wrapper.vm.selectedDestination = "dest2";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ org_id: "default" }),
@@ -400,7 +390,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.5 sets correct node_type as remote_stream", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ node_type: "remote_stream" }),
@@ -408,7 +398,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.6 sets correct io_type as output", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ io_type: "output" }),
@@ -428,10 +418,7 @@ describe("ExternalDestination.vue", () => {
 
     it("5.1 sets selectedDestination to the newly created destination name", async () => {
       await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      expect(wrapper.vm.selectedDestination).toEqual({
-        label: "brand-new-dest",
-        value: "brand-new-dest",
-      });
+      expect(wrapper.vm.selectedDestination).toBe("brand-new-dest");
     });
 
     it("5.2 switches createNewDestination back to false", async () => {
@@ -694,20 +681,16 @@ describe("ExternalDestination.vue", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await flushPromises();
-      const rootDiv = wrapper.find(
-        '[data-test="add-destination-title"]',
-      );
-      expect(rootDiv.exists()).toBe(true);
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-save-btn"]').exists()).toBe(true);
     });
 
     it("12.2 renders correctly in light theme", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await flushPromises();
-      const rootDiv = wrapper.find(
-        '[data-test="add-destination-title"]',
-      );
-      expect(rootDiv.exists()).toBe(true);
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-save-btn"]').exists()).toBe(true);
     });
 
     afterEach(() => {

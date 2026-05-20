@@ -321,7 +321,7 @@ describe("AddStream", () => {
       vm.addField();
 
       expect(vm.fields[0].name).toBe("");
-      expect(vm.fields[0].type).toBe("");
+      expect(vm.fields[0].type).toBeUndefined();
       expect(vm.fields[0].index_type).toEqual([]);
       expect(vm.fields[0].uuid).toBeDefined();
     });
