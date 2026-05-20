@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="tw:flex wrap tw:justify-evenly tw:gap-3 ">
             <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title"> Action Scripts</div>
@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title">Error Tracking</div>
@@ -75,9 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title">RUM Session</div>
@@ -99,9 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="tw:flex wrap tw:justify-evenly tw:gap-3 ">
             <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
               <!-- Top Section (60%) -->
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between">
                   <div class="usage-tile-title"> Ingestion</div>
@@ -118,9 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column tw:justify-between">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Search</div>
@@ -137,9 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column tw:justify-between">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Functions</div>
@@ -158,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-4 tw:w-full">
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
-                <div class="column tw:justify-between">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
                     <div style="opacity: 0.8;">
@@ -173,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column tw:justify-between">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Pipelines</div>
@@ -192,9 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column tw:justify-between">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Remote Pipelines</div>
@@ -211,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
                 <div class="feature-card">
-              <div class="tile-content tw:text-center column tw:justify-between ">
+              <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between ">
                 <!-- Top Section (60%) -->
-                <div class="column tw:justify-between">
+                <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between">
                     <div class="usage-tile-title">Data Retention</div>
