@@ -21,8 +21,8 @@
       class="user-guide-body"
       :class="
         store.state.theme == 'dark'
-          ? 'theme-dark bg-dark'
-          : 'theme-light bg-white'
+          ? 'theme-dark tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]'
+          : 'theme-light tw:bg-white'
       "
     >
       <p>{{ t("crossLinks.guideIntro") }}</p>

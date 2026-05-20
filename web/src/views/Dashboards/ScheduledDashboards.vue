@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="scheduled-dashboards"
-      :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'"
     >
     <OTable
       data-test="scheduled-dashboard-table"

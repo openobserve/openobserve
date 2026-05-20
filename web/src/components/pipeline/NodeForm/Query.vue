@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-stream-query-routing-section"
       class="tw:w-full stream-routing-section"
       :class="[
-        store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+        store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >

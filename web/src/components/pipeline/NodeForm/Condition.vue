@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="add-condition-section"
       class="stream-routing-section tw:w-full"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
 
 

@@ -200,7 +200,7 @@ export default defineComponent({
      * Returns theme class based on current theme
      */
     const themeClass = computed(() => {
-      return store.state.theme === "dark" ? "dark-mode" : "bg-white";
+      return store.state.theme === "dark" ? "dark-mode" : "tw:bg-white";
     });
 
     /**

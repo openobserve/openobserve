@@ -896,7 +896,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:flex tw:justify-start tw:items-end tw:mt-4 tw:pb-4 tw:w-full"
                     :class="
-                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
+                      store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'
                     "
                   ></div>
                 </div>
@@ -1038,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
-                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+                :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
               >
                 <div class="tw:flex tw:justify-end tw:gap-2">
                   <OButton

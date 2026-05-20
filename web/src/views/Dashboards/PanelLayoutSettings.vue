@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
     class="tw:p-0 tw:w-[300px]!"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+    :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
     style="min-height: inherit"
   >
     <div class="tw:mx-3">

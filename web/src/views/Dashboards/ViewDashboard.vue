@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :class="`${
-          store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
+          store.state.theme === 'light' ? 'tw:bg-white' : 'dark-mode'
         } stickyHeader ${
           isFullscreen || store.state.printMode === true
             ? 'fullscreenHeader'

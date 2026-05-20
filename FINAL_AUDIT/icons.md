@@ -2,6 +2,9 @@
 
 This document consolidates every icon/chip/badge-related finding from the 30 page-level audit MDs in `FINAL_AUDIT/`. Tick `- [ ]` boxes off as fixes land. See [README.md](./README.md) for the project-wide checklist.
 
+> **Scope note:** Sections 1–15 are pure **icon** issues (OIcon names, missing registry entries, OBadge `icon` prop, q-icon/q-chip/q-badge migration, OTooltip+OIcon patterns).
+> Sections 16–17 cover **chip/badge styling regressions** (Quasar utility classes like `bg-primary text-white` used on chip-like UI elements) — these are also tracked in [css_class_level_audit.md](./css_class_level_audit.md) §1.4 since they're CSS class migrations, not strictly icon work. They're listed here only because they affect the visual appearance of chip/pill components and were grouped with badges when consolidated.
+
 ## Executive Summary
 - **Total icon-related findings:** ~90 (across all categories)
 - **Total chip/badge-related findings:** ~25
@@ -121,7 +124,7 @@ Every finding from the 30 audits where an `OIcon name=` uses underscores instead
   ```
 
 ### Pipeline icon strings:
-- [ ] **`web/src/components/pipeline/NodeForm/CreateDestinationForm.vue`** — `name="url_endpoint"`, `name="output_format"`, `name="esbulk_index"` (verify these are intentional route keys vs icon names) — `css_class_level_audit.md §7.1`
+- [~] **`web/src/components/pipeline/NodeForm/CreateDestinationForm.vue *(form name, not icon)*`** — `name="url_endpoint"`, `name="output_format"`, `name="esbulk_index"` (verify these are intentional route keys vs icon names) — `css_class_level_audit.md §7.1`
 
 ### Pipelines node-form icon string typo:
 - [x] **`web/src/plugins/pipelines/CustomNode.vue` line ~71-89** — `<OIcon :name="getIcon(data, io - type)" size="md" ... />` — `io - type` is computed JS subtraction; should be `io_type` (string) — `pipelines_audit.md`
@@ -183,7 +186,7 @@ Names referenced but missing from `web/src/lib/core/Icon/OIcon.icons.ts`.
 
 - [x] **`web/src/plugins/metrics/MetricLegends.vue:354`** — `bar_chart` / `pin` — not in registry; reconcile with `MetricList.vue` (`bar-chart` / `tag`) — `metrics_audit.md`
 
-- [ ] **`web/src/views/Dashboards/RenderDashboardCharts.vue`** — `name="before_panels"` (likely custom — verify in registry) — `css_class_level_audit.md §7.1`
+- [~] **`web/src/views/Dashboards/RenderDashboardCharts.vue *(slot name, not icon)*`** — `name="before_panels"` (likely custom — verify in registry) — `css_class_level_audit.md §7.1`
 
 - [ ] **`web/src/enterprise/components/billings/Billing.vue`** — `name="invoice_history"` (verify in registry) — `css_class_level_audit.md §7.1`
 
@@ -303,14 +306,14 @@ OIcon toggles between `role="img" + aria-label` and `aria-hidden="true"` based o
   + <OIcon name="workspaces" size="lg" aria-hidden="true" />
   ```
 
-- [ ] **`web/src/components/ingestion/{Recommended,Server,Database,Networking,Security,Languages,DevOps,Others,MessageQueues}.vue`** — `<OIcon name="search" class="tw:cursor-pointer" />` in search-bar `#icon-left` — implies clickable but no handler — `ingestion_audit.md`
+- [~] **`web/src/components/ingestion/{Recommended,Server *(P2 a11y polish — functional)*,Database,Networking,Security,Languages,DevOps,Others,MessageQueues}.vue`** — `<OIcon name="search" class="tw:cursor-pointer" />` in search-bar `#icon-left` — implies clickable but no handler — `ingestion_audit.md`
   **Solution:**
   ```diff
   - <OIcon name="search" class="tw:cursor-pointer" />
   + <OIcon name="search" aria-hidden="true" />
   ```
 
-- [ ] **`web/src/plugins/traces/TraceDetails.vue` ~line 92-118** — clickable `<OIcon>` (copy trace ID) with only `title=`, no `aria-label` — `traces_audit.md A2`
+- [~] **`web/src/plugins/traces/TraceDetails.vue` ~line 92-118 *(P2 a11y polish — functional)*** — clickable `<OIcon>` (copy trace ID) with only `title=`, no `aria-label` — `traces_audit.md A2`
   **Solution:**
   ```diff
   - <OIcon name="content-copy" @click="copyTraceId" title="Copy trace ID" />
@@ -319,20 +322,20 @@ OIcon toggles between `role="img" + aria-label` and `aria-hidden="true"` based o
   + </button>
   ```
 
-- [ ] **`web/src/components/reports/CreateReport.vue` info-tooltip icons** — `reports_audit.md`
+- [x] **`web/src/components/reports/CreateReport.vue` info-tooltip icons** — `reports_audit.md`
   **Solution:**
   ```diff
   - <OIcon name="info-circle" />
   + <OIcon name="info-circle" aria-hidden="true" />
   ```
 
-- [ ] **`web/src/components/functions/AssociatedStreamFunction.vue`** — decorative info icons — `functions_audit.md`
+- [x] **`web/src/components/functions/AssociatedStreamFunction.vue`** — decorative info icons — `functions_audit.md`
 
 ## 7. OIcon + OTooltip Sibling Pattern
 
 OTooltip in "child mode" (no default slot) attaches mouse handlers to its **parent element** — when placed as a sibling of `<OIcon />` the tooltip triggers on the surrounding wrapper, not the icon. Hover hit-box is wider than intended.
 
-- [ ] **`web/src/components/actionScripts/EditScript.vue:246-273, 340-357`** — `<OIcon name="info" size="sm" />` + `<OTooltip :content="..." />` as siblings — `action_scripts_audit.md #27`
+- [x] **`web/src/components/actionScripts/EditScript.vue:246-273, 340-357`** — `<OIcon name="info" size="sm" />` + `<OTooltip :content="..." />` as siblings — `action_scripts_audit.md #27`
   **Solution:**
   ```diff
   - <OIcon name="info" size="sm" />
@@ -342,7 +345,7 @@ OTooltip in "child mode" (no default slot) attaches mouse handlers to its **pare
   + </OIcon>
   ```
 
-- [ ] **`web/src/views/HomeView.vue` / `O2AIChat.vue:99-100,141-142,437,549-550,646-647,670-671,693-694,820-821,862-863,911-912,1050,1106-1107,1119-1120,1212-1213,1287,1322,1352`** — broad pattern across 18+ sites; line 437 is particularly broken (orphan tooltip without v-if guard) — `home_audit.md C1, M1`
+- [x] **`web/src/views/HomeView.vue` / `O2AIChat.vue:99-100,141-142,437,549-550,646-647,670-671,693-694,820-821,862-863,911-912,1050,1106-1107,1119-1120,1212-1213,1287,1322,1352`** — broad pattern across 18+ sites; line 437 is particularly broken (orphan tooltip without v-if guard) — `home_audit.md C1, M1`
   **Solution:**
   ```diff
   - <OIcon name="info" />
@@ -352,10 +355,10 @@ OTooltip in "child mode" (no default slot) attaches mouse handlers to its **pare
   + </OIcon>
   ```
 
-- [ ] **`web/src/components/functions/EnrichmentTableList.vue:98-107,115-124,133-142,149-158,208-210`** (5 occurrences) — `functions_audit.md M3` / `enrichment_tables_audit.md L2`
-- [ ] **`web/src/components/functions/TestFunction.vue:23-28,175-180,233-238`** (3) — `functions_audit.md M3`
-- [ ] **`web/src/components/functions/FunctionsToolbar.vue:46-52,73-78`** (2) — `functions_audit.md M3`
-- [ ] **`web/src/plugins/metrics/PromQLBuilderOptions.vue`** — `<OIcon name="info" size="sm" /> <OTooltip ...>` no anchor — `metrics_audit.md`
+- [x] **`web/src/components/functions/EnrichmentTableList.vue:98-107,115-124,133-142,149-158,208-210`** (5 occurrences) — `functions_audit.md M3` / `enrichment_tables_audit.md L2`
+- [x] **`web/src/components/functions/TestFunction.vue:23-28,175-180,233-238`** (3) — `functions_audit.md M3`
+- [x] **`web/src/components/functions/FunctionsToolbar.vue:46-52,73-78`** (2) — `functions_audit.md M3`
+- [x] **`web/src/plugins/metrics/PromQLBuilderOptions.vue`** — `<OIcon name="info" size="sm" /> <OTooltip ...>` no anchor — `metrics_audit.md`
   **Solution:**
   ```diff
   - <OIcon name="info" size="sm" />
@@ -365,7 +368,7 @@ OTooltip in "child mode" (no default slot) attaches mouse handlers to its **pare
   + </OTooltip>
   ```
 
-- [ ] **`web/src/components/reports/CreateReport.vue`** — info-tooltip pattern — `reports_audit.md`
+- [x] **`web/src/components/reports/CreateReport.vue`** — info-tooltip pattern — `reports_audit.md`
   **Solution:**
   ```diff
   - <OIcon name="info-circle" />
@@ -375,15 +378,15 @@ OTooltip in "child mode" (no default slot) attaches mouse handlers to its **pare
   + </OTooltip>
   ```
 
-- [ ] **`web/src/components/iam/organizations/OrganizationManagement.vue:61,71,81,91,101,112` and `ServiceAccountsList.vue:98`** — `<OTooltip :content="..." />` placed inside `<OButton>` or `<OBadge>` without wrapping pattern — `iam_audit.md`
+- [x] **`web/src/components/iam/organizations/OrganizationManagement.vue:61,71,81,91,101,112` and `ServiceAccountsList.vue:98`** — `<OTooltip :content="..." />` placed inside `<OButton>` or `<OBadge>` without wrapping pattern — `iam_audit.md`
 
-- [ ] **`web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue:244,300,...`** + `AnomalyAlerting.vue:38` — `anomaly_detection_audit.md` (these note tooltip child-mode works but check anchor scope)
+- [x] **`web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue:244,300,...`** + `AnomalyAlerting.vue:38` — `anomaly_detection_audit.md` (these note tooltip child-mode works but check anchor scope)
 
-- [ ] **`web/src/components/QueryEditor.vue` lines 51-54** — `<OTooltip>` sibling of `<OIcon>` inside `<OButton>` — `query_editor_audit.md`
+- [x] **`web/src/components/QueryEditor.vue` lines 51-54** — `<OTooltip>` sibling of `<OIcon>` inside `<OButton>` — `query_editor_audit.md`
 
-- [ ] **`web/src/plugins/correlation/DimensionFiltersBar.vue` line 48** — tooltip child-mode works because OTooltip implements anchor-to-parent, but pattern is "Quasar-style" — `correlation_ai_audit.md`
+- [x] **`web/src/plugins/correlation/DimensionFiltersBar.vue` line 48** — tooltip child-mode works because OTooltip implements anchor-to-parent, but pattern is "Quasar-style" — `correlation_ai_audit.md`
 
-- [ ] **`web/src/components/functions/EnrichmentTableList.vue` (5)** + same pattern across status icon columns — `enrichment_tables_audit.md L2`
+- [x] **`web/src/components/functions/EnrichmentTableList.vue` (5)** + same pattern across status icon columns — `enrichment_tables_audit.md L2`
 
 ## 8. Material Font Ligature Leftovers (`material-icons-outlined`, `material-symbols-outlined`)
 
@@ -431,18 +434,18 @@ After cross-checking, no live `q-icon` runtime usages remain (most replaced with
 - Spec files still stubbing `q-icon` — see Section 17 below
 
 Library/page-level relevant references:
-- [ ] **`web/src/styles/app.scss:822-873`** — `.q-icon` rules dead — `global_css_architecture_audit.md`
-- [ ] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
-- [ ] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
-- [ ] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/app.scss:822-873`** — `.q-icon` rules dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/logs-page.scss:75-262`** — 42 `q-icon/.q-btn/.q-select/.q-field*` selectors — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/detail-table.scss:13`** — `.q-icon` rule dead — `global_css_architecture_audit.md`
+- [x] **`web/src/styles/logs/function-selector.scss:43-61`** — `.q-btn__content .q-icon` selector — `global_css_architecture_audit.md`
 
 `.OIcon` selectors (PascalCase as class) — OIcon does not emit a `.OIcon` class; these are renamed-but-still-wrong:
 - [ ] **`web/src/views/HomeView.vue`** scoped `.OIcon { font-size: 18px; animation: bounce ... }` — dead — `home_audit.md S4`
-- [ ] **`web/src/plugins/logs/IndexList.vue:1978`** — `.OIcon { margin-right: 4px; ... }` — `logs_audit.md`
-- [ ] **`web/src/components/ingestion/Recommended.vue:273`** + `Custom.vue:245` + `logs/Index.vue:286` — `.OIcon > img` (OIcon renders SVG, not `<img>`) — `ingestion_audit.md`
-- [ ] **`web/src/views/RUM/AppSessions.vue:755-826`** + `SearchBar.vue:343-468` — `.OIcon` in SCSS — `rum_sessions_audit.md`
-- [ ] **`web/src/plugins/traces/IndexList.vue:714, 794`** — `.OIcon { ... }` — `traces_audit.md`
-- [ ] **`web/src/plugins/metrics/Index.vue:635-652`** — `.OIcon { font-size: ... }` (won't size SVG) — `metrics_audit.md`
+- [~] **`web/src/plugins/logs/IndexList.vue:1978 *(P3 dead CSS)*`** — `.OIcon { margin-right: 4px; ... }` — `logs_audit.md`
+- [~] **`web/src/components/ingestion/Recommended.vue:273 *(P3 dead CSS)*`** + `Custom.vue:245` + `logs/Index.vue:286` — `.OIcon > img` (OIcon renders SVG, not `<img>`) — `ingestion_audit.md`
+- [~] **`web/src/views/RUM/AppSessions.vue:755-826 *(P3 dead CSS)*`** + `SearchBar.vue:343-468` — `.OIcon` in SCSS — `rum_sessions_audit.md`
+- [~] **`web/src/plugins/traces/IndexList.vue:714 *(P3 dead CSS)*, 794`** — `.OIcon { ... }` — `traces_audit.md`
+- [~] **`web/src/plugins/metrics/Index.vue:635-652 *(P3 dead CSS)*`** — `.OIcon { font-size: ... }` (won't size SVG) — `metrics_audit.md`
 
 ---
 
@@ -450,7 +453,7 @@ Library/page-level relevant references:
 
 Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="material-icons-outlined">{{ icon }}</span>`, conflicting with the offline SVG `OIcon` registry. Each usage should switch to the default slot with `<OIcon>`.
 
-- [ ] **`web/src/lib/core/Badge/OBadge.vue:149-154`** — Fix at the library level: change `icon` rendering to use OIcon registry — `o_library_audit.md #6`
+- [x] **`web/src/lib/core/Badge/OBadge.vue:149-154`** — Fix at the library level: change `icon` rendering to use OIcon registry — `o_library_audit.md #6`
   **Solution:**
   ```diff
   - <span class="material-icons-outlined">{{ icon }}</span>
@@ -498,7 +501,7 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
 
 ## 12. OBadge Variant Misuse
 
-- [ ] **`web/src/components/settings/AiToolsets.vue:128-133`** — `KIND_VARIANTS = { skill: "primary-soft", generic: "default" }` — `mcp: "primary"` and `skill: "primary-soft"` both render blueish, losing the old blue-vs-purple distinction — `settings_audit.md §3` + `§508`
+- [~] **`web/src/components/settings/AiToolsets.vue:128-133 *(P2 OBadge variant tuning)*`** — `KIND_VARIANTS = { skill: "primary-soft", generic: "default" }` — `mcp: "primary"` and `skill: "primary-soft"` both render blueish, losing the old blue-vs-purple distinction — `settings_audit.md §3` + `§508`
   **Solution (optional, design-dependent):**
   ```diff
   - skill: "primary-soft",
@@ -507,7 +510,7 @@ Per `o_library_audit.md §6`, `OBadge.icon` currently renders via `<span class="
 
 - [x] **`web/src/components/alerts/IncidentDetailDrawer.vue:1015,1064,1120`** — `:color="'warning'|'negative'|'grey-5'"` Quasar tokens passed to OIcon (not OBadge but related to badge-adjacent state icons) — verify variant tokens — `alerts_audit.md M-4`
 
-- [ ] **`web/src/views/Dashboards/viewPanel/ViewPanel.vue:75`** — `:variant="isVariablesChanged ? 'outline' : 'warning'"` on OButton — confirm `warning` variant exists (other places use `ghost-warning`) — `dashboards_audit.md §3`
+- [~] **`web/src/views/Dashboards/viewPanel/ViewPanel.vue:75 *(P2 OButton variant)*`** — `:variant="isVariablesChanged ? 'outline' : 'warning'"` on OButton — confirm `warning` variant exists (other places use `ghost-warning`) — `dashboards_audit.md §3`
   **Solution:**
   ```diff
   - :variant="isVariablesChanged ? 'outline' : 'warning'"
@@ -524,14 +527,14 @@ No active `<q-badge>` runtime usage found after the migration. References live i
 
 No active `<q-chip>` runtime usage found, but related cleanup:
 
-- [ ] **`web/src/components/alerts/steps/Deduplication.vue:310,331,350`** — `.q-chip { ... }` SCSS selectors targeting OBadge/OChip elements that don't emit `.q-chip` class — `alerts_audit.md` CSS table
+- [~] **`web/src/components/alerts/steps/Deduplication.vue:310,331,350 *(P3 dead CSS)*`** — `.q-chip { ... }` SCSS selectors targeting OBadge/OChip elements that don't emit `.q-chip` class — `alerts_audit.md` CSS table
   **Solution:**
   ```diff
   - .q-chip { ... }
   + :deep(.o-badge__root) { ... }   // (or use OBadge :class prop)
   ```
 
-- [ ] **`web/src/plugins/logs/patterns/PatternCard.vue:62-68`** — `q-chip` → `OBadge size="sm"` migration; verify `.wildcard-chip` SCSS no longer targets `.q-chip__content`. Re-scope to OBadge root — `logs_audit.md`
+- [~] **`web/src/plugins/logs/patterns/PatternCard.vue:62-68 *(P3 dead CSS)*`** — `q-chip` → `OBadge size="sm"` migration; verify `.wildcard-chip` SCSS no longer targets `.q-chip__content`. Re-scope to OBadge root — `logs_audit.md`
   **Solution:**
   ```diff
   - <q-chip>{{ wildcard }}</q-chip>     // (already migrated)
@@ -539,7 +542,7 @@ No active `<q-chip>` runtime usage found, but related cleanup:
   ```
   Then update `.wildcard-chip` scoped SCSS to target OBadge root selectors instead of `.q-chip__content`.
 
-- [ ] **`web/src/plugins/traces/TraceDetails.vue` (various)** — `q-chip dense square` (24px height, square corners) became `OBadge size="sm"` — OBadge defaults to pill shape; if square corners required: `class="tw:rounded-sm"` or extend OBadge with a `square` prop — `traces_audit.md CM3`
+- [~] **`web/src/plugins/traces/TraceDetails.vue` (various) *(P3 style polish)*** — `q-chip dense square` (24px height, square corners) became `OBadge size="sm"` — OBadge defaults to pill shape; if square corners required: `class="tw:rounded-sm"` or extend OBadge with a `square` prop — `traces_audit.md CM3`
   **Solution:**
   ```diff
   - <OBadge size="sm">{{ value }}</OBadge>
@@ -550,37 +553,39 @@ No active `<q-chip>` runtime usage found, but related cleanup:
 
 Not surfaced as discrete findings per audit; review during sweep for `tw:bg-[var(--o2-primary)] tw:text-white` chip patterns that should become `<OBadge variant="primary">`.
 
-- [ ] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — `bg-primary text-white` on a chip-like element — convert to OBadge — `dashboards_audit.md` (also see Section 16)
-- [ ] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` selected-state pill — see Section 16
-- [ ] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same pattern — see Section 16
+- [x] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — `bg-primary text-white` on a chip-like element — convert to OBadge — `dashboards_audit.md` (also see Section 16)
+- [x] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` selected-state pill — see Section 16
+- [x] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same pattern — see Section 16
 
 ## 16. Selected-State Pill Highlighting Lost
 
+> ⚠️ **Not strictly an icon issue.** These are Quasar utility-class migrations (`bg-primary text-white` → `tw:bg-[var(--o2-primary)] tw:text-white`) on chip/pill UI elements. Tracked here because they affect chip/badge visuals; canonical location is [css_class_level_audit.md §1.4](./css_class_level_audit.md).
+
 `bg-primary text-white` (Quasar utility) was unprefixed `tw:` — silently dropped, so selected states show no highlight. Per `css_class_level_audit.md §1.4`.
 
-- [ ] **`web/src/components/rum/ErrorsList.vue:31`** — `bg-primary text-white` (splitter drag-grip) — `error_tracking_audit.md` (orphan file)
+- [x] **`web/src/components/rum/ErrorsList.vue:31`** — `bg-primary text-white` (splitter drag-grip) — `error_tracking_audit.md` (orphan file)
   **Solution:**
   ```diff
   - <div class="bg-primary text-white">
   + <div class="tw:bg-[var(--o2-primary)] tw:text-white">
   ```
 
-- [ ] **`web/src/components/rum/VideoPlayer.vue:52,62`** — `bg-primary` × 2 — `rum_sessions_audit.md`
-- [ ] **`web/src/plugins/traces/TraceHeader.vue:37`** — `bg-primary` — `traces_audit.md`
-- [ ] **`web/src/components/iam/users/AddUser.vue:200`** + `EditUser.vue` (+2 more) — `bg-primary` — `iam_audit.md`
-- [ ] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — week/segmented control selected state — `dashboards_audit.md`
-- [ ] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` — `dashboards_audit.md`
-- [ ] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same — `dashboards_audit.md`
-- [ ] **`web/src/components/actionScripts/FileItem.vue:5`** — `:class="{ 'bg-primary text-white': active }"` — file-tree selection lost color — `action_scripts_audit.md #8`
+- [x] **`web/src/components/rum/VideoPlayer.vue:52,62`** — `bg-primary` × 2 — `rum_sessions_audit.md`
+- [x] **`web/src/plugins/traces/TraceHeader.vue:37`** — `bg-primary` — `traces_audit.md`
+- [x] **`web/src/components/iam/users/AddUser.vue:200`** + `EditUser.vue` (+2 more) — `bg-primary` — `iam_audit.md`
+- [x] **`web/src/components/dashboards/PanelEditor/PanelEditor.vue:563`** — week/segmented control selected state — `dashboards_audit.md`
+- [x] **`web/src/components/dashboards/addPanel/CustomHTMLEditor.vue:41`** — `bg-primary text-white` — `dashboards_audit.md`
+- [x] **`web/src/components/dashboards/addPanel/CustomMarkdownEditor.vue:44`** — same — `dashboards_audit.md`
+- [x] **`web/src/components/actionScripts/FileItem.vue:5`** — `:class="{ 'bg-primary text-white': active }"` — file-tree selection lost color — `action_scripts_audit.md #8`
   **Solution:**
   ```diff
   - :class="{ 'bg-primary text-white': active }"
   + :class="{ 'tw:bg-[var(--o2-primary)] tw:text-white': active }"
   ```
 
-- [ ] **`web/src/components/functions/StreamRouting.vue:2`** — `bg-white` (no `tw:` prefix) — `functions_audit.md` / `css_class_level_audit.md §1.4`
-- [ ] **`web/src/components/iam/roles/PermissionsTable.vue:60`** — `bg-white` — `iam_audit.md` / `css_class_level_audit.md §1.4`
-- [ ] **`web/src/components/settings/DomainManagement.vue:244`** — `bg-blue-1` (Quasar palette) — `css_class_level_audit.md §1.4`
+- [x] **`web/src/components/functions/StreamRouting.vue:2`** — `bg-white` (no `tw:` prefix) — `functions_audit.md` / `css_class_level_audit.md §1.4`
+- [x] **`web/src/components/iam/roles/PermissionsTable.vue:60`** — `bg-white` — `iam_audit.md` / `css_class_level_audit.md §1.4`
+- [x] **`web/src/components/settings/DomainManagement.vue:244`** — `bg-blue-1` (Quasar palette) — `css_class_level_audit.md §1.4`
   **Solution:**
   ```diff
   - <span class="bg-blue-1 text-blue-8">
@@ -588,6 +593,8 @@ Not surfaced as discrete findings per audit; review during sweep for `tw:bg-[var
   ```
 
 ## 17. Status Badge Color Regressions
+
+> ⚠️ **Not strictly an icon issue.** These are Quasar palette tokens (`text-red-5/6/7/8`, `text-green-6`, `text-primary`) without the `tw:` prefix — silently dropped. Tracked here because they affect badge/status color rendering; canonical location is [css_class_level_audit.md §1.3](./css_class_level_audit.md).
 
 State semantics (positive/negative/warning) lost when Quasar palette tokens were not migrated to OBadge variants or `tw:text-[var(--o2-*)]`.
 
@@ -702,7 +709,7 @@ Plus 48 instances of `text-blue-500 hover:text-blue-600` link colors across `web
 - [x] Normalize all `OIcon :size="18px"` to enum values (`License.vue:285,294` → `sm`; ServiceGraphEdgeSidePanel `size="10px"` → `xs`)
 - [ ] Wrap all OIcon+OTooltip sibling patterns (~30 occurrences across alerts, anomaly, common, enrichment, functions, home, metrics, query-editor, reports)
 - [ ] Add `tw:` prefix to all `text-blue-500 hover:text-blue-600` ingestion doc links (48 instances)
-- [ ] Add `tw:` prefix to all `bg-primary text-white` selected-state pills (8 occurrences)
+- [x] Add `tw:` prefix to all `bg-primary text-white` selected-state pills (8 occurrences)
 
 ### P2 — cleanup + API alignment
 - [ ] Migrate all OBadge `icon=...` props to default-slot `<OIcon>` (proPlan, enterprisePlan, ImportSemanticGroups × 2, BackfillJobDetails, ViewPerformanceMetrics)
