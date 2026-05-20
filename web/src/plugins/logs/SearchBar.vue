@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-start!">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:justify-between tw:w-full">
       <div
-        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden"
+        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap"
       >
         <!-- View Mode Toggle Group -->
         <OToggleGroup
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'width: 100%; min-width: 0'
                     "
                   >
-                    <div style="box-sizing: border-box; width: 100%; padding: 0 8px">
+                    <div class="tw:box-border tw:w-full tw:px-2">
                       <OInput
                         data-test="log-search-saved-view-field-search-input"
                         v-model="searchObj.data.savedViewFilterFields"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="log-search-saved-view-list-fields-table"
-                      style="max-height: 320px; overflow-y: auto; overflow-x: hidden"
+                      class="tw:max-h-[20rem] tw:overflow-y-auto tw:overflow-x-hidden"
                     >
                       <div
                         v-if="paginatedSavedViews.length === 0"
@@ -205,8 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-for="row in paginatedSavedViews"
                         :key="row.view_id"
-                        style="display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 2px"
-                        class="tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
+                        class="tw:grid tw:grid-cols-[minmax(0,1fr)_auto_auto_auto] tw:items-center tw:gap-0.5 tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
                         :data-test="`logs-search-saved-view-item-${row.view_name}`"
                       >
                         <div
@@ -264,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="savedViewTotalPages > 1"
                       class="tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1 tw:border-t tw:border-[var(--color-border-default)]"
                     >
-                      <span class="tw:text-xs tw:text-gray-500">
+                      <span class="tw:text-xs tw:text-[var(--o2-text-caption)]">
                         {{ (savedViewPage - 1) * savedViewPageSize + 1 }}–{{ Math.min(savedViewPage * savedViewPageSize, filteredSavedViews.length) }} / {{ filteredSavedViews.length }}
                       </span>
                       <div class="tw:flex tw:gap-0.5">
@@ -305,8 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    class="tw:flex tw:flex-col"
-                    style="width: 40%; padding: 0; margin-left: 0px; justify-content: flex-start; align-self: flex-start"
+                    class="tw:flex tw:flex-col tw:w-[40%] tw:p-0 tw:ml-0 tw:justify-start tw:self-start"
                     v-if="localSavedViews.length > 0"
                   >
                     <div class="tw:p-0">
@@ -317,13 +315,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSeparator class="tw:mx-4" />
                     <div
                       data-test="log-search-saved-view-favorite-list-fields-table"
-                      style="max-height: 320px; overflow-y: auto; overflow-x: hidden"
+                      class="tw:max-h-[20rem] tw:overflow-y-auto tw:overflow-x-hidden"
                     >
                       <div
                         v-for="row in localSavedViews"
                         :key="row.view_id"
-                        style="display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 2px"
-                        class="tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
+                        class="tw:grid tw:grid-cols-[minmax(0,1fr)_auto_auto_auto] tw:items-center tw:gap-0.5 tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
                       >
                         <div
                           class="tw:truncate tw:text-sm tw:min-w-0"
@@ -415,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <div
-              style="width: 28px; display: flex; align-items: center; margin-right: 12px"
+              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
             >
               <OSwitch
                 v-model="searchObj.meta.showHistogram"
@@ -433,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <div
-              style="width: 28px; display: flex; align-items: center; margin-right: 12px"
+              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
             >
               <OSwitch
                 v-model="searchObj.meta.sqlMode"
@@ -451,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select.prevent="handleQuickMode"
           >
             <div
-              style="width: 28px; display: flex; align-items: center; margin-right: 12px"
+              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
             >
               <OSwitch
                 :model-value="searchObj.meta.quickMode"
@@ -516,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div class="float-right col-auto tw:flex tw:items-center tw:gap-1">
+      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
         <transform-selector
           v-if="isActionsEnabled && !shouldMoveShareToMenu"
           :function-options="functionOptions"
@@ -537,10 +534,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn"
+              class="download-logs-btn tw:order-4"
               variant="outline"
               size="icon-toolbar"
-              style="order: 4"
             >
               <OIcon name="menu" size="sm" />
               <OTooltip style="width: 110px" :content="t('search.moreActions')" />
@@ -568,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="searchHistoryIcon"
                 alt="Search History"
-                style="width: 16px; height: 16px"
+                class="tw:w-4 tw:h-4"
               />
             </template>
             {{ t("search.searchHistory") }}
@@ -619,7 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="customRangeIcon"
                 alt="Custom Range"
-                style="width: 16px; height: 16px"
+                class="tw:w-4 tw:h-4"
               />
             </template>
             {{ t("search.customRange") }}
@@ -650,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="createScheduledSearchIcon"
                 alt="Create Scheduled Search"
-                style="width: 16px; height: 16px"
+                class="tw:w-4 tw:h-4"
               />
             </template>
             <span data-test="search-scheduler-create-new-label">
@@ -667,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="listScheduledSearchIcon"
                 alt="List Scheduled Search"
-                style="width: 16px; height: 16px"
+                class="tw:w-4 tw:h-4"
               />
             </template>
             <span data-test="search-scheduler-list-label">
@@ -698,9 +694,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="shareURL"
           variant="outline"
           size="icon-toolbar"
-          style="order: 3"
+          class="tw:order-3"
         />
-        <div class="float-left tw:mr-[4px]" style="order: 1">
+        <div class="tw:mr-1 tw:order-1">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -723,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="element-box-shadow"
           />
         </div>
-        <div class="search-time float-left" style="order: 2">
+        <div class="search-time tw:order-2">
           <div class="tw:flex">
             <OButtonGroup
               class="tw:p-0 tw:mr-1 element-box-shadow el-border"
@@ -873,7 +869,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                    class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -974,7 +970,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                    class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -1166,7 +1162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- NLP mode: info message -->
                 <p
                   v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                  class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
                 >
                   {{ t("nlMode.noAdditionalOptions") }}
                 </p>
@@ -1188,9 +1184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex query-editor-container">
+    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
       <div
-        class="tw:flex tw:flex-col tw:h-full"
+        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
@@ -1260,7 +1256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="logs-vrl-function-editor"
               v-if="searchObj.data.transformType"
-              style="width: 100%; height: 100%"
+              class="tw:w-full tw:h-full"
             >
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
@@ -1307,22 +1303,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
-                      class="tw:absolute tw:bottom-0 tw:w-full"
-                      :style="{
-                        marginTop: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor:
-                          store.state.theme == 'dark'
-                            ? 'rgba(255, 255, 255, 0.1)'
-                            : 'rgba(0, 0, 0, 0.1)',
-                      }"
+                      class="tw:absolute tw:bottom-0 tw:w-full tw:mt-3 tw:flex tw:items-center vrl-disabled-warning"
                       data-test="vrl-editor-disabled-warning"
                     >
                       <OIcon name="warning" size="md" class="tw:mx-2" />
                       <span
-                        class="tw:text-red-500 tw:p-2"
-                        style="font-weight: 600; font-size: 14px"
+                        class="tw:text-red-500 tw:p-2 tw:font-semibold"
                         >VRL function is only supported for table chart.</span
                       >
                     </div>
@@ -1547,9 +1533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="info-outline" size="sm" class="tw:ml-1 tw:cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
-                <span style="font-size: 14px">{{
-                  t("search.noOfRecordsTooltip")
-                }}</span>
+                <span class="tw:text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
               </template>
             </OTooltip>
         </div>
@@ -1563,7 +1547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div style="opacity: 0.8" class="tw:text-left mapping-warning-msg tw:mt-3">
+      <div class="tw:opacity-80 tw:text-left mapping-warning-msg tw:mt-3">
         <OIcon name="warning" size="sm" class="tw:mr-2" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
@@ -1682,8 +1666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span
-                          class="tw:truncate"
-                          style="max-width: 140px"
+                          class="tw:truncate tw:max-w-[8.75rem]"
                           >{{ value }}</span
                         >
                       </div>
@@ -1758,8 +1741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div
-              class="tw:flex tw:flex-col"
-              style="width: 40%; margin-left: 0px"
+              class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0"
               v-if="localSavedViews.length > 0"
             >
               <OTable
@@ -1792,8 +1774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span
-                          class="tw:truncate"
-                          style="max-width: 90px"
+                          class="tw:truncate tw:max-w-[5.625rem]"
                           >{{ value }}</span
                         >
                       </div>
@@ -4572,19 +4553,14 @@ export default defineComponent({
       return searchIds;
     });
     const backgroundColorStyle = computed(() => {
-      const isDarkMode = store.state.theme === "dark";
       return {
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
-            ? isDarkMode
-              ? "var(--o2-card-bg)"
-              : "white" // Dark mode: grey, Light mode: yellow (or any color)
+            ? "var(--o2-card-bg)"
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
-            ? isDarkMode
-              ? "0.375rem solid var(--o2-card-bg)"
-              : "0.375rem solid var(--o2-card-bg)"
+            ? "0.375rem solid var(--o2-card-bg)"
             : "none",
         // Conditional width when focused (expand-on-focus active)
         width: isFocused.value
@@ -4595,12 +4571,10 @@ export default defineComponent({
       };
     });
     const editorWidthToggleFunction = computed(() => {
-      const isDarkMode = store.state.theme === "dark";
-
       if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
           width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
-          borderBottom: isDarkMode ? "2px solid #575A5A" : "2px solid #E0E0E0",
+          borderBottom: "0.125rem solid var(--o2-border-color)",
         };
       } else {
         return {
@@ -5300,15 +5274,15 @@ export default defineComponent({
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 12px;
-  font-size: 14px;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  font-size: var(--text-base);
   line-height: 1.2;
   cursor: pointer;
   user-select: none;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--o2-hover-accent);
   }
 
   /* Invisible hover bridge extending to the LEFT of the parent item,
@@ -5321,14 +5295,14 @@ export default defineComponent({
     position: absolute;
     top: 0;
     right: 100%;
-    width: 10px;
+    width: 0.625rem;
     height: 100%;
     /* Stays transparent — only present to extend the hover hit-test area */
   }
 
   body.body--dark & {
     &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
+      background-color: var(--o2-hover-accent);
     }
   }
 }
@@ -5342,43 +5316,43 @@ export default defineComponent({
   position: absolute;
   right: 100%;
   top: 0;
-  margin-right: 4px;
-  min-width: 160px;
-  background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
+  margin-right: 0.25rem;
+  min-width: 10rem;
+  background-color: var(--o2-card-bg);
+  border: 0.063rem solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
+  padding: 0.25rem 0;
   z-index: 9999;
 
   body.body--dark & {
-    background-color: #1f2937;
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background-color: var(--o2-card-bg);
+    border-color: var(--o2-border-color);
+    box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }
 }
 
 .search-download-submenu-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.625rem;
   width: 100%;
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 0.375rem 0.75rem;
+  font-size: var(--text-base);
   line-height: 1.2;
   text-align: left;
   background: transparent;
   border: 0;
   cursor: pointer;
-  color: inherit;
+  color: var(--o2-text-body);
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--o2-hover-accent);
   }
 
   body.body--dark & {
     &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
+      background-color: var(--o2-hover-accent);
     }
   }
 }
@@ -5387,21 +5361,17 @@ export default defineComponent({
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
+  max-width: 100vw;
   /* Width is now handled dynamically via backgroundColorStyle computed property */
 }
 
 .file-type label {
   transform: translate(-0.75rem, -175%);
-  font-weight: bold;
-  font-size: 0.875rem; // 14px
+  font-weight: var(--font-semibold);
+  font-size: var(--text-base);
   color: var(--o2-text-secondary);
 }
-.q-dark .q-btn {
-  font-weight: 600;
-  border: 0 solid rgba(255, 255, 255, 0.2);
-}
-.q-dark .file-type label,
-.q-dark .file-type .q-btn {
+.body--dark .file-type label {
   color: var(--o2-text-secondary);
 }
 
@@ -5422,9 +5392,6 @@ export default defineComponent({
   }
 }
 
-.dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid var(--color-button-outline-border);
-}
 
 .toolbar-icon {
   width: 1rem; // 16px
@@ -5432,7 +5399,7 @@ export default defineComponent({
   object-fit: contain;
 }
 
-.q-dark .toolbar-icon {
+.body--dark .toolbar-icon {
   filter: invert(1);
 }
 
@@ -5503,10 +5470,6 @@ export default defineComponent({
   }
 }
 
-.q-dark .toolbar-reset-btn,
-.dark-theme .toolbar-reset-btn {
-  border-color: var(--o2-border-color);
-}
 
 .group-menu-btn {
   padding: 0.25rem 0.25rem !important; // 4px 8px
@@ -5527,16 +5490,12 @@ export default defineComponent({
   }
 }
 
-.dark-theme .group-menu-btn,
-.q-dark .group-menu-btn {
-  border: 0.0625rem solid var(--color-button-outline-border) !important;
-}
 .o2-run-query-button {
-  font-size: 11px;
-  font-weight: 500 !important;
-  line-height: 16px !important;
-  padding: 0px 0px !important;
-  width: 94px !important;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium) !important;
+  line-height: 1rem !important;
+  padding: 0 !important;
+  width: 5.875rem !important;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -5563,7 +5522,7 @@ export default defineComponent({
 }
 
 .o2-color-cancel {
-  background-color: #f67a7a;
+  background-color: var(--o2-cancel-query-bg);
   color: var(--o2-primary-btn-text);
 }
 
@@ -5575,37 +5534,45 @@ export default defineComponent({
 
 .query-mode-toggle {
   position: absolute;
-  bottom: 6px;
-  right: 6px;
+  bottom: 0.375rem;
+  right: 0.375rem;
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   background: var(--o2-muted-background);
-  padding: 2px 4px;
+  padding: 0.125rem 0.25rem;
   border-radius: 0.375rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  border: 0.0625rem solid var(--o2-border-color);
+  box-shadow: 0 0.063rem 0.25rem var(--o2-hover-shadow);
+  border: 0.063rem solid var(--o2-border-color);
 
   .mode-label {
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
     color: var(--o2-text-secondary);
   }
 }
 
-// Dark mode support (both .dark-theme and .q-dark selectors)
-.dark-theme .query-mode-toggle,
-.q-dark .query-mode-toggle {
-  background: #1e1e1e;
-  border-color: #3a3a3a;
+// Dark mode support
+.body--dark .query-mode-toggle {
+  background: var(--o2-card-bg-solid);
+  border-color: var(--o2-border-color);
 
   .mode-label {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--o2-text-secondary);
   }
 }
 
 .o2-table-hide-header :deep(thead) {
   display: none;
+}
+
+// VRL disabled warning background — theme-aware via CSS cascade
+.vrl-disabled-warning {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.body--dark .vrl-disabled-warning {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 </style>

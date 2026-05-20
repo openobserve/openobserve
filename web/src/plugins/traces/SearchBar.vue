@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]">
-      <div class="float-right tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full">
+      <div class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="metricsIcon"
               alt="Metrics"
-              style="width: 20px; height: 20px"
+              class="tw:w-5 tw:h-5"
             />
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="error"
               size="sm"
-              class="tw:mx-1 tw:text-red-500"
+              class="tw:mx-1 tw:text-[var(--o2-status-error)]"
             />
             <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
+        class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
         <date-time
           ref="dateTimeRef"
@@ -239,11 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               {{ t("search.runQuery") }}
             </OButton>
-            <!-- Dropdown: shown when live mode feature is enabled -->
-            <OSeparator
-              v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
-              class="tw:h-[1.875rem]! tw:w-[1px]"
-            />
+            <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
             <ODropdown
               v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
               side="bottom"
@@ -310,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
       <div
         v-if="searchObj.meta.searchMode === 'service-graph'"
-        class="float-right col-auto o2-input-full"
+        class="tw:ml-auto"
       >
         <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
           <date-time
@@ -373,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Services Catalog right toolbar: DateTime, Refresh -->
       <div
         v-if="searchObj.meta.searchMode === 'services-catalog'"
-        class="float-right col-auto o2-input-full"
+        class="tw:ml-auto"
       >
         <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
           <date-time
@@ -1204,11 +1200,11 @@ export default defineComponent({
 }
 
 .o2-run-query-button {
-  font-size: 11px;
-  font-weight: 500 !important;
-  line-height: 16px !important;
-  padding: 0px 0px !important;
-  width: 94px !important;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium) !important;
+  line-height: 1rem !important;
+  padding: 0 !important;
+  width: 5.875rem !important;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -1220,13 +1216,13 @@ export default defineComponent({
 
   &:hover {
     opacity: 0.9;
-    box-shadow: 0 0 8px
+    box-shadow: 0 0 0.5rem
       color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
 
 .search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0px 0px 0.375rem !important;
+  border-radius: 0.375rem 0 0 0.375rem !important;
 }
 
 .search-button-normal-border-radius {
@@ -1234,11 +1230,11 @@ export default defineComponent({
 }
 
 .search-button-dropdown-enterprise-border-radius {
-  border-radius: 0px 0.375rem 0.375rem 0px !important;
+  border-radius: 0 0.375rem 0.375rem 0 !important;
 }
 
 .o2-color-cancel {
-  background-color: #f67a7a;
+  background-color: var(--o2-cancel-query-bg);
   color: var(--o2-primary-btn-text);
 }
 
@@ -1257,7 +1253,7 @@ export default defineComponent({
   }
 }
 
-:global(.dark-theme) .toolbar-toggle-container {
+:global(.body--dark) .toolbar-toggle-container {
   border: 0.0625rem solid var(--color-button-outline-border);
 }
 </style>

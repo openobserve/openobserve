@@ -109,7 +109,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:w-1/3 tw:text-right tw:pr-2 tw:gap-1 pagination-block">
+        <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+          <!-- Wrap Content Button -->
+          <OButton
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
+            data-test="logs-search-result-wrap-table-content-btn"
+            variant="ghost"
+            size="icon"
+            class="wrap-content-btn"
+            :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }"
+            @click="
+              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
+            "
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
+          <OSelect
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs' &&
+              !searchObj.loading
+            "
+            data-test="logs-search-result-records-per-page"
+            v-model="searchObj.meta.resultGrid.rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination"
+            size="sm"
+            @update:model-value="getPageData('recordsPerPage')"
+          />
           <OPagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
@@ -133,43 +166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
-            class="float-right paginator-section"
+            class="paginator-section"
             @update:model-value="getPageData('pageChange')"
             data-test="logs-search-result-pagination"
           />
-          <OSelect
-            v-if="
-              searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs' &&
-              !searchObj.loading
-            "
-            data-test="logs-search-result-records-per-page"
-            v-model="searchObj.meta.resultGrid.rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="float-right select-pagination"
-            size="sm"
-            @update:model-value="getPageData('recordsPerPage')"
-          />
-          <!-- Wrap Content Button -->
-          <OButton
-            v-if="
-              searchObj.meta.logsVisualizeToggle === 'logs' ||
-              searchObj.meta.logsVisualizeToggle === 'patterns'
-            "
-            data-test="logs-search-result-wrap-table-content-btn"
-            variant="ghost"
-            size="icon"
-            class="wrap-content-btn float-right"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
-              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
-            "
-          >
-            <OIcon name="wrap-text" size="sm" />
-            <OTooltip :content="t('search.messageWrapContent')" />
-          </OButton>
         </div>
       </div>
 

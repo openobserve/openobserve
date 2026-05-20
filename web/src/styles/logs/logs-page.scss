@@ -990,10 +990,9 @@
     border-radius: 0.25rem !important;
     line-height: 1rem !important;
 
-    .material-icons,
-    .material-icons-outlined {
-      font-size: 1rem !important;
-      line-height: 1rem !important;
+    :deep(svg) {
+      width: 1rem !important;
+      height: 1rem !important;
     }
   }
 }
