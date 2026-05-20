@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="column index-menu default-index-menu tw:h-full!">
+  <div class="tw:flex tw:flex-col index-menu default-index-menu tw:h-full!">
     <div class="index-table logs-index-menu tw:h-full!">
       <OFieldList
         ref="fieldListRef"
