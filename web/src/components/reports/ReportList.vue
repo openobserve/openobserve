@@ -372,7 +372,7 @@ const columns = computed<OTableColumnDef[]>(() => {
     { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, meta: { align: "left" } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, size: 150, meta: { align: "center" } },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, size: 300, meta: { align: "center" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, size: 150, meta: { align: "left" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, size: 220, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column" } },
   ];
 
