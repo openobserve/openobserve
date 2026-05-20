@@ -111,14 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="info" size="xs" class="field-info-icon" />
           <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
         </div>
-        <div class="textarea-border" :class="{ 'field-error': errors.content }" style="flex: 1; display: flex; flex-direction: column">
           <OTextarea
             v-model="form.content"
-            class="prompt-input"
-            style="resize: none; height: 100%"
+            fill
             @update:model-value="errors.content = false"
           />
-        </div>
       </div>
     </div>
 
@@ -368,7 +365,6 @@ onBeforeMount(async () => {
 }
 
 .field-info-icon {
-  color: var(--q-color-text);
   opacity: 0.45;
   cursor: default;
   flex-shrink: 0;
@@ -381,11 +377,6 @@ onBeforeMount(async () => {
 .textarea-border {
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-
-  :deep(.q-field__control) {
-    border: none !important;
-    box-shadow: none !important;
-  }
 }
 
 .textarea-label {
@@ -401,34 +392,7 @@ onBeforeMount(async () => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 
-  :deep(.q-field__inner) {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
-
-  :deep(.q-field__control) {
-    flex: 1;
-    min-height: 0;
-    height: auto !important;
-    align-items: stretch;
-  }
-
-  :deep(.q-field__control-container) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :deep(textarea) {
-    flex: 1;
-    min-height: 0;
-    height: 100% !important;
-    resize: none !important;
-    padding: 8px 12px !important;
-  }
 }
 </style>
