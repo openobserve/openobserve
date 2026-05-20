@@ -13,7 +13,7 @@
     >
       <div class="tw:col-span-1 tw:min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="tw:mb-4">
+          <OCard class="tw:mb-4 tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="tw:mt-2 tw:text-sm">
@@ -36,7 +36,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard>
+          <OCard class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="tw:text-base tw:font-medium tw:mb-3">
                 {{ t("about.enter_license_key") }}
@@ -75,7 +75,7 @@
         </div>
 
         <div v-else>
-          <OCard>
+          <OCard class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_info") }}</div>
               <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
@@ -182,7 +182,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard v-show="showUpdateForm" class="tw:mt-4">
+          <OCard v-show="showUpdateForm" class="tw:mt-4 tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="tw:text-base tw:font-medium tw:mb-2">
                 {{ t("about.update_license_key") }}
@@ -235,7 +235,7 @@
       </div>
 
       <div class="tw:col-span-1 tw:self-start">
-        <OCard class="futuristic-card">
+        <OCard class="futuristic-card tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
           <OCardSection class="tw:p-3">
             <div class="futuristic-header">
               <div class="header-glow"></div>

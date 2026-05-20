@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
               :label="t('settings.correlation.serviceOptionalLabel')"
-              size="sm"
+              size="md"
             />
             <div
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"

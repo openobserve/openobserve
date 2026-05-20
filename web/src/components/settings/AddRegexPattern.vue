@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="formKey"
           :default-values="{ name: regexPatternInputs.name, pattern: regexPatternInputs.pattern }"
           @submit="saveRegexPattern"
-          class="tw:flex tw:flex-col tw:gap-4"
+          class="tw:flex tw:flex-col tw:gap-4 tw:mt-2"
         >
-          <div class="tw:flex tw:flex-col">
+          <div class="tw:flex tw:flex-col tw:gap-y-3">
             <OFormInput
               name="name"
               :readonly="isEdit"
