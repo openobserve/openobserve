@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <div v-if="!listLoading && filterQuery == ''" class="tw:w-full column flex-center tw:mt-1 full-height" style="font-size: 1.5rem">
+        <div v-if="!listLoading && filterQuery == ''" class="tw:w-full tw:flex tw:flex-col flex-center tw:mt-1 tw:h-full" style="font-size: 1.5rem">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
         </div>
         <NoData v-else-if="!listLoading && filterQuery != ''" />

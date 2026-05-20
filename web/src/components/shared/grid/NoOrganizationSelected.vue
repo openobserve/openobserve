@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="tw:w-full column flex-center tw:gap-2"
+      class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2"
       style="font-size: 1.5rem"
     >
       <img

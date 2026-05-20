@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:flex tw:flex-col column full-height"
+    class="tw:flex tw:flex-col full-height"
     style="
       overflow: hidden !important;
       padding: 0 !important;

@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="full-height">
+    <div id="tracesSecondLevel" class="tw:h-full">
       <OSplitter
         :class="[
-          'traces-horizontal-splitter full-height',
+          'traces-horizontal-splitter tw:h-full',
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'hide-splitter-separator'
             : '',

@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-    <div v-else class="tw:flex flex-column tw:items-center tw:justify-center tw:p-4">
+    <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:p-4">
       <OIcon name="error-outline" style="width: 64px; height: 64px;" />
       <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">Job not found</div>
     </div>
