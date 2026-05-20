@@ -92,7 +92,7 @@
         </div>
         <!-- Action buttons -->
 
-        <div class="flex tw:justify-start tw:items-center tw:ml-4"
+        <div class="tw:flex tw:justify-start tw:items-center tw:ml-4"
         >
         <OButton
             data-test="alert-conditions-add-condition-btn"

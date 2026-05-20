@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="source-maps-list tw:p-3">
       <!-- Loading State -->
       <template v-if="isLoading">
-        <div class="tw:p-4 flex tw:items-center tw:justify-center tw:text-center">
+        <div class="tw:p-4 tw:flex tw:items-center tw:justify-center tw:text-center">
           <div>
             <OSpinner
               size="md"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="tw:cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">

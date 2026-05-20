@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         width: 33.14px;
                         height: auto;
                       "
-                      class="flex tw:justify-center tw:items-center tw:ml-1"
+                      class="tw:flex tw:justify-center tw:items-center tw:ml-1"
                       :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                     >
                       <OSpinner size="xs" />
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="!templates.length || !destinations.length"
-                    class="tw:w-full flex column tw:justify-center tw:items-center tw:text-center"
+                    class="tw:w-full tw:flex column tw:justify-center tw:items-center tw:text-center"
                   >
                     <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #header-left>
           <div
             data-test="add-alert-back-btn"
-            class="flex tw:justify-center tw:items-center cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;

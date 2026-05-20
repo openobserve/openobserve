@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
     <div class="card-container tw:h-[calc(100vh-50px)]">
-      <div class="flex tw:justify-between tw:items-start tw:py-2 tw:px-2">
-        <div class="flex tw:items-center tw:pl-3">
+      <div class="tw:flex tw:justify-between tw:items-start tw:py-2 tw:px-2">
+        <div class="tw:flex tw:items-center tw:pl-3">
           <div class="tw:text-xl tw:font-semibold" v-if="pipelineObj.isEditPipeline == true">
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OSeparator class="tw:mb-2 tw:px-2" />
 
-      <div class="flex tw:mt-3 tw:px-2">
+      <div class="tw:flex tw:mt-3 tw:px-2">
         <div class="nodes-drag-container tw:pr-3">
           <div
             data-test="pipeline-editor-nodes-list-title"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
 
-          <div class="flex tw:mt-2">
+          <div class="tw:flex tw:mt-2">
             <NodeSidebar
               v-show="
                 !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'

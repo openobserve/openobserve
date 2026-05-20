@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div
-      class="tw:w-full flex tw:ml-2"
+      class="tw:w-full tw:flex tw:ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
 
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: calc(100% - 120px)"
           class="tw:pr-2"
         />
-        <div class="flex tw:justify-center">
+        <div class="tw:flex tw:justify-center">
           <OSelect
             v-model="selectedRole"
             :options="options"

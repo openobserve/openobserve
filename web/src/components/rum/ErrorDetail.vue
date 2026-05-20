@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="error_details tw:w-[40vw]">
-    <div @click="handleErrorTypeClick" class="error_type cursor-pointer">
+    <div @click="handleErrorTypeClick" class="error_type tw:cursor-pointer">
       {{ column.error_type || "Error" }}
     </div>
     <div
-      class="error_message cursor-pointer tw:truncate tw:mt-1"
+      class="error_message tw:cursor-pointer tw:truncate tw:mt-1"
       :title="column.error_message"
     >
       {{ column.error_message }}

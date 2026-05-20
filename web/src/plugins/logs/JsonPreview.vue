@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="tw:pb-1 flex tw:justify-start tw:px-3 copy-log-btn">
+    <div class="tw:pb-1 tw:flex tw:justify-start tw:px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
         class="tw:mb-[0.375rem] logs-json-preview-tabs tw:mr-2 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
@@ -32,7 +32,7 @@
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
         "
-        class="o2-input flex tw:items-center logs-trace-selector"
+        class="o2-input tw:flex tw:items-center logs-trace-selector"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"

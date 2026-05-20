@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:py-2 variables-input "
   :class="{
-    'flex tw:gap-2 tw:items-center tw:w-full': variables.length == 0,
+    'tw:flex tw:gap-2 tw:items-center tw:w-full': variables.length == 0,
   }"
   >
     <div class="tw:pb-1 custom-input-label tw:font-bold">
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
     <template v-if="!variables.length">
-      <div class="flex tw:justify-between tw:items-center tw:ml-auto">
+      <div class="tw:flex tw:justify-between tw:items-center tw:ml-auto">
 
         <OButton
           data-test="alert-variables-add-btn"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(variable, index) in variables as any"
         :key="variable.uuid"
-        class="tw:gap-2 tw:pb-2 flex tw:items-center"
+        class="tw:gap-2 tw:pb-2 tw:flex tw:items-center"
         :data-test="`alert-variables-${index + 1}`"
       >
         <div class="tw:ml-0">

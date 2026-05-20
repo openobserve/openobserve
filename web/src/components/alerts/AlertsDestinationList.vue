@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <div
               v-if="!templates.length"
-              class="tw:w-full flex column tw:justify-center tw:items-center tw:text-center"
+              class="tw:w-full tw:flex column tw:justify-center tw:items-center tw:text-center"
             >
               <div style="width: 600px" class="tw:mt-6">
                 <div class="tw:text-base tw:font-medium">

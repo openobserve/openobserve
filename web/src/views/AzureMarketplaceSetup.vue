@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="azure-marketplace-setup">
-    <div class="flex relative-position tw-px-3 tw-pt-2">
+    <div class="tw:flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
         loading="lazy"

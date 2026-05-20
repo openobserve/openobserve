@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="restart-alt" size="sm"
           data-test="logs-page-fields-list-reset-icon"
-          class="cursor-pointer reset-icon"
+          class="tw:cursor-pointer reset-icon"
           @click="$emit('reset-fields')"
         />
         <OTooltip

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex tw:items-end tw:gap-2">
+  <div class="tw:flex tw:items-end tw:gap-2">
     <!-- select new dashboard -->
     <OSelect
       v-model="selectedDashboard"

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="recommended-list-search-input"
           >
             <template #icon-left>
-              <OIcon name="search" size="sm" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="tw:cursor-pointer" />
             </template>
           </OInput>
           <span

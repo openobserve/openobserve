@@ -2,12 +2,12 @@
   <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
     <div class="">
       <div
-        class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
+        class="tw:flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
       >
-        <div class="flex tw:items-center tw:py-2 tw:pl-3">
+        <div class="tw:flex tw:items-center tw:py-2 tw:pl-3">
           <div
             data-test="search-history-alert-back-btn"
-            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer tw:font-[600]"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:font-[600]"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -33,7 +33,7 @@
             />
           </div>
           <div
-            class="warning-text flex tw:items-center tw:px-2 tw:mr-3 tw:h-[36px] tw:rounded-md"
+            class="warning-text tw:flex tw:items-center tw:px-2 tw:mr-3 tw:h-[36px] tw:rounded-md"
           >
             <OIcon name="info" class="tw:mr-1" size="sm" />
             <div>

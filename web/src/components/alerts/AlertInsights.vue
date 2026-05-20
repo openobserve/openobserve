@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem]">
         <!-- Header -->
         <div
-          class="insights-header flex tw:justify-between tw:items-center"
+          class="insights-header tw:flex tw:justify-between tw:items-center"
         >
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <OButton
               variant="outline"
               size="icon-sm"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="q-table__title tw:font-[600] tw:ml-2">{{ t("alerts.insights.title") }}</div>
           </div>
 
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <date-time
               ref="dateTimeRef"
               auto-apply
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           @contextmenu="handleNativeContextMenu"
         >
-          <div v-show="isLoading" class="loading-container flex tw:items-center tw:justify-center">
+          <div v-show="isLoading" class="loading-container tw:flex tw:items-center tw:justify-center">
             <OSpinner size="md" />
             <div class="tw:ml-3">Loading insights...</div>
           </div>

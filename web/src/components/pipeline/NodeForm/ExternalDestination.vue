@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:rounded-md">
       <div class="o2-input">
         <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pb-2 tw:pl-3 tw:pt-3">
-          <div class="flex tw:items-center tw:w-full">
+          <div class="tw:flex tw:items-center tw:w-full">
             <div class="tw:w-full" data-test="add-destination-title">
               <div
                 class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"

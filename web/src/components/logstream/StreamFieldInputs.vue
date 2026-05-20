@@ -19,12 +19,12 @@
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="flex tw:justify-start tw:items-end tw:gap-2"
+        class="tw:flex tw:justify-start tw:items-end tw:gap-2"
         :data-test="`alert-conditions-${index + 1}`"
       >
         <div
           data-test="add-stream-field-name-input"
-          class="tw:ml-0 o2-input flex tw:items-center"
+          class="tw:ml-0 o2-input tw:flex tw:items-center"
         >
           <OInput
             v-model="field.name"
@@ -62,7 +62,7 @@
         <div
           v-if="visibleInputs.index_type"
           data-test="add-stream-field-type-select-input"
-          class="tw:ml-0 flex tw:items-end o2-input"
+          class="tw:ml-0 tw:flex tw:items-end o2-input"
         >
           <OSelect
             v-model="field.index_type"
@@ -93,7 +93,7 @@
         <div
           v-if="visibleInputs.data_type"
           data-test="add-stream-field-type-select-input"
-          class="tw:ml-0 flex tw:items-end o2-input"
+          class="tw:ml-0 tw:flex tw:items-end o2-input"
         >
           <OSelect
             v-model="field.type"

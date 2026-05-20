@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           v-if="!createNewFunction"
-          class="flex tw:justify-start tw:items-center tw:w-full"
+          class="tw:flex tw:justify-start tw:items-center tw:w-full"
           style="padding-top: 0px"
         >
           <div

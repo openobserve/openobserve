@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="overflow: hidden"
     data-test="dashboard-query"
   >
-    <div class="column" style="width: 100%; height: 100%">
+      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
         <div class="tw:flex" style="height: 100%">
           <OSplitter            

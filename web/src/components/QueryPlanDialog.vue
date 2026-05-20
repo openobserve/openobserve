@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSeparator />
 
-            <div v-if="loading" class="flex flex-center tw:p-6 full-height">
+            <div v-if="loading" class="tw:flex flex-center tw:p-6 full-height">
               <div class="tw:text-center">
                 <OSpinner variant="dots" size="lg" />
                 <div class="tw:mt-3">

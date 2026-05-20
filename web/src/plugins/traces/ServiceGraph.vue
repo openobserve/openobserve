@@ -162,7 +162,7 @@
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div v-if="loading" class="flex flex-center tw:h-full">
+            <div v-if="loading" class="tw:flex flex-center tw:h-full">
               <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
                 <OSpinner size="xl" />
                 <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
@@ -172,7 +172,7 @@
             </div>
             <div
               v-else-if="error"
-              class="flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
@@ -192,7 +192,7 @@
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
             >
               <div>
                 <OIcon name="hub" style="width: 5em; height: 5em;" />

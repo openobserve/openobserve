@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="tw:flex column"
+                  class="tw:flex tw:flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -624,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor for custom chart -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="tw:flex column"
+                  class="tw:flex tw:flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <div
-        class="flex content-center tw:truncate tw:w-full field-expansion-header tw:relative"
+        class="tw:flex content-center tw:truncate tw:w-full field-expansion-header tw:relative"
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="play-circle-filled"
               size="md"
-              class="cursor-pointer tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:cursor-pointer tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
             />
           </template>
         </OTable>

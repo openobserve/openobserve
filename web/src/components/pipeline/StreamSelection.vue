@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div>
-      <div class="flex tw:justify-between tw:items-center tw:px-3 tw:py-2">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2">
         <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
         <OIcon
           data-test="add-pipeline-close-dialog-btn"
           name="cancel"
-          class="cursor-pointer"
+          class="tw:cursor-pointer"
           size="md"
           v-close-popup="true"
         />

@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
               <div>
-                <div class="flex flex-row">
+                <div class="tw:flex tw:flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
                     class="tw:text-base tw:font-bold tw:mt-4"
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-            <div class="flex flex-col">
+            <div class="tw:flex tw:flex-col">
               <OButton
                 variant="outline"
                 size="sm"
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-3"
                 style="flex-wrap: wrap"
               >
-                <div class="flex tw:mr-2" style="width: 50%">
+                <div class="tw:flex tw:mr-2" style="width: 50%">
                   <OInput
                     v-model="variableData.customMultiSelectValue[index]"
                     placeholder="Enter value"
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="variableData.multiSelect"
-                class="flex"
+                class="tw:flex"
                 style="width: 50%"
               >
                 <OButton

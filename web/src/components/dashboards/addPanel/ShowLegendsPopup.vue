@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-show-legends-dialog"
   >
     <template #header-right>
-      <div class="flex tw:items-center">
+      <div class="tw:flex tw:items-center">
         <span class="legend-count tw:mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="legend-item tw:px-2 tw:py-1"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex tw:items-center legend-row">
+            <div class="tw:flex tw:items-center legend-row">
               <div
                 class="legend-color-box"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"

@@ -6,7 +6,7 @@
       <div class="tw:mr-2 add-script-back-btn">
         <div
           data-test="add-script-back-btn"
-          class="flex tw:justify-center tw:items-center cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -42,7 +42,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info"
             size="md"
-            class="tw:ml-1 cursor-pointer"
+            class="tw:ml-1 tw:cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <OTooltip side="right" :content="String(isValidMethodName())" />

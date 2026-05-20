@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="flex tw:justify-center tw:items-end">
+    <div class="tw:flex tw:justify-center tw:items-end">
       <!-- select new folder -->
       <OSelect
         v-model="selectedFolder"

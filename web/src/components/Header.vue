@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="flex relative-position tw:mr-2"
+      class="tw:flex relative-position tw:mr-2"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 cursor-pointer tw:mr-2 tw:flex tw:items-center"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center"
         @click="goToHome"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
       >
         <img
-          class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
+          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="flex relative-position tw:mr-2 logo-container">
+    <div v-else class="tw:flex relative-position tw:mr-2 logo-container">
       <img
-        class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
+        class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
           getImageURL(
             store.state.theme === 'dark'

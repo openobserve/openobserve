@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions Column: Delete -->
       <div class="actions-column">
-        <div class="flex tw:justify-end">
+        <div class="tw:flex tw:justify-end">
           <OButton
             data-test="semantic-group-remove-group-btn"
             :variant="isProtected ? 'ghost-muted' : 'ghost-destructive'"

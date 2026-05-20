@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length"
-        class="w-full tw:text-center tw:mt-4 tw:font-bold tw:text-gray-600"
+        class="tw:w-full tw:text-center tw:mt-4 tw:font-bold tw:text-gray-600"
         style="margin-top: 64px; font-size: 18px"
       >
         <span> No Permissions Selected </span>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
         v-show="parent.expand && parent.is_loading"
-        class="flex tw:items-center"
+        class="tw:flex tw:items-center"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col}-checkbox`"
               v-model="row.permission[col].value"
               :value="col"
-              class="filter-check-box cursor-pointer"
+              class="filter-check-box tw:cursor-pointer"
               @update:model-value="handlePermissionChange(row, col)"
             />
           </template>

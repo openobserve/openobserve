@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex column tw:justify-center tw:p-1" style="font-size: 1.5rem">
+  <div class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:p-1" style="font-size: 1.5rem">
     <img
       data-test="no-panel-image"
       :src="getImageURL('images/common/clipboard_icon.svg')"
       style="width: 230px; margin: 5vh auto 2rem"
       alt=""
     />
-    <div class="flex tw:justify-center tw:mb-3">
+    <div class="tw:flex tw:justify-center tw:mb-3">
       <span>Start by adding your first dashboard panel</span>
     </div>
-    <div class="flex tw:justify-center" v-if="!viewOnly">
+    <div class="tw:flex tw:justify-center" v-if="!viewOnly">
       <OButton
         variant="outline"
         size="sm-action"

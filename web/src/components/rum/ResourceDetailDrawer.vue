@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="flex tw:justify-between tw:items-center">
+      <div class="tw:flex tw:justify-between tw:items-center">
         <div class="tw:font-bold tw:text-xl tw:font-semibold">Resource Details</div>
         <OButton
           icon-left="close"

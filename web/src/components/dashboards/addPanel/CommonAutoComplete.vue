@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" style="margin-top: 5px" data-no-autofocus>
+  <div class="tw:relative" style="margin-top: 5px" data-no-autofocus>
     <OInput
       v-model="inputValue"
       @update:model-value="onModelValueChanged"

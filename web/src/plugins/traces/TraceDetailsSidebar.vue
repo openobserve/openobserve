@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
       data-test="trace-details-sidebar-header"
       :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"
         :style="{ width: 'calc(100% - 24px)' }"
-        class="tw:pb-0 tw:pl-[0.25rem] tw:truncate flex tw:items-center"
+        class="tw:pb-0 tw:pl-[0.25rem] tw:truncate tw:flex tw:items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Row 1: Trace Details -->
       <div
-        class="flex tw:items-center tw:justify-between tw:p-1"
+        class="tw:flex tw:items-center tw:justify-between tw:p-1"
         style="overflow-x: auto; flex-wrap: nowrap"
       >
-        <div class="flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
           <OBadge
             size="sm"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
         </div>
 
-        <div class="flex tw:items-center">
+        <div class="tw:flex tw:items-center">
           <!-- Span ID Badge -->
           <OBadge
             size="sm"
@@ -183,14 +183,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
         v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
-        class="flex tw:items-center tw:justify-between tw:p-1 llm-metrics-row"
+        class="tw:flex tw:items-center tw:justify-between tw:p-1 llm-metrics-row"
         style="
           overflow-x: auto;
           flex-wrap: nowrap;
           border-top: 1px solid #e9ecef;
         "
       >
-        <div class="flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
           <OBadge
             size="sm"
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
         </div>
 
-        <div class="flex tw:items-center">
+        <div class="tw:flex tw:items-center">
           <!-- Provider Badge -->
           <OBadge
             v-if="span.gen_ai_provider_name"
@@ -348,17 +348,17 @@ class="tw:h-full tw:overflow-y-auto">
           <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="flex io-container tw:w-full! tw:h-full!"
+              class="tw:flex io-container tw:w-full! tw:h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
               <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 flex tw:items-center tw:justify-between"
+                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Input</div>
-                  <div class="flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center gap-xs">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -422,10 +422,10 @@ class="tw:h-full tw:overflow-y-auto">
               <!-- Output Section -->
               <div class="tw:w-1/2 io-section">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 flex tw:items-center tw:justify-between"
+                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Output</div>
-                  <div class="flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center gap-xs">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -725,7 +725,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     class="field_list"
                     style="cursor: pointer"
                   >
-                    <div class="flex tw:flex tw:items-center tw:flex-nowrap">
+                    <div class="tw:flex tw:flex tw:items-center tw:flex-nowrap">
                       {{ column.prop(row) }}
                     </div>
                   </td>

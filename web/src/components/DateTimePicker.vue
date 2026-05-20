@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div id="date-time-menu" class="date-time-dialog">
-      <div class="flex tw:justify-evenly tw:py-2">
+      <div class="tw:flex tw:justify-evenly tw:py-2">
         <OButton
           class="tab-button"
           :variant="
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
-          <div class="date-time-table relative column">
+          <div class="date-time-table tw:relative column">
             <div
               class="relative-row tw:px-3 tw:py-2"
               v-for="(period, index) in relativePeriods"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OButton
                   :class="
-                    data.selectedDate.tab == 'relative' &&
+                    data.selectedDate.tab == 'tw:relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
                       ? 'rp-selector-selected'

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 cursor-pointer"
+                class="tw:ml-1 tw:cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />

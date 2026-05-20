@@ -11,6 +11,7 @@ import {
   CollapsibleContent,
 } from "reka-ui";
 import { ref, computed, watch, useSlots } from "vue";
+import OIcon from "../Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<OCollapsibleProps>(), {
   defaultOpen: false,
@@ -95,13 +96,13 @@ watch(
       ]"
     >
       <!-- Sidebar: left-side chevron (always before slot or label) -->
-      <span
+      <OIcon
         v-if="variant === 'sidebar'"
-        class="material-icons-outlined tw:text-[18px] tw:text-collapsible-icon tw:shrink-0 tw:transition-transform tw:duration-200"
+        name="chevron-right"
+        size="md"
+        class="tw:text-collapsible-icon tw:transition-transform tw:duration-200"
         :class="isOpen ? 'tw:rotate-90' : 'tw:rotate-0'"
-        aria-hidden="true"
-        >chevron_right</span
-      >
+      />
 
       <!-- Custom trigger slot - renders after sidebar chevron if present -->
       <template v-if="hasCustomTrigger">
@@ -133,13 +134,13 @@ watch(
         </span>
 
         <!-- Right chevron — default variant only -->
-        <span
+        <OIcon
           v-if="variant === 'default'"
-          class="material-icons-outlined tw:text-icon-md tw:text-collapsible-icon tw:shrink-0 tw:transition-transform tw:duration-200"
+          name="expand-more"
+          size="md"
+          class="tw:text-collapsible-icon tw:transition-transform tw:duration-200"
           :class="isOpen ? 'tw:rotate-180' : 'tw:rotate-0'"
-          aria-hidden="true"
-          >expand_more</span
-        >
+        />
       </template>
     </CollapsibleTrigger>
 

@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]" :class="headerClass">
+      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]" :class="headerClass">
         <div class="tw:flex tw:flex-col">
-          <div class="flex">
+          <div class="tw:flex">
             <OButton
               variant="ghost"
               size="icon"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="flex tw:justify-center tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:gap-2">
           <OButton
             v-close-popup
             variant="outline"
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex" :class="contentWrapperClass">
-      <div class="flex" :style="contentStyle">
+    <div class="tw:flex" :class="contentWrapperClass">
+      <div class="tw:flex" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:mx-2 tw:pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
+                    <div class="tw:flex tw:mt-[0.725rem] tw:h-[64px]">
                       <div style="width: 100%" class="tw:pr-2">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:mx-2 tw:mt-3 tw:pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="tw:mb-1 flex">
+                    <div style="width: calc(100% - 10px)" class="tw:mb-1 tw:flex">
                       <div style="width: 100%" class="tw:pr-2">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon
                               name="close" size="sm"
                               @click.stop.prevent="jsonFiles = null"
-                              class="cursor-pointer"
+                              class="tw:cursor-pointer"
                             />
                           </template>
                           <template v-slot:hint> .json files only </template>

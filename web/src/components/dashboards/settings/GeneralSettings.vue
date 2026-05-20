@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-general-setting-dynamic-filter"
           size="lg"
         />
-        <div class="flex tw:justify-center tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:gap-2">
           <OButton
             @click="$emit('close')"
             variant="outline"

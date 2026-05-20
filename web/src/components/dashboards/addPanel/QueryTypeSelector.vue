@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:py-2">
+  <div>
     <div class="tw:flex tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup

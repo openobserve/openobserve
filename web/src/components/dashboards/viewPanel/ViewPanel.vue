@@ -16,13 +16,13 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
-    <div class="flex tw:justify-between tw:items-center tw:p-3">
-      <div class="flex tw:items-center q-table__title tw:mr-3">
+    <div class="tw:flex tw:justify-between tw:items-center tw:p-3">
+      <div class="tw:flex tw:items-center q-table__title tw:mr-3">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex tw:items-center" style="gap: 0.5rem">
+      <div class="tw:flex tw:items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"

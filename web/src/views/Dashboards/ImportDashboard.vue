@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:mx-2 tw:pt-1">
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
         <div class="tw:flex tw:flex-col">
-          <div class="flex">
+          <div class="tw:flex">
             <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
 
             <div class="tw:text-xl tw:font-semibold tw:ml-3">
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="flex tw:justify-center tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="flex">
-      <div class="flex">
+    <div class="tw:flex">
+      <div class="tw:flex">
         <OSplitter
           v-model="splitterModel"
           style="width: calc(100vw - 100px)"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="editor-container-url card-container tw:py-1"
               >
                 <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="flex tw:w-full">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dashboard-import-json-container card-container tw:py-1"
               >
                 <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="flex tw:w-full">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="close" size="sm"
                             @click.stop.prevent="jsonFiles = null"
-                            class="cursor-pointer"
+                            class="tw:cursor-pointer"
                           />
                         </template>
                         <template v-slot:hint> .json files only </template>

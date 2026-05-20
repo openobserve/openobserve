@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSelect>
       </div>
-      <div class="tw:w-full col-md-8 flex tw:items-center tw:justify-end tw:gap-2">
+      <div class="tw:w-full col-md-8 tw:flex tw:items-center tw:justify-end tw:gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"

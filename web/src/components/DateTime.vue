@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="date-time-menu"
         class="date-time-dialog"
       >
-        <div v-if="!disableRelative" class="flex tw:justify-evenly tw:py-2">
+        <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
             class="tab-button"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator />
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
-            <div class="date-time-table relative column">
+            <div class="date-time-table tw:relative column">
               <div
                 class="relative-row tw:pl-3 tw:py-2"
                 v-for="(period, index) in relativePeriods"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     :class="
-                      selectedType == 'relative' &&
+                      selectedType == 'tw:relative' &&
                       relativePeriod == period.value &&
                       relativeValue == item
                         ? 'rp-selector-selected'
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="isTimezoneSelectOpen = false"
           class="timezone-select"
         />
-        <div v-if="!autoApply" class="flex tw:justify-end tw:py-2 tw:px-3">
+        <div v-if="!autoApply" class="tw:flex tw:justify-end tw:py-2 tw:px-3">
           <OSeparator class="tw:my-2" />
           <OButton
             data-test="date-time-apply-btn"

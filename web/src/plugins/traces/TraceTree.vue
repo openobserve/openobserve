@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flexWrap: 'nowrap',
             height: '100%',
           }"
-          class="flex span-row"
+          class="tw:flex span-row"
           :class="{
             'span-row-selected':
               (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
@@ -115,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'px'
                 }`,
               }"
-              class="flex flex-col tw:items-start tw:justify-start tw:truncate"
+              class="tw:flex tw:flex-col tw:items-start tw:justify-start tw:truncate"
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
+                class="tw:flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
                   store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
                   isLLMTrace((spans as any[])[virtualRow.index])
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="absolute view-logs-container"
+                  class="tw:absolute view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
                   <div class="tw:mx-1 view-span-logs">
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
+                  class="span-count-box tw:cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="tw:truncate tw:pl-1 cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
+                    class="tw:truncate tw:pl-1 tw:cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'tw:flex-col tw:items-start'
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
                     <div
-                      class="tw:truncate flex tw:items-center span-name-section-content"
+                      class="tw:truncate tw:flex tw:items-center span-name-section-content"
                     >
                       <OIcon
                         v-if="
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="flex tw:items-center tw:text-xs text-red-6"
+                      class="tw:flex tw:items-center tw:text-xs text-red-6"
                       style="
                         margin-top: -4px;
                         margin-bottom: 2px;
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         getEventCount((spans as any[])[virtualRow.index]) > 0 &&
                         false
                       "
-                      class="flex tw:items-center"
+                      class="tw:flex tw:items-center"
                       :style="{
                         fontSize: '0.625rem',
                         lineHeight: 1,

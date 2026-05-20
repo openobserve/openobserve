@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:p-0 storage-settings-editor">
     <!-- Header -->
     <div class="tw:flex tw:items-center tw:flex-nowrap card-container  tw:px-3 tw:mb-[0.675rem]">
-      <div class="flex tw:items-center tw:h-[60px]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           data-test="storage-settings-editor-back-btn"
-          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           :title="t('storage_settings.goBack')"
           @click="emit('cancel')"
         >
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OStepper>
 
         <!-- Form buttons -->
-        <div class="flex tw:justify-start tw:mb-3">
+        <div class="tw:flex tw:justify-start tw:mb-3">
           <div v-if="step === 1">
             <OButton
               data-test="step1-cancel-btn"

@@ -107,7 +107,7 @@
                 />
                 <OIcon
                   name="cancel"
-                  class="cursor-pointer"
+                  class="tw:cursor-pointer"
                   size="xs"
                   :title="t('dashboard.valueMappingRemoveColor')"
                   @click="removeColorByIndex(index)"

@@ -1,6 +1,6 @@
 <template>
   <div style="max-width: 400px; margin-top: 100px" class="tw:mx-auto tw:p-3">
-    <div class="flex tw:justify-center" style="height: 150px">
+    <div class="tw:flex tw:justify-center" style="height: 150px">
       <img
         class="appLogo"
         style="width: 250px; height: auto"
@@ -12,7 +12,7 @@
       />
     </div>
 
-    <div class="flex tw:justify-center tw:mt-4">
+    <div class="tw:flex tw:justify-center tw:mt-4">
       <OButton
         data-test="sso-login-btn"
         variant="primary"
@@ -21,10 +21,10 @@
       >
         <div
           data-test="sso-login-btn"
-          class="flex tw:items-center tw:justify-center tw:w-full tw:text-center relative"
+          class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
         >
           <img
-            class="absolute"
+            class="tw:absolute"
             style="width: 30px; left: 16px"
             :src="getImageURL('images/common/sso.svg')"
           />
@@ -35,7 +35,7 @@
 
     <div class="tw:mb-3 tw:mt-4 tw:text-center">
       <a
-        class="cursor-pointer login-internal-link"
+        class="tw:cursor-pointer login-internal-link"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a

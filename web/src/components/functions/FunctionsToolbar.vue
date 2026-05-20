@@ -10,7 +10,7 @@
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="redirectToFunctions"
         >
@@ -41,7 +41,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info-outline"
             size="md"
-            class="tw:ml-1 cursor-pointer"
+            class="tw:ml-1 tw:cursor-pointer"
            />
             <OTooltip
               side="right"
@@ -79,7 +79,7 @@
         </div>
       </div>
     </div>
-    <div class="add-function-actions flex tw:justify-center tw:gap-2">
+    <div class="add-function-actions tw:flex tw:justify-center tw:gap-2">
       <OButton
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             variant="ghost"

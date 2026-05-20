@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex tw:justify-start tw:items-center header-bg tw:bg-gray-100 trace-header-container"
+    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-gray-100 trace-header-container"
     :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     data-test="trace-header"
     :style="
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2 trace-header-left"
+      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2 trace-header-left"
       :style="{
         width: splitterWidth + 'px',
       }"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex relative-position trace-header-right"
+      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex relative-position trace-header-right"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs flex tw:justify-between tw:items-center tw:px-1"
+        class="tw:w-1/4 tw:text-xs tw:flex tw:justify-between tw:items-center tw:px-1"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>

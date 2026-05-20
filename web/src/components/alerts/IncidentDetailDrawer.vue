@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1 tw:pb-[0.625rem]">
     <!-- Header -->
     <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
-      <div class="flex tw:items-center tw:gap-3 tw:flex-1">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
         <div
           data-test="incident-detail-back-btn"
-          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
-        <div class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
+        <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
           <div class="tw:flex tw:items-center tw:gap-3">
             <div class="q-table__title tw:font-[600]" data-test="inspector-title">
               Search Job Inspector
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading State -->
       <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
-        <div class="flex flex-center tw:h-full">
+        <div class="tw:flex flex-center tw:h-full">
           <OSpinner size="lg" />
         </div>
       </div>

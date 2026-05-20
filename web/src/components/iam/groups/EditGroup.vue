@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex tw:justify-end tw:w-full tw:flex-shrink-0"
+    class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
       style="z-index: 2"
     >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">

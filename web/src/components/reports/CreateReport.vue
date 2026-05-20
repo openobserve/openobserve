@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
       >
-        <div class="flex tw:items-center">
+        <div class="tw:flex tw:items-center">
           <div
             data-test="add-report-back-btn"
-            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex card-container tw:mb-[0.675rem]"
+        class="tw:flex card-container tw:mb-[0.675rem]"
         style="height: calc(100vh - 192px); overflow: auto"
       >
         <div
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OIcon
                 name="info-outline"
-                class="cursor-pointer tw:ml-2"
+                class="tw:cursor-pointer tw:ml-2"
                 size="sm"
                />
                 <OTooltip
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :data-test="`add-report-dashboard-${index}`"
-                    class="tw:my-2 tw:px-2 flex tw:items-center tw:justify-start"
+                    class="tw:my-2 tw:px-2 tw:flex tw:items-center tw:justify-start"
                   >
                     <div
                       data-test="add-report-folder-select"
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-custom-dimensions-section"
                       >
                         <div
-                          class="flex tw:items-center cursor-pointer"
+                          class="tw:flex tw:items-center tw:cursor-pointer"
                           style="font-size: 14px; color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-report-dimension-height"
                             />
                           </div>
-                          <div class="col-auto flex tw:items-end">
+                          <div class="col-auto tw:flex tw:items-end">
                             <div class="tw:text-xs tw:text-gray-400 tw:pb-1">
                               Leave blank to use server defaults
                             </div>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-3"
               >
                 <div class="tw:my-2 tw:px-2">
-                  <!-- <div class="flex tw:justify-start tw:items-center tw:py-2">
+                  <!-- <div class="tw:flex tw:justify-start tw:items-center tw:py-2">
                 <OIcon name="event" size="sm" class="tw:mr-2" />
                 <div style="font-size: 14px">
                   The report will be sent immediately after it is saved and will
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OToggleGroup>
 
                   <template v-if="frequency.type === 'cron'">
-                    <div class="flex tw:items-center tw:justify-start tw:mt-3">
+                    <div class="tw:flex tw:items-center tw:justify-start tw:mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input tw:mr-2"
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="info"
                             size="sm"
-                            class="tw:ml-1 cursor-pointer"
+                            class="tw:ml-1 tw:cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
                                 ? 'tw:text-gray-400'
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OToggleGroup>
                       <OIcon
                         name="info-outline"
-                        class="cursor-pointer tw:ml-2"
+                        class="tw:cursor-pointer tw:ml-2"
                         size="sm"
                        />
                         <OTooltip side="right" align="center">
@@ -551,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       v-if="frequency.type === 'custom'"
-                      class="flex tw:items-start tw:justify-start tw:mt-3"
+                      class="tw:flex tw:items-start tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
@@ -592,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex tw:items-center tw:justify-start tw:mt-3"
+                      class="tw:flex tw:items-center tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-start-date-input"
@@ -717,7 +717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <OIcon
                       name="info-outline"
-                      class="cursor-pointer tw:ml-2"
+                      class="tw:cursor-pointer tw:ml-2"
                       size="sm"
                      />
                       <OTooltip max-width="320px">
@@ -744,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
+      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
       style="position: sticky; bottom: 0.375rem; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{

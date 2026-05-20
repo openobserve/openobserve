@@ -45,13 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isCurrentlyHoveredPanel &&
             props.data.description != ''
           "
-          name="info-outline" size="sm"
+          name="info-outline"
+          size="sm"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
-         />
+        >
           <OTooltip side="bottom" align="end" max-width="220px">
             <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
+        </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           variant="ghost"

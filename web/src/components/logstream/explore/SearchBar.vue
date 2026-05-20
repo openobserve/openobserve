@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
-    <div class="tw:flex flex tw:justify-end align-center">
+    <div class="tw:flex tw:flex tw:justify-end align-center">
       <div class="col-auto tw:my-1">
         <OButton
           class="tw:mr-2"

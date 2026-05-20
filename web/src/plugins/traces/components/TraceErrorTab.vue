@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-@timestamp="{ row }">
         <div
           :data-test="`trace-event-detail-${row[timestampColumn]}`"
-          class="flex tw:flex tw:items-center tw:flex-nowrap cursor-pointer"
+          class="tw:flex tw:flex tw:items-center tw:flex-nowrap tw:cursor-pointer"
           @click="expandEvent(row._index)"
         >
           <OButton
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-type="{ row }">
         <span
-          class="cursor-pointer"
+          class="tw:cursor-pointer"
           @click="expandEvent(row._index)"
           v-html="highlightTextMatch(row['exception.type'], searchQuery)"
         />

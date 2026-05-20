@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="flex tw:justify-start tw:items-end tw:gap-2 tw:pb-2"
+        class="tw:flex tw:justify-start tw:items-end tw:gap-2 tw:pb-2"
         :data-test="`alert-conditions-${index + 1}`"
       >
         <div
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="alert-conditions-value-input"
-          class="tw:ml-0 flex tw:items-end o2-input"
+          class="tw:ml-0 tw:flex tw:items-end o2-input"
         >
           <OInput
             v-model="field.value"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
       <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
-          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >

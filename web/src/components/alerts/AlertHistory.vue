@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-history-page"
-    class="tw:p-0 flex"
+    class="tw:p-0 tw:flex"
   >
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-[0.325rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
+          class="tw:flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
         >
-          <div class="flex tw:items-center">
+          <div class="tw:flex tw:items-center">
             <OButton
               padding="xs"
               variant="outline"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`alerts.history`) }}
             </div>
           </div>
-          <div class="flex tw:ml-auto tw:items-center">
+          <div class="tw:flex tw:ml-auto tw:items-center">
             <div class="tw:mr-2">
               <DateTime
                 ref="dateTimeRef"
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OTooltip>
             </div>
-            <div v-else-if="row.grouped" class="text-primary flex tw:items-center tw:justify-center">
+            <div v-else-if="row.grouped" class="text-primary tw:flex tw:items-center tw:justify-center">
               <OIcon name="group-work" size="md" />
               <span class="tw:text-xs tw:ml-1">×{{ row.group_size || 1 }}</span>
               <OTooltip>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OTooltip>
             </div>
-            <div v-else class="tw:text-green-500 flex tw:items-center tw:justify-center">
+            <div v-else class="tw:text-green-500 tw:flex tw:items-center tw:justify-center">
               <OIcon name="check-circle" size="md" />
               <span v-if="row.dedup_count && row.dedup_count > 1" class="tw:text-xs tw:ml-1">
                 ×{{ row.dedup_count }}

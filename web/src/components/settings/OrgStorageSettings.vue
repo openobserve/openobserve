@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
    
     <!-- Loading state -->
-    <div v-if="loading" class="flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
+    <div v-if="loading" class="tw:flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
