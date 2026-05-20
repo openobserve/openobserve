@@ -209,11 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="sm"
                               class="tw:mr-0.5"
                             />
-                            <OIcon
-                              v-if="typeof group.icon === 'string'"
-                              :name="group.icon"
-                              size="sm"
-                            />
                             <span>{{ group.label }}</span>
                             <OBadge
                               variant="default"
@@ -223,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div class="metric-group-actions">
                             <OButton
                               variant="ghost"
-                              size="icon-xs"
+                              size="chip"
                               @click.stop="selectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'all'"
                             >
@@ -231,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OButton>
                             <OButton
                               variant="ghost"
-                              size="icon-xs"
+                              size="chip"
                               @click.stop="deselectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'none'"
                             >
@@ -676,16 +671,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             class="tw:mr-0.5"
                           />
-                          <component
-                            v-if="typeof group.icon !== 'string'"
-                            :is="group.icon"
-                            class=""
-                          />
-                          <OIcon
-                            v-if="typeof group.icon === 'string'"
-                            :name="group.icon"
-                            size="sm"
-                          />
                           <span>{{ group.label }}</span>
                           <OBadge
                             variant="default"
@@ -695,7 +680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="metric-group-actions">
                           <OButton
                             variant="ghost"
-                            size="icon-xs"
+                            size="chip"
                             @click.stop="selectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'all'"
                           >
@@ -703,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OButton>
                           <OButton
                             variant="ghost"
-                            size="icon-xs"
+                            size="chip"
                             @click.stop="deselectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'none'"
                           >
@@ -1045,11 +1030,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Group header -->
             <div class="metric-group-header">
               <div class="metric-group-label">
-                <OIcon
-                  v-if="typeof group.icon === 'string'"
-                  :name="group.icon"
-                  size="sm"
-                />
                 <span>{{ group.label }}</span>
                 <OBadge
                   variant="default"
@@ -1059,7 +1039,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="metric-group-actions">
                 <OButton
                   variant="ghost"
-                  size="icon-xs"
+                  size="chip"
                   @click="selectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'all'"
                 >
@@ -1067,7 +1047,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   variant="ghost"
-                  size="icon-xs"
+                  size="chip"
                   @click="deselectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'none'"
                 >
