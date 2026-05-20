@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ResumePipelineDialog from "@/components/ResumePipelineDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   convertUnixToQuasarFormat: vi.fn(() => "2023-01-01 10:00:00"),
@@ -54,12 +51,6 @@ const buildWrapper = (overrideProps: Record<string, any> = {}) =>
       provide: { store },
       stubs: {
         ODialog: ODialogStub,
-        "q-radio": {
-          template:
-            '<div class="q-radio-stub" @click="$emit(\'update:modelValue\', val)"><slot /></div>',
-          props: ["modelValue", "val"],
-          emits: ["update:modelValue"],
-        },
       },
     },
   });
@@ -190,7 +181,7 @@ describe("ResumePipelineDialog", () => {
       global: {
         plugins: [i18n],
         provide: { store },
-        stubs: { ODialog: ODialogStub, "q-radio": true },
+        stubs: { ODialog: ODialogStub },
       },
     });
     const dialog = localWrapper.findComponent(ODialogStub);

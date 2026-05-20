@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),

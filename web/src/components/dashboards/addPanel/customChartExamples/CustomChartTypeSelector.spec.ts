@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CustomChartTypeSelector from "./CustomChartTypeSelector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -55,7 +54,41 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
+const OCardStub = {
+  name: "OCard",
+  template: `<div :data-test="$attrs['data-test']"><slot /></div>`,
+};
+
+const OCardSectionStub = {
+  name: "OCardSection",
+  props: ["role"],
+  template: `<div :data-test="$attrs['data-test']"><slot /></div>`,
+};
+
+const OIconStub = {
+  name: "OIcon",
+  props: ["name", "size"],
+  template: `<i :data-test="$attrs['data-test']" :data-name="name"></i>`,
+};
+
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "placeholder", "clearable"],
+  emits: ["update:modelValue", "clear"],
+  template: `<input :data-test="$attrs['data-test']" :value="modelValue" :placeholder="placeholder" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "iconLeft", "title"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
+};
+
+const OSeparatorStub = {
+  name: "OSeparator",
+  template: `<hr />`,
+};
 
 const mountComponent = () =>
   mount(CustomChartTypeSelector, {
@@ -63,6 +96,14 @@ const mountComponent = () =>
       plugins: [store, router, i18n],
       provide: {
         dashboardPanelDataPageKey: "dashboard",
+      },
+      stubs: {
+        OCard: OCardStub,
+        OCardSection: OCardSectionStub,
+        OIcon: OIconStub,
+        OInput: OInputStub,
+        OButton: OButtonStub,
+        OSeparator: OSeparatorStub,
       },
     },
     attachTo: document.getElementById("app") as HTMLElement,

@@ -16,8 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { QBtn, QMenu, QCard, QCardSection, QSeparator, QTooltip } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import store from "@/test/unit/helpers/store";
 
@@ -32,8 +30,6 @@ const i18n = createI18n({
     en: mockTranslations
   }
 });
-
-installQuasar({ components: { QBtn, QMenu, QCard, QCardSection, QSeparator, QTooltip } });
 
 describe("SyntaxGuide.vue", () => {
   let wrapper: any;

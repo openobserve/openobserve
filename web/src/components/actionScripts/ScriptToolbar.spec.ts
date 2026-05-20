@@ -3,7 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createStore } from 'vuex';
 import ScriptToolbar from '@/components/actionScripts/ScriptToolbar.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock vue-i18n
 vi.mock('vue-i18n', () => ({
@@ -12,13 +11,15 @@ vi.mock('vue-i18n', () => ({
   })
 }));
 
-installQuasar();
+const mockToggleFullscreen = vi.fn();
+vi.mock('@/utils/dom', () => ({
+  toggleFullscreen: () => mockToggleFullscreen(),
+}));
 
 describe('ScriptToolbar.vue', () => {
   let wrapper: VueWrapper;
   let router: any;
   let store: any;
-  let mockQuasar: any;
 
   beforeEach(() => {
     // Mock router
@@ -37,13 +38,6 @@ describe('ScriptToolbar.vue', () => {
       mutations: {},
       actions: {}
     });
-
-    // Mock Quasar fullscreen
-    mockQuasar = {
-      fullscreen: {
-        toggle: vi.fn()
-      }
-    };
   });
 
   afterEach(() => {
@@ -72,32 +66,20 @@ describe('ScriptToolbar.vue', () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [currentStore, router],
-        provide: {
-          $q: mockQuasar,
-          _q_: mockQuasar
-        },
         stubs: {
           'OIcon': {
-            template: '<div class="OIcon-stub" :name="name"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
+            template: '<div class="OIcon-stub" :name="name"><o-tooltip-stub v-if="$slots.default"><slot></slot></o-tooltip-stub></div>',
             props: ['name', 'size']
           },
-          'q-input': {
+          'OInput': {
             template: '<input class="q-input-stub" :data-test="$attrs[\'data-test\']" />',
             props: ['modelValue', 'label', 'readonly', 'disable', 'rules']
-          },
-          'q-btn': {
-            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')">{{ label }}</button>',
-            props: ['label', 'color', 'padding', 'type', 'textColor', 'noEaps', 'icon']
           },
           OButton: {
             template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             props: ['variant', 'size', 'disabled', 'loading', 'type']
           },
-          'q-form': {
-            template: '<form class="q-form-stub"><slot></slot></form>',
-            props: []
-          },
-          'q-tooltip': {
+          'OTooltip': {
             template: '<div class="q-tooltip-stub"><slot></slot></div>',
             props: ['anchor', 'self', 'maxWidth', 'offset']
           }
@@ -123,7 +105,7 @@ describe('ScriptToolbar.vue', () => {
       
       expect(backBtn.exists()).toBe(true);
       expect(backBtn.attributes('title')).toBe('Go Back');
-      expect(backBtn.classes()).toContain('cursor-pointer');
+      expect(backBtn.classes()).toContain('tw:cursor-pointer');
     });
 
     it('renders name input field', () => {
@@ -267,11 +249,10 @@ describe('ScriptToolbar.vue', () => {
     it('handles fullscreen toggle', async () => {
       wrapper = createWrapper();
       const fullscreenBtn = wrapper.find('[data-test="add-script-fullscreen-btn"]');
-      const vm = wrapper.vm as any;
-      
+
       await fullscreenBtn.trigger('click');
-      
-      expect(mockQuasar.fullscreen.toggle).toHaveBeenCalled();
+
+      expect(mockToggleFullscreen).toHaveBeenCalled();
     });
 
     it('emits save event and shows input error when save button is clicked', async () => {

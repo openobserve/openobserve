@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -86,8 +85,6 @@ const mockRouter = createRouter({
     { path: '/', component: { template: '<div>Home</div>' } },
   ],
 });
-
-installQuasar();
 
 describe('CouchDB.vue Comprehensive Coverage', () => {
   let wrapper: VueWrapper;

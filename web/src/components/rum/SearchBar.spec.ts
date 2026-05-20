@@ -23,8 +23,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -48,12 +46,13 @@ vi.mock("vue", async (importOriginal) => {
   };
 });
 
-import SearchBar from "@/components/rum/SearchBar.vue";
+// Mock toast
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [],
-});
+import SearchBar from "@/components/rum/SearchBar.vue";
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
@@ -160,18 +159,6 @@ vi.doMock("@/composables/useTraces", () => ({
   }),
 }));
 
-// Mock Quasar notify
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
-
 // Mock components
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
@@ -220,7 +207,7 @@ describe("SearchBar Component", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
+    mockToast.mockClear();
 
     wrapper = mount(SearchBar, {
       props: {
@@ -235,6 +222,22 @@ describe("SearchBar Component", () => {
       global: {
         plugins: [i18n, router],
         provide: { store },
+        stubs: {
+          OButton: {
+            template:
+              '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+            props: ["variant", "size", "iconLeft", "disabled", "title"],
+            emits: ["click"],
+          },
+          OIcon: {
+            template: '<div class="o-icon"></div>',
+            props: ["name", "size", "color"],
+          },
+          OSeparator: {
+            template: '<hr class="o-separator" />',
+            props: ["vertical"],
+          },
+        },
       },
     });
 
@@ -367,7 +370,6 @@ describe("SearchBar Component", () => {
 
     it("should handle SQL mode query parsing", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
-      // Ensure streamResults.list is available
       wrapper.vm.searchObj.data.streamResults = {
         list: [
           {
@@ -413,12 +415,11 @@ describe("SearchBar Component", () => {
 
       await wrapper.vm.updateQueryValue("SELECT * FROM nonexistent_stream");
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: "Stream not found",
-        color: "negative",
-        position: "top",
-        timeout: 2000,
-      });
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Stream not found",
+        }),
+      );
     });
 
     it("should update query via updateQuery method", async () => {
@@ -444,10 +445,6 @@ describe("SearchBar Component", () => {
 
   describe("Error Handling", () => {
     it("should handle parser errors gracefully", async () => {
-      // mockParser.astify.mockImplementation(() => {
-      //   throw new Error("Parser error");
-      // });
-
       wrapper.vm.searchObj.meta.sqlMode = true;
 
       await wrapper.vm.updateQueryValue("INVALID SQL");
@@ -492,21 +489,18 @@ describe("SearchBar Component", () => {
     let originalFile: any;
 
     beforeEach(() => {
-      // Store originals
       originalCreateElement = document.createElement;
       originalAppendChild = document.body.appendChild;
       originalRemoveChild = document.body.removeChild;
       originalURL = globalThis.URL;
       originalFile = globalThis.File;
 
-      // Mock URL methods
       globalThis.URL = {
         ...originalURL,
         createObjectURL: vi.fn(() => "mock-url"),
         revokeObjectURL: vi.fn(),
       };
 
-      // Mock File constructor
       globalThis.File = class MockFile {
         data: any;
         name: string;
@@ -518,7 +512,6 @@ describe("SearchBar Component", () => {
         }
       } as any;
 
-      // Mock document methods only for download operations
       const mockLink = {
         href: "",
         download: "",
@@ -541,7 +534,6 @@ describe("SearchBar Component", () => {
     });
 
     afterEach(() => {
-      // Restore originals
       document.createElement = originalCreateElement;
       document.body.appendChild = originalAppendChild;
       document.body.removeChild = originalRemoveChild;
@@ -550,28 +542,25 @@ describe("SearchBar Component", () => {
     });
 
     it("should download logs as CSV when downloadLogs is called", () => {
-      // Setup test data
       wrapper.vm.searchObj.data.queryResults.hits = [
         { field1: "value1", field2: "value2", timestamp: "2023-01-01" },
         { field1: "value3", field2: "value4", timestamp: "2023-01-02" },
       ];
 
-      // Spy on File constructor
       const fileSpy = vi.spyOn(globalThis, "File" as any);
 
       wrapper.vm.downloadLogs();
 
-      // Check that File was called with correct parameters
       expect(fileSpy).toHaveBeenCalled();
       const fileCall = fileSpy.mock.calls[0];
-      const csvData = fileCall[0][0]; // First element of the array
+      const csvData = fileCall[0][0];
 
       expect(csvData).toContain("field1,field2,timestamp");
       expect(csvData).toContain('"value1","value2","2023-01-01"');
       expect(csvData).toContain('"value3","value4","2023-01-02"');
 
       expect(fileSpy).toHaveBeenCalledWith(
-        expect.any(Array), // File constructor receives an array of data
+        expect.any(Array),
         "logs-data.csv",
         { type: "text/csv" },
       );
@@ -599,17 +588,16 @@ describe("SearchBar Component", () => {
         },
       ];
 
-      // Spy on File constructor
       const fileSpy = vi.spyOn(globalThis, "File" as any);
 
       wrapper.vm.downloadLogs();
 
       const fileCall = fileSpy.mock.calls[0];
-      const csvCall = fileCall[0][0]; // First element of the array
+      const csvCall = fileCall[0][0];
       expect(csvCall).toContain("field1,field2,field3");
       expect(csvCall).toContain('"value with \\"quotes\\""');
       expect(csvCall).toContain('"value,with,commas"');
-      expect(csvCall).toContain('""'); // null should become empty string
+      expect(csvCall).toContain('""');
 
       fileSpy.mockRestore();
     });
@@ -617,7 +605,6 @@ describe("SearchBar Component", () => {
 
   describe("AddSearchTerm Watch Functionality", () => {
     beforeEach(() => {
-      // Setup queryEditorRef mock
       const mockSetValue = vi.fn();
       wrapper.vm.queryEditorRef = { setValue: mockSetValue };
     });
@@ -627,7 +614,6 @@ describe("SearchBar Component", () => {
       wrapper.vm.searchObj.data.stream.addToFilter = "";
       wrapper.vm.searchObj.data.editorValue = "existing query";
 
-      // Trigger the watcher by calling it directly
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
       expect(mockSetValue).not.toHaveBeenCalled();

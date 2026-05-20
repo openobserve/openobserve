@@ -15,7 +15,6 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import TelegrafConfig from './TelegrafConfig.vue';
 import { createStore } from 'vuex';
 
@@ -65,8 +64,6 @@ const defaultProps = {
   currUserEmail: 'test@example.com'
 };
 
-installQuasar();
-
 describe('TelegrafConfig', () => {
   let wrapper: any;
 
@@ -95,7 +92,7 @@ describe('TelegrafConfig', () => {
     });
 
     it('should render main container div', () => {
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should render CopyContent component', () => {

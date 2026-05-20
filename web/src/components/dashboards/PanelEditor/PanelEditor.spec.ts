@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelEditor from "./PanelEditor.vue";
 
 // Mock vuex store
@@ -273,15 +272,11 @@ const ODialogStub = {
 const mountGlobal = {
   plugins: [i18n],
   stubs: {
-    QSeparator: true,
-    QSplitter: {
-      template:
-        '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-    },
-    QIcon: true,
-    QBtn: true,
-    QTooltip: true,
     ODialog: ODialogStub,
+    OSplitter: {
+      template:
+        '<div class="o-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+    },
     // Explicit stub so shallowMount tracks `open` as a declared prop.
     ShowLegendsPopup: {
       name: "ShowLegendsPopup",
@@ -291,8 +286,6 @@ const mountGlobal = {
     },
   },
 };
-
-installQuasar();
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;

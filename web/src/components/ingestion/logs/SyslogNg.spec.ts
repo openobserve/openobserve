@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SyslogNg from './SyslogNg.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -76,8 +75,6 @@ const mockI18n = createI18n({
     en: {},
   },
 });
-
-installQuasar();
 
 describe('SyslogNg.vue Comprehensive Coverage', () => {
   let mockStore: any;
@@ -406,7 +403,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.find('div').exists()).toBe(true);
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should render CopyContent component with correct content prop', () => {
@@ -461,7 +458,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
   });
 

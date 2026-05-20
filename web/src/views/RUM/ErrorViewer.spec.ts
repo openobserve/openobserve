@@ -30,7 +30,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
 // Mock search service
@@ -106,7 +105,6 @@ vi.mock("@/composables/useErrorTracking", () => ({
 import ErrorViewer from "./ErrorViewer.vue";
 import searchService from "@/services/search";
 
-installQuasar();
 
 describe("ErrorViewer.vue", () => {
   let wrapper: VueWrapper<any>;

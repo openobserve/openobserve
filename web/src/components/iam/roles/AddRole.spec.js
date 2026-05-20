@@ -15,7 +15,6 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 import AddRole from "./AddRole.vue";
 import { createRole } from "@/services/iam";
@@ -43,7 +42,6 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: trackMock }),
 }));
 
-installQuasar();
 
 // ODrawer stub: exposes the migrated props (open/width/title/...) and drives
 // the primary/secondary/neutral buttons via the standard click:* emits. Buttons

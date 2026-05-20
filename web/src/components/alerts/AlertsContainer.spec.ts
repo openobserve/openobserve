@@ -15,11 +15,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertsContainer from "./AlertsContainer.vue";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 

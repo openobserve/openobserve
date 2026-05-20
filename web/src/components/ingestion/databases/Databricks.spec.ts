@@ -16,7 +16,6 @@
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import Databricks from './Databricks.vue';
 import useIngestion from '@/composables/useIngestion';
@@ -31,17 +30,6 @@ vi.mock('../../../aws-exports', () => ({
     API_ENDPOINT: 'https://test.openobserve.ai'
   }
 }));
-
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
 
 const createMockStore = () => {
   return createStore({
@@ -86,8 +74,6 @@ const mockIngestionData = {
     databricks: 'https://short.openobserve.ai/databricks'
   }
 };
-
-installQuasar({});
 
 describe('Databricks.vue', () => {
   let wrapper: any;
@@ -143,7 +129,7 @@ describe('Databricks.vue', () => {
   // Test 5: Template renders main container
   it('should render main container with correct class', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-pa-sm');
+    const container = wrapper.find('.tw\\:p-2');
     expect(container.exists()).toBe(true);
   });
 
@@ -252,7 +238,7 @@ describe('Databricks.vue', () => {
   // Test 19: Component structure matches expected layout
   it('should have correct component structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-pa-sm');
+    const container = wrapper.find('.tw\\:p-2');
     const textDiv = container.find('div[class*="tw:text-"]');
     const boldDiv = wrapper.find('div[class*="tw:font-bold"]');
     

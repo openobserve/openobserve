@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
@@ -41,7 +40,6 @@ vi.hoisted(() => {
 
 import SearchBar from "./SearchBar.vue";
 
-installQuasar();
 
 vi.mock("@/composables/useLogs", () => ({
   default: () => ({

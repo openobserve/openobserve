@@ -16,13 +16,8 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/services/iam", () => ({
   getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
@@ -35,17 +30,40 @@ vi.mock("@/composables/iam/usePermissions", () => ({
   })),
 }));
 
-vi.mock("@/components/AppTable.vue", () => ({
-  default: {
-    name: "AppTable",
-    template: `
-      <div data-test="app-table-mock">
-        <slot name="select" :column="{ row: { role_name: 'test-role', isInGroup: true } }"></slot>
-      </div>
-    `,
-    props: ["rows", "columns", "dense", "filter", "title"],
+const stubs = {
+  OTable: {
+    name: "OTable",
+    template: `<div data-test="iam-roles-table"><slot name="cell-select" :row="{ role_name: 'test-role', isInGroup: true }"></slot></div>`,
+    props: ["data", "columns", "rowKey", "globalFilter", "pagination", "pageSize", "sorting", "filterMode", "defaultColumns", "showGlobalFilter", "dense"],
   },
-}));
+  OInput: {
+    name: "OInput",
+    template: `<div><input type="text" :placeholder="placeholder" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+    props: ["modelValue", "placeholder"],
+    emits: ["update:modelValue"],
+  },
+  OButton: {
+    name: "OButton",
+    template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
+    props: ["variant", "active", "size"],
+    emits: ["click"],
+  },
+  OIcon: {
+    name: "OIcon",
+    template: `<i></i>`,
+    props: ["name", "size"],
+  },
+  OCheckbox: {
+    name: "OCheckbox",
+    template: `<input type="checkbox" :data-test="$attrs['data-test']" :checked="modelValue" @change="$emit('update:modelValue', !modelValue)" />`,
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+  },
+  NoData: {
+    name: "NoData",
+    template: `<div data-test="no-data"></div>`,
+  },
+};
 
 describe("GroupRoles Component", () => {
   let wrapper: any;
@@ -62,6 +80,7 @@ describe("GroupRoles Component", () => {
       global: {
         provide: { store },
         plugins: [i18n],
+        stubs,
       },
       props: {
         groupRoles: ["admin", "user"],
@@ -83,7 +102,7 @@ describe("GroupRoles Component", () => {
     it("renders filter options", () => {
       const showToggle = wrapper.find('[data-test="iam-roles-selection-show-toggle"]');
       const showText = wrapper.find('[data-test="iam-roles-selection-show-text"]');
-      
+
       expect(showToggle.exists()).toBe(true);
       expect(showText.text()).toBe("Show");
     });
@@ -114,7 +133,7 @@ describe("GroupRoles Component", () => {
     it("renders filter buttons for each option", () => {
       const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
       const selectedButton = wrapper.find('[data-test="iam-roles-selection-show-selected-btn"]');
-      
+
       expect(allButton.exists()).toBe(true);
       expect(selectedButton.exists()).toBe(true);
     });
@@ -122,7 +141,7 @@ describe("GroupRoles Component", () => {
     it("switches display option when button is clicked", async () => {
       const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
       await allButton.trigger("click");
-      
+
       expect(wrapper.vm.usersDisplay).toBe("all");
     });
   });
@@ -131,46 +150,13 @@ describe("GroupRoles Component", () => {
     it("updates search key when typing", async () => {
       const searchInput = wrapper.find('input[type="text"]');
       await searchInput.setValue("admin");
-      
+
       expect(wrapper.vm.userSearchKey).toBe("admin");
     });
 
     it("has correct search placeholder", () => {
       const searchInput = wrapper.find('input[placeholder="Search Roles"]');
       expect(searchInput.exists()).toBe(true);
-    });
-
-    it("filters roles correctly", () => {
-      const testRoles = [
-        { role_name: "admin" },
-        { role_name: "user" },
-        { role_name: "developer" },
-      ];
-
-      const filteredResults = wrapper.vm.filterRoles(testRoles, "admin");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].role_name).toBe("admin");
-    });
-
-    it("filters roles case-insensitively", () => {
-      const testRoles = [
-        { role_name: "Admin" },
-        { role_name: "User" },
-      ];
-
-      const filteredResults = wrapper.vm.filterRoles(testRoles, "ADMIN");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].role_name).toBe("Admin");
-    });
-
-    it("returns all roles when search term is empty", () => {
-      const testRoles = [
-        { role_name: "admin" },
-        { role_name: "user" },
-      ];
-
-      const filteredResults = wrapper.vm.filterRoles(testRoles, "");
-      expect(filteredResults).toEqual(testRoles);
     });
   });
 
@@ -226,15 +212,13 @@ describe("GroupRoles Component", () => {
   describe("Table Structure", () => {
     it("has correct column structure", () => {
       expect(wrapper.vm.columns).toHaveLength(2);
-      
+
       const selectColumn = wrapper.vm.columns[0];
-      expect(selectColumn.name).toBe("select");
-      expect(selectColumn.slot).toBe(true);
-      expect(selectColumn.slotName).toBe("select");
+      expect(selectColumn.id).toBe("select");
 
       const roleNameColumn = wrapper.vm.columns[1];
-      expect(roleNameColumn.name).toBe("role_name");
-      expect(roleNameColumn.field).toBe("role_name");
+      expect(roleNameColumn.id).toBe("role_name");
+      expect(roleNameColumn.accessorKey).toBe("role_name");
       expect(roleNameColumn.sortable).toBe(true);
     });
 
@@ -250,15 +234,6 @@ describe("GroupRoles Component", () => {
 
       expect(wrapper.vm.rows).toHaveLength(2);
     });
-
-    it("shows no users message when no roles", async () => {
-      wrapper.vm.rows = [];
-      await wrapper.vm.$nextTick();
-
-      const noUsersText = wrapper.find('[data-test="iam-roles-selection-table-no-users-text"]');
-      expect(noUsersText.exists()).toBe(true);
-      expect(noUsersText.text()).toBe("No users added");
-    });
   });
 
   describe("Role Selection", () => {
@@ -270,7 +245,7 @@ describe("GroupRoles Component", () => {
     it("handles role selection toggle", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -279,18 +254,18 @@ describe("GroupRoles Component", () => {
       });
 
       const testRole = { role_name: "user", isInGroup: false };
-      
+
       // Simulate checking the checkbox (selecting the role)
       testRole.isInGroup = true;
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("user")).toBe(true);
     });
 
     it("adds role to addedRoles when selecting unassigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: [],
         activeTab: "roles",
@@ -300,16 +275,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testRole = { role_name: "admin", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("admin")).toBe(true);
     });
 
     it("adds role to removedRoles when deselecting assigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -319,16 +294,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
       const testRole = { role_name: "admin", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(removedRoles.has("admin")).toBe(true);
     });
 
     it("removes role from addedRoles when deselecting newly added role", async () => {
       const addedRoles = new Set(["user"]);
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: [],
         activeTab: "roles",
@@ -338,16 +313,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testRole = { role_name: "user", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("user")).toBe(false);
     });
 
     it("removes role from removedRoles when reselecting removed role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set(["admin"]);
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -357,9 +332,9 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
       const testRole = { role_name: "admin", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(removedRoles.has("admin")).toBe(false);
     });
   });
@@ -382,17 +357,16 @@ describe("GroupRoles Component", () => {
     it("shows only selected roles when display is 'selected'", async () => {
       await wrapper.vm.getchOrgUsers(); // This will mark admin and user as selected
       await wrapper.vm.updateUserTable("selected");
-      
+
       const selectedRoles = wrapper.vm.rows.filter((role: any) => role.isInGroup);
       expect(wrapper.vm.rows).toEqual(selectedRoles);
     });
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
-      const initialLength = wrapper.vm.users.length;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       // Test behavior: hasFetchedOrgUsers should be set to true after fetch
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true);
     });
@@ -400,20 +374,18 @@ describe("GroupRoles Component", () => {
     it("does not refetch data when switching to 'all' after first fetch", async () => {
       const getchOrgUsersSpy = vi.spyOn(wrapper.vm, "getchOrgUsers");
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       expect(getchOrgUsersSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("Props Watching", () => {
     it("updates when groupRoles prop changes", async () => {
-      const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-      
       await wrapper.setProps({ groupRoles: ["admin", "user", "developer"] });
       await flushPromises();
-      
+
       // Test behavior: groupUsersMap should be updated with new prop values
       expect(wrapper.vm.groupUsersMap.size).toBe(3);
       expect(wrapper.vm.groupUsersMap.has("admin")).toBe(true);
@@ -423,10 +395,10 @@ describe("GroupRoles Component", () => {
 
     it("resets hasFetchedOrgUsers when groupRoles changes", async () => {
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.setProps({ groupRoles: ["new-role"] });
       await flushPromises();
-      
+
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true); // Gets set back to true after fetch
     });
   });
@@ -437,6 +409,7 @@ describe("GroupRoles Component", () => {
         global: {
           provide: { store },
           plugins: [i18n],
+          stubs,
         },
         props: {
           groupRoles: [],
@@ -462,14 +435,6 @@ describe("GroupRoles Component", () => {
       await wrapper.vm.getchOrgUsers();
 
       expect(wrapper.vm.users).toEqual([]);
-    });
-
-    it("handles undefined filter input", () => {
-      const testRoles = [{ role_name: "admin" }];
-      // Since the actual function doesn't handle undefined gracefully, we wrap it
-      // Test the actual filterRoles method with proper input validation
-      const result = wrapper.vm.filterRoles(testRoles, "");
-      expect(result).toEqual(testRoles);
     });
   });
 

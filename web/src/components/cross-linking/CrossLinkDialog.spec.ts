@@ -1,13 +1,11 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("CrossLinkDialog Component", () => {
   let wrapper: any;
@@ -62,28 +60,6 @@ describe("CrossLinkDialog Component", () => {
               "click:secondary",
               "click:neutral",
             ],
-          },
-          "q-form": {
-            template: '<form @submit.prevent><slot /></form>',
-          },
-          "q-input": {
-            template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-select": {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
-            props: ["modelValue", "options"],
-            methods: {
-              updateInputValue: vi.fn(),
-            },
-          },
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
-            emits: ["click"],
           },
         },
       },

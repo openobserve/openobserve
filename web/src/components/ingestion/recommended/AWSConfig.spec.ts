@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import AWSConfig from "./AWSConfig.vue";
 import { createI18n } from 'vue-i18n';
@@ -81,8 +80,6 @@ vi.mock('./AWSIndividualServices.vue', () => ({
 
 // Mock console.error to test error handling
 const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-installQuasar();
 
 // Create mock store
 const mockStore = createStore({
@@ -299,7 +296,6 @@ describe("AWSConfig", () => {
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
     expect(wrapper.find('.aws-config-page').exists()).toBe(true);
   });
 
@@ -467,7 +463,7 @@ describe("AWSConfig", () => {
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
+    expect(wrapper.find('.aws-config-page').exists()).toBe(true);
     expect(wrapper.find('h6').exists()).toBe(true);
   });
 });

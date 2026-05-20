@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport).
 // Exposes the same props/emits surface used by ColumnOrderPopUp.
@@ -172,7 +169,7 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.text()).toContain(
         "Columns will be displayed in their default order",
       );
-      expect(wrapper.findComponent({ name: "QIcon" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(true);
     });
 
     it("should not show draggable list in empty state", () => {
@@ -634,7 +631,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });

@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 
 // Mock external dependencies
@@ -62,8 +61,6 @@ vi.mock("marked", () => ({
       .replace(/\[([^\]]*)\]\(([^\)]*)\)/gim, '<a href="$2">$1</a>');
   }),
 }));
-
-installQuasar();
 
 describe("MarkdownRenderer", () => {
   let wrapper: VueWrapper<any>;

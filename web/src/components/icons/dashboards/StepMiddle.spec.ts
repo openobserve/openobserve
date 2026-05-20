@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import StepMiddle from '@/components/icons/dashboards/StepMiddle.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-
-installQuasar();
 
 describe('StepMiddle.vue', () => {
   let wrapper: VueWrapper;

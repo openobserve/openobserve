@@ -198,27 +198,9 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
-    "q-page": true,
-    "q-input": true,
-    "q-btn": true,
-    "q-toggle": true,
-    "q-tooltip": true,
     // q-splitter must render both named slots so the drawers nested in
     // <template v-slot:after> are present for assertions.
-    "q-splitter": {
-      name: "QSplitter",
-      template: '<div data-test-stub="q-splitter"><slot name="before" /><slot name="after" /></div>',
-    },
-    "q-tabs": true,
-    "q-tab": true,
-    "q-separator": true,
-    "q-menu": true,
-    "q-list": true,
-    "q-item": true,
-    "q-item-section": true,
-    "q-item-label": true,
     "OIcon": true,
-    "q-table": true,
     // Migrated overlay primitives — preserve props/emits for assertion
     ODrawer: {
       name: "ODrawer",

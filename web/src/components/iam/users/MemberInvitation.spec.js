@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from 'vue';
 
 // Mock services
@@ -37,6 +36,12 @@ vi.mock("@/services/segment_analytics", () => ({
   }
 }));
 
+// Mock toast
+const toastMock = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args) => toastMock(...args),
+}));
+
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -55,29 +60,54 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-installQuasar({
-  plugins: [],
-  config: {
-    platform
-  }
-});
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "placeholder"],
+  emits: ["update:modelValue"],
+  template: '<input class="o-input" :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+};
+
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options", "labelKey", "valueKey"],
+  emits: ["update:modelValue"],
+  template: '<div class="o-select"></div>',
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled"],
+  emits: ["click"],
+  template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+};
+
+const mountComponent = (currentrole = "admin") =>
+  mount(MemberInvitation, {
+    props: { currentrole },
+    global: {
+      plugins: [i18n],
+      provide: { store, platform },
+      stubs: {
+        OInput: OInputStub,
+        OSelect: OSelectStub,
+        OButton: OButtonStub,
+      },
+    },
+    attachTo: document.body,
+  });
 
 describe("MemberInvitation Component", () => {
   let wrapper;
 
   beforeEach(async () => {
-    // Reset mocks
     vi.mocked(organizationsService.add_members).mockReset();
     vi.mocked(usersService.getRoles).mockReset();
     vi.mocked(segment.track).mockReset();
-    
+    toastMock.mockClear();
 
-    // Setup store state
     store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
     store.state.userInfo = { email: "test@example.com" };
 
-    // Mock getRoles response
     vi.mocked(usersService.getRoles).mockResolvedValue({
       data: [
         { label: "Admin", value: "admin" },
@@ -85,32 +115,8 @@ describe("MemberInvitation Component", () => {
       ]
     });
 
-    wrapper = mount(MemberInvitation, {
-      props: {
-        currentrole: "admin"
-      },
-      global: {
-        plugins: [
-          [{ platform }],
-          i18n
-        ],
-        provide: { 
-          store,
-          platform
-        },
-        mocks: {
-        }
-      },
-      attachTo: document.body
-    });
-
-
+    wrapper = mountComponent("admin");
     await flushPromises();
-
-    let dismissMock = vi.fn();
-    let notifyMock = vi.fn().mockReturnValue(dismissMock);
-    // wrapper.vm.$q = { notify: notifyMock };
-    wrapper.vm.$q.notify = notifyMock;
   });
 
   afterEach(() => {
@@ -126,21 +132,7 @@ describe("MemberInvitation Component", () => {
   });
 
   it("does not render for non-admin users", async () => {
-    const memberWrapper = mount(MemberInvitation, {
-      props: {
-        currentrole: "member"
-      },
-      global: {
-        plugins: [
-          [{ platform }],
-          i18n
-        ],
-        provide: { 
-          store,
-          platform
-        }
-      }
-    });
+    const memberWrapper = mountComponent("member");
     await nextTick();
     expect(memberWrapper.find('.invite-user').exists()).toBe(false);
     memberWrapper.unmount();
@@ -148,44 +140,37 @@ describe("MemberInvitation Component", () => {
 
   describe("Email Validation", () => {
     it("validates single email", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("invalid-email");
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      wrapper.vm.userEmail = "invalid-email";
+      await nextTick();
+      await wrapper.find('button').trigger('click');
       await flushPromises();
-      
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Please enter correct email id."
         })
       );
     });
 
     it("validates multiple emails", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test1@example.com; invalid-email, test2@example.com");
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      wrapper.vm.userEmail = "test1@example.com; invalid-email, test2@example.com";
+      await nextTick();
+      await wrapper.find('button').trigger('click');
       await flushPromises();
-      
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Please enter correct email id."
         })
       );
     });
 
     it("accepts valid emails", async () => {
-      const validEmails = "test1@example.com; test2@example.com, test3@example.com";
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue(validEmails);
-      
+      wrapper.vm.userEmail = "test1@example.com; test2@example.com, test3@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: {
           data: {},
@@ -193,9 +178,9 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
-      
+
       expect(organizationsService.add_members).toHaveBeenCalledWith(
         {
           invites: ["test1@example.com", "test2@example.com", "test3@example.com"],
@@ -208,11 +193,9 @@ describe("MemberInvitation Component", () => {
 
   describe("Invitation Process", () => {
     it("handles successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: {
           data: {},
@@ -220,12 +203,12 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Invitations sent successfully",
           timeout: 5000
         })
@@ -234,11 +217,9 @@ describe("MemberInvitation Component", () => {
     });
 
     it("handles invalid members error", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: {
           data: {
@@ -247,12 +228,12 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Error while member invitation: test@example.com",
           timeout: 15000
         })
@@ -260,11 +241,9 @@ describe("MemberInvitation Component", () => {
     });
 
     it("tracks invitation in analytics", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: {
           data: {},
@@ -272,7 +251,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(segment.track).toHaveBeenCalledWith(
@@ -289,52 +268,46 @@ describe("MemberInvitation Component", () => {
 
   describe("UI Interactions", () => {
     it("disables invite button when email is empty", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("");
+      wrapper.vm.userEmail = "";
       await nextTick();
-      
-      const inviteButton = wrapper.find('button[data-o2-btn]');
+
+      const inviteButton = wrapper.find('button');
       expect(inviteButton.attributes('disabled')).toBeDefined();
     });
 
     it("enables invite button when email is provided", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
+      wrapper.vm.userEmail = "test@example.com";
       await nextTick();
-      
-      const inviteButton = wrapper.find('button[data-o2-btn]');
+
+      const inviteButton = wrapper.find('button');
       expect(inviteButton.attributes('disabled')).toBeUndefined();
     });
 
     it("allows role selection", async () => {
-      const select = wrapper.findComponent('.q-select');
+      const select = wrapper.findComponent(OSelectStub);
       expect(select.exists()).toBe(true);
-      
+
       await select.vm.$emit('update:modelValue', 'member');
       await nextTick();
-      
+
       expect(wrapper.vm.selectedRole).toBe('member');
     });
   });
 
   describe("Error Handling", () => {
     it("handles API error during invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       const error = new Error("Network error");
       vi.mocked(organizationsService.add_members).mockRejectedValue(error);
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: error.message,
           timeout: 5000
         })
@@ -343,15 +316,8 @@ describe("MemberInvitation Component", () => {
 
     it("handles empty response from getRoles", async () => {
       vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
-      
-      const newWrapper = mount(MemberInvitation, {
-        props: { currentrole: "admin" },
-        global: {
-          plugins: [[{ platform }], i18n],
-          provide: { store, platform }
-        }
-      });
-      
+
+      const newWrapper = mountComponent("admin");
       await flushPromises();
       expect(newWrapper.vm.options).toEqual([]);
       newWrapper.unmount();
@@ -360,14 +326,14 @@ describe("MemberInvitation Component", () => {
 
   describe("Email Input Handling", () => {
     it("handles mixed separators in email list", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test1@example.com, test2@example.com; test3@example.com,test4@example.com");
-      
+      wrapper.vm.userEmail = "test1@example.com, test2@example.com; test3@example.com,test4@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -385,14 +351,14 @@ describe("MemberInvitation Component", () => {
     });
 
     it("trims whitespace from emails", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("  test1@example.com ,  test2@example.com  ");
-      
+      wrapper.vm.userEmail = "  test1@example.com ,  test2@example.com  ";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -405,14 +371,14 @@ describe("MemberInvitation Component", () => {
     });
 
     it("converts emails to lowercase", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("TEST@EXAMPLE.COM, Test@Example.com");
+      wrapper.vm.userEmail = "TEST@EXAMPLE.COM, Test@Example.com";
+      await nextTick();
 
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -445,18 +411,18 @@ describe("MemberInvitation Component", () => {
 
   describe("Notification Behavior", () => {
     it("shows loading notification during invitation process", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockImplementation(() => 
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
+      vi.mocked(organizationsService.add_members).mockImplementation(() =>
         new Promise(resolve => setTimeout(() => resolve({ data: { data: {}, message: "Success" } }), 100))
       );
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
-      
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      await wrapper.find('button').trigger('click');
+
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          spinner: true,
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000
         })
@@ -464,17 +430,17 @@ describe("MemberInvitation Component", () => {
     });
 
     it("dismisses loading notification after successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       const dismissMock = vi.fn();
-      wrapper.vm.$q.notify = vi.fn().mockReturnValue(dismissMock);
+      toastMock.mockReturnValueOnce(dismissMock);
 
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(dismissMock).toHaveBeenCalled();
@@ -483,25 +449,18 @@ describe("MemberInvitation Component", () => {
 
   describe("Role Selection Validation", () => {
     it("updates selected role when valid option is chosen", async () => {
-      const select = wrapper.findComponent('.q-select');
+      const select = wrapper.findComponent(OSelectStub);
       await select.vm.$emit('update:modelValue', 'member');
       await nextTick();
-      
+
       expect(wrapper.vm.selectedRole).toBe('member');
       expect(select.props('modelValue')).toBe('member');
     });
 
     it("maintains default role when options are empty", async () => {
       vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
-      
-      const newWrapper = mount(MemberInvitation, {
-        props: { currentrole: "admin" },
-        global: {
-          plugins: [[{ platform }], i18n],
-          provide: { store, platform }
-        }
-      });
-      
+
+      const newWrapper = mountComponent("admin");
       await flushPromises();
       expect(newWrapper.vm.selectedRole).toBe('admin');
       newWrapper.unmount();
@@ -512,51 +471,29 @@ describe("MemberInvitation Component", () => {
         { label: "Super Admin", value: "super_admin" },
         { label: "Basic User", value: "basic" }
       ];
-      
+
       vi.mocked(usersService.getRoles).mockResolvedValue({ data: newRoles });
-      
-      const newWrapper = mount(MemberInvitation, {
-        props: { currentrole: "admin" },
-        global: {
-          plugins: [[{ platform }], i18n],
-          provide: { store, platform }
-        }
-      });
-      
+
+      const newWrapper = mountComponent("admin");
       await flushPromises();
       expect(newWrapper.vm.options).toEqual(newRoles);
       newWrapper.unmount();
     });
   });
 
-
   describe("Component Visibility", () => {
     const roles = ["member", "viewer", "custom", "unknown"];
-    
+
     roles.forEach(role => {
       it(`does not show invitation form for ${role} role`, () => {
-        const newWrapper = mount(MemberInvitation, {
-          props: { currentrole: role },
-          global: {
-            plugins: [[{ platform }], i18n],
-            provide: { store, platform }
-          }
-        });
-        
+        const newWrapper = mountComponent(role);
         expect(newWrapper.find('.invite-user').exists()).toBe(false);
         newWrapper.unmount();
       });
     });
 
     it("shows invitation form for root user", () => {
-      const newWrapper = mount(MemberInvitation, {
-        props: { currentrole: "root" },
-        global: {
-          plugins: [[{ platform }], i18n],
-          provide: { store, platform }
-        }
-      });
-      
+      const newWrapper = mountComponent("root");
       expect(newWrapper.find('.invite-user').exists()).toBe(true);
       newWrapper.unmount();
     });
@@ -564,19 +501,17 @@ describe("MemberInvitation Component", () => {
 
   describe("Input Reset Behavior", () => {
     it("resets email input after successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test@example.com");
-      
+      wrapper.vm.userEmail = "test@example.com";
+      await nextTick();
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button[data-o2-btn]').trigger('click');
+      await wrapper.find('button').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.userEmail).toBe("");
-      expect(emailInput.element.value).toBe("");
     });
   });
-
 });

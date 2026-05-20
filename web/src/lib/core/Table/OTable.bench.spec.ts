@@ -3,9 +3,6 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest";
 import { mount, VueWrapper, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,
@@ -115,6 +112,7 @@ describe("OTable Performance Benchmarks", () => {
             virtualScroll: true,
             rowHeight: 28,
             maxHeight: 600,
+            pagination: "none",
           },
         });
       });
@@ -133,6 +131,7 @@ describe("OTable Performance Benchmarks", () => {
             data: rows,
             columns: makeColumns(),
             virtualScroll: false,
+            pagination: "none",
           },
         });
       });
@@ -159,6 +158,7 @@ describe("OTable Performance Benchmarks", () => {
             virtualScroll: true,
             rowHeight: 28,
             maxHeight: 600,
+            pagination: "none",
           },
         });
       });
@@ -235,6 +235,7 @@ describe("OTable Performance Benchmarks", () => {
           virtualScroll: true,
           rowHeight: 28,
           maxHeight: 600,
+          pagination: "none",
         },
       });
 
@@ -263,6 +264,7 @@ describe("OTable Performance Benchmarks", () => {
             virtualScroll: true,
             rowHeight: 28,
             maxHeight: 600,
+            pagination: "none",
           },
         });
         expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
@@ -278,6 +280,7 @@ describe("OTable Performance Benchmarks", () => {
           virtualScroll: true,
           rowHeight: 28,
           maxHeight: 600,
+          pagination: "none",
         },
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);

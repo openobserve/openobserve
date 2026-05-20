@@ -15,12 +15,36 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SelectFunction from "@/components/dashboards/addPanel/dynamicFunction/SelectFunction.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options", "label", "iconKey", "required"],
+  emits: ["update:modelValue", "search"],
+  template: `<div :data-test="$attrs['data-test']" class="o-select-stub"><slot name="icon-left" /></div>`,
+};
+
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "type", "placeholder"],
+  emits: ["update:modelValue"],
+  template: `<input :data-test="$attrs['data-test']" :type="type" :placeholder="placeholder" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "iconLeft"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" @click="$emit('click', $event)"><slot /></button>`,
+};
+
+const OIconStub = {
+  name: "OIcon",
+  props: ["name", "size"],
+  template: `<i :data-test="$attrs['data-test']" :data-name="name"></i>`,
+};
 
 const i18n = createI18n({
   legacy: false,
@@ -104,6 +128,10 @@ describe("SelectFunction", () => {
           HistogramIntervalDropDown: true,
           StreamFieldSelect: true,
           SubTaskArrow: true,
+          OSelect: OSelectStub,
+          OInput: OInputStub,
+          OButton: OButtonStub,
+          OIcon: OIconStub,
         },
       },
     });

@@ -15,12 +15,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import i18n from "@/locales";
 import Error404 from "./Error404.vue";
-
-installQuasar();
 
 describe("Error404", () => {
   let wrapper: VueWrapper;

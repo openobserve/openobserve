@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 
 // Stable spy references — must be declared before vi.mock() factories reference them.
@@ -69,22 +67,10 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: notifyMock,
-      dialog: vi.fn(),
-    }),
-  };
-});
-
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Shared fixtures

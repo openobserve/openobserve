@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddDashboardFromGitHub from "./AddDashboardFromGitHub.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -43,7 +42,6 @@ const s3FileListXml = (folderPath: string, files: string[]): string => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${keys}\n</ListBucketResult>`;
 };
 
-installQuasar({ plugins: [] });
 
 import dashboardsService from "@/services/dashboards";
 
@@ -173,37 +171,6 @@ describe("AddDashboardFromGitHub Component", () => {
           OButton: OButtonStub,
           "OIcon": {
             template: '<span class="OIcon">{{ $attrs.name }}</span>',
-          },
-          "q-input": {
-            template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-list": {
-            template: '<ul class="q-list"><slot /></ul>',
-          },
-          "q-item": {
-            template:
-              '<li class="q-item" @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></li>',
-            emits: ["click"],
-          },
-          "q-item-section": {
-            template: '<div class="q-item-section"><slot /></div>',
-          },
-          "q-item-label": {
-            template: '<span class="q-item-label"><slot /></span>',
-          },
-          "q-checkbox": {
-            template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-select": {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
-            props: ["modelValue", "options"],
           },
           AddFolder: {
             template: '<div class="add-folder-mock"></div>',

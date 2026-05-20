@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock ErrorTag component
 vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
@@ -66,9 +59,16 @@ describe("ErrorSessionReplay Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "OIcon": {
+          OIcon: {
             template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
+          },
+          OButton: {
+            name: "OButton",
+            template:
+              '<button data-test="o-button" @click="$emit(\'click\')"><slot /></button>',
+            props: ["variant", "size", "iconLeft", "title"],
+            emits: ["click"],
           },
         },
       },
@@ -92,10 +92,8 @@ describe("ErrorSessionReplay Component", () => {
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
+    it("should render main container", () => {
+      expect(wrapper.find("div").exists()).toBe(true);
     });
   });
 
@@ -106,12 +104,9 @@ describe("ErrorSessionReplay Component", () => {
       expect(title.text()).toBe("Session Replay");
     });
 
-    it("should have correct title styling", () => {
+    it("should have tags-title class", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
     });
   });
 
@@ -124,7 +119,7 @@ describe("ErrorSessionReplay Component", () => {
     it("should display session_id tag", () => {
       const sessionIdTag = wrapper
         .findAll('[data-test="error-tag"]')
-        .find((tag) => tag.text().includes("session_id"));
+        .find((tag: any) => tag.text().includes("session_id"));
       expect(sessionIdTag).toBeDefined();
       expect(sessionIdTag?.text()).toContain("session-abc123");
     });
@@ -132,15 +127,9 @@ describe("ErrorSessionReplay Component", () => {
     it("should display view_id tag", () => {
       const viewIdTag = wrapper
         .findAll('[data-test="error-tag"]')
-        .find((tag) => tag.text().includes("view_id"));
+        .find((tag: any) => tag.text().includes("view_id"));
       expect(viewIdTag).toBeDefined();
       expect(viewIdTag?.text()).toContain("view-def456");
-    });
-
-    it("should render tags in row container", () => {
-      const tagsContainer = wrapper.find(".row");
-      expect(tagsContainer.exists()).toBe(true);
-      expect(tagsContainer.classes()).toContain("row");
     });
   });
 
@@ -150,32 +139,9 @@ describe("ErrorSessionReplay Component", () => {
       expect(playButton.exists()).toBe(true);
     });
 
-    it("should have correct button styling", () => {
-      const playButton = wrapper.findComponent({ name: "OButton" });
-      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
-    });
-
-    it("should have correct button inline styles", () => {
-      const playButton = wrapper.findComponent({ name: "OButton" });
-      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
-    });
-
-    it("should display play icon", () => {
-      // Icon is now a Lucide SVG (PlayCircle), check it's rendered inside the button
-      const playButton = wrapper.findComponent({ name: "OButton" });
-      expect(playButton.find("svg").exists()).toBe(true);
-    });
-
     it("should display 'Play Session Replay' text", () => {
       const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.text()).toContain("Play Session Replay");
-    });
-
-    it("should have correct icon styling", () => {
-      // Icon is now a Lucide SVG with tw:mr-1 class
-      const playButton = wrapper.findComponent({ name: "OButton" });
-      const svg = playButton.find("svg");
-      expect(svg.exists()).toBe(true);
     });
   });
 
@@ -286,29 +252,6 @@ describe("ErrorSessionReplay Component", () => {
     });
   });
 
-  describe("Component Structure", () => {
-    it("should have proper layout hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const title = container.find(".tags-title");
-      const tagsRow = container.find(".row");
-      const playButton = container.findComponent({ name: "OButton" });
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(tagsRow.exists()).toBe(true);
-      expect(playButton.exists()).toBe(true);
-    });
-
-    it("should maintain correct element order", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const children = Array.from(container.element.children) as HTMLElement[];
-
-      expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].classList.contains("row")).toBe(true);
-      expect(children[2].tagName.toLowerCase()).toBe("button");
-    });
-  });
-
   describe("Error Tags Integration", () => {
     it("should pass correct props to ErrorTag components", () => {
       const errorTagComponents = wrapper.findAllComponents({
@@ -317,10 +260,10 @@ describe("ErrorSessionReplay Component", () => {
       expect(errorTagComponents.length).toBe(2);
 
       const sessionIdTag = errorTagComponents.find(
-        (component) => component.props("tag").key === "session_id",
+        (component: any) => component.props("tag").key === "session_id",
       );
       const viewIdTag = errorTagComponents.find(
-        (component) => component.props("tag").key === "view_id",
+        (component: any) => component.props("tag").key === "view_id",
       );
 
       expect(sessionIdTag).toBeDefined();
@@ -410,18 +353,6 @@ describe("ErrorSessionReplay Component", () => {
           end_time: null,
         },
       });
-    });
-  });
-
-  describe("CSS Styling", () => {
-    it("should apply correct title styling", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.classes()).toContain("tags-title");
-    });
-
-    it("should apply correct button styling", () => {
-      const playButton = wrapper.findComponent({ name: "OButton" });
-      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
     });
   });
 

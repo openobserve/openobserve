@@ -15,18 +15,13 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
   plugins: [quasar.quasar.Loading],
-});
 
 describe("ErrorEventDescription Component", () => {
   let wrapper: any;

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -52,8 +51,6 @@ const mockRouter = createRouter({
   routes: [{ path: '/', component: { template: '<div>Home</div>' } }],
 });
 
-installQuasar({ plugins: {} });
-
 describe('AzureConfig.vue', () => {
   let wrapper: VueWrapper;
 
@@ -70,8 +67,44 @@ describe('AzureConfig.vue', () => {
   const createWrapper = () =>
     mount(AzureConfig, {
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockI18n, mockRouter, mockStore],
         provide: { store: mockStore },
+        stubs: {
+          OToggleGroup: {
+            template: '<div data-test="o-toggle-group" :data-value="modelValue"><slot /></div>',
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+          },
+          OToggleGroupItem: {
+            template: '<button :data-value="value" @click="$emit(\'select\', value)"><slot /></button>',
+            props: ['value'],
+            emits: ['select'],
+          },
+          OSelect: {
+            template: '<select :data-test="$attrs[\'data-test\']" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value || o" :value="o.value || o">{{ o.label || o }}</option></select>',
+            props: ['modelValue', 'options', 'valueKey', 'labelKey'],
+            emits: ['update:modelValue'],
+          },
+          OCheckbox: {
+            template: '<input type="checkbox" :value="value" :checked="Array.isArray(modelValue) ? modelValue.includes(value) : modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+            props: ['modelValue', 'value', 'label'],
+            emits: ['update:modelValue'],
+          },
+          OButton: {
+            template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+            props: ['variant', 'size', 'disabled'],
+            emits: ['click'],
+          },
+          OIcon: { template: '<i></i>', props: ['name', 'size', 'color'] },
+          OBadge: { template: '<span><slot /></span>', props: ['variant', 'size'] },
+          OTooltip: { template: '<span></span>', props: ['content'] },
+          OSeparator: { template: '<hr />' },
+          OInput: {
+            template: '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+          },
+        },
       },
     });
 

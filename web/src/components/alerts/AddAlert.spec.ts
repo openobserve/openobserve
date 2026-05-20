@@ -18,7 +18,6 @@ import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import alertsService from "@/services/alerts";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 import { detectConditionsVersion } from "@/utils/alerts/alertDataTransforms";
@@ -32,7 +31,6 @@ import { useLocalOrganization } from "@/utils/zincutils";
 
 import searchService from "@/services/search";
 
-installQuasar();
 vi.mock('@/composables/useStreams', () => {
   return {
     default: () => ({

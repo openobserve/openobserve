@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { computed } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
@@ -27,8 +26,6 @@ import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-
-installQuasar();
 
 const mockDashboardPanelData = {
   data: {
@@ -2651,10 +2648,10 @@ describe("ConfigPanel", () => {
   });
 
   describe("Section expansion items render", () => {
-    it("renders q-expansion-item for general section", () => {
+    it("renders OCollapsible for general section", () => {
       wrapper = createWrapper();
       // The general section expansion item uses isSectionVisible('general') via v-show
-      const expansionItems = wrapper.findAllComponents({ name: "QExpansionItem" });
+      const expansionItems = wrapper.findAllComponents({ name: "OCollapsible" });
       expect(expansionItems.length).toBeGreaterThan(0);
     });
   });

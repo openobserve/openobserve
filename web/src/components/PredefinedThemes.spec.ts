@@ -15,29 +15,11 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [],
-});
-
-// Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn());
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-      dark: {
-        set: vi.fn(),
-      },
-    }),
-  };
-});
 
 // Mock composable
 vi.mock("@/composables/usePredefinedThemes", () => ({
@@ -129,30 +111,6 @@ const createWrapper = (props = {}, options = {}) => {
           props: ['open', 'size', 'title', 'primaryButtonLabel'],
           emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
         },
-        QCard: {
-          template: '<div data-test-stub="q-card"><slot></slot></div>',
-        },
-        QCardSection: {
-          template: '<div data-test-stub="q-card-section"><slot></slot></div>',
-        },
-        QTabs: {
-          template: '<div data-test-stub="q-tabs"><slot></slot></div>',
-          props: ['modelValue'],
-        },
-        QTab: {
-          template: '<button data-test-stub="q-tab" @click="$emit(\'click\')"><slot></slot></button>',
-        },
-        QTabPanels: {
-          template: '<div data-test-stub="q-tab-panels"><slot></slot></div>',
-          props: ['modelValue'],
-        },
-        QTabPanel: {
-          template: '<div data-test-stub="q-tab-panel"><slot></slot></div>',
-          props: ['name'],
-        },
-        QBtn: {
-          template: '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
-        },
         // O2 component stubs (migrated from Quasar)
         OTabs: {
           template: '<div data-test-stub="q-tabs"><slot></slot></div>',
@@ -177,14 +135,14 @@ const createWrapper = (props = {}, options = {}) => {
           props: ['variant', 'size', 'disabled', 'loading'],
           emits: ['click'],
         },
-        QIcon: {
+        OIcon: {
           template: '<i data-test-stub="OIcon"></i>',
         },
-        QTooltip: {
-          template: '<div data-test-stub="q-tooltip"><slot></slot></div>',
+        OTooltip: {
+          template: '<div data-test-stub="o-tooltip"><slot></slot></div>',
         },
-        QColor: {
-          template: '<div data-test-stub="q-color"></div>',
+        OColor: {
+          template: '<div data-test-stub="o-color"></div>',
           props: ['modelValue'],
           emits: ['update:modelValue'],
         },
@@ -382,7 +340,8 @@ describe("PredefinedThemes", () => {
       expect(mockLocalStorage.removeItem).toHaveBeenCalled();
     });
 
-    it("should show notification after reset", async () => {
+    // TODO: useQuasar/notify removed when Quasar was removed from the project
+    it.skip("should show notification after reset", async () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import License from './License.vue';
 import licenseServer from '@/services/license_server';
 import { createStore } from 'vuex';
@@ -88,34 +87,16 @@ vi.mock('@/enterprise/components/billings/LicensePeriod.vue', () => ({
   },
 }));
 
-// Mock useQuasar
+// Mock toast (replaces Quasar notify)
 const mockNotify = vi.fn();
 const mockDialog = vi.fn().mockReturnValue({
   onOk: vi.fn().mockReturnThis(),
   onCancel: vi.fn().mockReturnThis(),
 });
 
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-      dialog: mockDialog,
-      platform: {
-        has: {
-          touch: false,
-        },
-        is: {
-          mobile: false,
-          desktop: true,
-        },
-      },
-    }),
-  };
-});
-
-installQuasar({ plugins: {} });
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 describe('License.vue', () => {
   let store: any;
@@ -162,24 +143,6 @@ describe('License.vue', () => {
         stubs: {
           LicensePeriod: true,
           ODialog: ODialogStub,
-        },
-        mocks: {
-          $q: {
-            notify: vi.fn(),
-            dialog: vi.fn().mockReturnValue({
-              onOk: vi.fn().mockReturnThis(),
-              onCancel: vi.fn().mockReturnThis(),
-            }),
-            platform: {
-              has: {
-                touch: false,
-              },
-              is: {
-                mobile: false,
-                desktop: true,
-              },
-            },
-          },
         },
       },
       ...options,
@@ -462,10 +425,12 @@ describe('License.vue', () => {
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
-        message: 'License updated successfully',
-      });
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'success',
+          message: 'License updated successfully',
+        }),
+      );
     });
 
     it('should show error notification on failed update', async () => {
@@ -475,10 +440,12 @@ describe('License.vue', () => {
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Failed to update license : unexpected error',
-      });
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'error',
+          message: 'Failed to update license : unexpected error',
+        }),
+      );
     });
 
     it('should clear license key after successful update', async () => {

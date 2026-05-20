@@ -1,12 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Pagination from "@/components/shared/grid/Pagination.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
-
-installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `/mocked/${path}`)
@@ -60,20 +57,20 @@ describe("Pagination", () => {
           store,
         },
         stubs: {
-          'q-input': {
+          OInput: {
             template: '<input @blur="$emit(\'blur\', $event)" />',
           },
-          'q-select': {
+          OSelect: {
             template: '<select @update:modelValue="$emit(\'update:modelValue\', $event)"><option value="10">10</option><option value="20">20</option></select>',
           },
-          'q-btn': {
+          OButton: {
             template: '<button @click="$emit(\'click\')"><slot /></button>'
           },
-          'q-btn-group': {
-            template: '<div class="q-btn-group"><slot /></div>'
+          OButtonGroup: {
+            template: '<div class="o-btn-group"><slot /></div>'
           },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
+          OSeparator: {
+            template: '<div class="o-separator"></div>'
           }
         }
       },

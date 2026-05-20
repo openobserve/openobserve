@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardSankeyChartBuilder from "@/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue";
 import i18n from "@/locales";
-
-installQuasar();
 
 // Mock the composables
 const mockDashboardPanelData = {
@@ -129,13 +126,6 @@ describe("DashboardSankeyChartBuilder", () => {
           DashboardJoinsOption: true,
           DynamicFunctionPopUp: true,
           "OIcon": true,
-          "q-tooltip": true,
-          "q-btn-group": true,
-          "q-btn": true,
-          "q-menu": true,
-          "q-input": true,
-          "q-select": true,
-          "q-separator": true,
         },
         mocks: {
           $t: (key: string) => key,

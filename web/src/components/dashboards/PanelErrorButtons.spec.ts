@@ -16,10 +16,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import PanelErrorButtons from "./PanelErrorButtons.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-
-installQuasar();
 
 // Create a mock Vuex store with timezone state
 const mockStore = createStore({

@@ -16,8 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
-import { copyToClipboard } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -47,17 +46,9 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn()
-  };
-});
-
-installQuasar({
-  plugins: []
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
 
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;
@@ -81,9 +72,6 @@ describe("IngestLogs Index Component", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          "q-splitter": true,
-          "q-tabs": true,
-          "q-route-tab": true,
           "router-view": true
         }
       }
@@ -171,16 +159,13 @@ describe("IngestLogs Index Component", () => {
     it("should copy content to clipboard successfully", async () => {
       const mockContent = { innerText: "test content" };
       (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
+      expect(copyToClipboard).toHaveBeenCalledWith("test content", expect.objectContaining({
+        successMessage: "Content Copied Successfully!",
         timeout: 5000,
-      });
+      }));
     });
 
     it("should handle clipboard copy failure", () => {
@@ -215,16 +200,10 @@ describe("IngestLogs Index Component", () => {
     it("should handle empty content", async () => {
       const mockContent = { innerText: "" };
       (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Object));
     });
 
     it("should handle content with whitespace", async () => {
@@ -233,7 +212,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ");
+      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ", expect.any(Object));
     });
 
     it("should handle content with special characters", async () => {
@@ -242,7 +221,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test@#$%^&*()content");
+      expect(copyToClipboard).toHaveBeenCalledWith("test@#$%^&*()content", expect.any(Object));
     });
 
     it("should handle content with newlines", async () => {
@@ -251,7 +230,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("line1\nline2\nline3");
+      expect(copyToClipboard).toHaveBeenCalledWith("line1\nline2\nline3", expect.any(Object));
     });
 
     it("should handle content with HTML entities", async () => {
@@ -260,7 +239,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test &amp; content &lt; &gt;");
+      expect(copyToClipboard).toHaveBeenCalledWith("test &amp; content &lt; &gt;", expect.any(Object));
     });
 
     it("should track analytics with correct current route name", async () => {
@@ -333,7 +312,7 @@ describe("IngestLogs Index Component", () => {
   // Template and UI Tests
   describe("Template and UI", () => {
     it("should render splitter component", () => {
-      expect(wrapper.find('q-splitter-stub').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OSplitter" }).exists()).toBe(true);
     });
 
     it("should have template structure", () => {
@@ -368,9 +347,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }
@@ -386,9 +362,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }
@@ -447,26 +420,19 @@ describe("IngestLogs Index Component", () => {
     it("should handle null content in copyToClipboardFn", async () => {
       const mockContent = { innerText: null };
       (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null);
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(null, expect.any(Object));
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
       const mockContent = { innerText: undefined };
       (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Object));
     });
 
     it("should handle missing innerText property", async () => {
@@ -475,7 +441,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Object));
     });
 
     it("should handle very long content", async () => {
@@ -485,7 +451,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(longContent);
+      expect(copyToClipboard).toHaveBeenCalledWith(longContent, expect.any(Object));
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
@@ -505,7 +471,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test");
+      expect(copyToClipboard).toHaveBeenCalledWith("test", expect.any(Object));
     });
 
     it("should handle component updates", async () => {
@@ -536,9 +502,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }

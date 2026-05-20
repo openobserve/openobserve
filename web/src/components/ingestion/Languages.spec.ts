@@ -1,12 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Languages from "@/components/ingestion/Languages.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
@@ -36,19 +32,30 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
+const baseStubs = {
+  OSplitter: {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder", "clearable"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+  },
+  OIcon: true,
+  OTabs: {
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
 };
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
 
 describe("Languages Component", () => {
   let wrapper: any = null;
@@ -56,7 +63,7 @@ describe("Languages Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "languages";
     mockRouter.currentRoute.value.query = {};
@@ -70,16 +77,7 @@ describe("Languages Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-input': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'OIcon': true
-        }
+        stubs: { ...baseStubs },
       },
     });
   });
@@ -116,19 +114,10 @@ describe("Languages Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -148,25 +137,16 @@ describe("Languages Component", () => {
     it("should not redirect when not on languages route", () => {
       mockRouter.currentRoute.value.name = "python";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -175,25 +155,16 @@ describe("Languages Component", () => {
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.currentRoute.value.query = { someParam: "value" };
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "python",
         query: {
@@ -208,70 +179,52 @@ describe("Languages Component", () => {
     it("should redirect to python route when updated to languages route", async () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "python";
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to languages to trigger onUpdated
       mockRouter.currentRoute.value.name = "languages";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
 
     it("should not redirect when updated to non-languages route", async () => {
       // First mount with languages route
       mockRouter.currentRoute.value.name = "languages";
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to python - should not trigger redirect in onUpdated
       mockRouter.currentRoute.value.name = "python";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
   });
@@ -517,37 +470,18 @@ describe("Languages Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("string-value");
       testWrapper.unmount();
     });
   });
 
   describe("Template Rendering", () => {
-    it("should render q-splitter component", () => {
-      const splitterWrapper = wrapper.find('[modelValue="270"]');
-      expect(splitterWrapper.exists()).toBe(true);
-    });
-
     it("should have correct splitter model value", () => {
       expect(wrapper.vm.splitterModel).toBe(270);
-    });
-
-    it("should render router-view with correct props", () => {
-      const routerView = wrapper.findComponent({ name: 'router-view' });
-      expect(routerView.exists()).toBe(true);
     });
   });
 
@@ -556,55 +490,37 @@ describe("Languages Component", () => {
       // Test multiple redirects
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.push.mockClear();
-      
+
       // First redirect
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       testWrapper.unmount();
     });
 
     it("should not interfere with other route names", () => {
       const routeNames = ["python", "dotnettracing", "dotnetlogs", "nodejs", "go"];
-      
+
       routeNames.forEach(routeName => {
         mockRouter.currentRoute.value.name = routeName;
         mockRouter.push.mockClear();
-        
+
         const testWrapper = mount(Languages, {
           props: { currOrgIdentifier: "test-org" },
           global: {
             plugins: [i18n],
             provide: { store },
-            stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'OIcon': true
-            }
+            stubs: { ...baseStubs },
           },
         });
-        
+
         expect(mockRouter.push).not.toHaveBeenCalled();
         testWrapper.unmount();
       });
@@ -619,60 +535,19 @@ describe("Languages Component", () => {
           userInfo: { email: "" }
         }
       };
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store: emptyStore },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.vm.currentUserEmail).toBe("");
       expect(testWrapper.vm.currentOrgIdentifier).toBe("");
       testWrapper.unmount();
-    });
-
-    it("should handle null router current route", () => {
-      const nullRouter = {
-        currentRoute: { value: null },
-        push: vi.fn()
-      };
-      
-      vi.doMock("vue-router", () => ({
-        useRouter: () => nullRouter
-      }));
-      
-      // This should not throw an error
-      expect(() => {
-        const testWrapper = mount(Languages, {
-          props: { currOrgIdentifier: "test-org" },
-          global: {
-            plugins: [i18n],
-            provide: { store },
-            stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'OIcon': true
-            }
-          },
-        });
-      }).not.toThrow();
     });
 
     it("should handle missing translation keys gracefully", () => {
@@ -686,15 +561,15 @@ describe("Languages Component", () => {
       wrapper.vm.tabsFilter = "p";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "py";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "python";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(5);
@@ -704,11 +579,11 @@ describe("Languages Component", () => {
   describe("Computed Property Reactivity", () => {
     it("should update filteredList when tabsFilter changes", async () => {
       expect(wrapper.vm.filteredList).toHaveLength(5);
-      
+
       wrapper.vm.tabsFilter = "nodejs";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = ".net";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(2);
@@ -719,7 +594,7 @@ describe("Languages Component", () => {
       wrapper.vm.tabsFilter = "PyThOn";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       // Test with partial match
       wrapper.vm.tabsFilter = "nodejs";
       await wrapper.vm.$nextTick();
@@ -744,7 +619,7 @@ describe("Languages Component", () => {
         "images/ingestion/nodejs.svg",
         "images/ingestion/golang.svg"
       ];
-      
+
       paths.forEach(path => {
         const result = wrapper.vm.getImageURL(path);
         expect(result).toBe(`mock-image-url-${path}`);

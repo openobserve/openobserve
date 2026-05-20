@@ -17,11 +17,8 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import { usePagination } from "./usePagination";
-
-installQuasar();
 
 // Create i18n instance
 const i18n = createI18n({

@@ -72,27 +72,11 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
   splitDuration: vi.fn((n: number) => ({ value: n, unit: "ns" })),
 }));
 
-// quasar copyToClipboard mock
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, any>;
-  return {
-    ...actual,
-    copyToClipboard: vi.fn().mockResolvedValue(undefined),
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
-
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionDetails from "./SessionDetails.vue";
-
-installQuasar({ plugins: [quasar.Notify] });
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,25 +119,25 @@ function makeTrace(overrides: Record<string, any> = {}) {
 }
 
 const globalStubs = {
-  QSpinnerHourglass: {
+  OSpinner: {
     template: '<div data-test="loading-spinner" />',
-    props: ["color", "size"],
+    props: ["size"],
   },
-  QIcon: {
-    template: '<span class="q-icon-stub" :data-name="name"><slot /></span>',
-    props: ["name"],
+  OIcon: {
+    template: '<span class="q-icon-stub" :data-name="name" :name="name"><slot /></span>',
+    props: ["name", "size"],
   },
-  QTooltip: { template: "<div><slot /></div>" },
-  QInput: {
+  OTooltip: { template: "<div><slot /><slot name=\"content\" /></div>", props: ["content"] },
+  OInput: {
     template:
       "<div class='q-input-stub'><slot /><slot name='prepend' /></div>",
     props: ["modelValue", "placeholder"],
   },
-  QSelect: {
+  OSelect: {
     template: '<div class="q-select-stub"><slot /></div>',
     props: ["modelValue", "options"],
   },
-  QSkeleton: {
+  OSkeleton: {
     template: '<div class="q-skeleton-stub" />',
     props: ["type", "width", "height"],
   },

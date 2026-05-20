@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SqlServer from './SqlServer.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -88,8 +87,6 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
-
 describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   let wrapper: VueWrapper<any>;
   
@@ -157,7 +154,7 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 6: Component renders template correctly
   it('should render template with correct structure', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
   });
 
@@ -282,7 +279,7 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 35: Template structure validation
   it('should have correct template structure and classes', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
     expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
     expect(wrapper.find('.tw\\:pt-6').exists()).toBe(true);

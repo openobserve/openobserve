@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -25,10 +23,7 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
   plugins: [quasar.quasar.Loading],
-});
 
 // Mock lodash-es
 vi.mock("lodash-es", () => ({
@@ -164,34 +159,6 @@ describe("VideoPlayer Component", () => {
           "OIcon": {
             template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
-          },
-          "q-toggle": {
-            template: `
-              <div data-test="q-toggle" @click="$emit('update:model-value', !modelValue)">
-                {{ label }}
-              </div>
-            `,
-            props: ["modelValue", "label", "size"],
-            emits: ["update:model-value"],
-          },
-          "q-select": {
-            template: `
-              <div data-test="q-select" @click="$emit('update:model-value', options[0])">
-                {{ modelValue ? modelValue.label : '' }}
-              </div>
-            `,
-            props: [
-              "modelValue",
-              "options",
-              "color",
-              "bg-color",
-              "stack-label",
-              "outlined",
-              "filled",
-              "dense",
-              "size",
-            ],
-            emits: ["update:model-value"],
           },
         },
       },

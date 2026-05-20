@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { copyToClipboard } from "quasar";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";
@@ -59,17 +57,6 @@ vi.mock("@/utils/zincutils", async () => {
   };
 });
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn(() => Promise.resolve()),
-    useQuasar: () => ({
-      notify: vi.fn()
-    })
-  };
-});
-
 // Mock child components
 vi.mock("./JsonPreview.vue", () => ({
   default: {
@@ -106,7 +93,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
 
 describe("DetailTable Component", () => {
   let wrapper: any;
@@ -145,79 +131,6 @@ describe("DetailTable Component", () => {
         },
         plugins: [i18n, router],
         stubs: {
-          'q-card': {
-            template: '<div class="q-card" :data-test="$attrs[\'data-test\']"><slot /></div>'
-          },
-          'q-card-section': {
-            template: '<div class="q-card-section"><slot /></div>'
-          },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>'
-          },
-          'q-tabs': {
-            template: '<div class="q-tabs"><slot /></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          },
-          'q-tab': {
-            template: '<div class="q-tab" :class="{ \'q-tab--active\': active }" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            props: ['name', 'label'],
-            computed: {
-              active() {
-                return this.$parent?.modelValue === this.name;
-              }
-            },
-            emits: ['click']
-          },
-          'q-tab-panels': {
-            template: '<div class="q-tab-panels" :data-test="$attrs[\'data-test\']"><slot /></div>',
-            props: ['modelValue']
-          },
-          'q-tab-panel': {
-            template: '<div class="q-tab-panel" v-show="name === $parent?.modelValue"><slot /></div>',
-            props: ['name']
-          },
-          'q-toggle': {
-            template: '<div class="q-toggle" :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
-            props: ['modelValue', 'label'],
-            methods: {
-              toggle() {
-                this.$emit('update:modelValue', !this.modelValue);
-              }
-            },
-            emits: ['update:modelValue']
-          },
-          'q-list': {
-            template: '<div class="q-list"><slot /></div>'
-          },
-          'q-item': {
-            template: '<div class="q-item" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-item-section': {
-            template: '<div class="q-item-section" :data-test="$attrs[\'data-test\']"><slot /></div>'
-          },
-          'q-item-label': {
-            template: '<div class="q-item-label" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-btn-dropdown': {
-            template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-select': {
-            template: '<select class="q-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
-            props: ['modelValue', 'options'],
-            methods: {
-              onChange(e: any) {
-                this.$emit('update:modelValue', e.target.value);
-              }
-            },
-            emits: ['update:modelValue']
-          },
           'OIcon': {
             template: '<div class="OIcon"><slot /></div>'
           },

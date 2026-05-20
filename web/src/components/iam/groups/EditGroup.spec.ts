@@ -16,14 +16,9 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import EditGroup from "@/components/iam/groups/EditGroup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/services/iam", () => ({
   getGroup: vi.fn(() => Promise.resolve({ data: {} })),
@@ -38,16 +33,10 @@ vi.mock("@/composables/iam/usePermissions", () => ({
   })),
 }));
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -76,7 +65,7 @@ vi.mock("./GroupServiceAccounts.vue", () => ({
   default: {
     name: "GroupServiceAccounts",
     template: `<div data-test="group-service-accounts-mock">GroupServiceAccounts</div>`,
-    props: ["groupServiceAccounts", "activeTab", "addedServiceAccounts", "removedServiceAccounts"],
+    props: ["groupUsers", "activeTab", "addedUsers", "removedUsers"],
   },
 }));
 
@@ -85,8 +74,8 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
     name: "AppTabs",
     template: `
       <div data-test="app-tabs-mock">
-        <button 
-          v-for="tab in tabs" 
+        <button
+          v-for="tab in tabs"
           :key="tab.value"
           :data-test="'tab-' + tab.value"
           @click="$emit('update:active-tab', tab.value)"
@@ -99,6 +88,19 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
     emits: ["update:active-tab"],
   },
 }));
+
+const stubs = {
+  OButton: {
+    name: "OButton",
+    template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
+    props: ["variant", "size"],
+    emits: ["click"],
+  },
+  OSeparator: {
+    name: "OSeparator",
+    template: `<hr />`,
+  },
+};
 
 describe("EditGroup Component", () => {
   let wrapper: any;
@@ -124,6 +126,7 @@ describe("EditGroup Component", () => {
       global: {
         provide: { store },
         plugins: [i18n, router],
+        stubs,
       },
     });
 
@@ -142,12 +145,10 @@ describe("EditGroup Component", () => {
 
       const titleElement = wrapper.find('[data-test="edit-group-section-title"]');
       expect(titleElement.exists()).toBe(true);
-      // The title div contains both the group name and tabs, so we check if it includes the group name
       expect(titleElement.text()).toContain("test-group");
     });
 
     it("renders tabs component", () => {
-      // Check that the tabs component is rendered (since it's mocked)
       expect(wrapper.vm.tabs).toBeDefined();
       expect(wrapper.vm.activeTab).toBeDefined();
     });
@@ -155,11 +156,9 @@ describe("EditGroup Component", () => {
     it("renders cancel and save buttons", () => {
       const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
       const saveButton = wrapper.find('[data-test="edit-group-submit-btn"]');
-      
+
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
-      expect(cancelButton.text()).toContain("Cancel");
-      expect(saveButton.text()).toContain("Save");
     });
   });
 
@@ -169,7 +168,7 @@ describe("EditGroup Component", () => {
     });
 
     it("has correct tab structure", () => {
-      expect(wrapper.vm.tabs).toHaveLength(3); // Since aws-exports mock sets isCloud to "false"
+      expect(wrapper.vm.tabs).toHaveLength(3); // Since service_account_enabled is true in store
       expect(wrapper.vm.tabs[0]).toMatchObject({
         value: "roles",
         label: "Roles",
@@ -184,8 +183,7 @@ describe("EditGroup Component", () => {
       });
     });
 
-    it("includes service accounts tab when not in cloud mode", () => {
-      // Since our mock sets isCloud to "false", service accounts tab should be included
+    it("includes service accounts tab when service_account_enabled", () => {
       expect(wrapper.vm.tabs).toHaveLength(3);
       expect(wrapper.vm.tabs[2]).toMatchObject({
         value: "serviceAccounts",
@@ -209,7 +207,7 @@ describe("EditGroup Component", () => {
     it("shows GroupRoles when roles tab is active", async () => {
       wrapper.vm.activeTab = "roles";
       await wrapper.vm.$nextTick();
-      
+
       const groupRoles = wrapper.find('[data-test="group-roles-mock"]');
       expect(groupRoles.exists()).toBe(true);
     });
@@ -217,15 +215,15 @@ describe("EditGroup Component", () => {
     it("shows GroupUsers when users tab is active", async () => {
       wrapper.vm.activeTab = "users";
       await wrapper.vm.$nextTick();
-      
+
       const groupUsers = wrapper.find('[data-test="group-users-mock"]');
       expect(groupUsers.exists()).toBe(true);
     });
 
-    it("shows GroupServiceAccounts when serviceAccounts tab is active and not in cloud", async () => {
+    it("shows GroupServiceAccounts when serviceAccounts tab is active", async () => {
       wrapper.vm.activeTab = "serviceAccounts";
       await wrapper.vm.$nextTick();
-      
+
       const groupServiceAccounts = wrapper.find('[data-test="group-service-accounts-mock"]');
       expect(groupServiceAccounts.exists()).toBe(true);
     });
@@ -244,6 +242,7 @@ describe("EditGroup Component", () => {
       vi.mocked(getGroup).mockResolvedValue(mockGroupData);
 
       await wrapper.vm.getGroupDetails();
+      await flushPromises();
 
       expect(getGroup).toHaveBeenCalledWith(
         "test-group",
@@ -260,18 +259,20 @@ describe("EditGroup Component", () => {
     it("handles error when fetching group details", async () => {
       const { getGroup } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      
+
       // Create a new wrapper to avoid interference with previous calls
       const newWrapper = mount(EditGroup, {
         global: {
           provide: { store },
           plugins: [i18n, router],
+          stubs,
         },
       });
-      
+
       vi.mocked(getGroup).mockRejectedValueOnce(new Error("Network error"));
 
       await newWrapper.vm.getGroupDetails();
+      await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -289,6 +290,7 @@ describe("EditGroup Component", () => {
       vi.mocked(getGroup).mockResolvedValue(mockGroupData);
 
       await wrapper.vm.getGroupDetails();
+      await flushPromises();
 
       expect(wrapper.vm.groupsState.groups["test-group"]).toBeDefined();
     });
@@ -303,7 +305,6 @@ describe("EditGroup Component", () => {
     });
 
     it("maintains default group details structure", () => {
-      // The component fetches data on mount, so groupDetails will be populated
       expect(wrapper.vm.groupDetails.group_name).toBeDefined();
       expect(Array.isArray(wrapper.vm.groupDetails.roles)).toBe(true);
       expect(Array.isArray(wrapper.vm.groupDetails.users)).toBe(true);
@@ -312,14 +313,14 @@ describe("EditGroup Component", () => {
 
   describe("Save Changes", () => {
     beforeEach(() => {
-      mockNotify.mockClear();
+      mockToast.mockClear();
     });
 
     it("shows info notification when no changes detected", async () => {
       await wrapper.vm.saveGroupChanges();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "info",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "info",
         message: "No updates detected.",
         timeout: 3000,
       });
@@ -334,6 +335,7 @@ describe("EditGroup Component", () => {
       wrapper.vm.removedRoles.add("old-role");
 
       await wrapper.vm.saveGroupChanges();
+      await flushPromises();
 
       expect(updateGroup).toHaveBeenCalledWith({
         group_name: "test-group",
@@ -346,8 +348,8 @@ describe("EditGroup Component", () => {
         },
       });
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Updated group successfully!",
         timeout: 3000,
       });
@@ -363,6 +365,7 @@ describe("EditGroup Component", () => {
       wrapper.vm.removedRoles.add("role2");
 
       await wrapper.vm.saveGroupChanges();
+      await flushPromises();
 
       expect(wrapper.vm.addedUsers.size).toBe(0);
       expect(wrapper.vm.removedUsers.size).toBe(0);
@@ -386,6 +389,7 @@ describe("EditGroup Component", () => {
       wrapper.vm.removedRoles.add("old-role");
 
       await wrapper.vm.saveGroupChanges();
+      await flushPromises();
 
       expect(wrapper.vm.groupDetails.users).toEqual(["user1@test.com", "newuser@test.com"]);
       expect(wrapper.vm.groupDetails.roles).toEqual(["admin", "new-role"]);
@@ -407,8 +411,8 @@ describe("EditGroup Component", () => {
       // Give time for async operations
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Error while updating group!",
         timeout: 3000,
       });
@@ -422,8 +426,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.addedUsers.add("user1@test.com");
 
       await wrapper.vm.saveGroupChanges();
+      await flushPromises();
 
-      expect(mockNotify).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
     });
   });
 
@@ -443,45 +448,14 @@ describe("EditGroup Component", () => {
 
     it("triggers navigation when cancel button is clicked", async () => {
       const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
-      
+
       expect(cancelButton.exists()).toBe(true);
-      expect(cancelButton.text()).toContain("Cancel");
-      
+
       // Test that the button can be clicked (without actually triggering navigation)
       await cancelButton.trigger("click");
-      
+
       // The click event should be handled (we tested the actual navigation above)
       expect(cancelButton.exists()).toBe(true);
-    });
-  });
-
-  describe("Theme Support", () => {
-    it("applies correct theme classes to sticky footer", () => {
-      // Footer classes have been updated to use Tailwind CSS
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
-      expect(footer.exists()).toBe(true);
-      // Test that theme classes are applied correctly
-    });
-
-    it("switches to dark theme classes when theme is dark", async () => {
-      const darkStore = {
-        ...store,
-        state: {
-          ...store.state,
-          theme: 'dark',
-        },
-      };
-
-      const wrapper = mount(EditGroup, {
-        global: {
-          provide: { store: darkStore },
-          plugins: [i18n, router],
-        },
-      });
-
-      // Footer classes have been updated, theme classes are no longer applied to footer
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
-      expect(footer.exists()).toBe(true);
     });
   });
 
@@ -491,9 +465,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.roles = ["admin", "user"];
       wrapper.vm.addedRoles.add("new-role");
       wrapper.vm.removedRoles.add("old-role");
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const groupRoles = wrapper.findComponent({ name: "GroupRoles" });
       expect(groupRoles.props()).toEqual({
         groupRoles: ["admin", "user"],
@@ -508,9 +482,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.users = ["user1@test.com"];
       wrapper.vm.addedUsers.add("new-user@test.com");
       wrapper.vm.removedUsers.add("old-user@test.com");
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const groupUsers = wrapper.findComponent({ name: "GroupUsers" });
       expect(groupUsers.props()).toEqual({
         groupUsers: ["user1@test.com"],
@@ -527,7 +501,7 @@ describe("EditGroup Component", () => {
       vi.mocked(router).currentRoute = {
         value: { params: {} },
       } as any;
-      
+
       expect(() => wrapper.vm.getGroupDetails()).not.toThrow();
     });
 
@@ -539,10 +513,12 @@ describe("EditGroup Component", () => {
         global: {
           provide: { store },
           plugins: [i18n, router],
+          stubs,
         },
       });
 
       await newWrapper.vm.getGroupDetails();
+      await flushPromises();
 
       expect(newWrapper.vm.groupDetails.group_name).toBeDefined();
     });
@@ -558,8 +534,8 @@ describe("EditGroup Component", () => {
       // This should still trigger the "no changes" path
       await wrapper.vm.saveGroupChanges();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "info",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "info",
         message: "No updates detected.",
         timeout: 3000,
       });

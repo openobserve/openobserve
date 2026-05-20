@@ -16,10 +16,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // All external dependencies must be mocked before importing the composable.
-vi.mock("quasar", () => ({
-  date: {
-    formatDate: vi.fn().mockReturnValue("Jan 01, 2024 00:00:00.000 +0000"),
-  },
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn().mockReturnValue("Jan 01, 2024 00:00:00.000 +0000"),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -27,7 +25,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 import { useEventFormatters } from "./useEventFormatters";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { formatDuration } from "@/utils/zincutils";
 
 describe("useEventFormatters", () => {
@@ -47,15 +45,15 @@ describe("useEventFormatters", () => {
       expect(formatters.formatTimestamp(null as unknown as number)).toBe("N/A");
     });
 
-    it("calls date.formatDate with Math.floor of the timestamp", () => {
+    it("calls formatDate with Math.floor of the timestamp", () => {
       formatters.formatTimestamp(1704067200500.9);
-      expect(date.formatDate).toHaveBeenCalledWith(
+      expect(formatDate).toHaveBeenCalledWith(
         1704067200500,
         "MMM DD, YYYY HH:mm:ss.SSS Z"
       );
     });
 
-    it("returns the formatted string from date.formatDate", () => {
+    it("returns the formatted string from formatDate", () => {
       const result = formatters.formatTimestamp(1704067200000);
       expect(result).toBe("Jan 01, 2024 00:00:00.000 +0000");
     });

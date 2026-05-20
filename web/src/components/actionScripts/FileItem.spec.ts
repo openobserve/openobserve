@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FileItem from "@/components/actionScripts/FileItem.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-
-installQuasar();
 
 describe("FileItem.vue", () => {
   let wrapper: VueWrapper;
@@ -67,8 +64,8 @@ describe("FileItem.vue", () => {
       const editButton = buttons[0];
       const deleteButton = buttons[1];
 
-      expect(editButton.find("OIcon-stub").attributes("name")).toBe("edit");
-      expect(deleteButton.find("OIcon-stub").attributes("name")).toBe(
+      expect(editButton.find("o-icon-stub").attributes("name")).toBe("edit");
+      expect(deleteButton.find("o-icon-stub").attributes("name")).toBe(
         "delete",
       );
     });

@@ -1,26 +1,14 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import TestFunction from "./TestFunction.vue";
 import jstransform from "@/services/jstransform";
 import searchService from "@/services/search";
 import { nextTick, ref } from 'vue';
-import * as components from "@quasar/extras/material-icons";
 import useStreams from "@/composables/useStreams";
 
 // Mock useQuasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(() => ({ dismiss: vi.fn() }))
-    }))
-  };
-});
-
 // Mock the jstransform service
 vi.mock("@/services/jstransform", () => ({
   default: {
@@ -123,7 +111,6 @@ describe("TestFunction Component", () => {
     }));
 
     // Install Quasar
-    installQuasar({
       plugins: [],
       components,
       config: {

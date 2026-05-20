@@ -15,11 +15,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import Curl from "@/components/ingestion/logs/Curl.vue";
-
-installQuasar();
 
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({
@@ -107,7 +104,7 @@ describe("Curl", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
   });
 
@@ -344,7 +341,7 @@ describe("Curl", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-pa-sm');
+      const container = wrapper.find('.tw\\:p-2');
       expect(container.exists()).toBe(true);
     });
 

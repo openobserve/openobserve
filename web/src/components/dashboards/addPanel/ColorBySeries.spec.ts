@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { defineComponent, h } from "vue";
 import ColorBySeries from "./ColorBySeries.vue";
 import i18n from "@/locales";
@@ -81,8 +80,6 @@ const ODrawerStub = defineComponent({
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-installQuasar();
 
 const mountOptionsBase = () => ({
   attachTo: "#app",

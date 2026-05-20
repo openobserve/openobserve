@@ -13,25 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Login from "@/components/login/Login.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Mock useQuasar
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock toast
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 // Mock dependencies
 vi.mock("@/services/auth", () => ({
@@ -47,6 +40,12 @@ vi.mock("@/services/organizations", () => ({
       data: { data: [] }
     }),
   },
+}));
+
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({
+    identify: vi.fn(),
+  }),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -76,7 +75,18 @@ vi.mock("@openobserve/browser-rum", () => ({
   },
 }));
 
-installQuasar();
+const stubsConfig = {
+  OButton: {
+    template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+    props: ['variant', 'size', 'disabled', 'loading', 'block', 'type'],
+    emits: ['click'],
+  },
+  OInput: {
+    template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ['modelValue', 'label', 'placeholder', 'type'],
+    emits: ['update:modelValue'],
+  },
+};
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -86,49 +96,40 @@ describe("Login", () => {
   let wrapper: any = null;
   let store: any;
   let router: any;
-  
+
   // Helper function to mount component with mocks
   const mountComponentWithMocks = (options: any = {}) => {
-    const mockNotify = options.mockNotify || vi.fn();
     const mockResetValidation = options.mockResetValidation || vi.fn();
-    
+
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, options.customStore || store, router],
-        provide: {
-          $q: { notify: mockNotify },
-        },
+        stubs: stubsConfig,
         ...options.globalOptions,
       },
       ...options.mountOptions,
     });
-    
-    // Set up component mocks after mounting
-    Object.defineProperty(wrapper.vm, '$q', {
-      value: { notify: mockNotify },
-      writable: true,
-    });
-    
+
     Object.defineProperty(wrapper.vm, 'loginform', {
       value: { value: { resetValidation: mockResetValidation } },
       writable: true,
     });
-    
-    return { mockNotify, mockResetValidation };
+
+    return { mockResetValidation };
   };
 
   beforeEach(async () => {
     // Reset all mocks
     vi.clearAllMocks();
-    mockNotify.mockClear();
-    
+    mockToast.mockClear();
+
     // Set default mock implementations
     const authService = await import("@/services/auth");
     (authService.default.sign_in_user as any).mockResolvedValue({
       data: { status: true, role: "admin" }
     });
     (authService.default.get_dex_login as any).mockResolvedValue("https://sso.example.com");
-    
+
     // Create mock store
     store = createStore({
       state: {
@@ -195,6 +196,7 @@ describe("Login", () => {
       attachTo: "#app",
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper).toBeTruthy();
@@ -206,6 +208,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper.vm.$options.name).toBe("PageLogin");
@@ -216,9 +219,10 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
-    
+
     expect(wrapper.vm.name).toBe("");
     expect(wrapper.vm.password).toBe("");
     expect(wrapper.vm.confirmpassword).toBe("");
@@ -235,6 +239,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper.vm.showSSO).toBe(true);
@@ -263,6 +268,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, storeWithoutSSO, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper.vm.showSSO).toBe(false);
@@ -273,6 +279,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper.vm.showInternalLogin).toBe(true);
@@ -301,45 +308,46 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, storeWithoutNativeLogin, router],
+        stubs: stubsConfig,
       },
     });
     expect(wrapper.vm.showInternalLogin).toBe(false);
   });
 
-  // Test 8: onSignIn with empty username shows warning notification
-  it("should call notify when username is empty", async () => {
+  // Test 8: onSignIn with empty username calls toast
+  it("should call toast when username is empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
 
-    expect(mockNotify).toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalled();
   });
 
-  // Test 9: onSignIn with empty password shows warning notification
-  it("should call notify when password is empty", async () => {
+  // Test 9: onSignIn with empty password calls toast
+  it("should call toast when password is empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "";
-    
+
     await wrapper.vm.onSignIn();
 
-    expect(mockNotify).toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalled();
   });
 
-  // Test 10: onSignIn with both empty username and password shows warning notification
-  it("should call notify when both username and password are empty", async () => {
+  // Test 10: onSignIn with both empty username and password calls toast
+  it("should call toast when both username and password are empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "";
     wrapper.vm.password = "";
-    
+
     await wrapper.vm.onSignIn();
 
-    expect(mockNotify).toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalled();
   });
 
   // Test 11: onSignIn sets submitting to true when credentials are provided
@@ -347,12 +355,13 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     const onSignInPromise = wrapper.vm.onSignIn();
     expect(wrapper.vm.submitting).toBe(true);
     await onSignInPromise;
@@ -364,6 +373,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -376,17 +386,19 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     await wrapper.vm.loginWithSSo();
+    await flushPromises();
     expect(window.location.href).toBe("https://sso.example.com");
   });
 
   // Test 14: loginWithSSo handles errors gracefully
   it("should handle errors gracefully when get_dex_login fails", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Mock the service to reject
     (authService.default.get_dex_login as any).mockRejectedValueOnce(new Error("Network error"));
 
@@ -402,20 +414,19 @@ describe("Login", () => {
     expect(threwError).toBe(false);
   });
 
-  // Test 15: selected method shows notification
-  it("should show notification when selected method is called", () => {
-    const mockNotify = vi.fn();
+  // Test 15: selected method shows toast
+  it("should show toast when selected method is called", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
-    wrapper.vm.$q = { notify: mockNotify };
     const item = { label: "Test Item" };
     wrapper.vm.selected(item);
 
-    expect(mockNotify).toHaveBeenCalledWith('Selected suggestion "Test Item"');
+    expect(mockToast).toHaveBeenCalledWith('Selected suggestion "Test Item"');
   });
 
   // Test 16: successful sign in calls getBasicAuth
@@ -424,13 +435,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(zincUtils.getBasicAuth).toHaveBeenCalledWith("testuser", "password123");
   });
 
@@ -440,13 +453,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(zincUtils.b64EncodeStandard).toHaveBeenCalled();
   });
 
@@ -456,13 +471,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(zincUtils.useLocalUserInfo).toHaveBeenCalledWith("encoded-data");
   });
 
@@ -472,13 +489,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(zincUtils.useLocalCurrentUser).toHaveBeenCalled();
   });
 
@@ -507,13 +526,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, testStore, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockDispatch).toHaveBeenCalledWith("setUserInfo", "encoded-data");
   });
 
@@ -542,13 +563,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, testStore, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockDispatch).toHaveBeenCalledWith("setCurrentUser", expect.objectContaining({
       given_name: "testuser",
       name: "testuser",
@@ -582,13 +605,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, rumStore, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(rum.openobserveRum.setUser).toHaveBeenCalledWith({
       name: "testuser ",
       email: "testuser",
@@ -634,6 +659,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, noRumStore, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -641,6 +667,7 @@ describe("Login", () => {
     wrapper.vm.password = "password123";
 
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockGetItem).toHaveBeenCalledWith("redirectURI");
     expect(mockRemoveItem).toHaveBeenCalledWith("redirectURI");
   });
@@ -653,12 +680,13 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn completes without throwing an error
     await expect(() => wrapper.vm.onSignIn()).not.toThrow();
   });
@@ -666,7 +694,7 @@ describe("Login", () => {
   // Test 25: failed sign in behavior verification
   it("should handle authentication failure appropriately", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock for authentication failure
     (authService.default.sign_in_user as any).mockResolvedValueOnce({
       data: {
@@ -677,21 +705,21 @@ describe("Login", () => {
 
     mountComponentWithMocks();
 
-    // Set up component data 
+    // Set up component data
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "wrongpassword";
-    
+
     const initialSubmittingState = wrapper.vm.submitting;
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // The sign in should have been attempted
     expect(authService.default.sign_in_user).toHaveBeenCalledWith({
       name: "testuser",
       password: "wrongpassword",
     });
-    
+
     // Initial state should have been false
     expect(initialSubmittingState).toBe(false);
   });
@@ -699,7 +727,7 @@ describe("Login", () => {
   // Test 26: sign in error resets form validation
   it("should handle form validation on sign in error", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock to reject
     (authService.default.sign_in_user as any).mockRejectedValueOnce(new Error("Network error"));
 
@@ -707,10 +735,10 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // Should set submitting to false after error
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -718,7 +746,7 @@ describe("Login", () => {
   // Test 27: sign in exception handles errors gracefully
   it("should handle sign in exceptions gracefully", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock to reject
     (authService.default.sign_in_user as any).mockRejectedValueOnce(new Error("Network error"));
 
@@ -726,10 +754,10 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // Should handle the error gracefully and set submitting to false
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -739,6 +767,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -760,6 +789,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, mockRouter],
+        stubs: stubsConfig,
       },
     });
 
@@ -780,6 +810,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, mockRouter],
+        stubs: stubsConfig,
       },
     });
 
@@ -791,11 +822,12 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     const expectedProperties = [
-      't', 'name', 'password', 'confirmpassword', 'email', 'loginform',
+      't', 'name', 'password', 'confirmpassword', 'email',
       'submitting', 'onSignIn', 'tab', 'innerTab', 'store', 'getImageURL',
       'loginAsInternalUser', 'showSSO', 'showInternalLogin', 'loginWithSSo',
       'config', 'autoRedirectDexLogin'
@@ -816,8 +848,9 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockB64Encode).toHaveBeenCalled();
     const callArg = mockB64Encode.mock.calls[0][0];
     const userInfo = JSON.parse(callArg);
@@ -841,11 +874,12 @@ describe("Login", () => {
     const now = Date.now();
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     const userInfo = JSON.parse(mockB64Encode.mock.calls[0][0]);
     const expectedExp = Math.floor((now + 1000 * 60 * 60 * 24 * 30) / 1000);
-    
+
     expect(userInfo.exp).toBeCloseTo(expectedExp, -2);
   });
 
@@ -885,8 +919,9 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockDispatch).toHaveBeenCalledWith("setSelectedOrganization", expect.any(Object));
   });
 
@@ -931,6 +966,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, noRumStore, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -938,6 +974,7 @@ describe("Login", () => {
     wrapper.vm.password = "password123";
 
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockUseLocalOrganization).toHaveBeenCalledWith("");
   });
 
@@ -946,6 +983,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -962,11 +1000,11 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn method exists and can be called
     expect(wrapper.vm.onSignIn).toBeDefined();
     expect(typeof wrapper.vm.onSignIn).toBe("function");
-    
+
     // Test that calling onSignIn doesn't throw an error
     let threwError = false;
     try {
@@ -981,6 +1019,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -988,14 +1027,13 @@ describe("Login", () => {
   });
 
   it("should have selected method that accepts parameters", () => {
-    const mockNotify = vi.fn();
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
-    wrapper.vm.$q = { notify: mockNotify };
     expect(() => wrapper.vm.selected({ label: "test" })).not.toThrow();
   });
 
@@ -1009,37 +1047,18 @@ describe("Login", () => {
     const now = Date.now();
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     const userInfo = JSON.parse(mockB64Encode.mock.calls[0][0]);
     const expectedAuthTime = Math.floor(now / 1000);
-    
+
     expect(userInfo.auth_time).toBeCloseTo(expectedAuthTime, -2);
   });
 
-  it("should handle failed sign in form validation reset", async () => {
-    const authService = await import("@/services/auth");
-    const mockResetValidation = vi.fn();
-    
-    (authService.default.sign_in_user as any).mockResolvedValueOnce({
-      data: {
-        status: false,
-        message: "Invalid credentials",
-      },
-    });
-
-    wrapper = mount(Login, {
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
-
-    wrapper.vm.name = "testuser";
-    wrapper.vm.password = "wrongpassword";
-    wrapper.vm.loginform = { resetValidation: mockResetValidation };
-    
-    await wrapper.vm.onSignIn();
-    expect(mockResetValidation).toHaveBeenCalled();
+  it.skip("should handle failed sign in form validation reset", async () => {
+    // TODO: Login.vue no longer references loginform.resetValidation in the script setup.
+    // The form validation reset is no longer performed in the new component implementation.
   });
 
   // Test 42: loginWithSSo handles null response
@@ -1050,10 +1069,12 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     await wrapper.vm.loginWithSSo();
+    await flushPromises();
     expect(window.location.href).toBe(""); // Should not change
   });
 
@@ -1087,13 +1108,15 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, testStore, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
+    await flushPromises();
     expect(mockDispatch).toHaveBeenCalledWith("setCurrentUser", expect.objectContaining({
       role: "user",
     }));
@@ -1110,12 +1133,13 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn doesn't throw when organization service fails
     let threwError = false;
     try {
@@ -1132,7 +1156,7 @@ describe("Login", () => {
       isCloud: "true",
       isEnterprise: "true",
     };
-    
+
     vi.doMock("@/aws-exports", () => ({
       default: mockConfig,
     }));
@@ -1149,6 +1173,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, mockRouter],
+        stubs: stubsConfig,
       },
     });
 
@@ -1163,20 +1188,20 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    wrapper.vm.loginform = undefined;
-    
+
     // Ensure initial state
     expect(wrapper.vm.submitting).toBe(false);
-    
+
     // Test that the method runs and handles undefined loginform gracefully
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // After the error and catch block, submitting should be set back to false
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -1208,6 +1233,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, reactiveStore, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -1230,6 +1256,7 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
@@ -1256,16 +1283,17 @@ describe("Login", () => {
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
+        stubs: stubsConfig,
       },
     });
 
     expect(wrapper.vm.tab).toBe("signin");
     expect(wrapper.vm.innerTab).toBe("signup");
-    
+
     // Test if they can be modified
     wrapper.vm.tab = "signup";
     wrapper.vm.innerTab = "signin";
-    
+
     expect(wrapper.vm.tab).toBe("signup");
     expect(wrapper.vm.innerTab).toBe("signin");
   });

@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorsList from "@/components/rum/ErrorsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -27,10 +25,7 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
   plugins: [quasar.quasar.Loading],
-});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -99,16 +94,6 @@ describe("ErrorsList Component", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-splitter": {
-              template: `
-                <div data-test="splitter">
-                  <div data-test="before-section"><slot name="before" /></div>
-                  <div data-test="separator-section"><slot name="separator" /></div>
-                  <div data-test="after-section"><slot name="after" /></div>
-                </div>
-              `,
-              props: ["modelValue", "unit", "vertical"],
-            },
           },
         },
       });

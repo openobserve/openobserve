@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EventDetailsSection from "./EventDetailsSection.vue";
 
-installQuasar();
 
 vi.mock("./KeyValueRow.vue", () => ({
   default: {

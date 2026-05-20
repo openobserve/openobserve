@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
 import i18n from "@/locales";
 
@@ -24,27 +22,9 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
   plugins: [quasar.quasar.Loading],
-});
 
 // Mock date formatter to have consistent output
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    date: {
-      formatDate: vi.fn((timestamp, format) => {
-        if (format === "MMM DD, YYYY HH:mm:ss.SSS Z") {
-          return "Jan 01, 2024 10:00:00.000 +0000";
-        }
-        return "Jan 01, 2024 10:00:00.000 +0000";
-      }),
-    },
-  };
-});
-
 describe("ErrorDetail Component", () => {
   let wrapper: any;
 

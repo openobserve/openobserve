@@ -3,9 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import PendingSubscriptionWarning from '@/components/PendingSubscriptionWarning.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-
-installQuasar();
 
 describe('PendingSubscriptionWarning.vue', () => {
   let wrapper: VueWrapper;
@@ -61,7 +58,6 @@ describe('PendingSubscriptionWarning.vue', () => {
         plugins: [currentStore, router],
         stubs: {
           'OIcon': true,
-          'q-btn': true,
           OButton: {
             template: '<button class="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
             props: ['variant', 'size', 'disabled', 'loading'],
@@ -80,11 +76,9 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('displays warning icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('OIcon-stub');
+      const icon = wrapper.find('o-icon-stub');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes('name')).toBe('warning');
-      expect(icon.attributes('size')).toBe('80px');
-      expect(icon.attributes('color')).toBe('warning row col-8 justify-center q-mt-lg');
     });
 
     it('displays warning message', () => {
@@ -103,8 +97,9 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('has correct structure and classes', () => {
       wrapper = createWrapper();
-      const mainDiv = wrapper.find('.row.col-11.justify-center.q-mt-xl');
+      const mainDiv = wrapper.find('div');
       expect(mainDiv.exists()).toBe(true);
+      expect(mainDiv.classes()).toContain('tw:flex');
     });
   });
 
@@ -289,19 +284,19 @@ describe('PendingSubscriptionWarning.vue', () => {
     it('applies correct CSS classes to main container', () => {
       wrapper = createWrapper();
       const mainDiv = wrapper.find('div');
-      
-      expect(mainDiv.classes()).toContain('row');
-      expect(mainDiv.classes()).toContain('col-11');
-      expect(mainDiv.classes()).toContain('justify-center');
-      expect(mainDiv.classes()).toContain('q-mt-xl');
+
+      expect(mainDiv.classes()).toContain('tw:flex');
+      expect(mainDiv.classes()).toContain('tw:w-11/12');
+      expect(mainDiv.classes()).toContain('tw:justify-center');
+      expect(mainDiv.classes()).toContain('tw:mt-6');
     });
 
     it('has correct icon styling', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('OIcon-stub');
-      
-      expect(icon.attributes('size')).toBe('80px');
-      expect(icon.attributes('color')).toContain('warning');
+      const icon = wrapper.find('o-icon-stub');
+
+      expect(icon.exists()).toBe(true);
+      expect(icon.attributes('name')).toBe('warning');
     });
   });
 });

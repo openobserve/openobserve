@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ViewPanel from "./ViewPanel.vue";
 
 // Mock vue-router
@@ -185,8 +184,6 @@ vi.mock("lodash-es", () => ({
   isEqual: vi.fn((a, b) => JSON.stringify(a) === JSON.stringify(b)),
 }));
 
-installQuasar();
-
 describe("ViewPanel", () => {
   let wrapper: VueWrapper<any>;
   let mockGetDashboard: any;
@@ -279,21 +276,21 @@ describe("ViewPanel", () => {
           },
           PanelErrorButtons: {
             template: `<div>
-              <q-btn v-if="error" data-test="panel-error-data" class="warning">
-                <q-tooltip>{{ error }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
-                <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
-                <q-tooltip>{{ limitNumberOfSeriesWarningMessage }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
-                <q-tooltip>The data shown is cached</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
-                <q-tooltip>Partial data</q-tooltip>
-              </q-btn>
+              <button v-if="error" data-test="panel-error-data" class="warning">
+                <span>{{ error }}</span>
+              </button>
+              <button v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
+                <span>{{ maxQueryRangeWarning }}</span>
+              </button>
+              <button v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
+                <span>{{ limitNumberOfSeriesWarningMessage }}</span>
+              </button>
+              <button v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+                <span>The data shown is cached</span>
+              </button>
+              <button v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
+                <span>Partial data</span>
+              </button>
               <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
                 <span data-test="relative-time">{{ lastTriggeredAt }}</span>
               </span>
@@ -309,31 +306,9 @@ describe("ViewPanel", () => {
               "viewOnly",
             ],
           },
-          "q-separator": {
-            template: '<div class="q-separator"></div>',
-          },
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\', $event)" :disabled="disable" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            props: [
-              "outline",
-              "padding",
-              "no-caps",
-              "icon",
-              "disable",
-              "color",
-              "text-color",
-              "flat",
-            ],
-            emits: ["click"],
-            inheritAttrs: false,
-          },
           "OIcon": {
             template: '<i class="OIcon"></i>',
             props: ["name"],
-          },
-          "q-tooltip": {
-            template: '<div class="q-tooltip"><slot /></div>',
           },
           OButton: {
             name: "OButton",

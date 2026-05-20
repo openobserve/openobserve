@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
@@ -81,13 +80,10 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
+// Mock clipboard utility — O2AIChat.vue uses @/utils/clipboard
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(() => Promise.resolve(true)),
+}));
 
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
@@ -108,8 +104,6 @@ vi.mock("@/composables/contextProviders", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
-
-installQuasar();
 
 // ── Stub definitions ─────────────────────────────────────────────────────────
 

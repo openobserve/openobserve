@@ -22,13 +22,10 @@ import {
   vi,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SpanRenderer from "@/plugins/traces/SpanRenderer.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
-
-installQuasar();
 
 const mockStore = createStore({
   state: {
@@ -120,9 +117,7 @@ describe("SpanRenderer", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
   });
@@ -156,9 +151,7 @@ describe("SpanRenderer", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
 
@@ -182,9 +175,7 @@ describe("SpanRenderer", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
 
@@ -200,9 +191,7 @@ describe("SpanRenderer", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
 
@@ -249,7 +238,6 @@ describe("SpanRenderer", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -274,7 +262,6 @@ describe("SpanRenderer", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -288,7 +275,7 @@ describe("SpanRenderer", () => {
     it("should have correct template structure", () => {
       const spanRenderer = wrapper.find("[data-test='span-renderer']");
       expect(spanRenderer.exists()).toBe(true);
-      expect(spanRenderer.classes()).toContain("q-pt-sm");
+      expect(spanRenderer.classes()).toContain("tw:pt-2");
     });
   });
 });

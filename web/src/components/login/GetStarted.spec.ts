@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import GetStarted from './GetStarted.vue';
@@ -12,17 +11,11 @@ vi.mock('@/services/billings', () => ({
   },
 }));
 
-// Mock useQuasar
-const mockNotify = vi.fn();
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock toast
+const mockToast = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 const mockStore = createStore({
   state: {
@@ -42,8 +35,6 @@ const mockI18n = createI18n({
   messages: { en: {} },
 });
 
-installQuasar();
-
 describe('GetStarted.vue', () => {
   let wrapper: VueWrapper;
 
@@ -61,6 +52,23 @@ describe('GetStarted.vue', () => {
     return mount(GetStarted, {
       global: {
         plugins: [mockI18n, storeOverride || mockStore],
+        stubs: {
+          OButton: {
+            template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'loading', 'block'],
+            emits: ['click'],
+          },
+          OInput: {
+            template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ['modelValue', 'label', 'placeholder'],
+            emits: ['update:modelValue'],
+          },
+          OCheckbox: {
+            template: '<label><input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" /><slot /></label>',
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+          },
+        },
       },
     });
   };
@@ -196,9 +204,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Please fill all the fields',
-        color: 'negative',
       });
     });
 
@@ -268,9 +275,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
-        color: 'positive',
       });
     });
 
@@ -316,9 +322,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
-        color: 'negative',
       });
     });
 

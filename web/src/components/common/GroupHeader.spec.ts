@@ -22,7 +22,6 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 const stubs = {
-  "q-separator": { template: "<hr class='q-separator-stub' />" },
 };
 
 describe("GroupHeader.vue", () => {

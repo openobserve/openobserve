@@ -15,11 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardMapsQueryBuilder from "@/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock the composables
 const mockDashboardPanelData = {
@@ -133,13 +131,6 @@ describe("DashboardMapsQueryBuilder", () => {
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
           "OIcon": true,
-          "q-tooltip": true,
-          "q-btn-group": true,
-          "q-btn": true,
-          "q-menu": true,
-          "q-input": true,
-          "q-select": true,
-          "q-separator": true,
         },
         mocks: {
           $t: (key: string) => key,

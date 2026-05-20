@@ -24,9 +24,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
-
 // Hoisted mock references — available inside vi.mock factories so individual
 // tests can assert against them without re-mocking entire modules.
 const {
@@ -117,7 +114,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
   plugins: [],
 });
 
@@ -250,18 +246,6 @@ const traceErrorTabStub = {
 
 // Base stubs shared across all mount calls in this spec file
 const baseStubs = {
-  "q-resize-observer": true,
-  "q-virtual-scroll": {
-    template: `
-      <div>
-        <slot name="before"></slot>
-        <div v-for="(item, index) in items" :key="index">
-          <slot :item="item" :index="index"></slot>
-        </div>
-      </div>
-    `,
-    props: ["items"],
-  },
   TraceErrorTab: traceErrorTabStub,
   ...tabStubs,
 };
@@ -1558,7 +1542,6 @@ describe("TraceDetailsSidebar", async () => {
               ],
             },
             TenstackTable: true,
-            "q-expansion-item": true,
             CodemirrorEditor: true,
             CodeQueryEditor: true,
           },

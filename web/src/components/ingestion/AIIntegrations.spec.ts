@@ -2,11 +2,8 @@
 
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
 
 const mockReplace = vi.fn();
 const mockCurrentRoute = { value: { name: "ai-integrations" } };
@@ -20,11 +17,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRoute,
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, useQuasar: () => ({ notify: vi.fn() }) };
-});
-
 import AIIntegrations from "./AIIntegrations.vue";
 
 describe("AIIntegrations", () => {
@@ -35,17 +27,26 @@ describe("AIIntegrations", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "q-input": true,
-          "OIcon": true,
-          "router-view": true,
-          "q-tabs": {
-            template: '<div class="q-tabs-stub"><slot /></div>',
-          },
-          "q-tab": {
+          OIcon: true,
+          OInput: {
             template:
-              '<div class="q-tab-stub" :data-test="$attrs[\'data-test\']">{{ $attrs.label }}</div>',
+              '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ["modelValue", "placeholder", "clearable"],
+            emits: ["update:modelValue"],
             inheritAttrs: false,
           },
+          OTabs: {
+            template: '<div class="o-tabs-stub"><slot /></div>',
+            props: ["modelValue", "orientation"],
+            emits: ["update:modelValue"],
+          },
+          OTab: {
+            template:
+              '<div class="o-tab-stub" :data-test="$attrs[\'data-test\']">{{ label }}</div>',
+            props: ["name", "label"],
+            inheritAttrs: false,
+          },
+          "router-view": true,
         },
       },
     });

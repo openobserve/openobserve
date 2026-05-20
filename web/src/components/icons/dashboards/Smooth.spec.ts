@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import Smooth from '@/components/icons/dashboards/Smooth.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-
-installQuasar();
 
 describe('Smooth.vue', () => {
   let wrapper: VueWrapper;

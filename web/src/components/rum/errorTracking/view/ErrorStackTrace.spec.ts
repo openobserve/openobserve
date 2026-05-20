@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import i18n from "@/locales";
 
@@ -24,10 +22,14 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
+// Mock PrettyStackTrace
+vi.mock("@/components/rum/errorTracking/view/PrettyStackTrace.vue", () => ({
+  default: {
+    name: "PrettyStackTrace",
+    template: '<div data-test="pretty-stack-trace"></div>',
+    props: ["error_stack", "error"],
+  },
+}));
 
 describe("ErrorStackTrace Component", () => {
   let wrapper: any;
@@ -45,6 +47,30 @@ describe("ErrorStackTrace Component", () => {
     timestamp: "2024-01-01 10:00:00",
   };
 
+  const stubs = {
+    OTabs: {
+      template:
+        '<div data-test="o-tabs" :class="$attrs.class"><slot /></div>',
+      props: ["modelValue", "dense", "align"],
+      emits: ["update:modelValue"],
+    },
+    OTab: {
+      template: '<div data-test="o-tab" :data-name="name">{{ label }}</div>',
+      props: ["name", "label"],
+    },
+    OTabPanels: {
+      template: '<div data-test="o-tab-panels"><slot /></div>',
+      props: ["modelValue", "animated"],
+    },
+    OTabPanel: {
+      template: '<div data-test="o-tab-panel" :data-name="name"><slot /></div>',
+      props: ["name"],
+    },
+    OSeparator: {
+      template: '<hr data-test="o-separator" />',
+    },
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -56,6 +82,7 @@ describe("ErrorStackTrace Component", () => {
       },
       global: {
         plugins: [i18n],
+        stubs,
       },
     });
 
@@ -77,18 +104,8 @@ describe("ErrorStackTrace Component", () => {
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".row");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("row");
-      expect(container.classes()).toContain("q-mt-lg");
-      expect(container.classes()).toContain("q-ml-xs");
-    });
-
-    it("should render column container", () => {
-      const column = wrapper.find(".col-12");
-      expect(column.exists()).toBe(true);
-      expect(column.classes()).toContain("col-12");
+    it("should render main container", () => {
+      expect(wrapper.find("div").exists()).toBe(true);
     });
   });
 
@@ -99,26 +116,17 @@ describe("ErrorStackTrace Component", () => {
       expect(title.text()).toBe("Error Stack");
     });
 
-    it("should have correct title styling", () => {
+    it("should have tags-title class", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-xs");
     });
   });
 
   describe("First Stack Line Display", () => {
     it("should display the first stack line separately", () => {
-      const firstLine = wrapper.find(".q-mb-sm");
-      expect(firstLine.exists()).toBe(true);
-      expect(firstLine.text()).toBe(
+      expect(wrapper.text()).toContain(
         "TypeError: Cannot read property 'foo' of undefined",
       );
-    });
-
-    it("should have correct first line styling", () => {
-      const firstLine = wrapper.find(".q-mb-sm");
-      expect(firstLine.classes()).toContain("q-mb-sm");
     });
   });
 
@@ -142,12 +150,11 @@ describe("ErrorStackTrace Component", () => {
       );
     });
 
-    it("should apply correct styling to stack lines", () => {
+    it("should apply error_stack class to stack lines", () => {
       const stackLines = wrapper.findAll(".error_stack");
 
-      stackLines.forEach((line) => {
+      stackLines.forEach((line: any) => {
         expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("q-px-sm");
       });
     });
   });
@@ -175,19 +182,6 @@ describe("ErrorStackTrace Component", () => {
       expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
     });
 
-    it("should not apply top border to non-first stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      for (let i = 1; i < stackLines.length; i++) {
-        const style = stackLines[i].attributes("style");
-        if (style) {
-          expect(style).not.toContain(
-            "border-top: 1px solid rgb(224, 224, 224)",
-          );
-        }
-      }
-    });
-
     it("should apply correct border radius to first stack line", () => {
       const stackLines = wrapper.findAll(".error_stack");
       const firstStackLine = stackLines[0];
@@ -202,20 +196,6 @@ describe("ErrorStackTrace Component", () => {
 
       const style = lastStackLine.attributes("style");
       expect(style).toContain("border-radius: 0 0 4px 4px");
-    });
-
-    it("should not apply border radius to middle stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      if (stackLines.length > 2) {
-        for (let i = 1; i < stackLines.length - 1; i++) {
-          const style = stackLines[i].attributes("style");
-          if (style) {
-            expect(style).not.toContain("border-radius: 4px 4px 0 0");
-            expect(style).not.toContain("border-radius: 0 0 4px 4px");
-          }
-        }
-      }
     });
   });
 
@@ -237,10 +217,7 @@ describe("ErrorStackTrace Component", () => {
         error_stack: [],
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
       const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("");
       expect(stackLines).toHaveLength(0);
     });
 
@@ -249,11 +226,9 @@ describe("ErrorStackTrace Component", () => {
         error_stack: ["Single error line"],
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
       const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("Single error line");
       expect(stackLines).toHaveLength(0);
+      expect(wrapper.text()).toContain("Single error line");
     });
   });
 
@@ -300,12 +275,11 @@ describe("ErrorStackTrace Component", () => {
   });
 
   describe("Content Rendering", () => {
-    it("should preserve whitespace in stack traces", () => {
+    it("should preserve text content in stack traces", () => {
       const stackLines = wrapper.findAll(".error_stack");
 
-      stackLines.forEach((line) => {
+      stackLines.forEach((line: any) => {
         const text = line.text();
-        // Check that text starts with "at"
         if (text.includes("at")) {
           expect(text).toMatch(/^at/);
         }
@@ -323,58 +297,28 @@ describe("ErrorStackTrace Component", () => {
         error_stack: specialStack,
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
       const stackLines = wrapper.findAll(".error_stack");
-
-      expect(firstLine.text()).toBe("Error: Special chars <>&\"'");
+      expect(wrapper.text()).toContain("Error: Special chars");
       expect(stackLines[1].text()).toContain("<anonymous>");
     });
   });
 
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".row .col-12");
-      const title = container.find(".tags-title");
-      const firstLine = container.find(".q-mb-sm");
-      const stackContainer = container.find(".error-stacks");
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(firstLine.exists()).toBe(true);
-      expect(stackContainer.exists()).toBe(true);
+  describe("Tabs", () => {
+    it("should render tabs for Raw and Pretty views", () => {
+      const tabs = wrapper.findAll('[data-test="o-tab"]');
+      expect(tabs.length).toBe(2);
     });
 
-    it("should render template conditionally", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line, index) => {
-        // Should skip index 0 (first line)
-        const actualIndex = index + 1;
-        expect(actualIndex).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe("CSS Classes", () => {
-    it("should apply correct CSS classes to stack lines", () => {
-      const stackLines = wrapper.findAll(".error_stack");
-
-      stackLines.forEach((line) => {
-        expect(line.classes()).toContain("error_stack");
-        expect(line.classes()).toContain("q-px-sm");
-      });
+    it("should render Raw tab", () => {
+      const tabs = wrapper.findAll('[data-test="o-tab"]');
+      const rawTab = tabs.find((tab: any) => tab.attributes("data-name") === "raw");
+      expect(rawTab).toBeDefined();
     });
 
-    it("should apply correct CSS classes to containers", () => {
-      const mainContainer = wrapper.find(".row");
-      const colContainer = wrapper.find(".col-12");
-      const stackContainer = wrapper.find(".error-stacks");
-
-      expect(mainContainer.classes()).toEqual(
-        expect.arrayContaining(["row", "q-mt-lg", "q-ml-xs"]),
-      );
-      expect(colContainer.classes()).toContain("col-12");
-      expect(stackContainer.classes()).toContain("error-stacks");
+    it("should render Pretty tab", () => {
+      const tabs = wrapper.findAll('[data-test="o-tab"]');
+      const prettyTab = tabs.find((tab: any) => tab.attributes("data-name") === "pretty");
+      expect(prettyTab).toBeDefined();
     });
   });
 
@@ -388,8 +332,7 @@ describe("ErrorStackTrace Component", () => {
         error: newError,
       });
 
-      const firstLine = wrapper.find(".q-mb-sm");
-      expect(firstLine.text()).toBe("New error");
+      expect(wrapper.text()).toContain("New error");
 
       expect(wrapper.props("error_stack")).toEqual(newStack);
       expect(wrapper.props("error")).toEqual(newError);

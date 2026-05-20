@@ -17,7 +17,6 @@ import { vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { Quasar } from "quasar";
 
 /**
  * Shared test fixtures for cipher key components to avoid repetitive setup
@@ -182,8 +181,50 @@ export const createMockI18n = () =>
     },
   });
 
-// Common Quasar component stubs
+// Common component stubs (kept named "Quasar" stubs for backward compat, but includes O* stubs)
 export const createQuasarStubs = () => ({
+  OInput: {
+    template: `
+      <div class='o-input' :data-test='$attrs["data-test"]'>
+        <input
+          :value='modelValue'
+          @input='$emit("update:modelValue", $event.target.value)'
+        />
+      </div>
+    `,
+    props: ["modelValue", "label", "error", "errorMessage", "placeholder", "type", "disabled"],
+    emits: ["update:modelValue"],
+  },
+  OSelect: {
+    template: `
+      <div class='o-select' :data-test='$attrs["data-test"]'>
+        <select
+          :value='modelValue'
+          @change='$emit("update:modelValue", $event.target.value)'
+        >
+          <option v-for='option in options' :key='option.value ?? option' :value='option.value ?? option'>
+            {{ option.label ?? option }}
+          </option>
+        </select>
+      </div>
+    `,
+    props: ["modelValue", "options", "label", "labelKey", "valueKey", "error", "errorMessage", "placeholder"],
+    emits: ["update:modelValue"],
+  },
+  OButton: {
+    template: `
+      <button
+        :data-test='$attrs["data-test"]'
+        :disabled='disabled || loading'
+        @click='$emit("click")'
+        :class='$attrs.class'
+      >
+        <slot />{{ label }}
+      </button>
+    `,
+    props: ["label", "disabled", "loading", "variant", "size"],
+    emits: ["click"],
+  },
   QForm: {
     template: "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
     emits: ["submit"],
@@ -313,14 +354,12 @@ export const createCipherKeyMountConfig = (
   const router = createMockRouter();
   const i18n = createMockI18n();
   const stubs = { ...createQuasarStubs(), ...customStubs };
-  const quasarConfig = createQuasarConfig();
 
   return {
     component,
     props,
     global: {
       plugins: [
-        [Quasar, quasarConfig],
         store,
         router,
         i18n,

@@ -1,12 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick, ref } from "vue";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/services/search", () => ({
@@ -57,22 +54,11 @@ vi.mock("vue-router", () => ({
   })
 }));
 
-// Mock Quasar
+// Mock notify (replacing Quasar notify)
 const mockQuasar = {
   notify: vi.fn(),
   dialog: vi.fn()
 };
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    date: {
-      formatDate: vi.fn((date, format) => "2024-01-01T10:00:00Z")
-    }
-  };
-});
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -116,17 +102,7 @@ describe("SearchSchedulersList Component", () => {
           store,
         },
         stubs: {
-                    'q-table': true,
-          'q-tr': true,
-          'q-td': true,
-          'q-btn': true,
           'OIcon': true,
-          'q-toggle': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-select': true,
           'DateTime': {
             template: '<div class="mock-datetime"></div>',
             methods: {
@@ -138,7 +114,6 @@ describe("SearchSchedulersList Component", () => {
           'ConfirmDialog': true,
           'NoData': true,
           'TenstackTable': true,
-          'QTablePagination': true,
           'JsonPreview': true
         },
         mocks: {

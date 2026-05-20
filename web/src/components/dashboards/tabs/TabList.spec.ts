@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabList from "./TabList.vue";
 
 // Mock vue-router
@@ -40,7 +39,6 @@ vi.mock("./AddTab.vue", () => ({
   },
 }));
 
-installQuasar();
 
 describe("TabList", () => {
   let wrapper: VueWrapper<any>;
@@ -81,9 +79,6 @@ describe("TabList", () => {
           selectedTabId: selectedTabIdRef,
         },
         stubs: {
-          "q-tooltip": {
-            template: "<span data-test='tooltip-wrapper'><slot /></span>",
-          },
           "OIcon": {
             template: "<span data-test='OIcon'></span>",
           },
@@ -451,9 +446,6 @@ describe("TabList", () => {
             selectedTabId: customSelectedTabIdRef,
           },
           stubs: {
-            "q-tooltip": {
-              template: "<span data-test='tooltip-wrapper'><slot /></span>",
-            },
             "OIcon": {
               template: "<span data-test='OIcon'></span>",
             },

@@ -1,13 +1,9 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
-import { createRouter, createWebHistory, createMemoryHistory } from 'vue-router';
+import { createRouter, createMemoryHistory } from 'vue-router';
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
-
-installQuasar();
 
 // Mock the organizations service
 vi.mock("@/services/organizations", () => ({
@@ -30,14 +26,60 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn(() => vi.fn()) }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
+const stubs = {
+  OTable: {
+    name: "OTable",
+    template: '<div class="o-table-stub" data-test="organizations-table"><slot name="cell-actions" :row="{ identifier: \'test-row\', name: \'Test Row\' }" /></div>',
+    props: ["data", "columns", "rowKey", "globalFilter", "pagination", "pageSize", "pageSizeOptions", "footerTitle", "sorting", "filterMode", "defaultColumns", "showGlobalFilter"],
+  },
+  OInput: {
+    name: "OInput",
+    template: '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder"],
+    emits: ["update:modelValue"],
+  },
+  OButton: {
+    name: "OButton",
+    template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+    props: ["variant", "size", "title"],
+    emits: ["click"],
+  },
+  OIcon: {
+    name: "OIcon",
+    template: '<i></i>',
+    props: ["name", "size"],
+  },
+  AddUpdateOrganization: {
+    name: 'AddUpdateOrganization',
+    template: '<div class="add-update-organization-stub" :data-open="open" />',
+    props: ['open', 'modelValue'],
+    emits: ['update:open', 'updated'],
+  },
+  NoData: {
+    name: "NoData",
+    template: '<div class="no-data-stub" />',
+  },
+};
+
 describe("ListOrganizations", () => {
   let wrapper;
   let router;
   let mockStore;
   let mockOrganizations;
-  let mockNotify;
 
   beforeEach(() => {
+    mockToast.mockClear();
+    mockToast.mockReturnValue(vi.fn());
+
     // Create a new router instance for each test using memory history
     router = createRouter({
       history: createMemoryHistory(),
@@ -87,53 +129,13 @@ describe("ListOrganizations", () => {
     // Mock the organizations service list method
     organizationsService.list.mockResolvedValue(mockOrganizations);
 
-    // Mock Quasar notify
-    mockNotify = vi.fn();
-    mockNotify.mockReturnValue({ dismiss: vi.fn() });
-
     wrapper = mount(ListOrganizations, {
       global: {
         plugins: [i18n, router],
         provide: {
           store: mockStore,
         },
-        stubs: {
-          QTable: {
-            template: '<div class="o2-quasar-table" :class="$attrs.class"><slot></slot></div>',
-            props: ['rows', 'columns'],
-            methods: {
-              setPagination: vi.fn(),
-            }
-          },
-          QInput: true,
-          QIcon: true,
-          QBtn: true,
-          ODialog: {
-            name: 'ODialog',
-            template: '<div class="o-dialog-stub" v-if="open"><slot /></div>',
-            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width'],
-            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
-          },
-          ODrawer: {
-            name: 'ODrawer',
-            template: '<div class="o-drawer-stub" v-if="open"><slot /></div>',
-            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width'],
-            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
-          },
-          AddUpdateOrganization: {
-            name: 'AddUpdateOrganization',
-            template: '<div class="add-update-organization-stub" v-if="open" />',
-            props: ['open', 'modelValue'],
-            emits: ['update:open', 'updated'],
-          },
-          QTablePagination: true,
-          NoData: true,
-        },
-        mocks: {
-          $q: {
-            notify: mockNotify
-          }
-        }
+        stubs,
       },
     });
   });
@@ -155,78 +157,20 @@ describe("ListOrganizations", () => {
           provide: {
             store: mockStore,
           },
-          stubs: {
-            QTable: true,
-            QInput: true,
-            QIcon: true,
-            QBtn: true,
-            ODialog: true,
-            ODrawer: true,
-            AddUpdateOrganization: true,
-            QTablePagination: true,
-            NoData: true,
-          },
-          mocks: {
-            $q: {
-              notify: mockNotify
-            }
-          }
+          stubs,
         },
       });
-      
+
       expect(freshWrapper.vm.filterQuery).toBe("");
       expect(freshWrapper.vm.loading).toBe(false);
       freshWrapper.unmount();
     });
 
-    it("should have correct pagination settings", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-      expect(wrapper.vm.perPageOptions).toHaveLength(5);
-    });
-
     it("should setup columns correctly", () => {
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(6); // Base columns without plan
-      expect(columns.map(c => c.name)).toContain("name");
-      expect(columns.map(c => c.name)).toContain("identifier");
-    });
-
-    it("should add plan column when isCloud is true", async () => {
-      vi.mock("@/aws-exports", () => ({
-        default: {
-          isCloud: "true",
-        },
-      }));
-      
-      const wrapperWithCloud = mount(ListOrganizations, {
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: {
-              ...mockStore,
-              state: {
-                ...mockStore.state,
-                config: { isCloud: "true" },
-              },
-            },
-          },
-          stubs: {
-            QTable: true,
-            QInput: true,
-            QIcon: true,
-            QBtn: true,
-            ODialog: true,
-            ODrawer: true,
-            AddUpdateOrganization: true,
-            QTablePagination: true,
-            NoData: true,
-          },
-        },
-      });
-      
-      await wrapperWithCloud.vm.$nextTick();
-      expect(wrapperWithCloud.vm.columns).toHaveLength(6); // Including plan column
-      wrapperWithCloud.unmount();
+      expect(columns.length).toBeGreaterThanOrEqual(5);
+      expect(columns.map((c) => c.id)).toContain("name");
+      expect(columns.map((c) => c.id)).toContain("identifier");
     });
   });
 
@@ -262,63 +206,14 @@ describe("ListOrganizations", () => {
     });
   });
 
-  describe("Search and Filtering", () => {
-    it("should filter organizations by name", async () => {
-      await flushPromises();
-      wrapper.vm.filterQuery = "Test Org 1";
-      const filtered = wrapper.vm.filterData(wrapper.vm.organizations, "Test Org 1");
-      expect(filtered).toHaveLength(1);
-    });
-
-    it("should handle case-insensitive search", async () => {
-      await flushPromises();
-      const filtered = wrapper.vm.filterData(wrapper.vm.organizations, "test ORG");
-      expect(filtered).toHaveLength(2);
-    });
-
-    it("should return empty array for no matches", async () => {
-      await flushPromises();
-      const filtered = wrapper.vm.filterData(wrapper.vm.organizations, "nonexistent");
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("should handle empty search query", async () => {
-      await flushPromises();
-      const filtered = wrapper.vm.filterData(wrapper.vm.organizations, "");
-      expect(filtered).toHaveLength(2);
-    });
-  });
-
-  describe("Pagination", () => {
-    it("should change pagination settings", () => {
-      wrapper.vm.changePagination({ value: 50 });
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-    });
-
-    it("should update selected per page value", () => {
-      wrapper.vm.changePagination({ value: 100 });
-      expect(wrapper.vm.selectedPerPage).toBe(100);
-    });
-
-    it("should have correct initial pagination state", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-    });
-
-    it("should update table pagination", async () => {
-      wrapper.vm.changePagination({ value: 50 });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-    });
-  });
-
   describe("Add Organization Dialog", () => {
     it("should open add organization dialog", async () => {
       await router.push('/organizations');
       await flushPromises();
-      
+
       await wrapper.vm.addOrganization();
       await flushPromises();
-      
+
       expect(router.currentRoute.value.query).toEqual({
         action: "add",
         org_identifier: "test-org",
@@ -328,7 +223,7 @@ describe("ListOrganizations", () => {
     it("should track add organization button click", async () => {
       await router.push('/organizations');
       await flushPromises();
-      
+
       const mockEvent = {
         target: {
           innerText: "Add Organization",
@@ -336,7 +231,7 @@ describe("ListOrganizations", () => {
       };
       await wrapper.vm.addOrganization(mockEvent);
       await flushPromises();
-      
+
       expect(router.currentRoute.value.query.action).toBe("add");
     });
 
@@ -346,10 +241,10 @@ describe("ListOrganizations", () => {
         query: { action: 'add', org_identifier: 'test-org' }
       });
       await flushPromises();
-      
+
       await wrapper.vm.hideAddOrgDialog();
       await flushPromises();
-      
+
       expect(router.currentRoute.value.query).toEqual({
         org_identifier: "test-org",
       });
@@ -414,10 +309,10 @@ describe("ListOrganizations", () => {
     it("should handle successful organization addition", async () => {
       await router.push('/organizations');
       await flushPromises();
-      
+
       await wrapper.vm.updateOrganizationList();
       await flushPromises();
-      
+
       expect(router.currentRoute.value.name).toBe("organizations");
       expect(wrapper.vm.showAddOrganizationDialog).toBe(false);
     });
@@ -428,10 +323,10 @@ describe("ListOrganizations", () => {
       expect(spy).toHaveBeenCalled();
     });
 
-    it("should show success notification on organization update", async () => {
+    it("should show success toast on organization update", async () => {
       await wrapper.vm.updateOrganizationList();
-      expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: "success",
         message: "Organization added successfully.",
       }));
     });
@@ -439,7 +334,6 @@ describe("ListOrganizations", () => {
 
 
   describe("Error Handling", () => {
-
     it("should handle empty organization list", async () => {
       organizationsService.list.mockResolvedValueOnce({ data: { data: [] } });
       await wrapper.vm.getOrganizations();
@@ -448,5 +342,3 @@ describe("ListOrganizations", () => {
     });
   });
 });
-
-

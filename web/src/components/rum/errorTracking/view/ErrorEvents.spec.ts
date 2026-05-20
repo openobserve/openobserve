@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock OTable component
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
@@ -76,18 +69,11 @@ vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
 }));
 
 // Mock date formatting
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
+vi.mock("@/utils/date", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/date")>();
   return {
     ...actual,
-    date: {
-      formatDate: vi.fn((timestamp, format) => {
-        if (format === "MMM DD, YYYY HH:mm:ss Z") {
-          return "Jan 01, 2024 10:00:00 +0000";
-        }
-        return "Jan 01, 2024 10:00:00 +0000";
-      }),
-    },
+    formatDate: vi.fn(() => "Jan 01, 2024 10:00:00 +0000"),
   };
 });
 
@@ -154,12 +140,6 @@ describe("ErrorEvents Component", () => {
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
-    });
-
     it("should render OTable component", () => {
       const oTable = wrapper.find('[data-test="o-table"]');
       expect(oTable.exists()).toBe(true);
@@ -173,12 +153,9 @@ describe("ErrorEvents Component", () => {
       expect(title.text()).toBe("Events");
     });
 
-    it("should have correct title styling", () => {
+    it("should have tags-title class", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
     });
   });
 
@@ -481,26 +458,6 @@ describe("ErrorEvents Component", () => {
       expect(sortableIds).toContain("description");
       expect(sortableIds).toContain("timestamp");
       expect(sortableIds).not.toContain("level"); // level is not sortable
-    });
-  });
-
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const title = container.find(".tags-title");
-      const oTable = container.findComponent({ name: "OTable" });
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(oTable.exists()).toBe(true);
-    });
-
-    it("should maintain correct order of elements", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const children = Array.from(container.element.children);
-
-      expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].getAttribute("data-test")).toBe("o-table");
     });
   });
 

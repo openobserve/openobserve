@@ -4,7 +4,6 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppSessions from "./AppSessions.vue";
 
 // Mock the composables
@@ -112,20 +111,6 @@ vi.mock("@/utils/date", () => ({
   }),
 }));
 
-// Mock Quasar
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-    date: {
-      formatDate: vi.fn((timestamp, format) => "Jan 01, 2023 12:00:00 +00:00"),
-    },
-  };
-});
-
 // Mock async components
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
@@ -135,8 +120,6 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
     emits: ["update:query"],
   },
 }));
-
-installQuasar();
 
 describe("AppSessions.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -202,21 +185,6 @@ describe("AppSessions.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-                    QBtn: {
-            template:
-              '<button class="q-btn" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
-          },
-          QSeparator: {
-            template: '<hr class="q-separator" />',
-          },
-          QSplitter: {
-            template:
-              '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            props: ["modelValue", "unit", "vertical"],
-          },
-          QIcon: {
-            template: '<span class="OIcon" v-bind="$attrs"></span>',
-          },
           DateTime: {
             template:
               '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
@@ -648,12 +616,6 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QBtn: { template: "<button><slot /></button>" },
-            QSplitter: {
-              template:
-                '<div><slot name="before" /><slot name="after" /></div>',
-            },
-            QIcon: { template: "<span></span>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
@@ -789,13 +751,6 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QBtn: { template: "<button><slot /></button>" },
-            QSeparator: { template: "<hr />" },
-            QSplitter: {
-              template:
-                '<div><slot name="before" /><slot name="after" /></div>',
-            },
-            QIcon: { template: "<span></span>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },

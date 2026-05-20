@@ -16,11 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddStream from "./AddStream.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import i18n from "@/locales";
-
-installQuasar({ plugins: [] });
 
 const { mockGetStream, mockAddStream, mockCreateStream, mockSchemaStream } = vi.hoisted(() => ({
   mockGetStream: vi.fn(),
@@ -161,7 +158,11 @@ describe("AddStream", () => {
     });
 
     it("should render the data retention input", async () => {
-      const wrapper = mountComp();
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.streamInputs.stream_type = "logs";
       await flushPromises();
       expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
     });
@@ -191,22 +192,22 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      // Stub out the underlying form ref's submit method.
-      const submitSpy = vi.fn();
-      vm.addStreamFormRef = { submit: submitSpy };
+      // Set valid inputs so validation passes
+      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.stream_type = "logs";
+      await flushPromises();
 
       const drawer = wrapper.findComponent(ODrawerStub);
       await drawer.vm.$emit("click:primary");
-
-      expect(submitSpy).toHaveBeenCalled();
-    });
-
-    it("should not throw if click:primary fires while addStreamFormRef is null", async () => {
-      const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.addStreamFormRef = null;
+      // submitForm -> saveStream -> getStream
+      expect(mockGetStream).toHaveBeenCalled();
+    });
+
+    it("should not throw if click:primary fires while form is empty", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
 
       const drawer = wrapper.findComponent(ODrawerStub);
       expect(() => drawer.vm.$emit("click:primary")).not.toThrow();

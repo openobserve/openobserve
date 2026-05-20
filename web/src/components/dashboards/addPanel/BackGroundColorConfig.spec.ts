@@ -59,7 +59,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Removed installQuasar() since we're using Quasar directly in global plugins
 
 describe("BackGroundColorConfig", () => {
   let wrapper: any;
@@ -74,39 +73,6 @@ describe("BackGroundColorConfig", () => {
           ...provide,
         },
         stubs: {
-          "q-select": {
-            template: `
-              <div class="q-select-stub" :data-test="$attrs['data-test']">
-                <select 
-                  :value="modelValue" 
-                  @change="$emit('update:modelValue', $event.target.value)"
-                  class="select-element"
-                >
-                  <option 
-                    v-for="option in options" 
-                    :key="option.value" 
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-                <div class="display-value">{{ displayValue }}</div>
-                <div class="label">{{ label }}</div>
-              </div>
-            `,
-            props: [
-              "modelValue",
-              "options",
-              "dense",
-              "label",
-              "stackLabel",
-              "emitValue",
-              "displayValue",
-              "outlined",
-            ],
-            emits: ["update:modelValue"],
-            inheritAttrs: false,
-          },
         },
       },
     });

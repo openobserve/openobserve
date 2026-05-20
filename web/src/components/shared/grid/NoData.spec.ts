@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import NoData from '@/components/shared/grid/NoData.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('vue-i18n', () => ({
@@ -13,8 +12,6 @@ vi.mock('vue-i18n', () => ({
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn((path: string) => `mocked-url-for-${path}`)
 }));
-
-installQuasar();
 
 describe('NoData.vue', () => {
   let wrapper: VueWrapper;
@@ -56,18 +53,18 @@ describe('NoData.vue', () => {
     it('has correct main container structure', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      
-      expect(container.classes()).toContain('full-width');
-      expect(container.classes()).toContain('column');
-      expect(container.classes()).toContain('flex-center');
-      expect(container.classes()).toContain('q-gutter-sm');
+
+      expect(container.classes()).toContain('tw:w-full');
+      expect(container.classes()).toContain('tw:flex');
+      expect(container.classes()).toContain('tw:flex-col');
+      expect(container.classes()).toContain('tw:items-center');
     });
 
-    it('applies correct inline styles', () => {
+    it('applies correct text-2xl class', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      
-      expect(container.attributes('style')).toContain('font-size: 1.5rem');
+
+      expect(container.classes()).toContain('tw:text-2xl');
     });
 
   });
@@ -123,29 +120,28 @@ describe('NoData.vue', () => {
   });
 
   describe('CSS Classes and Styling', () => {
-    it('applies Quasar utility classes correctly', () => {
+    it('applies utility classes correctly', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      
-      expect(container.classes()).toContain('full-width');
-      expect(container.classes()).toContain('column');
-      expect(container.classes()).toContain('flex-center');
-      expect(container.classes()).toContain('q-gutter-sm');
+
+      expect(container.classes()).toContain('tw:w-full');
+      expect(container.classes()).toContain('tw:flex');
+      expect(container.classes()).toContain('tw:flex-col');
+      expect(container.classes()).toContain('tw:items-center');
     });
 
     it('applies correct margin class to text element', () => {
       wrapper = createWrapper();
-      const textElement = wrapper.find('.q-ma-none');
-      
+      const textElement = wrapper.find('.tw\\:m-0');
+
       expect(textElement.exists()).toBe(true);
-      expect(textElement.classes()).toContain('q-ma-none');
     });
 
-    it('has correct inline styling for font size', () => {
+    it('has correct font size class', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      
-      expect(container.attributes('style')).toContain('font-size: 1.5rem');
+
+      expect(container.classes()).toContain('tw:text-2xl');
     });
   });
 
@@ -220,17 +216,17 @@ describe('NoData.vue', () => {
   describe('Integration with Parent Components', () => {
     it('can be used as a placeholder in tables', () => {
       wrapper = createWrapper();
-      
+
       // Component should be suitable for table no-data scenarios
-      expect(wrapper.classes()).toContain('full-width');
+      expect(wrapper.classes()).toContain('tw:w-full');
     });
 
     it('maintains consistent styling across different contexts', () => {
       wrapper = createWrapper();
-      
+
       const container = wrapper.find('div');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('full-width');
+      expect(container.classes()).toContain('tw:w-full');
     });
   });
 

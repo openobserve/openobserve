@@ -14,26 +14,30 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { usePipelines } from './usePipelines';
 import pipelines from '@/services/pipelines';
 import destinationService from '@/services/alert_destination';
 import { useStore } from 'vuex';
-import { useQuasar } from 'quasar';
 
 // Mock the services
 vi.mock('@/services/pipelines');
 vi.mock('@/services/alert_destination');
-vi.mock('quasar');
 vi.mock('vuex');
 
+// Mock toast
+const mockToast = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
+
+import { usePipelines } from './usePipelines';
+
 describe('usePipelines', () => {
-  let mockNotify: any;
   let mockPipelinesService: any;
   let mockDestinationService: any;
   let mockStore: any;
 
   beforeEach(() => {
-    mockNotify = vi.fn();
+    mockToast.mockClear();
     mockStore = {
       state: {
         selectedOrganization: {
@@ -42,14 +46,9 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     // Mock the store
     vi.mocked(useStore).mockReturnValue(mockStore);
-    
-    // Mock quasar notify
-    vi.mocked(useQuasar).mockReturnValue({
-      notify: mockNotify
-    });
 
     // Mock the services
     mockPipelinesService = vi.mocked(pipelines);
@@ -65,7 +64,7 @@ describe('usePipelines', () => {
   // Test 1: Composable initialization
   it('should initialize composable correctly', () => {
     const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
-    
+
     expect(getUsedStreamsList).toBeDefined();
     expect(getPipelineDestinations).toBeDefined();
     expect(typeof getUsedStreamsList).toBe('function');
@@ -79,12 +78,12 @@ describe('usePipelines', () => {
         list: ['stream1', 'stream2', 'stream3']
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual(['stream1', 'stream2', 'stream3']);
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith('test-org');
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledTimes(1);
@@ -97,12 +96,12 @@ describe('usePipelines', () => {
         list: []
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith('test-org');
   });
@@ -117,14 +116,14 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
   });
 
   // Test 5: getUsedStreamsList - error handling with non-403 status
@@ -137,17 +136,16 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(mockToast).toHaveBeenCalledWith({
       message: 'Internal Server Error',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-center',
       timeout: 2000,
     });
   });
@@ -160,17 +158,16 @@ describe('usePipelines', () => {
         data: {}
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(mockToast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-center',
       timeout: 2000,
     });
   });
@@ -182,17 +179,16 @@ describe('usePipelines', () => {
         status: 400
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(mockToast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-center',
       timeout: 2000,
     });
   });
@@ -206,12 +202,12 @@ describe('usePipelines', () => {
         { name: 'destination3', url: 'http://dest3.com' }
       ]
     };
-    
+
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     const result = await getPipelineDestinations();
-    
+
     expect(result).toEqual(['destination1', 'destination2', 'destination3']);
     expect(mockDestinationService.list).toHaveBeenCalledWith({
       page_num: 1,
@@ -228,12 +224,12 @@ describe('usePipelines', () => {
     const mockResponse = {
       data: []
     };
-    
+
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     const result = await getPipelineDestinations();
-    
+
     expect(result).toEqual([]);
     expect(mockDestinationService.list).toHaveBeenCalledWith({
       page_num: 1,
@@ -252,12 +248,12 @@ describe('usePipelines', () => {
         { name: 'single-destination', url: 'http://single.com' }
       ]
     };
-    
+
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     const result = await getPipelineDestinations();
-    
+
     expect(result).toEqual(['single-destination']);
     expect(result.length).toBe(1);
   });
@@ -274,13 +270,13 @@ describe('usePipelines', () => {
     };
 
     vi.mocked(useStore).mockReturnValue(customStore);
-    
+
     const mockResponse = { data: { list: [] } };
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
-    
+
     const { getUsedStreamsList } = usePipelines();
     await getUsedStreamsList();
-    
+
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith('custom-org-123');
   });
 
@@ -296,13 +292,13 @@ describe('usePipelines', () => {
     };
 
     vi.mocked(useStore).mockReturnValue(customStore);
-    
+
     const mockResponse = { data: [] };
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     await getPipelineDestinations();
-    
+
     expect(mockDestinationService.list).toHaveBeenCalledWith({
       page_num: 1,
       page_size: 100000,
@@ -313,7 +309,7 @@ describe('usePipelines', () => {
     });
   });
 
-  // Test 13: Quasar notification parameters
+  // Test 13: Toast notification parameters
   it('should call notification with correct parameters', async () => {
     const mockError = {
       response: {
@@ -323,17 +319,16 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     await getUsedStreamsList();
-    
-    expect(mockNotify).toHaveBeenCalledTimes(1);
-    expect(mockNotify).toHaveBeenCalledWith({
+
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
       message: 'Bad Request Error',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-center',
       timeout: 2000,
     });
   });
@@ -347,20 +342,20 @@ describe('usePipelines', () => {
         { name: 'slack-dest', type: 'slack', channel: '#alerts' }
       ]
     };
-    
+
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     const result = await getPipelineDestinations();
-    
+
     expect(result).toEqual(['webhook1', 'email-dest', 'slack-dest']);
-    expect(result.every(item => typeof item === 'string')).toBe(true);
+    expect(result.every((item: any) => typeof item === 'string')).toBe(true);
   });
 
   // Test 15: Return value structure validation
   it('should return object with correct function names', () => {
     const result = usePipelines();
-    
+
     expect(result).toHaveProperty('getUsedStreamsList');
     expect(result).toHaveProperty('getPipelineDestinations');
     expect(Object.keys(result)).toEqual(['getUsedStreamsList', 'getPipelineDestinations']);
@@ -370,34 +365,34 @@ describe('usePipelines', () => {
   it('should handle async operations correctly', async () => {
     const mockStreamResponse = { data: { list: ['async-stream'] } };
     const mockDestResponse = { data: [{ name: 'async-dest' }] };
-    
+
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockStreamResponse);
     mockDestinationService.list.mockResolvedValue(mockDestResponse);
-    
+
     const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
-    
+
     const [streams, destinations] = await Promise.all([
       getUsedStreamsList(),
       getPipelineDestinations()
     ]);
-    
+
     expect(streams).toEqual(['async-stream']);
     expect(destinations).toEqual(['async-dest']);
   });
 
   // Test 17: Error boundary testing
   it('should handle network errors gracefully', async () => {
-    const networkError = new Error('Network Error');
+    const networkError: any = new Error('Network Error');
     networkError.response = {
       status: 0,
       data: { message: 'Network failure' }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(networkError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
   });
 
@@ -405,10 +400,10 @@ describe('usePipelines', () => {
   it('should call pipeline service with exact parameters', async () => {
     const mockResponse = { data: { list: [] } };
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
-    
+
     const { getUsedStreamsList } = usePipelines();
     await getUsedStreamsList();
-    
+
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith('test-org');
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledTimes(1);
   });
@@ -417,10 +412,10 @@ describe('usePipelines', () => {
   it('should call destination service with exact parameters', async () => {
     const mockResponse = { data: [] };
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     await getPipelineDestinations();
-    
+
     const expectedParams = {
       page_num: 1,
       page_size: 100000,
@@ -429,7 +424,7 @@ describe('usePipelines', () => {
       org_identifier: 'test-org',
       module: 'pipeline',
     };
-    
+
     expect(mockDestinationService.list).toHaveBeenCalledWith(expectedParams);
     expect(mockDestinationService.list).toHaveBeenCalledTimes(1);
   });
@@ -438,16 +433,16 @@ describe('usePipelines', () => {
   it('should handle multiple function calls independently', async () => {
     const streamResponse = { data: { list: ['stream1'] } };
     const destResponse = { data: [{ name: 'dest1' }] };
-    
+
     mockPipelinesService.getPipelineStreams.mockResolvedValue(streamResponse);
     mockDestinationService.list.mockResolvedValue(destResponse);
-    
+
     const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
-    
+
     const streams1 = await getUsedStreamsList();
     const dest1 = await getPipelineDestinations();
     const streams2 = await getUsedStreamsList();
-    
+
     expect(streams1).toEqual(['stream1']);
     expect(dest1).toEqual(['dest1']);
     expect(streams2).toEqual(['stream1']);
@@ -466,12 +461,12 @@ describe('usePipelines', () => {
         {} // Missing name property
       ]
     };
-    
+
     mockDestinationService.list.mockResolvedValue(mockResponse);
-    
+
     const { getPipelineDestinations } = usePipelines();
     const result = await getPipelineDestinations();
-    
+
     // Should include all mapped values, even non-string ones
     expect(result).toEqual([123, null, undefined, 'valid-name', undefined]);
     expect(result.length).toBe(5);
@@ -487,28 +482,28 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).not.toHaveBeenCalled();
-    
+    expect(mockToast).not.toHaveBeenCalled();
+
     // Test 402 (should trigger notification)
     mockError.response.status = 402;
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
-    
+
     await getUsedStreamsList();
-    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledTimes(1);
   });
 
   // Test 23: Composable reusability
   it('should create independent instances', () => {
     const instance1 = usePipelines();
     const instance2 = usePipelines();
-    
+
     expect(instance1).not.toBe(instance2);
     expect(instance1.getUsedStreamsList).not.toBe(instance2.getUsedStreamsList);
     expect(instance1.getPipelineDestinations).not.toBe(instance2.getPipelineDestinations);
@@ -517,14 +512,14 @@ describe('usePipelines', () => {
   // Test 24: Store integration validation
   it('should access store state correctly', async () => {
     const { getUsedStreamsList } = usePipelines();
-    
+
     expect(useStore).toHaveBeenCalled();
-    
+
     const mockResponse = { data: { list: [] } };
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
-    
+
     await getUsedStreamsList();
-    
+
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith('test-org');
   });
 
@@ -543,17 +538,16 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     mockPipelinesService.getPipelineStreams.mockRejectedValue(completeError);
-    
+
     const { getUsedStreamsList } = usePipelines();
     const result = await getUsedStreamsList();
-    
+
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(mockToast).toHaveBeenCalledWith({
       message: 'Validation failed',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-center',
       timeout: 2000,
     });
   });

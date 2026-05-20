@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from 'vue';
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
@@ -110,14 +109,6 @@ const platform = {
     touch: false,
   },
 };
-
-// Install Quasar with platform
-installQuasar({
-  plugins: [],
-  config: {
-    platform
-  }
-});
 
 // ODrawer stub: mirrors props/events from the real component so tests can drive
 // open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).

@@ -106,27 +106,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
     _q_: { notify: notifyMock },
   },
   stubs: {
-    "q-select": {
-      name: "QSelect",
-      props: ["modelValue", "options", "label"],
-      emits: ["update:modelValue", "filter", "new-value"],
-      template:
-        '<div data-test-stub="q-select" :data-label="label"><slot name="no-option" /></div>',
-    },
-    "q-item": true,
-    "q-item-section": true,
-    "q-item-label": true,
-    "q-separator": true,
     "OIcon": true,
-    "q-table": {
-      name: "QTable",
-      props: ["rows", "columns", "rowKey", "pagination"],
-      template:
-        '<div data-test-stub="q-table" :data-rows="rows.length"><slot name="body" :cols="columns" :row="rows[0]" /></div>',
-    },
-    "q-tr": true,
-    "q-td": true,
-    "q-list": true,
     OButton: {
       name: "OButton",
       props: ["variant", "size", "icon", "loading", "title"],

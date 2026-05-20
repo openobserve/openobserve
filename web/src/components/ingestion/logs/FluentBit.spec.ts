@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 
@@ -39,8 +38,6 @@ vi.mock("@/components/CopyContent.vue", () => ({
     template: "<div>{{ content }}</div>"
   }
 }));
-
-installQuasar();
 
 describe("FluentBit Component", () => {
   let wrapper: any;

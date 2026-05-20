@@ -15,26 +15,12 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertsDestinationList from "@/components/alerts/AlertsDestinationList.vue";
 import i18n from "@/locales";
-import { QTable } from "quasar";
-
 // Mock Quasar's notify globally
 const mockNotify = vi.fn(() => vi.fn()); // Return a dismiss function
 
 // Mock useQuasar
-vi.mock("quasar", async (importOriginal) => {
-  const original: any = await importOriginal();
-  return {
-    ...original,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
-
-installQuasar({
   plugins: [QTable],
 });
 

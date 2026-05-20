@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddTab from "./AddTab.vue";
 
 // Mock vue-router
@@ -152,7 +151,6 @@ const ODrawerStub = {
   inheritAttrs: false,
 };
 
-installQuasar();
 
 describe("AddTab", () => {
   let wrapper: VueWrapper<any>;
@@ -171,25 +169,6 @@ describe("AddTab", () => {
         plugins: [],
         stubs: {
           ODrawer: ODrawerStub,
-          "q-form": {
-            template:
-              "<form ref=\"addTabForm\" @submit.prevent=\"$emit('submit', $event)\"><slot /></form>",
-            emits: ["submit"],
-            methods: {
-              validate: () => Promise.resolve(true),
-              resetValidation: () => Promise.resolve(),
-            },
-          },
-          "q-input": {
-            template: `<input
-              :value="modelValue"
-              @input="$emit('update:modelValue', $event.target.value)"
-              data-test="dashboard-add-tab-name"
-              :rules="rules"
-            />`,
-            props: ["modelValue", "label", "rules", "lazy-rules"],
-            emits: ["update:modelValue"],
-          },
         },
       },
     });

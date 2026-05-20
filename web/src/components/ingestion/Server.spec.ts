@@ -1,12 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Server from "@/components/ingestion/Server.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
@@ -42,19 +38,30 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
+const baseStubs = {
+  OSplitter: {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder", "clearable"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+  },
+  OIcon: true,
+  OTabs: {
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
 };
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
 
 describe("Server Component", () => {
   let wrapper: any = null;
@@ -62,7 +69,7 @@ describe("Server Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "servers";
     mockRouter.currentRoute.value.query = {};
@@ -76,16 +83,7 @@ describe("Server Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'q-input': true,
-          'OIcon': true
-        }
+        stubs: { ...baseStubs },
       },
     });
   });
@@ -139,19 +137,10 @@ describe("Server Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -193,25 +182,16 @@ describe("Server Component", () => {
     it("should not redirect when route is not servers", () => {
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -219,25 +199,16 @@ describe("Server Component", () => {
     it("should handle iis route without redirect", () => {
       mockRouter.currentRoute.value.name = "iis";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -245,25 +216,16 @@ describe("Server Component", () => {
     it("should handle apache route without redirect", () => {
       mockRouter.currentRoute.value.name = "apache";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -271,25 +233,16 @@ describe("Server Component", () => {
     it("should handle unknown route without redirect", () => {
       mockRouter.currentRoute.value.name = "unknown";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -300,32 +253,23 @@ describe("Server Component", () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
 
       // Change route to trigger onUpdated
       mockRouter.currentRoute.value.name = "servers";
-      
+
       // Force update to trigger onUpdated
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
 
@@ -333,32 +277,23 @@ describe("Server Component", () => {
       // First mount
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Server, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
 
       // Change route to another valid route
       mockRouter.currentRoute.value.name = "iis";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -374,7 +309,7 @@ describe("Server Component", () => {
     it("should have nginx tab with correct properties", () => {
       const filteredList = wrapper.vm.filteredList;
       const nginxTab = filteredList.find((tab: any) => tab.name === "nginx");
-      
+
       expect(nginxTab).toBeDefined();
       expect(nginxTab.name).toBe("nginx");
       expect(nginxTab.to.name).toBe("nginx");
@@ -386,7 +321,7 @@ describe("Server Component", () => {
     it("should have iis tab with correct properties", () => {
       const filteredList = wrapper.vm.filteredList;
       const iisTab = filteredList.find((tab: any) => tab.name === "iis");
-      
+
       expect(iisTab).toBeDefined();
       expect(iisTab.name).toBe("iis");
       expect(iisTab.to.name).toBe("iis");
@@ -398,7 +333,7 @@ describe("Server Component", () => {
     it("should not include apache tab (commented out)", () => {
       const filteredList = wrapper.vm.filteredList;
       const apacheTab = filteredList.find((tab: any) => tab.name === "apache");
-      
+
       expect(apacheTab).toBeUndefined();
     });
 
@@ -458,38 +393,38 @@ describe("Server Component", () => {
   describe("Reactive Data Properties", () => {
     it("should have reactive tabs", async () => {
       expect(wrapper.vm.tabs).toBe("");
-      
+
       wrapper.vm.tabs = "test-tab";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabs).toBe("test-tab");
     });
 
     it("should have reactive ingestTabType", async () => {
       expect(wrapper.vm.ingestTabType).toBe("nginx");
-      
+
       wrapper.vm.ingestTabType = "iis";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.ingestTabType).toBe("iis");
     });
 
     it("should have reactive tabsFilter", async () => {
       expect(wrapper.vm.tabsFilter).toBe("");
-      
+
       wrapper.vm.tabsFilter = "test-filter";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabsFilter).toBe("test-filter");
       expect(wrapper.vm.filteredList.length).toBe(0); // No matches
     });
 
     it("should have reactive splitterModel", async () => {
       expect(wrapper.vm.splitterModel).toBe(270);
-      
+
       wrapper.vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.splitterModel).toBe(300);
     });
 
@@ -522,7 +457,7 @@ describe("Server Component", () => {
       wrapper.vm.filteredList.forEach((tab: any) => {
         expect(tab.icon).toContain("img:");
       });
-      
+
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
@@ -588,40 +523,22 @@ describe("Server Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.exists()).toBe(true);
       testWrapper.unmount();
-      
+
       const testWrapper2 = mount(Server, {
         props: { currOrgIdentifier: "test-org-2" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper2.exists()).toBe(true);
       expect(testWrapper2.props('currOrgIdentifier')).toBe("test-org-2");
       testWrapper2.unmount();
@@ -629,9 +546,9 @@ describe("Server Component", () => {
 
     it("should handle prop changes", async () => {
       expect(wrapper.exists()).toBe(true);
-      
+
       await wrapper.setProps({ currOrgIdentifier: "new-org" });
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -644,7 +561,7 @@ describe("Server Component", () => {
         'verifyOrganizationStatus', 'tabs', 'ingestTabType',
         'tabsFilter', 'filteredList'
       ];
-      
+
       expectedProps.forEach(prop => {
         expect(wrapper.vm).toHaveProperty(prop);
       });

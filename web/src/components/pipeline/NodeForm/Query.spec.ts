@@ -16,14 +16,16 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Query from "./Query.vue";
 import searchService from "@/services/search";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar();
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -483,10 +485,9 @@ describe("Query Component", () => {
     });
 
     it("sets isValidSqlQuery to false on search error with message", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       const errMsg = "Syntax error near SELECT";
       (searchService.search as any).mockRejectedValueOnce({
         response: { data: { message: errMsg } },
@@ -496,19 +497,17 @@ describe("Query Component", () => {
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
           message: `Invalid SQL Query: ${errMsg}`,
         })
       );
     });
 
     it("sets isValidSqlQuery to false when error has no message", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       (searchService.search as any).mockRejectedValueOnce({
         response: { data: {} },
       });
@@ -516,7 +515,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "Invalid SQL Query" })
       );
     });

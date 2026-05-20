@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import TraceTimelineIcon from '@/components/icons/TraceTimelineIcon.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-
-installQuasar();
 
 describe('TraceTimelineIcon.vue', () => {
   let wrapper: VueWrapper;

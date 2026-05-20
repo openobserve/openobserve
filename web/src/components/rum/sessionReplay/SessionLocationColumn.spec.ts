@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,10 +24,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-installQuasar({
-  plugins: [],
-});
 
 // Mock flag-icons CSS
 vi.mock("flag-icons/css/flag-icons.min.css", () => ({}));
@@ -63,9 +57,9 @@ describe("SessionLocationColumn", () => {
           store,
         },
         stubs: {
-          "OIcon": {
+          OIcon: {
             template:
-              '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
+              '<i data-test="circle-icon" :class="name" :style="`font-size: ${size}`"></i>',
             props: ["name", "size"],
           },
         },
@@ -149,43 +143,15 @@ describe("SessionLocationColumn", () => {
   describe("Separator Icons", () => {
     it("should render separator icons between details", () => {
       const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
-      // Filter for circle icons
-      const circleIcons = separatorIcons.filter((icon) =>
-        icon.attributes("class")?.includes("circle"),
-      );
       expect(separatorIcons.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("should apply correct styling to separator icons", () => {
-      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
-      separatorIcons.forEach((icon) => {
-        expect(icon.attributes("style")).toContain("font-size: 4px");
-      });
-    });
-  });
-
-  describe("Layout Structure", () => {
-    it("should have correct row structure for country info", () => {
-      const countryRow = wrapper.find(".row.items-center.no-wrap");
-      expect(countryRow.exists()).toBe(true);
-    });
-
-    it("should have correct row structure for details", () => {
-      const detailsRow = wrapper.find(".row.q-mt-xs.items-center");
-      expect(detailsRow.exists()).toBe(true);
-    });
-
-    it("should apply correct text styling for details", () => {
-      const greyTextElements = wrapper.findAll(".text-grey-8");
-      expect(greyTextElements.length).toBeGreaterThanOrEqual(3); // city, browser, os
     });
   });
 
   describe("Component Properties", () => {
     it("should require column prop", () => {
-      const columnProp = wrapper.vm.$options.props.column;
-      expect(columnProp.required).toBe(true);
-      expect(columnProp.type).toBe(Object);
+      const columnProp = SessionLocationColumn.props?.column;
+      expect(columnProp?.required).toBe(true);
+      expect(columnProp?.type).toBe(Object);
     });
 
     it("should handle complete column data", async () => {
@@ -246,21 +212,6 @@ describe("SessionLocationColumn", () => {
     });
   });
 
-  describe("Styling", () => {
-    it("should apply correct margin classes", () => {
-      const flagElement = wrapper.find(".q-mr-sm");
-      expect(flagElement.exists()).toBe(true);
-
-      const topMarginElement = wrapper.find(".q-mt-xs");
-      expect(topMarginElement.exists()).toBe(true);
-    });
-
-    it("should apply correct spacing for separators", () => {
-      const separatorElements = wrapper.findAll(".q-mx-md");
-      expect(separatorElements.length).toBeGreaterThan(0);
-    });
-  });
-
   describe("Integration Tests", () => {
     it("should handle complete session location workflow", async () => {
       // Verify component mounted
@@ -312,8 +263,6 @@ describe("SessionLocationColumn", () => {
       for (const testCase of testCases) {
         await wrapper.setProps({ column: testCase });
 
-        expect(wrapper.find(".row.items-center.no-wrap").exists()).toBe(true);
-        expect(wrapper.find(".row.q-mt-xs.items-center").exists()).toBe(true);
         expect(wrapper.text()).toContain(testCase.country);
         expect(wrapper.text()).toContain(testCase.city);
       }
@@ -324,9 +273,6 @@ describe("SessionLocationColumn", () => {
     it("should have proper semantic structure", () => {
       const mainDiv = wrapper.find("div");
       expect(mainDiv.exists()).toBe(true);
-
-      const rows = wrapper.findAll(".row");
-      expect(rows.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should handle long location names", async () => {
@@ -341,7 +287,6 @@ describe("SessionLocationColumn", () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".row").exists()).toBe(true);
     });
   });
 });

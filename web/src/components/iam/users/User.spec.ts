@@ -24,7 +24,6 @@ import {
   afterAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
@@ -34,7 +33,6 @@ import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
 
-installQuasar();
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -223,25 +221,7 @@ const mountUser = () =>
         QTablePagination: QTablePaginationStub,
         // Keep Quasar components shallow so we don't depend on real
         // table internals; we still render their slots.
-        "q-page": { template: "<div><slot /></div>" },
-        "q-table": {
-          props: ["rows", "columns", "selected"],
-          template: '<div class="q-table-stub"><slot /></div>',
-        },
-        "q-input": {
-          props: ["modelValue"],
-          template: '<div class="q-input-stub"><slot name="prepend" /></div>',
-          emits: ["update:modelValue"],
-        },
         "OIcon": { template: "<i />" },
-        "q-td": { template: "<div><slot /></div>" },
-        "q-th": { template: "<div><slot /></div>" },
-        "q-tr": { template: "<div><slot /></div>" },
-        "q-checkbox": {
-          props: ["modelValue"],
-          template: '<div class="q-checkbox-stub" />',
-          emits: ["update:modelValue"],
-        },
         OButton: {
           props: ["variant", "size", "disabled", "loading"],
           template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',

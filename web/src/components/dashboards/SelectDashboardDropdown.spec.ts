@@ -16,11 +16,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SelectDashboardDropdown from "./SelectDashboardDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
-
-installQuasar();
 
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({
@@ -196,10 +193,8 @@ describe("SelectDashboardDropdown", () => {
     const wrapper = mountComponent({}, store);
     await flushPromises();
 
-    expect(wrapper.vm.selectedDashboard).toEqual({
-      label: "Dashboard 1",
-      value: "dash1",
-    });
+    // Component now stores selected dashboard as a string value
+    expect(wrapper.vm.selectedDashboard).toBe("dash1");
   });
 
   describe("ODrawer migration", () => {
@@ -323,10 +318,8 @@ describe("SelectDashboardDropdown", () => {
       await flushPromises();
 
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-      expect(wrapper.vm.selectedDashboard).toEqual({
-        label: "Dashboard 1",
-        value: "dash1",
-      });
+      // Component now stores selected dashboard as a string value
+      expect(wrapper.vm.selectedDashboard).toBe("dash1");
     });
 
     it("should emit dashboard-list-updated after refresh", async () => {

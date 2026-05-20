@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
@@ -73,7 +72,6 @@ import serviceStreamsService from "@/services/service_streams";
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,
@@ -220,8 +218,6 @@ function mountComponent(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        "q-menu": true,
-        "q-tooltip": true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
       },

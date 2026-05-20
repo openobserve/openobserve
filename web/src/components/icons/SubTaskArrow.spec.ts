@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import SubTaskArrow from '@/components/icons/SubTaskArrow.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-
-installQuasar();
 
 describe('SubTaskArrow.vue', () => {
   let wrapper: VueWrapper;

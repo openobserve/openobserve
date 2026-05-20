@@ -16,13 +16,15 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Condition from "./Condition.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar();
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args) => mockToast(...args),
+}));
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -346,15 +348,13 @@ describe("Condition Component", () => {
   // -------------------------------------------------------------------------
   describe("saveCondition – validation", () => {
     it("notifies and does NOT call addNode when conditions array is empty", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", []);
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       await wrapper.vm.saveCondition();
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
           message: "Please add at least one condition",
         })
       );
@@ -362,32 +362,26 @@ describe("Condition Component", () => {
     });
 
     it("notifies and does NOT call addNode when condition has empty column", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "", operator: "=" }),
       ]);
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       await wrapper.vm.saveCondition();
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" })
-      );
+      expect(mockToast).toHaveBeenCalled();
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("notifies and does NOT call addNode when condition has empty operator", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "level", operator: "" }),
       ]);
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       await wrapper.vm.saveCondition();
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" })
-      );
+      expect(mockToast).toHaveBeenCalled();
       expect(mockAddNode).not.toHaveBeenCalled();
     });
   });

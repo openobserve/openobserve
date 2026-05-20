@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -75,8 +74,6 @@ const ODialogStub = {
     </div>
   `,
 };
-
-installQuasar();
 
 describe("TabsDeletePopUp", () => {
   let wrapper: VueWrapper<any>;
@@ -286,10 +283,8 @@ describe("TabsDeletePopUp", () => {
     it("should set first available tab as default selection", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.selectedTabToMovePanels).toEqual({
-        label: "Tab 1",
-        value: "tab1",
-      });
+      // selectedTabToMovePanels is now stored as the value (string), not an object
+      expect(wrapper.vm.selectedTabToMovePanels).toBe("tab1");
     });
 
     it("should handle case with only one tab", () => {
@@ -334,8 +329,8 @@ describe("TabsDeletePopUp", () => {
     it("should change action when radio button emits update:modelValue", async () => {
       wrapper = createWrapper();
 
-      const deleteRadio = wrapper.findComponent({ name: "QRadio" });
-      await deleteRadio.vm.$emit("update:modelValue", "delete");
+      const radioGroup = wrapper.findComponent({ name: "ORadioGroup" });
+      await radioGroup.vm.$emit("update:modelValue", "delete");
 
       expect(wrapper.vm.action).toBe("delete");
     });
@@ -462,7 +457,7 @@ describe("TabsDeletePopUp", () => {
     it("should emit update:ok with correct tab id for different selections", async () => {
       wrapper = createWrapper();
 
-      wrapper.vm.selectedTabToMovePanels = { label: "Tab 2", value: "tab2" };
+      wrapper.vm.selectedTabToMovePanels = "tab2";
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent(ODialogStub);
@@ -503,11 +498,10 @@ describe("TabsDeletePopUp", () => {
     it("should update selected tab when dropdown value changes", async () => {
       wrapper = createWrapper();
 
-      const newSelection = { label: "Tab 2", value: "tab2" };
-      wrapper.vm.selectedTabToMovePanels = newSelection;
+      wrapper.vm.selectedTabToMovePanels = "tab2";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.selectedTabToMovePanels).toEqual(newSelection);
+      expect(wrapper.vm.selectedTabToMovePanels).toBe("tab2");
     });
 
     it("should handle empty options gracefully", () => {

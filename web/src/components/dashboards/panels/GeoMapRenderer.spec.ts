@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
 
 // Mock Leaflet
@@ -154,8 +153,6 @@ Object.defineProperty(window, 'removeEventListener', {
   writable: true,
   value: removeEventListenerSpy,
 });
-
-installQuasar();
 
 describe("GeoMapRenderer", () => {
   let wrapper: VueWrapper<any>;

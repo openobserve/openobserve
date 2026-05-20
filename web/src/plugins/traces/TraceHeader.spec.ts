@@ -15,14 +15,11 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import TraceHeader from "@/plugins/traces/TraceHeader.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-installQuasar({
   plugins: [],
 });
 
@@ -102,7 +99,6 @@ describe("TraceHeader", () => {
           store: mockStore,
         },
         stubs: {
-          "q-resize-observer": true,
         },
       },
     });
@@ -276,7 +272,6 @@ describe("TraceHeader", () => {
             store: darkStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -314,7 +309,6 @@ describe("TraceHeader", () => {
             store: darkStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -528,7 +522,6 @@ describe("TraceHeader", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });

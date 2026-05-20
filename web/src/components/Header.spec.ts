@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
@@ -32,10 +31,6 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
-
-installQuasar({
-  plugins: [],
-});
 
 describe("Header Component", () => {
   let wrapper: any;
@@ -176,16 +171,6 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
-        QBtn: true,
-        QIcon: true,
-        QToolbarTitle: true,
-        QMenu: true,
-        QList: true,
-        QItem: true,
-        QItemSection: true,
-        QSeparator: true,
-        QTooltip: true,
-        QMarkupTable: true,
       },
     };
 
@@ -734,15 +719,15 @@ describe("Header Component", () => {
     it("should emit updateOrganization when organization is selected", async () => {
       const newOrg = { identifier: "new-org", label: "New Organization" };
 
-      // handleOrgSelection was renamed to handleOrgSelect during migration
-      // and now takes an identifier (matching the OSelect value contract).
       await wrapper.setProps({
         organizations: [
           { identifier: "test-org", label: "Test Organization" },
           newOrg,
         ],
       });
-      await wrapper.vm.handleOrgSelect("new-org");
+      // handleOrgSelection is the current method name on Header.vue and takes
+      // the organization object.
+      await wrapper.vm.handleOrgSelection(newOrg);
 
       expect(wrapper.emitted("update:selectedOrg")).toBeTruthy();
       expect(wrapper.emitted("update:selectedOrg")[0]).toEqual([newOrg]);

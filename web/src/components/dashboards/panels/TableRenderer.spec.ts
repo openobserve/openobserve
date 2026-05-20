@@ -19,7 +19,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: (optsRef: any) => ({
     __v_isRef: true,
@@ -36,11 +35,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
     },
   }),
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
-});
 
 vi.mock("vuex", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -131,8 +125,6 @@ import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { createStore } from "vuex";
-
-installQuasar();
 
 const mockStore = createStore({
   state: {
@@ -88,6 +85,23 @@ describe("StreamFieldSelect", () => {
     }
   });
 
+  const OSelectStub = {
+    name: "OSelect",
+    props: ["modelValue", "options", "label", "useInput", "inputDebounce", "behavior", "hideSelected", "fillInput"],
+    emits: ["update:modelValue", "filter"],
+    template: `<div :data-test="$attrs['data-test']" class="o-select-stub"><template v-for="(opt, index) in options" :key="index"><slot name="option" :opt="opt" :index="index" /></template></div>`,
+    methods: {
+      updateInputValue(_val: string) { /* no-op stub */ },
+    },
+  };
+
+  const OCollapsibleStub = {
+    name: "OCollapsible",
+    props: ["modelValue", "label"],
+    emits: ["update:modelValue"],
+    template: `<div :data-test="$attrs['data-test']" class="o-collapsible-stub"><span>{{ label }}</span><slot /></div>`,
+  };
+
   const createWrapper = (props = {}, provide = {}) => {
     return mount(StreamFieldSelect, {
       props: {
@@ -99,6 +113,10 @@ describe("StreamFieldSelect", () => {
         provide: {
           dashboardPanelDataPageKey: "dashboard",
           ...provide,
+        },
+        stubs: {
+          OSelect: OSelectStub,
+          OCollapsible: OCollapsibleStub,
         },
       },
     });
@@ -118,11 +136,11 @@ describe("StreamFieldSelect", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have q-select component", async () => {
+    it("should have OSelect component", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.exists()).toBe(true);
     });
   });
 
@@ -545,37 +563,37 @@ describe("StreamFieldSelect", () => {
     });
   });
 
-  describe("Q-Select Properties", () => {
+  describe("O-Select Properties", () => {
     it("should have use-input enabled", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.exists()).toBe(true);
     });
 
     it("should have hide-selected enabled", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.exists()).toBe(true);
     });
 
     it("should have fill-input enabled", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.exists()).toBe(true);
     });
 
     it("should use menu behavior", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.exists()).toBe(true);
     });
   });
 

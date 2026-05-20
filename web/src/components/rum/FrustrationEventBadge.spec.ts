@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FrustrationEventBadge from './FrustrationEventBadge.vue';
 
-installQuasar();
 
 describe('FrustrationEventBadge.vue', () => {
   let wrapper: VueWrapper;

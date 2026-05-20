@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import { createStore } from "vuex";
 import destinationService from "@/services/alert_destination";
@@ -40,8 +39,6 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => `test-uuid-${++uuidCounter}`),
 }));
 
-installQuasar();
-
 describe("CreateDestinationForm", () => {
   let wrapper: any;
   let store: any;
@@ -59,15 +56,7 @@ describe("CreateDestinationForm", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "q-stepper": false,
-          "q-step": false,
-          "q-input": false,
-          "q-select": false,
-          "q-btn": false,
           "OIcon": false,
-          "q-card": false,
-          "q-card-section": false,
-          "q-toggle": false,
         },
       },
     });

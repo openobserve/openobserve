@@ -15,19 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock ErrorTag component
 vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
@@ -86,6 +79,13 @@ describe("ErrorTags Component", () => {
     geo_info_city: "New York",
   };
 
+  const stubs = {
+    OSeparator: {
+      template: '<div data-test="separator" />',
+      props: ["vertical"],
+    },
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -96,12 +96,7 @@ describe("ErrorTags Component", () => {
       },
       global: {
         plugins: [i18n],
-        stubs: {
-          "q-separator": {
-            template: '<div data-test="separator" />',
-            props: ["vertical"],
-          },
-        },
+        stubs,
       },
     });
 
@@ -131,33 +126,26 @@ describe("ErrorTags Component", () => {
   });
 
   describe("IP Address Display", () => {
-    it("should display IP address with icon", () => {
-      const ipSection = wrapper.find(".q-mr-lg.items-center");
-      expect(ipSection.exists()).toBe(true);
-      expect(ipSection.text()).toContain("192.168.1.1");
+    it("should display IP address", () => {
+      expect(wrapper.text()).toContain("192.168.1.1");
     });
 
     it("should render IP icon", () => {
       const ipIcon = wrapper.find("img[src='/mock/ip.png']");
       expect(ipIcon.exists()).toBe(true);
       expect(ipIcon.attributes("alt")).toBe("IP");
-      expect(ipIcon.classes()).toContain("tw:w-[1.875rem]!");
-      expect(ipIcon.classes()).toContain("tw:h-auto!");
     });
   });
 
   describe("Browser Information", () => {
     it("should display browser information", () => {
-      const browserSection = wrapper.find(".q-mx-lg.items-center");
-      expect(browserSection.exists()).toBe(true);
-      expect(browserSection.text()).toContain("Chrome");
-      expect(browserSection.text()).toContain("Version 120.0.0");
+      expect(wrapper.text()).toContain("Chrome");
+      expect(wrapper.text()).toContain("Version 120.0.0");
     });
 
     it("should render correct browser icon for Chrome", () => {
       const browserIcon = wrapper.find("img[src='/mock/chrome.png']");
       expect(browserIcon.exists()).toBe(true);
-      expect(browserIcon.classes()).toContain("inline-block");
     });
 
     it("should render Firefox icon for Firefox", async () => {
@@ -170,8 +158,6 @@ describe("ErrorTags Component", () => {
 
       await wrapper.vm.$nextTick();
 
-      // The component sets icons only on mount, not reactively
-      // So we need to check the computed method result instead
       expect(wrapper.vm.getBrowserIcon()).toBe("/mock/firefox.png");
     });
 
@@ -224,17 +210,14 @@ describe("ErrorTags Component", () => {
 
       await wrapper.vm.$nextTick();
 
-      const browserIcon = wrapper.find("img[src='/mock/chrome.png']");
-      expect(browserIcon.exists()).toBe(true);
+      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/chrome.png");
     });
   });
 
   describe("Operating System Information", () => {
     it("should display OS information", () => {
-      const osElements = wrapper.findAll(".q-mx-lg.items-center");
-      const osSection = osElements[1]; // Second section is OS
-      expect(osSection.text()).toContain("Windows");
-      expect(osSection.text()).toContain("Version 10.0.19045");
+      expect(wrapper.text()).toContain("Windows");
+      expect(wrapper.text()).toContain("Version 10.0.19045");
     });
 
     it("should render Windows icon for Windows", () => {
@@ -278,8 +261,7 @@ describe("ErrorTags Component", () => {
 
       await wrapper.vm.$nextTick();
 
-      const osIcon = wrapper.find("img[src='/mock/windows.png']");
-      expect(osIcon.exists()).toBe(true);
+      expect(wrapper.vm.getOsIcon()).toBe("/mock/windows.png");
     });
   });
 
@@ -463,17 +445,12 @@ describe("ErrorTags Component", () => {
       const errorTags = wrapper.findAllComponents({ name: "ErrorTag" });
 
       const ipTag = errorTags.find(
-        (tag) =>
+        (tag: any) =>
           tag.props("tag").key === "ip" &&
           tag.props("tag").value === "192.168.1.1",
       );
 
       expect(ipTag).toBeDefined();
-    });
-
-    it("should render tags in correct container", () => {
-      const tagsContainer = wrapper.find(".row.items-center.wrap.q-mt-md");
-      expect(tagsContainer.exists()).toBe(true);
     });
   });
 
@@ -481,15 +458,6 @@ describe("ErrorTags Component", () => {
     it("should render vertical separators", () => {
       const separators = wrapper.findAll('[data-test="separator"]');
       expect(separators.length).toBeGreaterThan(0);
-    });
-
-    it("should have proper separator placement", () => {
-      const separators = wrapper.findAllComponents({ name: "q-separator" });
-      separators.forEach((separator: any) => {
-        if (separator.exists()) {
-          expect(separator.props("vertical")).toBe(true);
-        }
-      });
     });
   });
 
@@ -515,7 +483,6 @@ describe("ErrorTags Component", () => {
 
       await wrapper.vm.$nextTick();
 
-      // Icons are set only on mount, but methods return correct values
       expect(wrapper.vm.getBrowserIcon()).toBe("/mock/firefox.png");
       expect(wrapper.vm.getOsIcon()).toBe("/mock/mac.png");
     });
@@ -609,15 +576,6 @@ describe("ErrorTags Component", () => {
     it("should apply correct styling classes", () => {
       const title = wrapper.find(".tags-title");
       expect(title.classes()).toContain("tags-title");
-
-      const mainRow = wrapper.find(".row.items-center");
-      expect(mainRow.classes()).toContain("row");
-      expect(mainRow.classes()).toContain("items-center");
-    });
-
-    it("should apply inline-block classes", () => {
-      const inlineElements = wrapper.findAll(".inline-block");
-      expect(inlineElements.length).toBeGreaterThan(0);
     });
   });
 

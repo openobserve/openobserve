@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
 import * as zincutils from '@/utils/zincutils';
@@ -29,8 +28,6 @@ vi.mock('@/components/SanitizedHtmlRenderer.vue', () => ({
 }));
 
 const mockOrganizationsService = organizationsService as any;
-
-installQuasar({ plugins: {} });
 
 describe('MemberSubscription.vue', () => {
   let wrapper: any;
@@ -90,10 +87,6 @@ describe('MemberSubscription.vue', () => {
           $store: store,
         },
         stubs: {
-                    'q-btn': {
-            template: '<button class="q-btn"><slot /></button>',
-            props: ['label'],
-          },
           'SanitizedHtmlRenderer': {
             template: '<div class="sanitized-html" data-test="sanitized-html">{{ htmlContent }}</div>',
             props: ['htmlContent'],

@@ -15,10 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ViewPerformanceMetrics from "@/components/rum/common/performance/ViewPerformanceMetrics.vue";
 
-installQuasar();
 
 function createMockMetrics(overrides: Record<string, any> = {}) {
   return {

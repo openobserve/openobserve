@@ -17,11 +17,9 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -129,19 +127,7 @@ const globalConfig = {
     AddFolder: AddFolderStub,
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
-    "q-select": {
-      template: `
-        <div class="q-select-stub" :data-test="$attrs['data-test']">
-          <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
-            <option v-for="opt in options" :key="opt.value" :value="JSON.stringify(opt)">{{ opt.label }}</option>
-          </select>
-        </div>`,
-      props: ["modelValue", "options", "label", "disable"],
-      emits: ["update:modelValue"],
-    },
     "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
-    "q-item": { template: "<div class='q-item-stub'><slot /></div>" },
-    "q-item-section": { template: "<div><slot /></div>" },
   },
   mocks: { $store: store },
   provide: { store },

@@ -1,12 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
-
-installQuasar();
 
 const mockRouter = createRouter({
   history: createWebHistory(),
@@ -26,31 +23,28 @@ vi.mock("@/utils/zincutils", () => ({
   convertToUtcTimestamp: vi.fn((dateStr, tz) => new Date(dateStr).getTime() * 1000)
 }));
 
-vi.mock("@/utils/date", () => ({
-  generateDurationLabel: vi.fn(() => "15m"),
-  formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00")
-}));
+vi.mock("@/utils/date", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    generateDurationLabel: vi.fn(() => "15m"),
+    formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00"),
+    subtractRelativeTime: vi.fn((date, obj) => {
+      const result = new Date(date);
+      if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
+      if (obj.hours) result.setHours(result.getHours() - obj.hours);
+      if (obj.days) result.setDate(result.getDate() - obj.days);
+      if (obj.weeks) result.setDate(result.getDate() - obj.weeks * 7);
+      if (obj.months) result.setMonth(result.getMonth() - obj.months);
+      if (obj.seconds) result.setSeconds(result.getSeconds() - obj.seconds);
+      return result;
+    }),
+  };
+});
 
 vi.mock("date-fns-tz", () => ({
   toZonedTime: vi.fn((date, tz) => new Date(date))
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    date: {
-      subtractFromDate: vi.fn((date, obj) => {
-        const result = new Date(date);
-        if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
-        if (obj.hours) result.setHours(result.getHours() - obj.hours);  
-        if (obj.days) result.setDate(result.getDate() - obj.days);
-        return result;
-      })
-    },
-    useQuasar: vi.fn(() => ({}))
-  };
-});
 
 describe("DateTime Component", () => {
   let wrapper: any = null;
@@ -88,25 +82,22 @@ describe("DateTime Component", () => {
           store,
         },
         stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-separator': true,
-          'q-select': true,
-          'q-input': true,
-          'q-date': true,
-          'q-time': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-list': true,
-          'q-tooltip': true
+          OButton: true,
+          OPopover: true,
+          OSeparator: true,
+          OSelect: true,
+          OInput: true,
+          ODatePicker: true,
+          OTimePicker: true,
+          OCard: true,
+          OTabs: true,
+          OTab: true,
+          OTabPanels: true,
+          OTabPanel: true,
+          OItem: true,
+          OList: true,
+          OTooltip: true,
+          OIcon: true,
         }
       },
     });

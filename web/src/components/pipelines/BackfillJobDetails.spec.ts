@@ -16,11 +16,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
 
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: vi.fn(() => ({
@@ -113,8 +110,6 @@ function createWrapper(props: Record<string, any> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODrawer: ODrawerStub,
-        QTimeline: { template: "<div><slot /></div>" },
-        QTimelineEntry: { template: "<div />" },
       },
     },
   });
@@ -296,31 +291,31 @@ describe("BackfillJobDetails – getStatusColor", () => {
     await flushPromises();
   });
 
-  it("returns 'positive' for status 'running'", () => {
-    expect((wrapper.vm as any).getStatusColor("running")).toBe("positive");
+  it("returns 'success' for status 'running'", () => {
+    expect((wrapper.vm as any).getStatusColor("running")).toBe("success");
   });
 
-  it("returns 'positive' for status 'completed'", () => {
-    expect((wrapper.vm as any).getStatusColor("completed")).toBe("positive");
+  it("returns 'success' for status 'completed'", () => {
+    expect((wrapper.vm as any).getStatusColor("completed")).toBe("success");
   });
 
-  it("returns 'negative' for status 'failed'", () => {
-    expect((wrapper.vm as any).getStatusColor("failed")).toBe("negative");
+  it("returns 'error' for status 'failed'", () => {
+    expect((wrapper.vm as any).getStatusColor("failed")).toBe("error");
   });
 
   it("returns 'warning' for status 'pending'", () => {
     expect((wrapper.vm as any).getStatusColor("pending")).toBe("warning");
   });
 
-  it("returns 'grey' for status 'canceled'", () => {
-    expect((wrapper.vm as any).getStatusColor("canceled")).toBe("grey");
+  it("returns 'default' for status 'canceled'", () => {
+    expect((wrapper.vm as any).getStatusColor("canceled")).toBe("default");
   });
 
-  it("returns 'negative' when deletionStatus is an object with 'failed' key", () => {
+  it("returns 'error' when deletionStatus is an object with 'failed' key", () => {
     const result = (wrapper.vm as any).getStatusColor("running", {
       failed: "some error",
     });
-    expect(result).toBe("negative");
+    expect(result).toBe("error");
   });
 });
 

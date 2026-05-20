@@ -15,11 +15,43 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ValueMappingPopUp from "@/components/dashboards/addPanel/ValueMappingPopUp.vue";
 import i18n from "@/locales";
 
-installQuasar();
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "iconLeft"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
+};
+
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "label"],
+  emits: ["update:modelValue"],
+  template: `<input :data-test="$attrs['data-test']" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options", "label"],
+  emits: ["update:modelValue"],
+  template: `<select :data-test="$attrs['data-test']" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)"><option v-for="(opt, i) in options" :key="i" :value="typeof opt === 'object' ? opt.value : opt">{{ typeof opt === 'object' ? opt.label : opt }}</option></select>`,
+};
+
+const OColorStub = {
+  name: "OColor",
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template: `<input type="color" :data-test="$attrs['data-test']" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const OIconStub = {
+  name: "OIcon",
+  props: ["name", "size", "title"],
+  emits: ["click"],
+  template: `<i :data-test="$attrs['data-test']" :data-name="name" :class="$attrs.class" @click="$emit('click', $event)"></i>`,
+};
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive the dialog's primary/neutral buttons via emit.
@@ -104,6 +136,11 @@ describe("ValueMappingPopUp", () => {
         plugins: [i18n],
         stubs: {
           ODialog: ODialogStub,
+          OButton: OButtonStub,
+          OInput: OInputStub,
+          OSelect: OSelectStub,
+          OColor: OColorStub,
+          OIcon: OIconStub,
           draggable: {
             name: "draggable",
             template: "<div><slot></slot></div>",

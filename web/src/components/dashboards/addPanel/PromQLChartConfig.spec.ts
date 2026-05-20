@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock useDashboardPanel
 vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
@@ -523,7 +520,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const stickyColumnsSelect = wrapper.findComponent({ name: "QSelect" });
+      const stickyColumnsSelect = wrapper.findComponent({ name: "OSelect" });
       // Check if the component exists and has the disable prop
       const disabledSelect = wrapper
         .findAll('[data-test="dashboard-config-sticky-columns"]')
@@ -984,7 +981,7 @@ describe("PromQLChartConfig", () => {
     it("should render info tooltips for configurations", async () => {
       wrapper = createWrapper({ chartType: "pie" });
 
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
 

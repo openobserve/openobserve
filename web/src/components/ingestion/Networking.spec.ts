@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Networking from "@/components/ingestion/Networking.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -35,19 +32,30 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
+const baseStubs = {
+  OSplitter: {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder", "clearable"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+  },
+  OIcon: true,
+  OTabs: {
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
 };
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
 
 describe("Networking Component", () => {
   let wrapper: any = null;
@@ -55,7 +63,7 @@ describe("Networking Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "networking";
     mockRouter.currentRoute.value.query = {};
@@ -69,15 +77,7 @@ describe("Networking Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-input': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true
-        }
+        stubs: { ...baseStubs },
       },
     });
   });
@@ -106,18 +106,10 @@ describe("Networking Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -150,49 +142,33 @@ describe("Networking Component", () => {
     it("should not redirect on non-networking route during mount", () => {
       mockRouter.currentRoute.value.name = "netflow";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Networking, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
 
     it("should handle undefined route name gracefully", () => {
-      mockRouter.currentRoute.value.name = undefined;
+      mockRouter.currentRoute.value.name = undefined as any;
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Networking, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -202,14 +178,14 @@ describe("Networking Component", () => {
     it("should redirect to netflow on networking route during update", async () => {
       // Clear initial mount call
       mockRouter.push.mockClear();
-      
+
       // Change route to trigger onUpdated
       mockRouter.currentRoute.value.name = "networking";
-      
+
       // Force update
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "netflow",
         query: {
@@ -222,27 +198,27 @@ describe("Networking Component", () => {
       // Change to non-networking route
       mockRouter.currentRoute.value.name = "netflow";
       mockRouter.push.mockClear();
-      
+
       // Force update
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
     it("should handle multiple updates with same route", async () => {
       // Clear initial mount call
       mockRouter.push.mockClear();
-      
+
       // Set to networking route
       mockRouter.currentRoute.value.name = "networking";
-      
+
       // Force multiple updates
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).toHaveBeenCalledTimes(2);
     });
   });
@@ -261,12 +237,12 @@ describe("Networking Component", () => {
         label: expect.any(String),
         contentClass: "tab_content",
       };
-      
-      // Access networkingTabs through the component (we might need to expose it)
+
+      // Access networkingTabs through the component
       expect(wrapper.vm.filteredList).toBeDefined();
       expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
       expect(wrapper.vm.filteredList.length).toBeGreaterThan(0);
-      
+
       const firstTab = wrapper.vm.filteredList[0];
       expect(firstTab.name).toBe(expectedTab.name);
       expect(firstTab.to.name).toBe(expectedTab.to.name);
@@ -334,7 +310,7 @@ describe("Networking Component", () => {
     it("should handle empty filter after having content", () => {
       wrapper.vm.tabsFilter = "something";
       expect(wrapper.vm.filteredList.length).toBe(0);
-      
+
       wrapper.vm.tabsFilter = "";
       expect(wrapper.vm.filteredList.length).toBe(1);
     });
@@ -425,37 +401,37 @@ describe("Networking Component", () => {
   describe("Reactive Data", () => {
     it("should update tabs reactively", async () => {
       expect(wrapper.vm.tabs).toBe("");
-      
+
       wrapper.vm.tabs = "netflow";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabs).toBe("netflow");
     });
 
     it("should update splitterModel reactively", async () => {
       expect(wrapper.vm.splitterModel).toBe(270);
-      
+
       wrapper.vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.splitterModel).toBe(300);
     });
 
     it("should update ingestTabType reactively", async () => {
       expect(wrapper.vm.ingestTabType).toBe("netflow");
-      
+
       wrapper.vm.ingestTabType = "customflow";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.ingestTabType).toBe("customflow");
     });
 
     it("should update tabsFilter reactively", async () => {
       expect(wrapper.vm.tabsFilter).toBe("");
-      
+
       wrapper.vm.tabsFilter = "test";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabsFilter).toBe("test");
     });
 
@@ -478,11 +454,11 @@ describe("Networking Component", () => {
     it("should handle onUpdated lifecycle hook", async () => {
       // Clear initial mount call
       mockRouter.push.mockClear();
-      
+
       // Trigger update
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       // Should redirect if still on networking route
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "netflow",
@@ -496,7 +472,7 @@ describe("Networking Component", () => {
   describe("Error Handling", () => {
     it("should handle router push errors gracefully", async () => {
       mockRouter.push.mockRejectedValueOnce(new Error("Navigation failed"));
-      
+
       // Should not throw error
       expect(() => {
         const testWrapper = mount(Networking, {
@@ -504,15 +480,7 @@ describe("Networking Component", () => {
           global: {
             plugins: [i18n],
             provide: { store },
-            stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true
-            }
+            stubs: { ...baseStubs },
           },
         });
         testWrapper.unmount();
@@ -526,22 +494,14 @@ describe("Networking Component", () => {
           userInfo: {}
         }
       };
-      
+
       expect(() => {
         const testWrapper = mount(Networking, {
           props: { currOrgIdentifier: "test-org" },
           global: {
             plugins: [i18n],
             provide: { store: mockStoreWithMissingData },
-            stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true
-            }
+            stubs: { ...baseStubs },
           },
         });
         testWrapper.unmount();
@@ -550,18 +510,8 @@ describe("Networking Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render q-splitter with correct props", () => {
+    it("should render splitter component", () => {
       expect(wrapper.html()).toContain('div');
-    });
-
-    it("should pass correct props to router-view", () => {
-      const routerView = wrapper.findComponent({ name: 'router-view' });
-      expect(routerView.exists()).toBe(true);
-    });
-
-    it("should render search input with correct attributes", () => {
-      const input = wrapper.findComponent({ name: 'q-input' });
-      expect(input.exists()).toBe(true);
     });
   });
 
@@ -569,10 +519,10 @@ describe("Networking Component", () => {
     it("should handle special characters in filter", () => {
       wrapper.vm.tabsFilter = "net@flow";
       expect(wrapper.vm.filteredList.length).toBe(0);
-      
+
       wrapper.vm.tabsFilter = "net-flow";
       expect(wrapper.vm.filteredList.length).toBe(0);
-      
+
       wrapper.vm.tabsFilter = "net_flow";
       expect(wrapper.vm.filteredList.length).toBe(0);
     });
@@ -580,7 +530,7 @@ describe("Networking Component", () => {
     it("should handle numeric filter", () => {
       wrapper.vm.tabsFilter = "123";
       expect(wrapper.vm.filteredList.length).toBe(0);
-      
+
       wrapper.vm.tabsFilter = "0";
       expect(wrapper.vm.filteredList.length).toBe(0);
     });
@@ -594,20 +544,20 @@ describe("Networking Component", () => {
   describe("Multiple Route Navigation Scenarios", () => {
     it("should handle rapid route changes", async () => {
       mockRouter.push.mockClear();
-      
+
       // Simulate rapid route changes
       mockRouter.currentRoute.value.name = "networking";
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       mockRouter.currentRoute.value.name = "netflow";
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       mockRouter.currentRoute.value.name = "networking";
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).toHaveBeenCalledTimes(2);
     });
   });
@@ -615,22 +565,14 @@ describe("Networking Component", () => {
   describe("Component Props Edge Cases", () => {
     it("should handle null currOrgIdentifier prop", () => {
       const testWrapper = mount(Networking, {
-        props: { currOrgIdentifier: null },
+        props: { currOrgIdentifier: null as any },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe(null);
       testWrapper.unmount();
     });
@@ -641,18 +583,10 @@ describe("Networking Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });

@@ -16,11 +16,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 import CustomNode from "./CustomNode.vue";
-
-installQuasar({});
 
 // ---------------------------------------------------------------------------
 // i18n

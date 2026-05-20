@@ -169,18 +169,6 @@ describe('ScheduledDashboards', () => {
             name: 'NoData',
             template: '<div class="no-data-mock">No data available</div>'
           },
-          'q-input': {
-            name: 'q-input',
-            template: '<input class="q-input-mock" />',
-            props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
-            emits: ['update:modelValue']
-          },
-          'q-btn': {
-            name: 'q-btn',
-            template: '<button class="q-btn-mock"><slot /></button>',
-            props: ['class', 'padding', 'color', 'no-caps', 'label', 'round', 'flat', 'icon'],
-            emits: ['click']
-          },
           'OButton': {
             name: 'OButton',
             template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',

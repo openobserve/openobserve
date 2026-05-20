@@ -15,10 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
-
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 

@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // vi.mock is hoisted — the real module is never loaded
 vi.mock("../../../utils/zincutils", () => ({
@@ -25,8 +24,6 @@ vi.mock("../../../utils/zincutils", () => ({
 
 import NoPanel from "./NoPanel.vue";
 import { getImageURL } from "../../../utils/zincutils";
-
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,
@@ -40,14 +37,6 @@ const i18n = createI18n({
   },
 });
 
-// Stubs for Quasar components not under test
-const qBtnStub = {
-  template:
-    "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",
-  props: ["label", "stack", "padding", "outline", "icon"],
-  emits: ["click"],
-};
-
 const oBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot></slot></button>",
@@ -60,7 +49,6 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       stubs: {
-        "q-btn": qBtnStub,
         OButton: oBtnStub,
       },
     },

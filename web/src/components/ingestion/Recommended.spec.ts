@@ -1,27 +1,32 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import Recommended from "./Recommended.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
+// Mock router state
+const mockRouterState = {
+  name: "recommended",
+};
+
+const mockRouter = {
+  currentRoute: {
+    value: {
+      get name() {
+        return mockRouterState.name;
+      },
+      query: {},
+    },
+  },
+  push: vi.fn(),
+};
+
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+  useRoute: () => mockRouter.currentRoute.value,
+}));
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({
@@ -29,11 +34,32 @@ vi.mock("@/utils/zincutils", () => ({
   verifyOrganizationStatus: vi.fn(),
 }));
 
+const baseStubs = {
+  OSplitter: {
+    name: "OSplitter",
+    template: '<div class="o-splitter"><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OTabs: {
+    name: "OTabs",
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    name: "ORouteTab",
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
+};
+
 describe("Recommended", () => {
   let store: any;
-  let router: any;
 
   beforeEach(() => {
+    mockRouterState.name = "recommended";
+
     store = createStore({
       state: {
         selectedOrganization: {
@@ -45,138 +71,64 @@ describe("Recommended", () => {
       },
     });
 
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        { path: "/", name: "recommended", component: { template: "<div>Recommended</div>" } },
-        { path: "/kubernetes", name: "ingestFromKubernetes", component: { template: "<div>Kubernetes</div>" } },
-      ],
-    });
-
-    router.push("/");
-
     vi.clearAllMocks();
   });
 
-  it("should render the component", () => {
-    const wrapper = mount(Recommended, {
+  const createWrapper = () =>
+    mount(Recommended, {
       global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
+        plugins: [i18n, store],
+        stubs: { ...baseStubs },
       },
     });
 
+  it("should render the component", () => {
+    const wrapper = createWrapper();
     expect(wrapper.exists()).toBe(true);
   });
 
   it("should render splitter component", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
-    const splitter = wrapper.findComponent({ name: "QSplitter" });
+    const wrapper = createWrapper();
+    const splitter = wrapper.findComponent({ name: "OSplitter" });
     expect(splitter.exists()).toBe(true);
   });
 
   it("should render navigation tabs", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const tabs = wrapper.findComponent({ name: "OTabs" });
     expect(tabs.exists()).toBe(true);
   });
 
   it("should have vertical tabs", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const tabs = wrapper.findComponent({ name: "OTabs" });
     expect(tabs.props("orientation")).toBe("vertical");
   });
 
   it("should render router-view for content", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.html()).toContain("router-view");
   });
 
   it("should pass org identifier to router-view", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.vm.currentOrgIdentifier).toBe("org123");
   });
 
   it("should pass user email to router-view", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.vm.currentUserEmail).toBe("test@example.com");
   });
 
   it("should have recommended tabs array", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.vm.recommendedTabs).toBeDefined();
     expect(Array.isArray(wrapper.vm.recommendedTabs)).toBe(true);
     expect(wrapper.vm.recommendedTabs.length).toBeGreaterThan(0);
   });
 
   it("should include Kubernetes ingestion tab", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const kubernetesTab = wrapper.vm.recommendedTabs.find(
       (tab: any) => tab.name === "ingestFromKubernetes"
     );
@@ -184,15 +136,7 @@ describe("Recommended", () => {
   });
 
   it("should include Windows ingestion tab", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const windowsTab = wrapper.vm.recommendedTabs.find(
       (tab: any) => tab.name === "ingestFromWindows"
     );
@@ -200,15 +144,7 @@ describe("Recommended", () => {
   });
 
   it("should include Linux ingestion tab", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const linuxTab = wrapper.vm.recommendedTabs.find(
       (tab: any) => tab.name === "ingestFromLinux"
     );
@@ -216,15 +152,7 @@ describe("Recommended", () => {
   });
 
   it("should include AWS config tab", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const awsTab = wrapper.vm.recommendedTabs.find(
       (tab: any) => tab.name === "AWSConfig"
     );
@@ -232,15 +160,7 @@ describe("Recommended", () => {
   });
 
   it("should include traces/OTLP tab", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const tracesTab = wrapper.vm.recommendedTabs.find(
       (tab: any) => tab.name === "ingestFromTraces"
     );
@@ -248,42 +168,18 @@ describe("Recommended", () => {
   });
 
   it("should have card container styling", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     const cardContainer = wrapper.find(".card-container");
     expect(cardContainer.exists()).toBe(true);
   });
 
   it("should set splitter model", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.vm.splitterModel).toBe(270);
   });
 
   it("should compute filtered list correctly", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
+    const wrapper = createWrapper();
     expect(wrapper.vm.filteredList).toBeDefined();
     expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
   });

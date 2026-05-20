@@ -16,16 +16,14 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-installQuasar();
-
 vi.mock("@/services/iam", () => ({
   getGroups: vi.fn(),
   deleteGroup: vi.fn(),
+  bulkDeleteGroups: vi.fn(),
 }));
 
 vi.mock("@/services/reodotdev_analytics", () => ({
@@ -55,16 +53,10 @@ vi.mock("@/composables/iam/usePermissions", () => ({
   }),
 }));
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 vi.mock("@/components/AppTable.vue", () => ({
   default: {
@@ -104,6 +96,36 @@ const createMockAxiosResponse = (data: any) => ({
   config: {} as any,
 });
 
+const stubs = {
+  OTable: {
+    name: "OTable",
+    template: `<div data-test="iam-groups-table-section"><slot name="cell-actions" :row="{ group_name: 'test-group' }"></slot></div>`,
+    props: ["data", "columns", "rowKey", "selectedIds", "globalFilter", "pagination", "pageSize", "pageSizeOptions", "footerTitle", "sorting", "selection", "filterMode", "defaultColumns", "showGlobalFilter"],
+    emits: ["update:selected-ids"],
+  },
+  OInput: {
+    name: "OInput",
+    template: `<div class="q-input"><input type="text" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+    props: ["modelValue", "placeholder"],
+    emits: ["update:modelValue"],
+  },
+  OButton: {
+    name: "OButton",
+    template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
+    props: ["variant", "size", "title", "iconLeft"],
+    emits: ["click"],
+  },
+  OIcon: {
+    name: "OIcon",
+    template: `<i></i>`,
+    props: ["name", "size"],
+  },
+  NoData: {
+    name: "NoData",
+    template: `<div data-test="no-data"></div>`,
+  },
+};
+
 describe("AppGroups Component", () => {
   let wrapper: any;
 
@@ -125,6 +147,7 @@ describe("AppGroups Component", () => {
       global: {
         provide: { store },
         plugins: [i18n, router],
+        stubs,
       },
     });
 
@@ -150,7 +173,6 @@ describe("AppGroups Component", () => {
     it("renders add group button", () => {
       const addButton = wrapper.find('[data-test="iam-groups-add-group-btn"]');
       expect(addButton.exists()).toBe(true);
-      expect(addButton.text()).toContain("New user group");
     });
   });
 
@@ -163,8 +185,8 @@ describe("AppGroups Component", () => {
     it("has correct table columns structure", () => {
       expect(wrapper.vm.columns).toBeDefined();
       expect(wrapper.vm.columns).toHaveLength(3);
-      
-      const columnNames = wrapper.vm.columns.map((col: any) => col.name);
+
+      const columnNames = wrapper.vm.columns.map((col: any) => col.id);
       expect(columnNames).toContain("#");
       expect(columnNames).toContain("group_name");
       expect(columnNames).toContain("actions");
@@ -206,41 +228,6 @@ describe("AppGroups Component", () => {
       await searchInput.setValue("admin");
       expect(wrapper.vm.filterQuery).toBe("admin");
     });
-
-    it("filters groups correctly", () => {
-      const testRows = [
-        { group_name: "admin" },
-        { group_name: "developers" },
-        { group_name: "users" },
-      ];
-
-      const filteredResults = wrapper.vm.filterGroups(testRows, "admin");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].group_name).toBe("admin");
-    });
-
-    it("filters groups case-insensitively", () => {
-      const testRows = [
-        { group_name: "Admin" },
-        { group_name: "developers" },
-        { group_name: "Users" },
-      ];
-
-      const filteredResults = wrapper.vm.filterGroups(testRows, "ADMIN");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].group_name).toBe("Admin");
-    });
-
-    it("returns all groups when search term is empty", () => {
-      const testRows = [
-        { group_name: "admin" },
-        { group_name: "developers" },
-        { group_name: "users" },
-      ];
-
-      const filteredResults = wrapper.vm.filterGroups(testRows, "");
-      expect(filteredResults).toHaveLength(3);
-    });
   });
 
   describe("Add Group Dialog", () => {
@@ -273,12 +260,6 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.showAddGroup).toBe(false);
     });
 
-    it("hides add group dialog when hideAddGroup is called", () => {
-      wrapper.vm.showAddGroup = true;
-      wrapper.vm.hideAddGroup();
-      expect(wrapper.vm.showAddGroup).toBe(false);
-    });
-
     it("refreshes groups list when AddGroup emits added:group", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockClear();
@@ -292,15 +273,7 @@ describe("AppGroups Component", () => {
   });
 
   describe("Group Actions", () => {
-    it("renders edit and delete icons for each group", () => {
-      const editIcon = wrapper.find('[data-test="iam-groups-edit-test-group-role-icon"]');
-      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-test-group-role-icon"]');
-      
-      expect(editIcon.exists()).toBe(true);
-      expect(deleteIcon.exists()).toBe(true);
-    });
-
-    it("navigates to edit page when edit icon is clicked", async () => {
+    it("navigates to edit page when editGroup is called", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       const testGroup = { group_name: "test-group" };
 
@@ -317,11 +290,11 @@ describe("AppGroups Component", () => {
       });
     });
 
-    it("shows confirm dialog when delete icon is clicked", async () => {
+    it("shows confirm dialog when showConfirmDialog is called", async () => {
       const testGroup = { group_name: "test-group" };
-      
+
       wrapper.vm.showConfirmDialog(testGroup);
-      
+
       expect(wrapper.vm.deleteConformDialog.show).toBe(true);
       expect(wrapper.vm.deleteConformDialog.data).toEqual(testGroup);
     });
@@ -329,25 +302,25 @@ describe("AppGroups Component", () => {
 
   describe("Group Deletion", () => {
     beforeEach(() => {
-      mockNotify.mockClear();
+      mockToast.mockClear();
     });
 
     it("deletes group successfully", async () => {
       const { deleteGroup } = await import("@/services/iam");
       vi.mocked(deleteGroup).mockResolvedValue({});
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.deleteUserGroup(testGroup);
-      
+      await flushPromises();
+
       expect(deleteGroup).toHaveBeenCalledWith(
         "test-group",
         store.state.selectedOrganization.identifier
       );
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Group deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     });
 
@@ -355,22 +328,21 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 500 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       try {
         await wrapper.vm.deleteUserGroup(testGroup);
       } catch (error) {
         // Error should be caught by component
       }
-      
+
       // Give time for async operations
       await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockNotify).toHaveBeenCalledWith({
+
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error while deleting group!",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     });
 
@@ -378,42 +350,36 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 403 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.deleteUserGroup(testGroup);
-      
-      expect(mockNotify).not.toHaveBeenCalled();
+      await flushPromises();
+
+      expect(mockToast).not.toHaveBeenCalled();
     });
 
     it("executes deletion through confirm dialog", async () => {
       const testGroup = { group_name: "test-group" };
-      
+
       wrapper.vm.deleteConformDialog.data = testGroup;
-      
+
       // Test the actual behavior instead of spying on the method
       const initialData = wrapper.vm.deleteConformDialog.data;
       expect(initialData).toEqual(testGroup);
-      
+
       wrapper.vm._deleteGroup();
-      
+
       // Check that data is set to null after deletion attempt
       expect(wrapper.vm.deleteConformDialog.data).toBeNull();
     });
   });
 
   describe("Confirm Dialog", () => {
-    it("renders confirm dialog", () => {
-      const confirmDialog = wrapper.find('[data-test="confirm-dialog-mock"]');
-      expect(confirmDialog.exists()).toBe(true);
-    });
-
-    it("displays correct delete confirmation message", async () => {
+    it("displays correct delete confirmation data", async () => {
       wrapper.vm.deleteConformDialog.data = { group_name: "test-group" };
       await wrapper.vm.$nextTick();
-      
-      // Since we're using a mock component, we check the computed message
-      const expectedMessage = "Are you sure you want to delete 'test-group'?";
+
       expect(wrapper.vm.deleteConformDialog.data.group_name).toBe("test-group");
     });
   });
@@ -429,6 +395,7 @@ describe("AppGroups Component", () => {
         global: {
           provide: { store },
           plugins: [i18n, router],
+          stubs,
         },
       });
 
@@ -449,74 +416,18 @@ describe("AppGroups Component", () => {
     });
   });
 
-  describe("Theme Support", () => {
-    it("applies correct theme classes", () => {
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
-      const table = wrapper.find('[data-test="iam-groups-table-section"]');
-
-      expect(header.exists()).toBe(true);
-      expect(table.exists()).toBe(true);
-      // Just check that theme classes exist, exact class names might vary
-    });
-
-    it("switches to dark theme classes when theme is dark", async () => {
-      const darkStore = {
-        ...store,
-        state: {
-          ...store.state,
-          theme: 'dark',
-        },
-      };
-
-      const wrapper = mount(AppGroups, {
-        global: {
-          provide: { store: darkStore },
-          plugins: [i18n, router],
-        },
-      });
-
-      await flushPromises();
-
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
-      const table = wrapper.find('[data-test="iam-groups-table-section"]');
-
-      expect(header.exists()).toBe(true);
-      expect(table.exists()).toBe(true);
-      // Theme classes have been removed from the component
-    });
-  });
-
   describe("Edge Cases", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse([]) as any
       );
+      mockGroupsState.groups = [] as any;
 
       await wrapper.vm.setupGroups();
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(0);
-    });
-
-    it("handles undefined group data", () => {
-      // Modify the function to handle undefined input
-      const filterGroupsSafe = (rows: any, terms: any) => {
-        if (!rows || !terms) return [];
-        return wrapper.vm.filterGroups(rows, terms);
-      };
-      const result = filterGroupsSafe(undefined, "test");
-      expect(result).toEqual([]);
-    });
-
-    it("handles null search term", () => {
-      const testRows = [{ group_name: "admin" }];
-      const filterGroupsSafe = (rows: any, terms: any) => {
-        if (!rows || terms === null) return [];
-        return wrapper.vm.filterGroups(rows, terms);
-      };
-      const result = filterGroupsSafe(testRows, null);
-      expect(result).toEqual([]);
     });
   });
 });

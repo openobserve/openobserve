@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, beforeAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LogStream from "@/views/LogStream.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -23,8 +22,6 @@ import router from "@/test/unit/helpers/router";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 
-// Install Quasar plugins
-installQuasar();
 
 // Mock services
 vi.mock("@/services/stream", () => ({
@@ -50,7 +47,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getTimezoneOffset: () => 0,
     getTimezonesByOffset: () => [],
   };
-});
 
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({

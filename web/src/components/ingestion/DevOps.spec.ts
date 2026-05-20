@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DevOps from "@/components/ingestion/DevOps.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
@@ -35,18 +32,30 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
+const baseStubs = {
+  OSplitter: {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder", "clearable"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+  },
+  OIcon: true,
+  OTabs: {
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
 };
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar
-  };
-});
 
 describe("DevOps Component", () => {
   let wrapper: any = null;
@@ -54,7 +63,7 @@ describe("DevOps Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "devops";
     mockRouter.currentRoute.value.query = {};
@@ -68,16 +77,7 @@ describe("DevOps Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-input': true,
-          'OIcon': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true
-        }
+        stubs: { ...baseStubs },
       },
     });
   });
@@ -122,28 +122,19 @@ describe("DevOps Component", () => {
     });
 
     it("should not redirect when not on devops route", () => {
+      mockRouter.push.mockClear();
       mockRouter.currentRoute.value.name = "jenkins";
-      
+
       const testWrapper = mount(DevOps, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'OIcon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+          stubs: { ...baseStubs },
         },
       });
-      
-      // Only the initial call from the previous test should exist
-      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+
+      expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
   });
@@ -151,10 +142,10 @@ describe("DevOps Component", () => {
   describe("DevOps Tools Configuration", () => {
     it("should have correct DevOps tabs structure", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       expect(Array.isArray(filteredList)).toBe(true);
       expect(filteredList.length).toBe(4);
-      
+
       // Check if key DevOps tools are present
       const tabNames = filteredList.map((tab: any) => tab.name);
       expect(tabNames).toContain("jenkins");
@@ -166,16 +157,16 @@ describe("DevOps Component", () => {
     it("should have correct tab structure for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
       const firstTab = filteredList[0];
-      
+
       expect(firstTab).toHaveProperty("name");
       expect(firstTab).toHaveProperty("to");
       expect(firstTab).toHaveProperty("icon");
       expect(firstTab).toHaveProperty("label");
       expect(firstTab).toHaveProperty("contentClass", "tab_content");
-      
+
       // Check icon URL structure
       expect(firstTab.icon).toMatch(/^img:mock-images\/ingestion\//);
-      
+
       // Check to object structure
       expect(firstTab.to).toHaveProperty("name");
       expect(firstTab.to).toHaveProperty("query");
@@ -184,13 +175,13 @@ describe("DevOps Component", () => {
 
     it("should generate correct icons for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       const jenkinsTab = filteredList.find((tab: any) => tab.name === "jenkins");
       expect(jenkinsTab.icon).toBe("img:mock-images/ingestion/jenkins.svg");
-      
+
       const ansibleTab = filteredList.find((tab: any) => tab.name === "ansible");
       expect(ansibleTab.icon).toBe("img:mock-images/ingestion/ansible.svg");
-      
+
       const terraformTab = filteredList.find((tab: any) => tab.name === "terraform");
       expect(terraformTab.icon).toBe("img:mock-images/ingestion/terraform.svg");
 
@@ -203,11 +194,11 @@ describe("DevOps Component", () => {
     it("should filter DevOps tabs based on search input", async () => {
       // Initially should show all tabs
       expect(wrapper.vm.filteredList.length).toBe(4);
-      
+
       // Filter by "jenkins"
       wrapper.vm.tabsFilter = "jenkins";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
       filteredList.forEach((tab: any) => {
         expect(tab.label.toLowerCase()).toContain("jenkins");
@@ -218,10 +209,10 @@ describe("DevOps Component", () => {
       // Set filter then clear it
       wrapper.vm.tabsFilter = "terraform";
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
-      
+
       // Should show all tabs again
       expect(wrapper.vm.filteredList.length).toBe(4); // Total number of DevOps tabs
     });
@@ -229,7 +220,7 @@ describe("DevOps Component", () => {
     it("should be case insensitive", async () => {
       wrapper.vm.tabsFilter = "ANSIBLE";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
       const hasAnsible = filteredList.some((tab: any) => tab.name === "ansible");
       expect(hasAnsible).toBe(true);
@@ -238,14 +229,14 @@ describe("DevOps Component", () => {
     it("should handle no matches", async () => {
       wrapper.vm.tabsFilter = "nonexistenttool";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredList.length).toBe(0);
     });
 
     it("should filter by partial matches", async () => {
       wrapper.vm.tabsFilter = "git";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
       const hasGithub = filteredList.some((tab: any) => tab.name === "github-actions");
       expect(hasGithub).toBe(true);
@@ -276,7 +267,7 @@ describe("DevOps Component", () => {
     it("should include CI/CD tools", () => {
       const filteredList = wrapper.vm.filteredList;
       const cicdTools = ["jenkins", "github-actions"];
-      
+
       cicdTools.forEach(toolName => {
         const hasTool = filteredList.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
@@ -286,7 +277,7 @@ describe("DevOps Component", () => {
     it("should include Infrastructure as Code tools", () => {
       const filteredList = wrapper.vm.filteredList;
       const iacTools = ["terraform", "ansible"];
-      
+
       iacTools.forEach(toolName => {
         const hasTool = filteredList.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
@@ -301,7 +292,7 @@ describe("DevOps Component", () => {
   describe("Localization", () => {
     it("should use translation keys for tool labels", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       // The labels should be translated strings
       filteredList.forEach((tab: any) => {
         expect(typeof tab.label).toBe("string");
@@ -313,7 +304,7 @@ describe("DevOps Component", () => {
   describe("Tab Configuration Details", () => {
     it("should have correct route configuration for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       filteredList.forEach((tab: any) => {
         expect(tab.to.name).toBe(tab.name);
         expect(tab.to.query).toHaveProperty("org_identifier");
@@ -323,7 +314,7 @@ describe("DevOps Component", () => {
 
     it("should maintain consistent icon path structure", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       filteredList.forEach((tab: any) => {
         expect(tab.icon).toMatch(/^img:mock-images\/ingestion\/.*\.svg$/);
       });

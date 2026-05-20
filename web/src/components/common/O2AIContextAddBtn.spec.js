@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import O2AIContextAddBtn from './O2AIContextAddBtn.vue';
 import { getImageURL } from '@/utils/zincutils';
 import store from '@/test/unit/helpers/store';
@@ -22,9 +21,6 @@ const node = document.createElement('div');
 node.setAttribute('id', 'app');
 document.body.appendChild(node);
 
-// Install Quasar
-installQuasar();
-
 describe('O2AIContextAddBtn', () => {
   let wrapper;
 
@@ -35,15 +31,13 @@ describe('O2AIContextAddBtn', () => {
       ai_enabled: true
     };
 
-    // Mount component with Quasar
+    // Mount component
     wrapper = mount(O2AIContextAddBtn, {
       attachTo: document.body,
       global: {
         plugins: [],
         provide: { store },
-        stubs: {
-          'q-btn': false // Don't stub q-btn to test actual Quasar button
-        }
+        stubs: {}
       },
       props: {
         class: '',

@@ -15,10 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricCard from "@/components/rum/common/performance/MetricCard.vue";
 
-installQuasar();
 
 describe("MetricCard", () => {
   describe("Component rendering", () => {

@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OverrideConfigPopup from "@/components/dashboards/OverrideConfigPopup.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // ── ODialog / OButton stubs ──────────────────────────────────────────────────
 // Stubs preserve the slot content (so child rendering can be asserted) and
@@ -123,24 +120,6 @@ describe("OverrideConfigPopup", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          "q-select": {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
-            props: ["modelValue", "options"],
-            emits: ["update:modelValue"],
-          },
-          "q-input": {
-            template:
-              '<input :value="modelValue" :data-test="$attrs[\'data-test\']" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-checkbox": {
-            template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
           "OIcon": {
             template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },

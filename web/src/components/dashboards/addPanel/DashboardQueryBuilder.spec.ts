@@ -1,6 +1,5 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardQueryBuilder from "./DashboardQueryBuilder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -240,8 +239,6 @@ const i18n = createI18n({
   },
 });
 
-installQuasar();
-
 describe("DashboardQueryBuilder", () => {
   let wrapper: any;
   const dashboardData = {
@@ -317,15 +314,6 @@ describe("DashboardQueryBuilder", () => {
             name: "DynamicFunctionPopUp",
             template: "<div class='dynamic-function-popup'></div>",
           },
-          QIcon: true,
-          QTooltip: true,
-          QSeparator: true,
-          QBtn: true,
-          QBtnGroup: true,
-          QMenu: true,
-          QSelect: true,
-          QInput: true,
-          QCheckbox: true,
         },
       },
     });

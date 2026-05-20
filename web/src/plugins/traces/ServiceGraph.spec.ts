@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
 
@@ -59,7 +58,6 @@ const ODialogStub = defineComponent({
   },
 });
 
-installQuasar({
   plugins: [],
 });
 

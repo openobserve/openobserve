@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SinglePanelMove from "./SinglePanelMove.vue";
 
 // Mock external dependencies
@@ -110,8 +109,6 @@ const ODialogStub = {
     </div>
   `,
 };
-
-installQuasar();
 
 describe("SinglePanelMove", () => {
   let wrapper: VueWrapper<any>;
@@ -459,7 +456,8 @@ describe("SinglePanelMove", () => {
 
       expect(wrapper.emitted("update:ok")).toBeTruthy();
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
-      expect(wrapper.emitted("update:ok")?.[0]).toEqual(["tab1"]);
+      // selectedMoveTabId is initialized to the first option object {label, value}
+      expect(wrapper.emitted("update:ok")?.[0]).toEqual([{ label: "Tab 1", value: "tab1" }]);
     });
 
     it("should not emit update:ok when secondary (cancel) is clicked", async () => {
@@ -522,10 +520,8 @@ describe("SinglePanelMove", () => {
       const newTabData = { name: "New Tab", tabId: "new-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
-      expect(wrapper.vm.selectedMoveTabId).toEqual({
-        label: "New Tab",
-        value: "new-tab",
-      });
+      // refreshRequired sets selectedMoveTabId to the new tab's id (string)
+      expect(wrapper.vm.selectedMoveTabId).toBe("new-tab");
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
@@ -611,7 +607,8 @@ describe("SinglePanelMove", () => {
       const newTabData = { name: "Updated Tab", tabId: "updated-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
-      expect(wrapper.vm.selectedMoveTabId.value).toBe("updated-tab");
+      // refreshRequired sets the value to the new tab's id (string)
+      expect(wrapper.vm.selectedMoveTabId).toBe("updated-tab");
     });
   });
 

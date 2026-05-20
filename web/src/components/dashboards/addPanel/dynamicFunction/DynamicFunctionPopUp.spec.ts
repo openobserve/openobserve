@@ -15,12 +15,67 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
+const OTabsStub = {
+  name: "OTabs",
+  props: ["modelValue", "dense", "align"],
+  emits: ["update:modelValue"],
+  template: `<div :data-test="$attrs['data-test']"><slot /></div>`,
+};
+
+const OTabStub = {
+  name: "OTab",
+  props: ["name", "label"],
+  template: `<div :data-test="$attrs['data-test']" :data-name="name">{{ label }}</div>`,
+};
+
+const OTabPanelsStub = {
+  name: "OTabPanels",
+  props: ["modelValue", "animated"],
+  template: `<div><slot /></div>`,
+};
+
+const OTabPanelStub = {
+  name: "OTabPanel",
+  props: ["name"],
+  template: `<div><slot /></div>`,
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "iconLeft"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
+};
+
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options"],
+  emits: ["update:modelValue"],
+  template: `<select :data-test="$attrs['data-test']" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)"><option v-for="(opt, i) in options" :key="i" :value="opt">{{ opt }}</option></select>`,
+};
+
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "type", "placeholder"],
+  emits: ["update:modelValue"],
+  template: `<input :data-test="$attrs['data-test']" :value="modelValue" :type="type" :placeholder="placeholder" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const OCheckboxStub = {
+  name: "OCheckbox",
+  props: ["modelValue", "label"],
+  emits: ["update:modelValue"],
+  template: `<input type="checkbox" :data-test="$attrs['data-test']" :checked="modelValue" @change="$emit('update:modelValue', $event.target.checked)" />`,
+};
+
+const OSeparatorStub = {
+  name: "OSeparator",
+  template: `<hr />`,
+};
 
 const i18n = createI18n({
   legacy: false,
@@ -82,6 +137,15 @@ describe("DynamicFunctionPopUp", () => {
           RawQueryBuilder: true,
           SelectFunction: true,
           SortByBtnGrp: true,
+          OTabs: OTabsStub,
+          OTab: OTabStub,
+          OTabPanels: OTabPanelsStub,
+          OTabPanel: OTabPanelStub,
+          OButton: OButtonStub,
+          OSelect: OSelectStub,
+          OInput: OInputStub,
+          OCheckbox: OCheckboxStub,
+          OSeparator: OSeparatorStub,
         },
       },
     });
@@ -150,6 +214,15 @@ describe("DynamicFunctionPopUp", () => {
             RawQueryBuilder: true,
             SelectFunction: true,
             SortByBtnGrp: true,
+            OTabs: OTabsStub,
+            OTab: OTabStub,
+            OTabPanels: OTabPanelsStub,
+            OTabPanel: OTabPanelStub,
+            OButton: OButtonStub,
+            OSelect: OSelectStub,
+            OInput: OInputStub,
+            OCheckbox: OCheckboxStub,
+            OSeparator: OSeparatorStub,
           },
         },
       });
@@ -185,7 +258,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should apply correct theme class to input", () => {
       wrapper = createWrapper({}, mockStoreDark);
       const inputs = wrapper.findAll("input");
-      expect(inputs[0].classes()).toContain("bg-grey-10");
+      expect(inputs[0].classes()).toContain("tw:bg-gray-800");
     });
   });
 
@@ -534,13 +607,13 @@ describe("DynamicFunctionPopUp", () => {
     it("should apply light theme to inputs", () => {
       wrapper = createWrapper({}, mockStore);
       const inputs = wrapper.findAll("input");
-      expect(inputs[0].classes()).not.toContain("bg-grey-10");
+      expect(inputs[0].classes()).not.toContain("tw:bg-gray-800");
     });
 
     it("should apply dark theme to inputs", () => {
       wrapper = createWrapper({}, mockStoreDark);
       const inputs = wrapper.findAll("input");
-      expect(inputs[0].classes()).toContain("bg-grey-10");
+      expect(inputs[0].classes()).toContain("tw:bg-gray-800");
     });
 
     it("should access store theme", () => {

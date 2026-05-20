@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AwsMarketplaceSetup from "./AwsMarketplaceSetup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 describe("AwsMarketplaceSetup", () => {
   let store: any;

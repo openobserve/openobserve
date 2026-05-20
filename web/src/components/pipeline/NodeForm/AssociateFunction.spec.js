@@ -16,13 +16,10 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
-
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -34,6 +31,11 @@ let mockPipelineObj = {};
 
 vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
+}));
+
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args) => mockToast(...args),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -442,6 +444,7 @@ describe("AssociateFunction Component", () => {
   // -------------------------------------------------------------------------
   describe("saveFunction – create new function mode", () => {
     it("shows notify when createNewFunction is true but function name is empty", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.createNewFunction = true;
@@ -450,19 +453,17 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "", function: "" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       await wrapper.vm.saveFunction();
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Function Name is required",
-          color: "negative",
         })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("does NOT show notify when createNewFunction is true and function name is set", async () => {
+      mockToast.mockClear();
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.createNewFunction = true;
@@ -470,10 +471,8 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "newFunc", function: "def newFunc(r): return r" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
       await wrapper.vm.saveFunction();
-      expect(notifyMock).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
     });
   });
 

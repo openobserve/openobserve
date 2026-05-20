@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import AddEnrichmentTable from './AddEnrichmentTable.vue';
 
 // Mock dependencies
@@ -10,6 +9,9 @@ vi.mock('@/services/jstransform', () => ({
   default: {
     create_enrichment_table: vi.fn(() => Promise.resolve({
       data: { message: 'Enrichment table created successfully' }
+    })),
+    create_enrichment_table_from_url: vi.fn(() => Promise.resolve({
+      data: { message: 'Enrichment table from URL created successfully' }
     })),
   },
 }));
@@ -20,20 +22,16 @@ vi.mock('@/services/segment_analytics', () => ({
   },
 }));
 
-const mockNotify = vi.fn(() => vi.fn()); // Return a dismiss function
-const mockQuasar = {
-  notify: mockNotify,
-};
+vi.mock('@/services/reodotdev_analytics', () => ({
+  useReo: () => ({
+    track: vi.fn(),
+  }),
+}));
 
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-  };
-});
-
-installQuasar({});
+const mockToast = vi.fn(() => vi.fn());
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 describe('AddEnrichmentTable.vue', () => {
   let wrapper: any;
@@ -74,6 +72,9 @@ describe('AddEnrichmentTable.vue', () => {
             appendData: 'Append Data',
             cancel: 'Cancel',
             save: 'Save',
+            dataSource: 'Data Source',
+            uploadFile: 'Upload File',
+            fromUrl: 'From URL',
           },
         },
       },
@@ -83,6 +84,7 @@ describe('AddEnrichmentTable.vue', () => {
       props: {
         modelValue: {
           name: '',
+          source: 'file',
           file: '',
           append: false,
         },
@@ -90,38 +92,36 @@ describe('AddEnrichmentTable.vue', () => {
         ...propsData,
       },
       global: {
-        plugins: [store, i18n, ],
+        plugins: [store, i18n],
         stubs: {
-          'q-form': {
-            template: '<form @submit.prevent="$attrs.onSubmit && $attrs.onSubmit()"><slot /></form>',
-          },
-          'q-input': {
-            template: '<input v-model="modelValue" :readonly="readonly" :disabled="disable" />',
-            props: ['modelValue', 'label', 'rules', 'readonly', 'disable'],
+          OInput: {
+            template: '<input :value="modelValue" :readonly="readonly" :disabled="disabled" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ['modelValue', 'label', 'readonly', 'disabled', 'error', 'errorMessage', 'placeholder'],
             emits: ['update:modelValue'],
           },
-          'q-file': {
-            template: '<div class="q-file"><slot /></div>',
-            props: ['modelValue', 'label', 'rules'],
+          OFile: {
+            template: '<div class="o-file"><slot /></div>',
+            props: ['modelValue', 'label', 'accept', 'error', 'errorMessage'],
             emits: ['update:modelValue'],
           },
-          'q-toggle': {
-            template: '<input type="checkbox" v-model="modelValue" />',
+          OSwitch: {
+            template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
             props: ['modelValue', 'label'],
             emits: ['update:modelValue'],
           },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :type="type">{{ label }}<slot /></button>',
-            props: ['label', 'type'],
+          OOptionGroup: {
+            template: '<div class="o-option-group"></div>',
+            props: ['modelValue', 'options', 'orientation'],
+            emits: ['update:modelValue'],
+          },
+          OButton: {
+            template: '<button @click="$emit(\'click\', $event)" :disabled="disabled"><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'loading'],
             emits: ['click'],
           },
-          'q-separator': {
-            template: '<hr />',
-          },
-          'OIcon': {
-            template: '<i></i>',
-            props: ['name'],
-          },
+          OSeparator: { template: '<hr />' },
+          OIcon: { template: '<i></i>', props: ['name', 'color', 'size'] },
+          OCard: { template: '<div class="o-card"><slot /></div>' },
         },
       },
     });
@@ -140,14 +140,14 @@ describe('AddEnrichmentTable.vue', () => {
   describe('Component Initialization', () => {
     it('should render the component with default configuration', () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.text-h6').text()).toBe('Add Enrichment Table');
+      expect(wrapper.text()).toContain('Add Enrichment Table');
     });
 
     it('should initialize with correct default values', () => {
       wrapper = createWrapper();
-      
+
       expect((wrapper.vm as any).formData.name).toBe('');
       expect((wrapper.vm as any).formData.file).toBe('');
       expect((wrapper.vm as any).formData.append).toBe(false);
@@ -155,19 +155,20 @@ describe('AddEnrichmentTable.vue', () => {
 
     it('should render update mode when isUpdating is true', () => {
       wrapper = createWrapper({ isUpdating: true });
-      
-      expect(wrapper.find('.text-h6').text()).toBe('Update Enrichment Table');
+
+      expect(wrapper.text()).toContain('Update Enrichment Table');
     });
 
     it('should initialize with provided modelValue', () => {
       const modelValue = {
         name: 'test-table',
+        source: 'file',
         file: 'test.csv',
         append: true,
       };
-      
+
       wrapper = createWrapper({ modelValue });
-      
+
       expect((wrapper.vm as any).formData.name).toBe('test-table');
       expect((wrapper.vm as any).formData.file).toBe('test.csv');
       expect((wrapper.vm as any).formData.append).toBe(true);
@@ -185,7 +186,7 @@ describe('AddEnrichmentTable.vue', () => {
     });
 
     it('should render file upload field', () => {
-      const fileInput = wrapper.find('.q-file');
+      const fileInput = wrapper.find('.o-file');
       expect(fileInput.exists()).toBe(true);
     });
 
@@ -207,11 +208,11 @@ describe('AddEnrichmentTable.vue', () => {
     });
 
     it('should disable name field in update mode', () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         isUpdating: true,
-        modelValue: { name: 'existing-table', file: '', append: false }
+        modelValue: { name: 'existing-table', source: 'file', file: '', append: false }
       });
-      
+
       // Check if the component is in update mode
       expect((wrapper.vm as any).isUpdating).toBe(true);
       expect((wrapper.vm as any).disableColor).toBe('grey-5');
@@ -233,23 +234,24 @@ describe('AddEnrichmentTable.vue', () => {
     it('should emit cancel event when cancel button is clicked', async () => {
       const cancelBtn = wrapper.findAll('button')[0];
       await cancelBtn.trigger('click');
-      
+
       expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 
     it('should call onSubmit when form is submitted', async () => {
       const onSubmitSpy = vi.spyOn(wrapper.vm, 'onSubmit');
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       // Call onSubmit directly since form submission might not work with stubs
       await (wrapper.vm as any).onSubmit();
-      
+
       expect(onSubmitSpy).toHaveBeenCalled();
     });
   });
@@ -262,7 +264,7 @@ describe('AddEnrichmentTable.vue', () => {
     it('should validate required name field', () => {
       // Test that rules function exists and works
       const rules = [(val: any) => !!val || 'Field is required!'];
-      
+
       expect(rules[0]('')).toBe('Field is required!');
       expect(rules[0]('test-name')).toBe(true);
     });
@@ -270,9 +272,35 @@ describe('AddEnrichmentTable.vue', () => {
     it('should validate required file field', () => {
       // Test that rules function exists and works
       const rules = [(val: any) => !!val || 'CSV File is required!'];
-      
+
       expect(rules[0]('')).toBe('CSV File is required!');
       expect(rules[0]('test.csv')).toBe(true);
+    });
+
+    it('should set nameError when name is missing', async () => {
+      wrapper = createWrapper();
+      (wrapper.vm as any).formData = {
+        name: '',
+        source: 'file',
+        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
+        append: false,
+      };
+
+      await (wrapper.vm as any).onSubmit();
+      expect((wrapper.vm as any).nameError).toBe('Field is required!');
+    });
+
+    it('should set fileError when file is missing', async () => {
+      wrapper = createWrapper();
+      (wrapper.vm as any).formData = {
+        name: 'test-table',
+        source: 'file',
+        file: '',
+        append: false,
+      };
+
+      await (wrapper.vm as any).onSubmit();
+      expect((wrapper.vm as any).fileError).toBe('CSV File is required!');
     });
   });
 
@@ -284,16 +312,17 @@ describe('AddEnrichmentTable.vue', () => {
     it('should call create_enrichment_table service on successful submit', async () => {
       const jsTransformService = await import('@/services/jstransform');
       const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table');
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+
       expect(createSpy).toHaveBeenCalledWith(
         'test-org-id',
         'test-table',
@@ -306,34 +335,33 @@ describe('AddEnrichmentTable.vue', () => {
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(wrapper.emitted('update:list')).toBeTruthy();
     });
 
-    it('should show success notification on successful submission', async () => {
+    it('should show loading toast on submission', async () => {
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
-      // Check that notify was called twice: once for loading, once for success
-      expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+
+      // Check that toast was called with loading
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'loading',
         message: 'Please wait...',
         timeout: 2000,
-      });
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
-        message: 'Enrichment table created successfully',
       });
     });
 
@@ -341,12 +369,14 @@ describe('AddEnrichmentTable.vue', () => {
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect((wrapper.vm as any).formData.name).toBe('');
       expect((wrapper.vm as any).formData.file).toBe('');
       expect((wrapper.vm as any).formData.append).toBe(false);
@@ -370,61 +400,64 @@ describe('AddEnrichmentTable.vue', () => {
           },
         },
       };
-      
+
       // Mock the service to reject
       vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect((wrapper.vm as any).compilationErr).toBe('Invalid CSV format');
     });
 
     it('should set compilationErr from error message when response data is missing', async () => {
       const jsTransformService = await import('@/services/jstransform');
       const error = new Error('Direct error message');
-      
+
       vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect((wrapper.vm as any).compilationErr).toBe('Direct error message');
     });
 
     it('should set compilationErr to "Unknown error" when no error details available', async () => {
       const jsTransformService = await import('@/services/jstransform');
       const error = {};
-      
+
       vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect((wrapper.vm as any).compilationErr).toBe('Unknown error');
     });
 
@@ -439,46 +472,48 @@ describe('AddEnrichmentTable.vue', () => {
           },
         },
       };
-      
+
       const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       try {
         await (wrapper.vm as any).onSubmit();
       } catch (e) {
         // Expected to fail
       }
-      
+
       expect(createSpy).toHaveBeenCalled();
     });
 
     it('should show default error message when error details are missing', async () => {
       const jsTransformService = await import('@/services/jstransform');
       const error = new Error('Network error');
-      
+
       const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       try {
         await (wrapper.vm as any).onSubmit();
       } catch (e) {
         // Expected to fail
       }
-      
+
       expect(createSpy).toHaveBeenCalled();
     });
   });
@@ -491,16 +526,17 @@ describe('AddEnrichmentTable.vue', () => {
     it('should track save button click event', async () => {
       const segment = await import('@/services/segment_analytics');
       const trackSpy = vi.spyOn(segment.default, 'track');
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+
       expect(trackSpy).toHaveBeenCalledWith('Button Click', {
         button: 'Save Enrichment Table',
         user_org: 'test-org-id',
@@ -516,23 +552,24 @@ describe('AddEnrichmentTable.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should show loading notification during submission', async () => {
+    it('should show loading toast during submission', async () => {
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       const submitPromise = (wrapper.vm as any).onSubmit();
-      
-      // Check if loading notification was called
-      expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+
+      // Check if loading toast was called
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'loading',
         message: 'Please wait...',
         timeout: 2000,
       });
-      
+
       await submitPromise;
     });
   });
@@ -541,42 +578,45 @@ describe('AddEnrichmentTable.vue', () => {
     it('should accept modelValue prop', () => {
       const modelValue = {
         name: 'test-table',
+        source: 'file',
         file: 'test.csv',
         append: true,
       };
-      
+
       wrapper = createWrapper({ modelValue });
-      
+
       expect(wrapper.props('modelValue')).toEqual(modelValue);
     });
 
     it('should accept isUpdating prop', () => {
       wrapper = createWrapper({ isUpdating: true });
-      
+
       expect(wrapper.props('isUpdating')).toBe(true);
     });
 
     it('should emit cancel:hideform event', async () => {
       wrapper = createWrapper();
-      
+
       const cancelBtn = wrapper.findAll('button')[0];
       await cancelBtn.trigger('click');
-      
+
       expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 
     it('should emit update:list event on successful submission', async () => {
       wrapper = createWrapper();
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(wrapper.emitted('update:list')).toBeTruthy();
     });
   });
@@ -589,23 +629,24 @@ describe('AddEnrichmentTable.vue', () => {
     it('should display compilation errors', async () => {
       (wrapper.vm as any).compilationErr = 'Test error message';
       await wrapper.vm.$nextTick();
-      
+
       const errorElement = wrapper.find('pre');
       expect(errorElement.text()).toBe('Test error message');
     });
 
     it('should clear compilation errors on successful submission', async () => {
       (wrapper.vm as any).compilationErr = 'Previous error';
-      
+
       // Set form data
       (wrapper.vm as any).formData = {
         name: 'test-table',
+        source: 'file',
         file: new File(['test'], 'test.csv', { type: 'text/csv' }),
         append: false,
       };
-      
+
       await (wrapper.vm as any).onSubmit();
-      
+
       // Error should remain as it's only cleared on error in catch block, not success
       // The component doesn't explicitly clear it on success
       expect((wrapper.vm as any).compilationErr).toBe('Previous error');
@@ -616,36 +657,38 @@ describe('AddEnrichmentTable.vue', () => {
     it('should set append to false by default in update mode', () => {
       const modelValue = {
         name: 'existing-table',
+        source: 'file',
         file: 'existing.csv',
         // append is undefined
       };
-      
-      wrapper = createWrapper({ 
+
+      wrapper = createWrapper({
         isUpdating: true,
-        modelValue 
+        modelValue
       });
-      
+
       expect((wrapper.vm as any).formData.append).toBe(false);
     });
 
     it('should preserve existing append value in update mode', () => {
       const modelValue = {
         name: 'existing-table',
+        source: 'file',
         file: 'existing.csv',
         append: true,
       };
-      
-      wrapper = createWrapper({ 
+
+      wrapper = createWrapper({
         isUpdating: true,
-        modelValue 
+        modelValue
       });
-      
+
       expect((wrapper.vm as any).formData.append).toBe(true);
     });
 
     it('should set disable color in update mode', () => {
       wrapper = createWrapper({ isUpdating: true });
-      
+
       expect((wrapper.vm as any).disableColor).toBe('grey-5');
     });
   });
@@ -670,7 +713,7 @@ describe('AddEnrichmentTable.vue', () => {
       // Call editorUpdate
       await (wrapper.vm as any).editorUpdate(mockEvent);
       await wrapper.vm.$nextTick();
-      
+
       // Verify the function was updated
       expect((wrapper.vm as any).formData.function).toBe('new function content');
     });
@@ -690,7 +733,7 @@ describe('AddEnrichmentTable.vue', () => {
       // Call editorUpdate
       await (wrapper.vm as any).editorUpdate(mockEvent);
       await wrapper.vm.$nextTick();
-      
+
       // Verify the function was updated to empty string
       expect((wrapper.vm as any).formData.function).toBe('');
     });
@@ -710,7 +753,7 @@ describe('AddEnrichmentTable.vue', () => {
       // Call editorUpdate
       await (wrapper.vm as any).editorUpdate(mockEvent);
       await wrapper.vm.$nextTick();
-      
+
       // Verify the function was updated to null
       expect((wrapper.vm as any).formData.function).toBe(null);
     });

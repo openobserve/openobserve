@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LabelFilterEditor from "./LabelFilterEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Mock useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({

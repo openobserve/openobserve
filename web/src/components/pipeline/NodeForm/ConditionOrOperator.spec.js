@@ -1,12 +1,14 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Condition from "./Condition.vue";
 
-installQuasar();
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args) => mockToast(...args),
+}));
 
 // Mock the services and composables
 vi.mock("@/services/search", () => ({
@@ -134,9 +136,6 @@ describe("Condition Component - OR Operator Tests", () => {
         }
       }
     });
-
-    const notifyMock = vi.fn();
-    wrapper.vm.$q.notify = notifyMock;
 
     await flushPromises();
     await wrapper.vm.getFields();

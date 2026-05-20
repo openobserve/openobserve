@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -173,31 +172,6 @@ vi.mock("vue-i18n", async () => {
   };
 });
 
-// Global Quasar mock instances
-const mockQuasarFullscreenRequest = vi.fn().mockReturnValue(Promise.resolve());
-const mockQuasarFullscreenExit = vi.fn().mockReturnValue(Promise.resolve());
-const mockQuasarNotify = vi.fn();
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      fullscreen: {
-        isActive: false,
-        request: () => Promise.resolve(),
-        exit: () => Promise.resolve(),
-      },
-      notify: mockQuasarNotify,
-    }),
-  };
-});
-
-// Export Quasar mocks for use in tests
-global.mockQuasarFullscreenRequest = mockQuasarFullscreenRequest;
-global.mockQuasarFullscreenExit = mockQuasarFullscreenExit;
-global.mockQuasarNotify = mockQuasarNotify;
-
 // Global notification mock instances
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
@@ -256,8 +230,6 @@ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
-
 describe("ViewDashboard", () => {
   let wrapper: any;
 
@@ -269,9 +241,6 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
-    global.mockQuasarFullscreenRequest.mockClear();
-    global.mockQuasarFullscreenExit.mockClear();
-    global.mockQuasarNotify.mockClear();
     global.mockShowPositiveNotification.mockClear();
     global.mockShowErrorNotification.mockClear();
     global.mockShowConflictErrorNotificationWithRefreshBtn.mockClear();
@@ -640,6 +609,13 @@ describe("ViewDashboard", () => {
   });
 
   describe("Fullscreen Functionality", () => {
+    beforeEach(() => {
+      document.documentElement.requestFullscreen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      document.exitFullscreen = vi.fn().mockResolvedValue(undefined);
+    });
+
     it("should toggle fullscreen mode when toggleFullscreen is called", async () => {
       wrapper = createWrapper();
       await flushPromises();

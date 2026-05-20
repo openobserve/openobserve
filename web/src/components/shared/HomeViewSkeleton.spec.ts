@@ -16,11 +16,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import HomeViewSkeleton from "./HomeViewSkeleton.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import SkeletonBox from "./SkeletonBox.vue";
-
-installQuasar();
 
 describe("HomeViewSkeleton", () => {
   let store: any;

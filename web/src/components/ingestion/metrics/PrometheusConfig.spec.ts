@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PrometheusConfig from "./PrometheusConfig.vue";
 
 // Mock dependencies
@@ -36,8 +35,6 @@ vi.mock("@/components/CopyContent.vue", () => ({
     props: ["content"]
   }
 }));
-
-installQuasar();
 
 describe("PrometheusConfig.vue", () => {
   let store: any;
@@ -187,7 +184,7 @@ describe("PrometheusConfig.vue", () => {
 
   describe("Template Rendering", () => {
     it("should render main container with correct class", () => {
-      const container = wrapper.find(".q-pa-sm");
+      const container = wrapper.find(".tw\\:p-2");
       expect(container.exists()).toBe(true);
     });
 

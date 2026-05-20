@@ -15,24 +15,23 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { ref } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
-
-// ─── Quasar mock — override useQuasar with a notify spy ────────────────────
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
+// ─── copyToClipboard mock ─────────────────────────────────────────────────
+const { mockCopyToClipboard, mockToast } = vi.hoisted(() => ({
+  mockCopyToClipboard: vi.fn(),
+  mockToast: vi.fn(),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify, dialog: vi.fn() }),
-  };
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // ─── useTraceDetails mock — tests control return values per test ───────────
 const { mockUseTraceDetails } = vi.hoisted(() => ({
@@ -48,7 +47,7 @@ import TraceErrorTab from "./TraceErrorTab.vue";
 // ─── Default mock helpers ──────────────────────────────────────────────────
 
 function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
-  return {
+  const values = {
     hasSpanError: false,
     hasExceptionEvents: [] as any[],
     spanStatusCode: null as string | null,
@@ -61,6 +60,10 @@ function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
     statusCodeTitle: "" as string,
     ...overrides,
   };
+  // Wrap all values in refs since the composable returns refs
+  return Object.fromEntries(
+    Object.entries(values).map(([k, v]) => [k, ref(v)]),
+  );
 }
 
 function createExceptionEvent(overrides: Record<string, unknown> = {}) {
@@ -665,7 +668,11 @@ describe("TraceErrorTab", () => {
         );
       });
 
-      it("should call clipboard.writeText with the stacktrace text", async () => {
+      beforeEach(() => {
+        mockCopyToClipboard.mockResolvedValue(true);
+      });
+
+      it("should call copyToClipboard with the stacktrace text", async () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
@@ -675,12 +682,13 @@ describe("TraceErrorTab", () => {
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect(mockCopyToClipboard).toHaveBeenCalledWith(
           exceptionEvent1["exception.stacktrace"],
+          expect.any(Object),
         );
       });
 
-      it("should show a success notification after copying", async () => {
+      it("should pass success/error messages to copyToClipboard", async () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
@@ -688,10 +696,11 @@ describe("TraceErrorTab", () => {
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockNotify).toHaveBeenCalledWith(
+        expect(mockCopyToClipboard).toHaveBeenCalledWith(
+          expect.any(String),
           expect.objectContaining({
-            message: "Stacktrace copied to clipboard",
-            color: "positive",
+            successMessage: expect.any(String),
+            errorMessage: expect.any(String),
           }),
         );
       });

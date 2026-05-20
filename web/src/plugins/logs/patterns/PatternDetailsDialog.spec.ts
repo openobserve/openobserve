@@ -15,13 +15,10 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar({
   plugins: [],
 });
 

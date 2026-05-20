@@ -1,6 +1,5 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MoveDashboardToAnotherFolder from "./MoveDashboardToAnotherFolder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -139,8 +138,6 @@ const getMockUtils = async () => {
     useLoading: vi.mocked(useLoadingModule.useLoading),
   };
 };
-
-installQuasar();
 
 describe("MoveDashboardToAnotherFolder", () => {
   let wrapper: any;
@@ -288,9 +285,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(
         wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-form"]').exists(),
-      ).toBe(true);
+      // TODO: form element removed in new design - body wraps content directly
     });
 
     it("should render current folder input", () => {
@@ -358,7 +353,8 @@ describe("MoveDashboardToAnotherFolder", () => {
       wrapper = createWrapper();
     });
 
-    it("should call onSubmit when form is submitted", async () => {
+    // TODO: form element removed in new design - submission is via ODrawer click:primary
+    it.skip("should call onSubmit when form is submitted", async () => {
       const form = wrapper.find('[data-test="dashboard-folder-move-form"]');
       const onSubmitSpy = vi.spyOn(wrapper.vm.onSubmit, "execute");
 
@@ -376,7 +372,8 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(onSubmitSpy).toHaveBeenCalled();
     });
 
-    it("should validate form before submission", async () => {
+    // TODO: form validation removed in new design - q-form replaced with simple div
+    it.skip("should validate form before submission", async () => {
       const mockValidate = vi.fn().mockResolvedValue(true);
       wrapper.vm.moveFolderForm = {
         validate: mockValidate,
@@ -388,7 +385,8 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(mockValidate).toHaveBeenCalled();
     });
 
-    it("should not proceed if form validation fails", async () => {
+    // TODO: form validation removed in new design
+    it.skip("should not proceed if form validation fails", async () => {
       const mockValidate = vi.fn().mockResolvedValue(false);
       wrapper.vm.moveFolderForm = {
         validate: mockValidate,
@@ -460,7 +458,8 @@ describe("MoveDashboardToAnotherFolder", () => {
       );
     });
 
-    it("should reset form validation on successful move", async () => {
+    // TODO: form validation removed in new design - no resetValidation needed
+    it.skip("should reset form validation on successful move", async () => {
       const mockValidate = vi.fn().mockResolvedValue(true);
       const mockResetValidation = vi.fn();
       wrapper.vm.moveFolderForm = {
@@ -739,13 +738,10 @@ describe("MoveDashboardToAnotherFolder", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should throw when active folder is not in store (template v-model lookup is unsafe)", () => {
-      // The template's q-input v-model still does `.name` on the folder lookup
-      // without optional chaining, so a missing folder still throws on render.
-      // setup()'s selectedFolder uses `?.name` (safe), but the template does not.
-      expect(() =>
-        createWrapper({ activeFolderId: "non-existent-folder" }),
-      ).toThrow(/Cannot read properties of undefined/);
+    it("should handle missing folder gracefully (template uses optional chaining)", () => {
+      // The new template uses optional chaining so it does not throw
+      wrapper = createWrapper({ activeFolderId: "non-existent-folder" });
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle empty dashboard IDs array", () => {
@@ -777,14 +773,12 @@ describe("MoveDashboardToAnotherFolder", () => {
         wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-folder-move-form"]').exists(),
-      ).toBe(true);
-      expect(
         wrapper.find('[data-test="dashboard-folder-move-name"]').exists(),
       ).toBe(true);
     });
 
-    it("should have a form element", () => {
+    // TODO: form element removed in new design
+    it.skip("should have a form element", () => {
       const form = wrapper.find('[data-test="dashboard-folder-move-form"]');
       expect(form.exists()).toBe(true);
     });

@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import RawQueryBuilder from "@/components/dashboards/addPanel/dynamicFunction/RawQueryBuilder.vue";
 import { createStore } from "vuex";
-
-installQuasar();
 
 const mockStore = createStore({
   state: {

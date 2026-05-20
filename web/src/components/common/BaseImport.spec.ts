@@ -17,10 +17,8 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import BaseImport from "@/components/common/BaseImport.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
-installQuasar();
 
 // ─── Mock heavy dependencies ──────────────────────────────────────────────────
 
@@ -57,27 +55,7 @@ const globalConfig = {
       props: ["tabs", "activeTab"],
       emits: ["update:active-tab"],
     },
-    "q-btn": {
-      template:
-        '<button :data-test="$attrs[\'data-test\']" :disabled="disable || loading" @click="$emit(\'click\')">{{ label }}<slot /></button>',
-      props: ["label", "disable", "loading"],
-    },
-    "q-splitter": {
-      template: '<div class="q-splitter-stub"><slot name="before" /><slot name="after" /></div>',
-    },
-    "q-form": {
-      template: '<form @submit.prevent="$emit(\'submit\')"><slot /></form>',
-    },
-    "q-input": {
-      template:
-        '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-      props: ["modelValue"],
-    },
-    "q-file": {
-      template: '<div class="q-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
-    },
     "OIcon": { template: '<i :class="name" />', props: ["name"] },
-    "q-separator": { template: "<hr />" },
   },
   plugins: [i18n],
 };

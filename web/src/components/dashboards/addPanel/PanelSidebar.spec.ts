@@ -15,10 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelSidebar from "./PanelSidebar.vue";
-
-installQuasar();
 
 describe("PanelSidebar", () => {
   let wrapper: VueWrapper<any>;
@@ -38,13 +35,13 @@ describe("PanelSidebar", () => {
             props: ["name"],
             inheritAttrs: false,
           },
-          "q-btn": {
-            template: '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" class="q-btn" :class="$attrs.class" :icon="icon"><slot /></button>',
-            props: ["square", "icon"],
+          "OButton": {
+            template: '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" :class="$attrs.class" :data-icon-left="iconLeft"><slot name="icon-left" />{{ icon }}{{ iconLeft }}<slot /></button>',
+            props: ["square", "icon", "variant", "size", "iconLeft"],
             emits: ["click"],
             inheritAttrs: false,
           },
-          "q-separator": {
+          "OSeparator": {
             template: '<div class="q-separator"></div>',
           },
         },
@@ -134,10 +131,10 @@ describe("PanelSidebar", () => {
 
     it("should render expand icon in collapsed state", () => {
       wrapper = createWrapper({ modelValue: false });
-      
+
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.exists()).toBe(true);
-      expect(icon.attributes("name")).toBe("expand_all");
+      expect(icon.attributes("name")).toBe("expand-all");
       expect(icon.classes()).toContain("collapsed-icon");
       expect(icon.classes()).toContain("rotate-90");
     });
@@ -179,8 +176,8 @@ describe("PanelSidebar", () => {
 
       const collapseBtn = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
       expect(collapseBtn.exists()).toBe(true);
-      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as OIcon
-      expect(collapseBtn.html()).toContain("unfold_less");
+      // OButton uses icon-left prop with the icon name
+      expect(collapseBtn.html()).toContain("unfold-less");
       // OButton applies tw:rotate-90 from the class attr; collapse-button is only a CSS definition
       expect(collapseBtn.classes()).toContain("tw:rotate-90");
     });
@@ -408,12 +405,12 @@ describe("PanelSidebar", () => {
           plugins: [],
           stubs: {
             "OIcon": true,
-            "q-btn": true,
-            "q-separator": true,
+            "OButton": true,
+            "OSeparator": true,
           },
         },
       });
-      
+
       expect(wrapper.find(".sidebar-content").exists()).toBe(true);
     });
   });

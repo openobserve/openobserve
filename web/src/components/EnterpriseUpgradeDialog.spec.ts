@@ -23,10 +23,7 @@ import {
   vi,
 } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
-
-installQuasar();
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -61,15 +58,11 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush }),
 }));
 
-// Mock useQuasar (notify is exercised by navigateToLicense error path).
+// Mock toast (used by navigateToLicense error path).
 const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<typeof import("quasar")>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 import config from "@/aws-exports";
 import EnterpriseUpgradeDialog from "@/components/EnterpriseUpgradeDialog.vue";
@@ -137,8 +130,11 @@ const createWrapper = (props: Record<string, any> = {}) =>
           template: '<i data-test-stub="OIcon" :data-name="name"></i>',
           props: ["name", "size"],
         },
-        "q-tooltip": {
-          template: '<div data-test-stub="q-tooltip"><slot /></div>',
+        OTooltip: {
+          template: '<div data-test-stub="o-tooltip"><slot /></div>',
+        },
+        OSkeleton: {
+          template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"></div>',
         },
       },
     },
@@ -598,7 +594,7 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(mockRouterPush).not.toHaveBeenCalled();
       expect(mockNotify).toHaveBeenCalledTimes(1);
       const arg = mockNotify.mock.calls[0][0];
-      expect(arg).toMatchObject({ color: "negative", timeout: 5000 });
+      expect(arg).toMatchObject({ timeout: 5000 });
     });
 
     it("handles a missing organizations array without crashing", () => {

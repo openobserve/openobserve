@@ -1,14 +1,16 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import Query from "./Query.vue";
 import searchService from "@/services/search";
 
-installQuasar();
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args) => mockToast(...args),
+}));
 
 // Mock the services and composables
 vi.mock("@/services/search", () => ({
@@ -100,8 +102,7 @@ describe("Query Component", () => {
       }
     });
 
-    const notifyMock = vi.fn();
-    wrapper.vm.$q.notify = notifyMock;
+    mockToast.mockClear();
   });
 
   afterEach(() => {
@@ -178,8 +179,7 @@ describe("Query Component", () => {
       // Verify the final state
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(expect.objectContaining({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
         message: `Invalid SQL Query: ${errorMessage}`
       }));
     });

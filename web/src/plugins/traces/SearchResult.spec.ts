@@ -22,14 +22,11 @@ import {
   vi,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-installQuasar({
   plugins: [],
 });
 
@@ -151,7 +148,6 @@ const globalOptions = {
     store: mockStore,
   },
   stubs: {
-    "q-resize-observer": true,
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list tw:w-full"></div>',

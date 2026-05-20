@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import AddFunction from './AddFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -19,6 +18,16 @@ vi.mock('@/services/segment_analytics', () => ({
   default: {
     track: vi.fn(),
   },
+}));
+
+vi.mock('@/services/reodotdev_analytics', () => ({
+  useReo: () => ({
+    track: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(() => vi.fn()),
 }));
 
 const mockStore = createStore({
@@ -68,8 +77,6 @@ const mockI18n = createI18n({
     },
   },
 });
-
-installQuasar();
 
 describe('AddFunction.vue Branch Coverage', () => {
   const defaultProps = {

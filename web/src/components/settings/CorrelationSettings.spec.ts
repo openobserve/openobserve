@@ -15,12 +15,10 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import CorrelationSettings from "./CorrelationSettings.vue";
 
-installQuasar();
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
@@ -111,8 +109,6 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        "q-tabs": { template: '<div class="q-tabs"><slot /></div>', props: ["modelValue"], emits: ["update:modelValue"] },
-        "q-tab": { template: '<div class="q-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps"] },
         OTabs: { template: '<div class="o-tabs"><slot /></div>', props: ["modelValue", "dense"], emits: ["update:modelValue"] },
         OTab: { template: '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps", "icon"] },
       },

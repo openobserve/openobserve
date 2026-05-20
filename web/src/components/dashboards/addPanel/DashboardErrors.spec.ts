@@ -37,7 +37,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Removed installQuasar() since we're using Quasar directly
 
 describe("DashboardErrors", () => {
   let wrapper: any;
@@ -53,19 +52,9 @@ describe("DashboardErrors", () => {
       global: {
         plugins: [],
         stubs: {
-          "q-separator": {
-            template: "<hr class='q-separator' />",
-          },
-          "q-bar": {
-            template: "<div class='q-bar q-pa-sm expand-bar' :class='$attrs.class'><slot /></div>",
-            inheritAttrs: false,
-          },
           "OIcon": {
             template: "<div class='OIcon q-mr-sm' :name='name' :text-color='textColor' :flat='flat !== false ? \"true\" : \"false\"'></div>",
             props: ["flat", "name", "textColor"],
-          },
-          "q-space": {
-            template: "<div class='q-space'></div>",
           },
         },
       },

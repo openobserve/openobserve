@@ -16,10 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import DatabaseDeprecationBanner from "./DatabaseDeprecationBanner.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-
-installQuasar();
 
 describe("DatabaseDeprecationBanner", () => {
   let store: any;

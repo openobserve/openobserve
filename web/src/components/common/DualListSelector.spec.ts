@@ -15,10 +15,8 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DualListSelector from "@/components/common/DualListSelector.vue";
 
-installQuasar();
 
 describe("DualListSelector", () => {
   const mockItems = [
@@ -38,14 +36,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button @click='$attrs.onClick'><slot /></button>" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -63,14 +54,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -87,14 +71,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -113,14 +90,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -138,14 +108,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -164,14 +127,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -189,14 +145,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -216,14 +165,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -243,14 +185,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -272,14 +207,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -300,14 +228,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -330,14 +251,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -357,14 +271,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -388,14 +295,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -415,14 +315,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -442,14 +335,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -467,14 +353,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -492,14 +371,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -521,14 +393,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -545,14 +410,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -572,14 +430,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -599,14 +450,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -626,14 +470,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -653,14 +490,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });
@@ -678,14 +508,7 @@ describe("DualListSelector", () => {
         },
         global: {
           stubs: {
-            "q-input": { template: "<input />" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
             "OIcon": { template: "<i />" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-tooltip": { template: "<div />" },
           },
         },
       });

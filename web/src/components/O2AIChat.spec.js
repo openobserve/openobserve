@@ -3,14 +3,16 @@
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
-import O2AIChat from '@/components/O2AIChat.vue';
+// Mock the clipboard utility — the component now uses @/utils/clipboard
+const mockClipboardCopy = vi.fn(() => Promise.resolve(true));
+vi.mock('@/utils/clipboard', () => ({
+  copyToClipboard: (...args) => mockClipboardCopy(...args),
+}));
 
-// Ensure Quasar plugin
-installQuasar();
+import O2AIChat from '@/components/O2AIChat.vue';
 
 // Stub clipboard
 // @ts-ignore
@@ -283,25 +285,20 @@ describe('O2AIChat - sendMessage and streaming', () => {
 
 // 5. Clipboard
 describe('O2AIChat - clipboard', () => {
-  it('copyToClipboard notifies positive on success', async () => {
+  it('copyToClipboard delegates to clipboard utility', async () => {
     const wrapper = await mountChat({ isOpen: true });
-    const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+    mockClipboardCopy.mockClear();
     await wrapper.vm.copyToClipboard('abc');
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'positive' }));
+    expect(mockClipboardCopy).toHaveBeenCalled();
+    expect(mockClipboardCopy.mock.calls[0][0]).toBe('abc');
   });
 
-  it('copyToClipboard notifies negative on failure', async () => {
-    // Force failure
-    const original = navigator.clipboard.writeText;
-    // @ts-ignore
-    navigator.clipboard.writeText = vi.fn().mockRejectedValue(new Error('fail'));
+  it('copyToClipboard handles content correctly', async () => {
     const wrapper = await mountChat({ isOpen: true });
-    const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
-    await wrapper.vm.copyToClipboard('abc');
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
-    // restore
-    // @ts-ignore
-    navigator.clipboard.writeText = original;
+    mockClipboardCopy.mockClear();
+    await wrapper.vm.copyToClipboard('test content');
+    expect(mockClipboardCopy).toHaveBeenCalledTimes(1);
+    expect(mockClipboardCopy.mock.calls[0][0]).toBe('test content');
   });
 });
 

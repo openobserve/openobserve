@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -37,19 +34,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar
-  };
-});
-
 // Mock billing service - using factory function to avoid hoisting issues
 vi.mock("@/services/billings", () => ({
   default: {
@@ -60,6 +44,24 @@ vi.mock("@/services/billings", () => ({
 // Import after mocking
 import BillingService from "@/services/billings";
 
+const STUBS = {
+  'router-view': true,
+  'OIcon': true,
+  'OSelect': true,
+  'OSplitter': {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+  },
+  'OTabs': true,
+  'ORouteTab': true,
+  'ConfirmDialog': true,
+  'Usage': true,
+  'AppTabs': {
+    template: '<div></div>',
+    props: ['tabs', 'activeTab'],
+    emits: ['update:activeTab']
+  }
+} as const;
+
 describe("Billing Component", () => {
   let wrapper: any = null;
 
@@ -69,7 +71,7 @@ describe("Billing Component", () => {
 
     // Mock billing service response
     (BillingService.list_subscription as any).mockResolvedValue({
-      data: { provider: "stripe" }
+      data: { provider: "stripe", customer_id: "" }
     });
 
     // Reset router state
@@ -85,24 +87,7 @@ describe("Billing Component", () => {
         provide: {
           store,
         },
-        stubs: {
-                    'q-separator': true,
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'q-select': true,
-          'OIcon': true,
-          'ConfirmDialog': true,
-          'Usage': true,
-          'AppTabs': {
-            template: '<div></div>',
-            props: ['tabs', 'activeTab'],
-            emits: ['update:activeTab']
-          }
-        }
+        stubs: STUBS as any
       },
     });
 
@@ -183,31 +168,14 @@ describe("Billing Component", () => {
 
       // Mock billing service response for this test
       (BillingService.list_subscription as any).mockResolvedValue({
-        data: { provider: "stripe" }
+        data: { provider: "stripe", customer_id: "" }
       });
 
       const testWrapper = mount(Billing, {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
 
@@ -232,24 +200,7 @@ describe("Billing Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
 
@@ -301,24 +252,7 @@ describe("Billing Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-            'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
       await testWrapper.vm.$nextTick();
@@ -346,9 +280,9 @@ describe("Billing Component", () => {
     it("should navigate to usage route with correct parameters", () => {
       wrapper.vm.usageDate = "60days";
       wrapper.vm.usageDataType = "mb";
-      
+
       wrapper.vm.selectUsageDate();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
         query: {
@@ -362,9 +296,9 @@ describe("Billing Component", () => {
     it("should use default values when properties are not set", () => {
       wrapper.vm.usageDate = undefined;
       wrapper.vm.usageDataType = undefined;
-      
+
       wrapper.vm.selectUsageDate();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
         query: {
@@ -378,9 +312,9 @@ describe("Billing Component", () => {
     it("should handle empty string values", () => {
       wrapper.vm.usageDate = "";
       wrapper.vm.usageDataType = "";
-      
+
       wrapper.vm.selectUsageDate();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
         query: {
@@ -395,9 +329,9 @@ describe("Billing Component", () => {
   describe("updateActiveTab Function", () => {
     it("should update usageDataType and call router push", () => {
       mockRouter.push.mockClear();
-      
+
       wrapper.vm.updateActiveTab("mb");
-      
+
       expect(wrapper.vm.usageDataType).toBe("mb");
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
@@ -411,9 +345,9 @@ describe("Billing Component", () => {
 
     it("should handle different tab values", () => {
       mockRouter.push.mockClear();
-      
+
       wrapper.vm.updateActiveTab("gb");
-      
+
       expect(wrapper.vm.usageDataType).toBe("gb");
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
@@ -427,9 +361,9 @@ describe("Billing Component", () => {
 
     it("should handle null value", () => {
       mockRouter.push.mockClear();
-      
+
       wrapper.vm.updateActiveTab(null);
-      
+
       expect(wrapper.vm.usageDataType).toBe(null);
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: '/billings/usage',
@@ -446,28 +380,28 @@ describe("Billing Component", () => {
     it("should have reactive billingtab", async () => {
       wrapper.vm.billingtab = "usage";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.billingtab).toBe("usage");
     });
 
     it("should have reactive usageDataType", async () => {
       wrapper.vm.usageDataType = "mb";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.usageDataType).toBe("mb");
     });
 
     it("should have reactive usageDate", async () => {
       wrapper.vm.usageDate = "60days";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.usageDate).toBe("60days");
     });
 
     it("should have reactive splitterModel", async () => {
       wrapper.vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.splitterModel).toBe(300);
     });
   });
@@ -480,7 +414,7 @@ describe("Billing Component", () => {
 
     it("should use store state in router navigation", () => {
       wrapper.vm.selectUsageDate();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.objectContaining({
@@ -515,24 +449,7 @@ describe("Billing Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
 
@@ -549,24 +466,7 @@ describe("Billing Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
 
@@ -583,24 +483,7 @@ describe("Billing Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-select': true,
-            'OIcon': true,
-            'ConfirmDialog': true,
-            'Usage': true,
-            'AppTabs': {
-              template: '<div></div>',
-              props: ['tabs', 'activeTab'],
-              emits: ['update:activeTab']
-            }
-          }
+          stubs: STUBS as any
         },
       });
 
@@ -619,7 +502,7 @@ describe("Billing Component", () => {
         'splitterModel', 'headerBasedOnRoute', 'options', 'usageDate',
         'selectUsageDate', 'isUsageRoute', 'tabs', 'usageDataType', 'updateActiveTab'
       ];
-      
+
       expectedProps.forEach(prop => {
         expect(wrapper.vm).toHaveProperty(prop);
       });

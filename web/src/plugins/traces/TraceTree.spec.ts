@@ -57,8 +57,6 @@ vi.mock("@/composables/useTraces", () => ({
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
@@ -66,7 +64,6 @@ import { createStore } from "vuex";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceTree from "@/plugins/traces/TraceTree.vue";
 
-installQuasar({
   plugins: [],
 });
 
@@ -247,7 +244,6 @@ function mountTraceTree(
     global: {
       plugins: [i18n, router, storePlugin],
       stubs: {
-        "q-resize-observer": true,
         "span-block": true,
       },
     },

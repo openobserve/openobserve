@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import i18n from "@/locales";
 import { getDueDays } from "@/utils/zincutils";
-
-installQuasar();
 
 // Mock getDueDays function
 vi.mock("@/utils/zincutils", () => ({
@@ -45,19 +42,6 @@ const mockRouter = {
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter
 }));
-
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...(actual as any),
-    useQuasar: () => mockQuasar
-  };
-});
 
 // Mock window.open
 const mockWindowOpen = vi.fn();
@@ -564,8 +548,8 @@ describe("TrialPeriod.vue", () => {
       wrapper = createWrapper({}, mockStore);
       const container = wrapper.find('.trial-period-container');
       expect(container.classes()).toContain('gradient-banner');
-      expect(container.classes()).toContain('q-pa-md');
-      expect(container.classes()).toContain('full-width');
+      expect(container.classes()).toContain('tw:p-3');
+      expect(container.classes()).toContain('tw:w-full');
     });
 
     it("should display correct subtitle text", () => {

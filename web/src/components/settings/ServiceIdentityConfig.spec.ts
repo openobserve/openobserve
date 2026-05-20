@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ServiceIdentityConfig from "./ServiceIdentityConfig.vue";
 
-installQuasar({ plugins: {  } });
 
 vi.mock("@/services/alerts", () => ({
   default: {
@@ -130,21 +128,6 @@ const mockI18n = createI18n({
 
 const globalStubs = {
   "OIcon": { template: "<span />", props: ["name", "size", "color"] },
-  "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "loading", "disable"], emits: ["click"] },
-  "q-expansion-item": { template: '<div class="expansion-item"><slot /><slot name="header" /></div>', props: ["label", "icon", "dense", "class", "modelValue"], emits: ["update:modelValue"] },
-  "q-input": { template: '<input />', props: ["modelValue", "dense", "filled", "clearable", "placeholder"] },
-  "q-item": { template: "<div class='q-item' @click=\"$emit('click')\"><slot /></div>", emits: ["click"] },
-  "q-item-section": { template: "<div><slot /></div>", props: ["side", "avatar"] },
-  "q-item-label": { template: "<div><slot /></div>", props: ["caption"] },
-  "q-list": { template: "<div><slot /></div>", props: ["dense", "bordered"] },
-  "q-separator": true,
-  "q-tooltip": { template: "<span><slot /></span>" },
-  "q-card": { template: "<div><slot /></div>" },
-  "q-card-section": { template: "<div><slot /></div>" },
-  "q-tab-panels": { template: "<div><slot /></div>", props: ["modelValue"] },
-  "q-tab-panel": { template: "<div><slot /></div>", props: ["name"] },
-  "q-tabs": { template: "<div><slot /></div>", props: ["modelValue"], emits: ["update:modelValue"] },
-  "q-tab": { template: "<div />", props: ["name", "label"] },
   "i18n-t": { template: "<span><slot /></span>", props: ["keypath", "tag"] },
 };
 

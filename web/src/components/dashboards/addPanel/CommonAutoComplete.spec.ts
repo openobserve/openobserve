@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 // Mock store
 const mockStore = {
@@ -55,8 +54,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
-
 describe("CommonAutoComplete", () => {
   let wrapper: any;
 
@@ -82,11 +79,11 @@ describe("CommonAutoComplete", () => {
           store: mockStore,
         },
         stubs: {
-          "q-input": {
+          "OInput": {
             template: `
-              <div class="q-input-stub" :data-test="$attrs['data-test']">
-                <input 
-                  :value="modelValue" 
+              <div class="o-input-stub" :data-test="$attrs['data-test']">
+                <input
+                  :value="modelValue"
                   @input="$emit('update:modelValue', $event.target.value)"
                   @focus="$emit('focus', $event)"
                   @blur="$emit('blur', $event)"
@@ -407,7 +404,7 @@ describe("CommonAutoComplete", () => {
   describe("Styling and Layout", () => {
     it("should have relative container", () => {
       wrapper = createWrapper();
-      const container = wrapper.find(".relative");
+      const container = wrapper.find(".tw\\:relative");
       expect(container.exists()).toBeTruthy();
     });
 

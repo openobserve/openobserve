@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ValueMapping from "@/components/dashboards/addPanel/ValueMapping.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -41,7 +40,12 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-installQuasar();
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
+};
 
 describe("ValueMapping", () => {
   let wrapper: any;
@@ -76,6 +80,7 @@ describe("ValueMapping", () => {
             template: '<div data-test="value-mapping-popup"></div>',
             emits: ["close", "save"],
           },
+          OButton: OButtonStub,
         },
         mocks: {
           $t: (key: string) => key,

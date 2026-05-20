@@ -15,23 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
-
-// Mock Quasar plugins
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    Quasar: actual.Quasar,
-    Dialog: {
-      create: vi.fn(),
-    }: {
-      create: vi.fn(),
-    },
-    exportFile: vi.fn().mockReturnValue(true),
-  };
-});
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -171,8 +155,6 @@ global.console = {
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;
@@ -614,14 +596,6 @@ describe("PanelSchemaRenderer", () => {
       mockExportFile = vi.fn().mockReturnValue(true);
       mockShowErrorNotification = vi.fn();
       mockShowPositiveNotification = vi.fn();
-
-      vi.doMock("quasar", async (importOriginal) => {
-        const actual = await importOriginal();
-        return {
-          ...actual,
-          exportFile: mockExportFile,
-        };
-      });
     });
 
     it("should have downloadDataAsCSV method", () => {
@@ -827,7 +801,7 @@ describe("PanelSchemaRenderer", () => {
     it("should not show annotation button when annotations not allowed", () => {
       wrapper = createWrapper({ allowAnnotationsAdd: false });
 
-      expect(wrapper.find('q-btn[color="primary"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-annotation-add-button"]').exists()).toBe(false);
     });
 
     it("should show annotation button when annotations allowed and panel supports it", () => {

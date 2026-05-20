@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from 'vue';
 
 // Mock service_accounts service
@@ -69,7 +68,6 @@ const platform = {
 };
 
 // Install Quasar with platform
-installQuasar({
   plugins: [],
   config: {
     platform

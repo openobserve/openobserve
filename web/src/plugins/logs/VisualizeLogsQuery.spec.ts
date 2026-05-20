@@ -1,13 +1,11 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { ref } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Create a mock router
 const mockRouter = createRouter({
@@ -205,13 +203,6 @@ describe("VisualizeLogsQuery Component", () => {
           CustomMarkdownEditor: true,
           AddToDashboard: true,
           CustomChartEditor: true,
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-          },
-          "q-splitter-panel": {
-            template: "<div><slot></slot></div>",
-          },
         },
       },
     });

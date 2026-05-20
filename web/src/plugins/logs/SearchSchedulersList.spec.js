@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchSchedulersList from "./SearchSchedulersList.vue";
@@ -72,8 +71,6 @@ vi.mock('vue-i18n', async (importOriginal) => {
   };
 });
 
-installQuasar();
-
 describe("SearchSchedulersList Component", () => {
   let wrapper;
   let mockStore;
@@ -140,13 +137,6 @@ describe("SearchSchedulersList Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: true,
-          QTable: true,
-          QTr: true,
-          QTd: true,
-          QBtn: true,
-          QIcon: true,
-          QToggle: true,
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {

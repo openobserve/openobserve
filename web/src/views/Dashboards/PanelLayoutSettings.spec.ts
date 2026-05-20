@@ -52,12 +52,7 @@ const ODrawerStub = {
 
 // Default Quasar child stubs used in shallowMount-style cases
 const quasarStubs = {
-  "q-btn": true,
-  "q-separator": true,
-  "q-form": true,
-  "q-input": true,
   "OIcon": true,
-  "q-tooltip": true,
 };
 
 // Create mock store

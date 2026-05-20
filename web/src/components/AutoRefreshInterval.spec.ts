@@ -1,11 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
-
-installQuasar();
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn((value) => `${value} seconds`)
@@ -42,15 +39,8 @@ describe("AutoRefreshInterval", () => {
       global: {
         plugins: [i18n, mockRouter],
         stubs: {
-          'q-btn-dropdown': {
-            template: '<div class="q-btn-dropdown"><slot /><slot name="label" /></div>'
-          },
           'OIcon': {
             template: '<div class="OIcon"></div>'
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :disabled="disable"><slot /></button>',
-            props: ['disable', 'disabled']
           },
           OButton: {
             template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /><slot name="label" /></button>',
@@ -65,13 +55,9 @@ describe("AutoRefreshInterval", () => {
           ODropdownSeparator: {
             template: '<hr />',
           },
-
-          'q-tooltip': {
-            template: '<div class="q-tooltip"><slot /></div>'
+          OTooltip: {
+            template: '<div class="o-tooltip"><slot /></div>',
           },
-          'q-menu': {
-            template: '<div class="q-menu"><slot /></div>'
-          }
         }
       },
     });

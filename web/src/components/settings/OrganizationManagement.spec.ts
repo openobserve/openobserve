@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
 import store from "../../test/unit/helpers/store";
@@ -154,7 +153,6 @@ const ODialogStub = {
   `,
 };
 
-installQuasar({ plugins: [] });
 
 describe("OrganizationManagement.vue", () => {
   let wrapper: any;
@@ -236,38 +234,6 @@ describe("OrganizationManagement.vue", () => {
         },
         stubs: {
                     ODialog: ODialogStub,
-          'q-table': {
-            template: `
-              <div
-                class="q-table"
-                :data-test="$attrs['data-test']"
-                :loading="loading"
-              >
-                <slot name="top" :scope="{pagination: {rowsPerPage: 20}}" />
-                <slot name="body" />
-                <slot name="bottom" :scope="{pagination: {rowsPerPage: 20}}" />
-                <slot name="no-data" />
-              </div>
-            `,
-            props: ['rows', 'columns', 'row-key', 'pagination', 'filter', 'filter-method', 'loading', 'table-style'],
-            methods: {
-              setPagination: vi.fn()
-            }
-          },
-          'q-td': {
-            template: '<td class="q-td"><slot /></td>',
-            props: ['props']
-          },
-          'q-btn': {
-            template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
-            props: ['label', 'class', 'unelevated', 'dense', 'size', 'padding', 'text-color', 'data-test', 'flat', 'outline'],
-            emits: ['click']
-          },
-          'q-input': {
-            template: '<input class="q-input" v-model="modelValue" :placeholder="placeholder" :data-test="$attrs[\'data-test\']" />',
-            props: ['modelValue', 'borderless', 'filled', 'dense', 'class', 'placeholder', 'outlined', 'type'],
-            emits: ['update:modelValue']
-          },
           'OIcon': {
             template: '<i class="OIcon"></i>',
             props: ['name', 'class']

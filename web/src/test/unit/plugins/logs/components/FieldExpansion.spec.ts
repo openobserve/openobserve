@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import i18n from "@/locales";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock formatLargeNumber utility
 vi.mock("@/utils/zincutils", () => ({
@@ -28,7 +27,6 @@ vi.mock("@/utils/zincutils", () => ({
   }),
 }));
 
-installQuasar();
 
 describe("FieldExpansion.vue", () => {
 
@@ -60,18 +58,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template:
-                '<div class="q-expansion-item"><slot name="header" /><slot /></div>',
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-checkbox": true,
-            "q-tooltip": true,
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -87,15 +74,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -119,15 +98,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -151,13 +122,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
           },
         },
       });
@@ -178,13 +143,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
           },
         },
       });
@@ -206,13 +165,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
           },
         },
       });
@@ -233,13 +186,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
           },
         },
       });
@@ -258,16 +205,10 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": {
               template: '<div class="OIcon" :name="name"></div>',
               props: ["name"],
             },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -284,13 +225,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -313,13 +248,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -333,13 +262,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -355,15 +278,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -382,15 +297,9 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": {
               template: '<div class="OIcon" @click="$attrs.onClick"></div>',
             },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -408,15 +317,9 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": {
               template: '<div class="OIcon" @click="$attrs.onClick"></div>',
             },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -430,14 +333,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template:
-                '<div class="q-expansion-item" @click="$emit(\'before-show\', {})"><slot name="header" /><slot /></div>',
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -455,17 +351,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
             EqualIcon: { template: "<div>=" },
             NotEqualIcon: { template: "<div>!=" },
           },
@@ -502,15 +388,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": { template: "<button><slot /></button>" },
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -534,15 +412,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": { template: "<button><slot /></button>" },
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -564,13 +434,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -587,13 +451,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
             "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
           },
         },
       });
@@ -612,15 +470,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,
           },
@@ -639,15 +489,7 @@ describe("FieldExpansion.vue", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
             "OIcon": true,
-            "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,
           },

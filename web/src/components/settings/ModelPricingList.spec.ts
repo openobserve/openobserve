@@ -16,12 +16,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ModelPricingList from "./ModelPricingList.vue";
 
-installQuasar();
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -294,42 +292,10 @@ const mockI18n = createI18n({
 // ── Global stubs ─────────────────────────────────────────────────────────────
 
 const globalStubs: Record<string, any> = {
-  "q-page": { template: "<div><slot /></div>" },
-  "q-table": {
-    name: "q-table",
-    props: ["rows", "columns", "pagination", "sortMethod"],
-    template: `
-      <div class="q-table">
-        <slot name="header" :cols="columns" />
-        <template v-for="(row, idx) in rows" :key="row.id">
-          <slot name="body" :row="row" :rowIndex="idx" :cols="columns" />
-        </template>
-        <slot name="no-data" />
-        <slot name="bottom" />
-      </div>
-    `,
-  },
-  "q-tr": { template: "<tr><slot /></tr>" },
-  "q-th": { template: "<th><slot /></th>" },
-  "q-td": { template: "<td><slot /></td>" },
   "OIcon": {
     template: '<span class="OIcon"><slot /></span>',
     props: ["name", "size", "color"],
   },
-  "q-tooltip": { template: "<span><slot /></span>" },
-  "q-checkbox": {
-    name: "q-checkbox",
-    props: ["modelValue", "indeterminate", "size"],
-    emits: ["update:modelValue"],
-    template: `<input type="checkbox" :checked="modelValue" @change="$emit('update:modelValue', !modelValue)" />`,
-  },
-  "q-input": {
-    name: "q-input",
-    props: ["modelValue", "placeholder", "borderless", "dense"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" :placeholder="placeholder" @input="$emit('update:modelValue', $event.target.value)" />`,
-  },
-  "q-separator": true,
   ODrawer: ODrawerStub,
   OButton: OButtonStub,
   ConfirmDialog: ConfirmDialogStub,

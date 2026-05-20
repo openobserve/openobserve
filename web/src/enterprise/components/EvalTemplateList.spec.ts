@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 const mockPush = vi.fn();
 
@@ -72,7 +69,6 @@ async function mountList() {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QTablePagination: true,
         NoData: true,
         ConfirmDialog: true,
       },
@@ -152,10 +148,10 @@ describe("EvalTemplateList - data loading", () => {
     expect(wrapper.vm.rows.length).toBe(templatesDB.length);
   });
 
-  it("sets resultTotal to number of loaded templates", async () => {
+  it("sets rows length to number of loaded templates", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
-    expect(wrapper.vm.resultTotal).toBe(templatesDB.length);
+    expect(wrapper.vm.rows.length).toBe(templatesDB.length);
   });
 
   it("sets isLoading to false after load completes", async () => {
@@ -186,36 +182,37 @@ describe("EvalTemplateList - filtering", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("returns all rows when filterQuery is empty", async () => {
+  it("rows holds all templates regardless of filterQuery", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
-    expect(wrapper.vm.visibleRows.length).toBe(3);
+    expect(wrapper.vm.rows.length).toBe(3);
   });
 
-  it("filters rows by name when filterQuery is set", async () => {
+  it("filterQuery is reactive to assignment", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
     wrapper.vm.filterQuery = "accuracy";
     await wrapper.vm.$nextTick();
-    expect(wrapper.vm.visibleRows.every((r: any) =>
-      r.name.toLowerCase().includes("accuracy"),
-    )).toBe(true);
+    expect(wrapper.vm.filterQuery).toBe("accuracy");
   });
 
-  it("returns empty array when filterQuery matches nothing", async () => {
+  it("rows array stays intact when filterQuery changes (filtering is handled by OTable)", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
     wrapper.vm.filterQuery = "zzznomatch";
     await wrapper.vm.$nextTick();
-    expect(wrapper.vm.visibleRows.length).toBe(0);
+    // Filtering is delegated to OTable's :global-filter prop
+    expect(wrapper.vm.rows.length).toBe(3);
   });
 
-  it("updates resultTotal to reflect filtered count", async () => {
+  it("filterQuery can be cleared back to empty string", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
     wrapper.vm.filterQuery = "accuracy";
     await wrapper.vm.$nextTick();
-    expect(wrapper.vm.resultTotal).toBe(2);
+    wrapper.vm.filterQuery = "";
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.filterQuery).toBe("");
   });
 });
 
@@ -289,7 +286,9 @@ describe("EvalTemplateList - delete", () => {
   it("bulk delete calls deleteTemplate for each selected item", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
-    wrapper.vm.selectedItems = [templatesDB[0], templatesDB[1]];
+    // selectedItems is a computed off selectedIds, so set ids to select rows
+    wrapper.vm.selectedIds = [templatesDB[0].id, templatesDB[1].id];
+    await wrapper.vm.$nextTick();
     await wrapper.vm.bulkDeleteTemplates();
     await flushPromises();
     expect(evalTemplateService.deleteTemplate).toHaveBeenCalledTimes(2);

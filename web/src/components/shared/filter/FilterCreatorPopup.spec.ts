@@ -15,11 +15,8 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 import FilterCreatorPopup from "./FilterCreatorPopup.vue";
-
-installQuasar();
 
 const mockI18n = createI18n({
   locale: "en",
@@ -64,48 +61,26 @@ const globalStubs = {
     props: ["variant", "size"],
     emits: ["click"],
   },
-  "q-card": { template: '<div class="q-card"><slot /></div>' },
-  "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
-  "q-card-actions": {
-    template: '<div class="q-card-actions"><slot /></div>',
-    props: ["align"],
+  OCardSection: {
+    template: '<div class="q-card-section"><slot /></div>',
   },
-  "q-select": {
+  OSelect: {
     template:
       '<select class="q-select"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
     props: [
       "modelValue",
       "options",
       "label",
-      "rules",
-      "popupContentStyle",
-      "color",
-      "bgColor",
-      "stackLabel",
-      "outlined",
-      "filled",
-      "dense",
+      "error",
+      "errorMessage",
     ],
-  },
-  "q-list": { template: "<div><slot /></div>", props: ["dense"] },
-  "q-item": { template: "<div><slot /></div>", props: ["tag"] },
-  "q-item-section": { template: "<div><slot /></div>", props: ["avatar"] },
-  "q-item-label": {
-    template: "<span class='q-item-label'><slot /></span>",
-    props: ["class"],
-  },
-  "q-checkbox": {
-    template:
-      '<input type="checkbox" class="q-checkbox" :value="val" :checked="modelValue && modelValue.includes(val)" />',
-    props: ["modelValue", "val", "size", "dense"],
     emits: ["update:modelValue"],
   },
-  "q-btn": {
+  OCheckbox: {
     template:
-      '<button class="q-btn" :class="closePop ? \'close-btn\' : \'\'" @click="$emit(\'click\')">{{ label }}</button>',
-    props: ["label", "color", "flat", "noCaps", "class"],
-    attrs: { "v-close-popup": "" },
-    emits: ["click"],
+      '<input type="checkbox" class="q-checkbox" :value="value" :checked="modelValue && modelValue.includes(value)" />',
+    props: ["modelValue", "value"],
+    emits: ["update:modelValue"],
   },
 };
 

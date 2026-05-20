@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import AssociatedRegexPatterns, { PatternAssociation } from './AssociatedRegexPatterns.vue';
-import { installQuasar } from '@/test/unit/helpers';
 import regexPatternsService from '@/services/regex_pattern';
 
 // Mock dependencies
@@ -39,7 +38,6 @@ vi.mock('vuex', () => ({
   useStore: () => mockStore,
 }));
 
-installQuasar();
 
 describe('AssociatedRegexPatterns.vue', () => {
   let wrapper: VueWrapper;
@@ -108,10 +106,6 @@ describe('AssociatedRegexPatterns.vue', () => {
           stubs: {
             FullViewContainer: true,
             ConfirmDialog: true,
-            'q-expansion-item': {
-              template: '<div><slot /><slot name="default" /></div>',
-              methods: { toggle: vi.fn() },
-            },
           },
           config: {
             warnHandler: () => {}, // Suppress Vue warnings in tests
@@ -615,7 +609,6 @@ describe('AssociatedRegexPatterns.vue', () => {
     });
 
     it('should integrate with Quasar components', () => {
-      // Quasar plugin is installed globally via installQuasar()
       expect(wrapper.vm).toBeDefined();
     });
   });

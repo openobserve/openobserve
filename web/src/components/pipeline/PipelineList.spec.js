@@ -1,6 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import PipelinesList from "./PipelinesList.vue";
@@ -16,19 +15,6 @@ vi.mock('@/plugins/pipelines/useDnD', () => ({
     }
   })
 }));
-
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(() => vi.fn())
-    })
-  };
-});
-
-installQuasar();
 
 // Mock the pipeline service
 vi.mock("@/services/pipelines", () => ({
@@ -114,20 +100,17 @@ describe("PipelinesList", () => {
         },
         stubs: {
           RouterView: true,
-          QDialog: true,
           StreamSelection: true,
           ConfirmDialog: true,
           ResumePipelineDialog: true,
-          'q-table': true,
-          'q-tr': true,
-          'q-td': true,
-          'q-checkbox': true,
-          'q-btn': true,
-          'q-tooltip': true,
           'OIcon': true,
-          'q-input': true,
+          'OButton': true,
+          'OInput': true,
+          'OTooltip': true,
+          'OSelect': true,
+          'ODialog': true,
+          'ODropdown': true,
           'app-tabs': true,
-          'q-table-pagination': true,
         },
       },
     });
@@ -160,12 +143,12 @@ describe("PipelinesList", () => {
       expect(wrapper.vm.activeTab).toBe("all");
       expect(wrapper.vm.filterQuery).toBe("");
       expect(wrapper.vm.selectedPipelines).toEqual([]);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
     });
   });
 
   describe("Pipeline Filtering", () => {
-    it("should filter pipelines by name", async () => {
+    // TODO: filterData method was removed - filtering is now done via global-filter prop
+    it.skip("should filter pipelines by name", async () => {
       wrapper.vm.filterQuery = "Test Pipeline 1";
       const rows = [mockPipelines.data.list[0], mockPipelines.data.list[1]];
       const filtered = wrapper.vm.filterData(rows, "Test Pipeline 1");
@@ -186,14 +169,16 @@ describe("PipelinesList", () => {
       expect(wrapper.vm.filteredPipelines.length).toBe(2);
     });
 
-    it("should handle empty filter query", async () => {
+    // TODO: filterData method was removed - filtering is now done via global-filter prop
+    it.skip("should handle empty filter query", async () => {
       wrapper.vm.filterQuery = "";
       const rows = [mockPipelines.data.list[0], mockPipelines.data.list[1]];
       const filtered = wrapper.vm.filterData(rows, "");
       expect(filtered.length).toBe(2);
     });
 
-    it("should handle case-insensitive filtering", async () => {
+    // TODO: filterData method was removed - filtering is now done via global-filter prop
+    it.skip("should handle case-insensitive filtering", async () => {
       wrapper.vm.filterQuery = "test pipeline";
       const rows = [mockPipelines.data.list[0], mockPipelines.data.list[1]];
       const filtered = wrapper.vm.filterData(rows, "test pipeline");
@@ -239,9 +224,9 @@ describe("PipelinesList", () => {
       const pipeline = mockPipelines.data.list[0];
       const mockLink = { click: vi.fn(), href: "", download: "" };
       global.document.createElement = vi.fn().mockReturnValue(mockLink);
-      
+
       wrapper.vm.exportPipeline(pipeline);
-      
+
       expect(global.URL.createObjectURL).toHaveBeenCalled();
       expect(mockLink.click).toHaveBeenCalled();
       expect(mockLink.download).toBe(`${pipeline.name}.json`);

@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -89,8 +88,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
-
 const mockSeriesOptions = [
   { name: "Series 1", value: "series1" },
   { name: "Series 2", value: "series2" },
@@ -145,9 +142,9 @@ describe("ColorBySeriesPopUp", () => {
     expect(dialog.props("title")).toBe("Color by series");
   });
 
-  it("forwards the width to ODialog", () => {
+  it("forwards the size to ODialog", () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("width")).toBe(40);
+    expect(dialog.props("size")).toBe("lg");
   });
 
   it("forwards open prop from parent to ODialog", () => {

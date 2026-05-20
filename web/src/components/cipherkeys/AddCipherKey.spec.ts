@@ -3,7 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import AddCipherKey from '@/components/cipherkeys/AddCipherKey.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('@/services/cipher_keys');
@@ -17,18 +16,6 @@ vi.mock('vue-i18n', () => ({
     t: (key: string) => key
   })
 }));
-
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn()
-    })
-  };
-});
-
-installQuasar();
 
 describe('AddCipherKey.vue', () => {
   let wrapper: VueWrapper;
@@ -80,41 +67,21 @@ describe('AddCipherKey.vue', () => {
           $q: mockQuasar
         },
         stubs: {
-                    'OIcon': {
+          'OIcon': {
             template: '<div class="OIcon-stub">{{ name }}</div>',
             props: ['name', 'size']
           },
-          'q-separator': {
-            template: '<div class="q-separator-stub"></div>'
-          },
-          'q-form': {
-            template: '<form class="q-form-stub" @submit.prevent="$emit(\'submit\')"><slot></slot></form>',
-            methods: {
-              validate: vi.fn().mockResolvedValue(true)
-            }
-          },
-          'q-input': {
-            template: '<input class="q-input-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue" />',
+          'OInput': {
+            template: '<input class="OInput-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue" />',
             props: ['modelValue', 'label', 'readonly', 'disable', 'rules']
           },
-          'q-select': {
-            template: '<select class="q-select-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue"><slot></slot></select>',
+          'OSelect': {
+            template: '<select class="OSelect-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue"><slot></slot></select>',
             props: ['modelValue', 'options', 'label']
           },
-          'q-stepper': {
-            template: '<div class="q-stepper-stub"><slot></slot></div>',
-            props: ['modelValue']
-          },
-          'q-step': {
-            template: '<div class="q-step-stub" :data-test="$attrs[\'data-test\']"><slot></slot></div>',
-            props: ['name', 'title', 'icon', 'done']
-          },
-          'q-stepper-navigation': {
-            template: '<div class="q-stepper-navigation-stub"><slot></slot></div>'
-          },
-          'q-btn': {
-            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disable">{{ label }}</button>',
-            props: ['label', 'color', 'disable', 'type']
+          'OButton': {
+            template: '<button class="OButton-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disabled">{{ label }}<slot /></button>',
+            props: ['label', 'variant', 'disabled', 'type', 'size']
           },
           'AddOpenobserveType': {
             template: '<div class="add-openobserve-type-stub"></div>',

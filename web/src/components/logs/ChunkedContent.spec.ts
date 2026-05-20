@@ -16,9 +16,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ChunkedContent from "./ChunkedContent.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
+const stubsConfig = {
+  OButton: {
+    template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+    props: ['variant', 'size'],
+    emits: ['click'],
+  },
+  OIcon: {
+    template: '<span class="o-icon"></span>',
+    props: ['name', 'size'],
+  },
+};
 
 const {
   mockInitializeChunk,
@@ -60,6 +69,19 @@ vi.mock("@/components/logs/LogsHighLighting.vue", () => ({
   },
 }));
 
+const mountChunked = (options: any) => {
+  return mount(ChunkedContent, {
+    ...options,
+    global: {
+      ...(options.global || {}),
+      stubs: {
+        ...stubsConfig,
+        ...(options.global?.stubs || {}),
+      },
+    },
+  });
+};
+
 describe("ChunkedContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,7 +98,7 @@ describe("ChunkedContent", () => {
 
   describe("Component Rendering", () => {
     it("should render the component", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "small content", fieldKey: "field1" },
       });
 
@@ -85,7 +107,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should render the chunked-content container", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "key1" },
       });
 
@@ -94,7 +116,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should render LogsHighLighting stub", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "key1" },
       });
 
@@ -105,7 +127,7 @@ describe("ChunkedContent", () => {
     it("should not show load more button when shouldShowLoadMore is false", async () => {
       mockHasMoreChunks.mockReturnValue(false);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "short content", fieldKey: "key1" },
       });
 
@@ -117,7 +139,7 @@ describe("ChunkedContent", () => {
       mockHasMoreChunks.mockReturnValue(true);
       mockNeedsChunking.mockReturnValue(true);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "large content", fieldKey: "key1" },
       });
 
@@ -129,7 +151,7 @@ describe("ChunkedContent", () => {
       mockHasMoreChunks.mockReturnValue(true);
       mockNeedsChunking.mockReturnValue(true);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "large content", fieldKey: "key1" },
       });
 
@@ -147,7 +169,7 @@ describe("ChunkedContent", () => {
         totalChunks: 5,
       });
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "large content", fieldKey: "myField" },
       });
 
@@ -158,7 +180,7 @@ describe("ChunkedContent", () => {
 
   describe("Props", () => {
     it("should have default props values", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "field1" },
       });
 
@@ -169,7 +191,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should accept custom chunkSizeKB", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "field1", chunkSizeKB: 100 },
       });
 
@@ -178,7 +200,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should pass queryString prop to LogsHighLighting", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "field1", queryString: "match_all('error')" },
       });
 
@@ -187,7 +209,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should pass simpleMode prop", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "field1", simpleMode: true },
       });
 
@@ -198,7 +220,7 @@ describe("ChunkedContent", () => {
 
   describe("contentString computed", () => {
     it("should return empty string for null data", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: null, fieldKey: "key1" },
       });
 
@@ -208,7 +230,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should return empty string for undefined data", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: undefined, fieldKey: "key1" },
       });
 
@@ -218,7 +240,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should return string data as-is", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "hello world", fieldKey: "key1" },
       });
 
@@ -229,7 +251,7 @@ describe("ChunkedContent", () => {
 
     it("should JSON.stringify object data", async () => {
       const obj = { name: "test", value: 42 };
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: obj, fieldKey: "key1" },
       });
 
@@ -239,7 +261,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should convert number to string", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: 12345, fieldKey: "key1" },
       });
 
@@ -249,7 +271,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should convert boolean to string", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: true, fieldKey: "key1" },
       });
 
@@ -261,7 +283,7 @@ describe("ChunkedContent", () => {
 
   describe("chunkSizeBytes computed", () => {
     it("should convert KB to bytes (default 50KB = 51200 bytes)", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "key1" },
       });
 
@@ -271,7 +293,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should use custom chunkSizeKB", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "test", fieldKey: "key1", chunkSizeKB: 100 },
       });
 
@@ -283,7 +305,7 @@ describe("ChunkedContent", () => {
 
   describe("Lifecycle - onMounted", () => {
     it("should call needsChunking on mount", async () => {
-      mount(ChunkedContent, {
+      mountChunked({
         props: { data: "test content", fieldKey: "key1" },
       });
 
@@ -295,7 +317,7 @@ describe("ChunkedContent", () => {
       mockNeedsChunking.mockReturnValue(true);
       const largeContent = "x".repeat(1000);
 
-      mount(ChunkedContent, {
+      mountChunked({
         props: { data: largeContent, fieldKey: "key1" },
       });
 
@@ -306,7 +328,7 @@ describe("ChunkedContent", () => {
     it("should not call initializeChunk when chunking is not needed", async () => {
       mockNeedsChunking.mockReturnValue(false);
 
-      mount(ChunkedContent, {
+      mountChunked({
         props: { data: "short content", fieldKey: "key1" },
       });
 
@@ -318,7 +340,7 @@ describe("ChunkedContent", () => {
   describe("Watch - data changes", () => {
     it("should call initializeChunk when data prop changes and chunking is needed", async () => {
       mockNeedsChunking.mockReturnValue(false);
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "initial", fieldKey: "key1" },
       });
 
@@ -338,7 +360,7 @@ describe("ChunkedContent", () => {
       mockHasMoreChunks.mockReturnValue(true);
       mockNeedsChunking.mockReturnValue(true);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "large content", fieldKey: "myField" },
       });
 
@@ -356,7 +378,7 @@ describe("ChunkedContent", () => {
       mockNeedsChunking.mockReturnValue(false);
       const data = "short string";
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data, fieldKey: "key1" },
       });
 
@@ -369,7 +391,7 @@ describe("ChunkedContent", () => {
       mockNeedsChunking.mockReturnValue(true);
       mockGetVisibleContent.mockReturnValue("first chunk of content...");
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "very long content", fieldKey: "key1" },
       });
 
@@ -383,7 +405,7 @@ describe("ChunkedContent", () => {
     it("should return true when hasMoreChunks returns true", async () => {
       mockHasMoreChunks.mockReturnValue(true);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "content", fieldKey: "key1" },
       });
 
@@ -395,7 +417,7 @@ describe("ChunkedContent", () => {
     it("should return false when hasMoreChunks returns false", async () => {
       mockHasMoreChunks.mockReturnValue(false);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "content", fieldKey: "key1" },
       });
 
@@ -415,7 +437,7 @@ describe("ChunkedContent", () => {
       };
       mockGetChunkInfo.mockReturnValue(mockInfo);
 
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "content", fieldKey: "key1" },
       });
 
@@ -425,7 +447,7 @@ describe("ChunkedContent", () => {
     });
 
     it("should call getChunkInfo with the fieldKey", async () => {
-      const wrapper = mount(ChunkedContent, {
+      const wrapper = mountChunked({
         props: { data: "content", fieldKey: "special-field-key" },
       });
 

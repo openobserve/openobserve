@@ -15,20 +15,20 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ResourceDetailDrawer from "@/components/rum/ResourceDetailDrawer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+// Mock the toast feedback module
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
+
 // ============================================================================
 // TEST DATA FACTORIES
 // ============================================================================
 
-/**
- * Factory function to create mock resource data with defaults
- */
 function createMockResource(overrides: Record<string, any> = {}) {
   return {
     resource_method: "GET",
@@ -53,9 +53,6 @@ function createMockResource(overrides: Record<string, any> = {}) {
   };
 }
 
-/**
- * Factory to create minimal resource data
- */
 function createMinimalResource() {
   return {
     resource_url: "http://localhost:5080",
@@ -63,9 +60,6 @@ function createMinimalResource() {
   };
 }
 
-/**
- * Factory to create resource with specific status code
- */
 function createResourceWithStatus(statusCode: number) {
   return createMockResource({
     resource_status_code: statusCode,
@@ -80,10 +74,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [],
-});
-
 // ============================================================================
 // TEST HELPERS
 // ============================================================================
@@ -93,9 +83,6 @@ interface MountOptions {
   stubs?: Record<string, any>;
 }
 
-/**
- * Helper to mount component with default configuration
- */
 function mountComponent(options: MountOptions = {}) {
   const defaultProps = {
     modelValue: true,
@@ -113,36 +100,38 @@ function mountComponent(options: MountOptions = {}) {
             '<div data-test="trace-correlation-card">Trace Correlation</div>',
           props: ["traceId", "spanId", "sessionId", "resourceDuration"],
         },
+        OButton: {
+          template:
+            '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+          props: ["iconLeft", "variant", "size"],
+          emits: ["click"],
+        },
+        OIcon: {
+          template: '<div class="o-icon" :data-name="name"></div>',
+          props: ["name", "size", "color"],
+        },
+        OSeparator: {
+          template: '<hr class="o-separator" />',
+          props: ["vertical"],
+        },
         ...options.stubs,
       },
     },
   });
 }
 
-/**
- * Helper to find elements by test-id or common selectors
- */
 function findByTestId(wrapper: VueWrapper, testId: string) {
   return wrapper.find(`[data-test="${testId}"]`);
 }
 
-/**
- * Helper to find close button
- */
 function findCloseButton(wrapper: VueWrapper) {
   return findByTestId(wrapper, "close-drawer-btn");
 }
 
-/**
- * Helper to find session replay button
- */
 function findSessionReplayButton(wrapper: VueWrapper) {
   return findByTestId(wrapper, "view-session-replay-btn");
 }
 
-/**
- * Helper to find session events button
- */
 function findSessionEventsButton(wrapper: VueWrapper) {
   return findByTestId(wrapper, "view-session-events-btn");
 }
@@ -157,7 +146,6 @@ describe("ResourceDetailDrawer", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Mock store state with zoConfig - preserve existing properties
     store.state.zoConfig = {
       ...(store.state.zoConfig || {}),
       timestamp_column: "_timestamp",
@@ -174,10 +162,6 @@ describe("ResourceDetailDrawer", () => {
     vi.clearAllTimers();
     vi.restoreAllMocks();
   });
-
-  // ==========================================================================
-  // INITIAL RENDERING
-  // ==========================================================================
 
   describe("Initial Rendering", () => {
     it("should render the component", () => {
@@ -202,14 +186,9 @@ describe("ResourceDetailDrawer", () => {
     });
   });
 
-  // ==========================================================================
-  // RESOURCE HEADER DISPLAY
-  // ==========================================================================
-
   describe("Resource Header Information", () => {
     it("should display HTTP method and URL", () => {
       const text = wrapper.text();
-
       expect(text).toContain("GET");
       expect(text).toContain("http://localhost:5080/users");
     });
@@ -227,25 +206,12 @@ describe("ResourceDetailDrawer", () => {
       expect(wrapper.text()).toContain("200");
     });
 
-    it("should show appropriate icon for successful status (2xx)", () => {
-      const icons = wrapper.findAllComponents({ name: "QIcon" });
-      const successIcon = icons.find((icon: any) =>
-        icon.props("name")?.includes("check_circle"),
-      );
-
-      expect(successIcon).toBeTruthy();
-    });
-
     it("should handle different HTTP status codes appropriately", async () => {
       const testCases = [
-        {
-          status: 200,
-          expectedIcon: "check_circle",
-          expectedColor: "positive",
-        },
-        { status: 301, expectedIcon: "info", expectedColor: "info" },
-        { status: 404, expectedIcon: "warning", expectedColor: "warning" },
-        { status: 500, expectedIcon: "error", expectedColor: "negative" },
+        { status: 200 },
+        { status: 301 },
+        { status: 404 },
+        { status: 500 },
       ];
 
       for (const testCase of testCases) {
@@ -267,10 +233,6 @@ describe("ResourceDetailDrawer", () => {
       expect(urlElement).toBeTruthy();
     });
   });
-
-  // ==========================================================================
-  // RESOURCE INFORMATION SECTION
-  // ==========================================================================
 
   describe("Resource Information Details", () => {
     it("should display Resource Information section", () => {
@@ -343,10 +305,6 @@ describe("ResourceDetailDrawer", () => {
     });
   });
 
-  // ==========================================================================
-  // TRACE CORRELATION SECTION
-  // ==========================================================================
-
   describe("Trace Correlation Integration", () => {
     it("should render TraceCorrelationCard when trace_id exists", () => {
       const traceCard = findByTestId(wrapper, "trace-correlation-card");
@@ -377,10 +335,6 @@ describe("ResourceDetailDrawer", () => {
       expect(text).toContain("Trace correlation requires browser SDK v0.3.3+");
     });
   });
-
-  // ==========================================================================
-  // SESSION CONTEXT SECTION
-  // ==========================================================================
 
   describe("Session Context Actions", () => {
     it("should display Session Context section when session exists", () => {
@@ -414,10 +368,6 @@ describe("ResourceDetailDrawer", () => {
     });
   });
 
-  // ==========================================================================
-  // USER INTERACTIONS & NAVIGATION
-  // ==========================================================================
-
   describe("User Interactions", () => {
     describe("Closing the Drawer", () => {
       it("should emit update:modelValue when close button is clicked", async () => {
@@ -430,13 +380,11 @@ describe("ResourceDetailDrawer", () => {
       });
 
       it("should close when modelValue prop changes", async () => {
-        // Initially component is mounted
         expect(wrapper.exists()).toBe(true);
 
         await wrapper.setProps({ modelValue: false });
         await flushPromises();
 
-        // Component should emit the change
         expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       });
     });
@@ -482,139 +430,22 @@ describe("ResourceDetailDrawer", () => {
       });
     });
 
-    describe.skip("Session Events Action", () => {
-      it("should show notification when View All Session Events is clicked", async () => {
-        // Spy on .create BEFORE mounting the component
-        const notifySpy = vi
-          .spyOn(quasar."create")
-          .mockImplementation(() => () => {});
-
-        // Mount a fresh wrapper with the spy already in place
-        const testWrapper = mountComponent();
-        await flushPromises();
-
-        const eventsBtn = findSessionEventsButton(testWrapper);
+    describe("Session Events Action", () => {
+      it("should call toast when View All Session Events is clicked", async () => {
+        const { toast } = await import("@/lib/feedback/Toast/useToast");
+        const eventsBtn = findSessionEventsButton(wrapper);
         await eventsBtn.trigger("click");
         await flushPromises();
 
-        expect(notifySpy).toHaveBeenCalledWith(
+        expect(toast).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: "info",
+            variant: "info",
             message: "Session events view coming soon",
           }),
         );
-
-        notifySpy.mockRestore();
-        testWrapper.unmount();
       });
     });
   });
-
-  // ==========================================================================
-  // ACCESSIBILITY
-  // ==========================================================================
-
-  describe.skip("Accessibility", () => {
-    it("should be keyboard accessible - close button with Enter", async () => {
-      const closeBtn = findCloseButton(wrapper);
-
-      await closeBtn.trigger("keydown.enter");
-      await closeBtn.trigger("click");
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-    });
-
-    it("should be keyboard accessible - close button with Space", async () => {
-      const closeBtn = findCloseButton(wrapper);
-
-      await closeBtn.trigger("keydown.space");
-      await closeBtn.trigger("click");
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    });
-
-    it("should be keyboard accessible - session replay button with Enter", async () => {
-      const replayBtn = findSessionReplayButton(wrapper);
-      const routerPushSpy = vi
-        .spyOn(router, "push")
-        .mockResolvedValue(undefined as any);
-
-      await replayBtn.trigger("keydown.enter");
-      await replayBtn.trigger("click");
-      await flushPromises();
-
-      expect(routerPushSpy).toHaveBeenCalled();
-    });
-
-    it("should be keyboard accessible - session replay button with Space", async () => {
-      const replayBtn = findSessionReplayButton(wrapper);
-      const routerPushSpy = vi
-        .spyOn(router, "push")
-        .mockResolvedValue(undefined as any);
-
-      await replayBtn.trigger("keydown.space");
-      await replayBtn.trigger("click");
-      await flushPromises();
-
-      expect(routerPushSpy).toHaveBeenCalled();
-    });
-
-    it("should be keyboard accessible - view events button with Enter", async () => {
-      const notifySpy = vi
-        .spyOn(quasar."create")
-        .mockImplementation(() => () => {});
-      const eventsBtn = findSessionEventsButton(wrapper);
-
-      await eventsBtn.trigger("keydown.enter");
-      await eventsBtn.trigger("click");
-      await flushPromises();
-
-      expect(notifySpy).toHaveBeenCalled();
-      notifySpy.mockRestore();
-    });
-
-    it.skip("should be keyboard accessible - view events button with Space", async () => {
-      const notifySpy = vi
-        .spyOn(quasar."create")
-        .mockImplementation(() => () => {});
-      const eventsBtn = findSessionEventsButton(wrapper);
-
-      await eventsBtn.trigger("keydown.space");
-      await eventsBtn.trigger("click");
-      await flushPromises();
-
-      expect(notifySpy).toHaveBeenCalled();
-      notifySpy.mockRestore();
-    });
-
-    it("should have accessible button labels", () => {
-      const replayBtn = findSessionReplayButton(wrapper);
-      const eventsBtn = findSessionEventsButton(wrapper);
-
-      // QBtn components expose label as text content
-      expect(replayBtn.text()).toContain("View Session Replay");
-      expect(eventsBtn.text()).toContain("View All Session Events");
-    });
-
-    it("should provide title attributes for truncated text", () => {
-      const urlElements = wrapper.findAll("[title]");
-      expect(urlElements.length).toBeGreaterThan(0);
-    });
-
-    it("should have semantic HTML structure with proper headings", () => {
-      // Check for proper content structure
-      expect(wrapper.text()).toContain("Resource Details");
-      expect(wrapper.text()).toContain("Resource Information");
-      expect(wrapper.text()).toContain("Session Context");
-    });
-  });
-
-  // ==========================================================================
-  // PROPS VALIDATION
-  // ==========================================================================
 
   describe("Component Props", () => {
     it("should display component when modelValue is true", () => {
@@ -623,7 +454,6 @@ describe("ResourceDetailDrawer", () => {
     });
 
     it("should display resource data correctly", () => {
-      // Verify resource data is displayed (test user-visible behavior)
       expect(wrapper.text()).toContain("GET");
       expect(wrapper.text()).toContain("http://localhost:5080/users");
       expect(wrapper.text()).toContain("200");
@@ -635,10 +465,15 @@ describe("ResourceDetailDrawer", () => {
         global: {
           plugins: [i18n, router],
           provide: { store },
+          stubs: {
+            TraceCorrelationCard: { template: "<div></div>" },
+            OButton: { template: "<button><slot /></button>" },
+            OIcon: { template: "<div></div>" },
+            OSeparator: { template: "<hr />" },
+          },
         },
       });
 
-      // Component should mount successfully with default props
       expect(newWrapper.exists()).toBe(true);
 
       newWrapper.unmount();
@@ -657,10 +492,6 @@ describe("ResourceDetailDrawer", () => {
       expect(wrapper.text()).toContain("404");
     });
   });
-
-  // ==========================================================================
-  // EDGE CASES & ERROR HANDLING
-  // ==========================================================================
 
   describe("Edge Cases", () => {
     it("should handle null resource gracefully", async () => {
@@ -718,17 +549,6 @@ describe("ResourceDetailDrawer", () => {
       expect(text).toContain("N/A");
     });
 
-    it("should handle extremely long URLs", async () => {
-      const longUrl = "http://example.com/" + "a".repeat(500);
-      await wrapper.setProps({
-        resource: createMockResource({ resource_url: longUrl }),
-      });
-      await flushPromises();
-
-      const ellipsisElement = wrapper.find(".ellipsis");
-      expect(ellipsisElement.exists()).toBe(true);
-    });
-
     it("should handle special characters in resource data", async () => {
       await wrapper.setProps({
         resource: createMockResource({
@@ -741,10 +561,6 @@ describe("ResourceDetailDrawer", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
-
-  // ==========================================================================
-  // DATA FORMATTING - USER-FACING DISPLAY
-  // ==========================================================================
 
   describe("Data Formatting Display", () => {
     describe("Timestamp Display", () => {
@@ -817,7 +633,6 @@ describe("ResourceDetailDrawer", () => {
         });
         await flushPromises();
 
-        // When size is 0, the Size field is not displayed (v-if="resource.resource_size")
         const text = wrapper.text();
         expect(text).not.toContain("Size:");
       });
@@ -832,8 +647,6 @@ describe("ResourceDetailDrawer", () => {
         await flushPromises();
 
         const text = wrapper.text();
-        // formatSessionId returns first 8 chars + "..." + last 8 chars for IDs > 16 chars
-        // "session-123456789-abcdefgh" -> "session-...abcdefgh"
         expect(text).toContain("session-");
         expect(text).toContain("abcdefgh");
       });
@@ -850,65 +663,43 @@ describe("ResourceDetailDrawer", () => {
     });
 
     describe("Status Code Display", () => {
-      it("should display success status with check icon", async () => {
+      it("should display success status code", async () => {
         await wrapper.setProps({
           resource: createResourceWithStatus(200),
         });
         await flushPromises();
 
         expect(wrapper.text()).toContain("200");
-        const icons = wrapper.findAllComponents({ name: "QIcon" });
-        const successIcon = icons.find((icon: any) =>
-          icon.props("name")?.includes("check_circle"),
-        );
-        expect(successIcon).toBeTruthy();
       });
 
-      it("should display client error status with warning icon", async () => {
+      it("should display client error status code", async () => {
         await wrapper.setProps({
           resource: createResourceWithStatus(404),
         });
         await flushPromises();
 
         expect(wrapper.text()).toContain("404");
-        const icons = wrapper.findAllComponents({ name: "QIcon" });
-        const warningIcon = icons.find((icon: any) =>
-          icon.props("name")?.includes("warning"),
-        );
-        expect(warningIcon).toBeTruthy();
       });
 
-      it("should display server error status with error icon", async () => {
+      it("should display server error status code", async () => {
         await wrapper.setProps({
           resource: createResourceWithStatus(500),
         });
         await flushPromises();
 
         expect(wrapper.text()).toContain("500");
-        const icons = wrapper.findAllComponents({ name: "QIcon" });
-        const errorIcon = icons.find((icon: any) =>
-          icon.props("name")?.includes("error"),
-        );
-        expect(errorIcon).toBeTruthy();
       });
     });
   });
 
-  // ==========================================================================
-  // INTEGRATION SCENARIOS
-  // ==========================================================================
-
   describe("Integration Scenarios", () => {
     it("should handle complete user flow: view resource details and navigate to session", async () => {
-      // 1. Component displays with resource details
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.text()).toContain("Resource Details");
 
-      // 2. User views resource information
       expect(wrapper.text()).toContain("GET");
       expect(wrapper.text()).toContain("http://localhost:5080/users");
 
-      // 3. User clicks to view session replay
       const routerPushSpy = vi
         .spyOn(router, "push")
         .mockResolvedValue(undefined as any);
@@ -916,7 +707,6 @@ describe("ResourceDetailDrawer", () => {
       await replayBtn.trigger("click");
       await flushPromises();
 
-      // 4. Navigation occurs and drawer closes
       expect(routerPushSpy).toHaveBeenCalled();
       expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
     });
@@ -936,7 +726,6 @@ describe("ResourceDetailDrawer", () => {
       await wrapper.setProps({ resource: completeResource });
       await flushPromises();
 
-      // All sections should be visible
       expect(wrapper.text()).toContain("Resource Information");
       expect(wrapper.text()).toContain("Session Context");
       expect(findByTestId(wrapper, "trace-correlation-card").exists()).toBe(

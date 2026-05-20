@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MapsRenderer from "./MapsRenderer.vue";
 
 // Create mock chart instance
@@ -78,8 +77,6 @@ Object.defineProperty(window, 'removeEventListener', {
     }
   }),
 });
-
-installQuasar();
 
 describe("MapsRenderer", () => {
   let wrapper: VueWrapper<any>;

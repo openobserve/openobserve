@@ -1,11 +1,9 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("CrossLinkUserGuide Component", () => {
   let wrapper: any;
@@ -15,14 +13,6 @@ describe("CrossLinkUserGuide Component", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            emits: ["click"],
-          },
-          "q-tooltip": {
-            template: '<span class="q-tooltip"><slot /></span>',
-          },
         },
       },
       attachTo: document.body,

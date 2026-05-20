@@ -118,14 +118,6 @@ describe("DimensionFilterEditor.vue", () => {
             emits: ["click"],
           },
           "OIcon": true,
-          "q-tooltip": true,
-          "q-input": {
-            name: "QInput",
-            template:
-              '<input class="q-input-stub" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ["modelValue", "dense", "outlined", "placeholder"],
-            emits: ["update:modelValue"],
-          },
         },
       },
     });

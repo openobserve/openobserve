@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
-
-installQuasar();
 
 vi.mock("@/services/organizations", () => ({
   default: {
@@ -19,6 +16,17 @@ vi.mock("@/services/organizations", () => ({
       data: { data: { id: "1", name, identifier: "org-1" } },
     })),
   },
+}));
+
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({
+    track: vi.fn(),
+  }),
+}));
+
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn(() => vi.fn()) }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 const orgService = (await import("@/services/organizations")).default;
@@ -51,9 +59,11 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open" :data-title="title">
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+      <form @submit.prevent="$emit('click:primary')">
+        <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+        <div data-test-stub="o-drawer-body"><slot /></div>
+        <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+      </form>
     </div>
   `,
 };
@@ -73,6 +83,20 @@ const OButtonStub = {
   inheritAttrs: false,
 };
 
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "label", "readonly", "disabled", "error", "errorMessage", "maxlength"],
+  emits: ["update:modelValue"],
+  template: `<input
+    :data-test="$attrs['data-test']"
+    :value="modelValue"
+    :readonly="readonly"
+    :disabled="disabled"
+    @input="$emit('update:modelValue', $event.target.value)"
+  />`,
+  inheritAttrs: false,
+};
+
 const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
   mount(AddUpdateOrganization, {
     global: {
@@ -80,6 +104,7 @@ const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
       stubs: {
         ODrawer: ODrawerStub,
         OButton: OButtonStub,
+        OInput: OInputStub,
       },
     },
     props: { open: true, modelValue: { id: "", name: "" }, ...props },
@@ -87,7 +112,8 @@ const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
 
 describe("AddUpdateOrganization", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    mockToast.mockClear();
+    mockToast.mockReturnValue(vi.fn());
   });
 
   it("renders create organization title when not updating", () => {
@@ -137,7 +163,7 @@ describe("AddUpdateOrganization", () => {
       resetValidation: vi.fn(),
     };
 
-    await wrapper.find("form").trigger("submit.prevent");
+    await wrapper.findComponent({ name: "ODrawer" }).vm.$emit("click:primary");
     await flushPromises();
 
     expect(orgService.create).toHaveBeenCalledWith({ name: "My Org" });
@@ -165,7 +191,7 @@ describe("AddUpdateOrganization", () => {
       resetValidation: vi.fn(),
     };
 
-    await wrapper.find("form").trigger("submit.prevent");
+    await wrapper.findComponent({ name: "ODrawer" }).vm.$emit("click:primary");
     await flushPromises();
 
     expect(wrapper.vm.proPlanRequired).toBe(true);
@@ -177,7 +203,7 @@ describe("AddUpdateOrganization", () => {
     });
   });
 
-  it("handles create rejection and shows notify negative", async () => {
+  it("handles create rejection and shows toast error", async () => {
     vi.spyOn(orgService, "create").mockRejectedValueOnce({
       response: { data: { message: "Organization creation failed." } },
     });
@@ -189,13 +215,11 @@ describe("AddUpdateOrganization", () => {
       resetValidation: vi.fn(),
     };
 
-    const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-
-    await wrapper.find("form").trigger("submit.prevent");
+    await wrapper.findComponent({ name: "ODrawer" }).vm.$emit("click:primary");
     await flushPromises();
 
-    expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
   });
 

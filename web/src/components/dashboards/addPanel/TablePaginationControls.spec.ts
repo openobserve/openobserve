@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TablePaginationControls from "./TablePaginationControls.vue";
 import { createI18n } from "vue-i18n";
-
-installQuasar();
 
 const mockI18n = createI18n({
   locale: "en",
@@ -31,6 +28,21 @@ const mockI18n = createI18n({
     },
   },
 });
+
+// Stubs for the new OButton & OSelect components used in TablePaginationControls.vue
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "iconLeft", "loading", "active", "block"],
+  emits: ["click"],
+  template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><span :data-icon="iconLeft">{{ iconLeft }}</span><slot /></button>`,
+};
+
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options"],
+  emits: ["update:modelValue"],
+  template: `<select :data-test="$attrs['data-test']" :value="modelValue" @change="$emit('update:modelValue', Number($event.target.value))"><option v-for="opt in options" :value="typeof opt === 'object' ? opt.value : opt" :key="typeof opt === 'object' ? opt.value : opt">{{ typeof opt === 'object' ? opt.label : opt }}</option></select>`,
+};
 
 describe("TablePaginationControls", () => {
   let wrapper: VueWrapper<any>;
@@ -53,6 +65,10 @@ describe("TablePaginationControls", () => {
       },
       global: {
         plugins: [mockI18n],
+        stubs: {
+          OButton: OButtonStub,
+          OSelect: OSelectStub,
+        },
       },
     });
   };
@@ -75,13 +91,13 @@ describe("TablePaginationControls", () => {
 
     it("should render rows per page dropdown when pagination is enabled", () => {
       wrapper = createWrapper({ showPagination: true });
-      expect(wrapper.find(".q-select").exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(true);
       expect(wrapper.text()).toContain("Rows per page");
     });
 
     it("should not render rows per page dropdown when pagination is disabled", () => {
       wrapper = createWrapper({ showPagination: false });
-      expect(wrapper.find(".q-select").exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(false);
     });
 
     it("should render count display", () => {
@@ -91,19 +107,19 @@ describe("TablePaginationControls", () => {
 
     it("should render navigation buttons when pagination is enabled and pages > 1", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 5 });
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       expect(buttons.length).toBeGreaterThan(0);
     });
 
     it("should not render navigation buttons when pagination is disabled", () => {
       wrapper = createWrapper({ showPagination: false, pagesNumber: 5 });
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       expect(buttons.length).toBe(0);
     });
 
     it("should not render navigation buttons when pagesNumber is 1", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 1 });
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       expect(buttons.length).toBe(0);
     });
   });
@@ -111,21 +127,23 @@ describe("TablePaginationControls", () => {
   describe("Pagination Options", () => {
     it("should display correct pagination options in dropdown", () => {
       wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("options")).toEqual([
+      const select = wrapper.findComponent({ name: "OSelect" });
+      // The source maps paginationOptions into { label, value } objects
+      const options = select.props("options") as Array<{ label: string; value: number }>;
+      expect(options.map((o) => o.value)).toEqual([
         10, 20, 50, 100, 250, 500, 1000,
       ]);
     });
 
     it("should show current rowsPerPage value", () => {
       wrapper = createWrapper({ pagination: { rowsPerPage: 50, page: 1 } });
-      const select = wrapper.findComponent({ name: "QSelect" });
+      const select = wrapper.findComponent({ name: "OSelect" });
       expect(select.props("modelValue")).toBe(50);
     });
 
     it("should emit update:rowsPerPage when dropdown value changes", async () => {
       wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
+      const select = wrapper.findComponent({ name: "OSelect" });
 
       await select.vm.$emit("update:model-value", 50);
 
@@ -135,11 +153,14 @@ describe("TablePaginationControls", () => {
 
     it("should display 'All' for option value 0", () => {
       wrapper = createWrapper({ paginationOptions: [0, 10, 20] });
-      const select = wrapper.findComponent({ name: "QSelect" });
-      const optionLabel = select.props("optionLabel");
+      const select = wrapper.findComponent({ name: "OSelect" });
+      const options = select.props("options") as Array<{ label: string; value: number }>;
 
-      expect(optionLabel(0)).toBe("All");
-      expect(optionLabel(10)).toBe(10);
+      // formattedPaginationOptions maps 0 -> { label: 'All', value: 0 }
+      const allOpt = options.find((o) => o.value === 0);
+      const tenOpt = options.find((o) => o.value === 10);
+      expect(allOpt?.label).toBe("All");
+      expect(tenOpt?.label).toBe("10");
     });
   });
 
@@ -229,31 +250,14 @@ describe("TablePaginationControls", () => {
     it("should render all four navigation buttons when pagesNumber > 1", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 5 });
 
-      const firstPageBtn = wrapper
-        .findAll("button")
-        .find(
-          (btn) =>
-            btn.attributes("aria-label")?.includes("first") ||
-            btn.html().includes("first_page"),
-        );
-      const lastPageBtn = wrapper
-        .findAll("button")
-        .find(
-          (btn) =>
-            btn.attributes("aria-label")?.includes("last") ||
-            btn.html().includes("last_page"),
-        );
-      const prevBtn = wrapper
-        .findAll("button")
-        .find((btn) => btn.html().includes("chevron_left"));
-      const nextBtn = wrapper
-        .findAll("button")
-        .find((btn) => btn.html().includes("chevron_right"));
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      expect(buttons.length).toBe(4);
 
-      expect(firstPageBtn).toBeTruthy();
-      expect(prevBtn).toBeTruthy();
-      expect(nextBtn).toBeTruthy();
-      expect(lastPageBtn).toBeTruthy();
+      const icons = buttons.map((b) => b.props("iconLeft"));
+      expect(icons).toContain("first-page");
+      expect(icons).toContain("chevron-left");
+      expect(icons).toContain("chevron-right");
+      expect(icons).toContain("last-page");
     });
 
     it("should disable first page and prev buttons when on first page", () => {
@@ -264,16 +268,12 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
-      const firstPageBtn = buttons.find((btn) =>
-        btn.html().includes("first_page"),
-      );
-      const prevBtn = buttons.find((btn) =>
-        btn.html().includes("chevron_left"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const firstPageBtn = buttons.find((b) => b.props("iconLeft") === "first-page");
+      const prevBtn = buttons.find((b) => b.props("iconLeft") === "chevron-left");
 
-      expect(firstPageBtn?.attributes("disabled")).toBeDefined();
-      expect(prevBtn?.attributes("disabled")).toBeDefined();
+      expect(firstPageBtn?.props("disabled")).toBe(true);
+      expect(prevBtn?.props("disabled")).toBe(true);
     });
 
     it("should disable last page and next buttons when on last page", () => {
@@ -284,16 +284,12 @@ describe("TablePaginationControls", () => {
         isLastPage: true,
       });
 
-      const buttons = wrapper.findAll("button");
-      const lastPageBtn = buttons.find((btn) =>
-        btn.html().includes("last_page"),
-      );
-      const nextBtn = buttons.find((btn) =>
-        btn.html().includes("chevron_right"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const lastPageBtn = buttons.find((b) => b.props("iconLeft") === "last-page");
+      const nextBtn = buttons.find((b) => b.props("iconLeft") === "chevron-right");
 
-      expect(lastPageBtn?.attributes("disabled")).toBeDefined();
-      expect(nextBtn?.attributes("disabled")).toBeDefined();
+      expect(lastPageBtn?.props("disabled")).toBe(true);
+      expect(nextBtn?.props("disabled")).toBe(true);
     });
 
     it("should enable all buttons when on middle page", () => {
@@ -304,9 +300,9 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       buttons.forEach((btn) => {
-        expect(btn.attributes("disabled")).toBeUndefined();
+        expect(btn.props("disabled")).toBe(false);
       });
     });
 
@@ -317,10 +313,8 @@ describe("TablePaginationControls", () => {
         isFirstPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
-      const firstPageBtn = buttons.find((btn) =>
-        btn.html().includes("first_page"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const firstPageBtn = buttons.find((b) => b.props("iconLeft") === "first-page");
 
       await firstPageBtn?.trigger("click");
 
@@ -335,10 +329,8 @@ describe("TablePaginationControls", () => {
         isFirstPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
-      const prevBtn = buttons.find((btn) =>
-        btn.html().includes("chevron_left"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const prevBtn = buttons.find((b) => b.props("iconLeft") === "chevron-left");
 
       await prevBtn?.trigger("click");
 
@@ -353,10 +345,8 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
-      const nextBtn = buttons.find((btn) =>
-        btn.html().includes("chevron_right"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const nextBtn = buttons.find((b) => b.props("iconLeft") === "chevron-right");
 
       await nextBtn?.trigger("click");
 
@@ -371,10 +361,8 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
-      const lastPageBtn = buttons.find((btn) =>
-        btn.html().includes("last_page"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const lastPageBtn = buttons.find((b) => b.props("iconLeft") === "last-page");
 
       await lastPageBtn?.trigger("click");
 
@@ -382,40 +370,28 @@ describe("TablePaginationControls", () => {
       expect(wrapper.emitted("lastPage")?.length).toBe(1);
     });
 
-    it("should not emit firstPage when button is disabled", async () => {
+    it("should mark first page button disabled when isFirstPage is true", async () => {
       wrapper = createWrapper({
         showPagination: true,
         pagesNumber: 5,
         isFirstPage: true,
       });
 
-      const buttons = wrapper.findAll("button");
-      const firstPageBtn = buttons.find((btn) =>
-        btn.html().includes("first_page"),
-      );
-
-      // Even if we try to click, the disabled button should not emit
-      await firstPageBtn?.trigger("click");
-
-      // The component should handle this gracefully
-      expect(firstPageBtn?.attributes("disabled")).toBeDefined();
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const firstPageBtn = buttons.find((b) => b.props("iconLeft") === "first-page");
+      expect(firstPageBtn?.props("disabled")).toBe(true);
     });
 
-    it("should not emit lastPage when button is disabled", async () => {
+    it("should mark last page button disabled when isLastPage is true", async () => {
       wrapper = createWrapper({
         showPagination: true,
         pagesNumber: 5,
         isLastPage: true,
       });
 
-      const buttons = wrapper.findAll("button");
-      const lastPageBtn = buttons.find((btn) =>
-        btn.html().includes("last_page"),
-      );
-
-      await lastPageBtn?.trigger("click");
-
-      expect(lastPageBtn?.attributes("disabled")).toBeDefined();
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const lastPageBtn = buttons.find((b) => b.props("iconLeft") === "last-page");
+      expect(lastPageBtn?.props("disabled")).toBe(true);
     });
   });
 
@@ -483,8 +459,9 @@ describe("TablePaginationControls", () => {
         paginationOptions: [5, 15, 25],
       });
 
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("options")).toEqual([5, 15, 25]);
+      const select = wrapper.findComponent({ name: "OSelect" });
+      const options = select.props("options") as Array<{ label: string; value: number }>;
+      expect(options.map((o) => o.value)).toEqual([5, 15, 25]);
     });
 
     it("should handle missing optional props with defaults", () => {
@@ -495,6 +472,10 @@ describe("TablePaginationControls", () => {
         },
         global: {
           plugins: [mockI18n],
+          stubs: {
+            OButton: OButtonStub,
+            OSelect: OSelectStub,
+          },
         },
       });
 
@@ -623,6 +604,10 @@ describe("TablePaginationControls", () => {
         props: defaultProps,
         global: {
           plugins: [customI18n],
+          stubs: {
+            OButton: OButtonStub,
+            OSelect: OSelectStub,
+          },
         },
       });
 
@@ -631,7 +616,7 @@ describe("TablePaginationControls", () => {
   });
 
   describe("Accessibility", () => {
-    it("should have proper button attributes for navigation", () => {
+    it("should render navigation buttons", () => {
       wrapper = createWrapper({
         showPagination: true,
         pagesNumber: 5,
@@ -639,29 +624,21 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       expect(buttons.length).toBeGreaterThan(0);
-
-      buttons.forEach((btn) => {
-        expect(
-          btn.attributes("role") || btn.element.tagName.toLowerCase(),
-        ).toBeTruthy();
-      });
     });
 
-    it("should properly disable buttons using disabled attribute", () => {
+    it("should properly disable buttons via disabled prop", () => {
       wrapper = createWrapper({
         showPagination: true,
         pagesNumber: 5,
         isFirstPage: true,
       });
 
-      const buttons = wrapper.findAll("button");
-      const firstPageBtn = buttons.find((btn) =>
-        btn.html().includes("first_page"),
-      );
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const firstPageBtn = buttons.find((b) => b.props("iconLeft") === "first-page");
 
-      expect(firstPageBtn?.attributes("disabled")).toBeDefined();
+      expect(firstPageBtn?.props("disabled")).toBe(true);
     });
   });
 
@@ -710,37 +687,35 @@ describe("TablePaginationControls", () => {
   });
 
   describe("Layout and Styling", () => {
-    it("should have row layout class", () => {
+    it("should render with flex layout", () => {
       wrapper = createWrapper();
 
-      const mainDiv = wrapper.find(".row.items-center");
+      const mainDiv = wrapper.find('[data-test="dashboard-table-pagination-controls"]');
       expect(mainDiv.exists()).toBe(true);
     });
 
-    it("should have q-gutter-sm class when pagination is shown", () => {
+    it("should render OSelect with data-test attribute when pagination is shown", () => {
       wrapper = createWrapper({ showPagination: true });
 
-      const gutterDiv = wrapper.find(".q-gutter-sm");
-      expect(gutterDiv.exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-table-rows-per-page-select"]')
+          .exists(),
+      ).toBe(true);
     });
 
-    it("should apply text-caption class to labels", () => {
-      wrapper = createWrapper();
-
-      const captions = wrapper.findAll(".text-caption");
-      expect(captions.length).toBeGreaterThan(0);
-    });
-
-    it("should render buttons with correct icon names", () => {
+    it("should render OButton components with correct iconLeft values", () => {
       wrapper = createWrapper({
         showPagination: true,
         pagesNumber: 5,
       });
 
-      expect(wrapper.html()).toContain("first_page");
-      expect(wrapper.html()).toContain("chevron_left");
-      expect(wrapper.html()).toContain("chevron_right");
-      expect(wrapper.html()).toContain("last_page");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
+      const icons = buttons.map((b) => b.props("iconLeft"));
+      expect(icons).toContain("first-page");
+      expect(icons).toContain("chevron-left");
+      expect(icons).toContain("chevron-right");
+      expect(icons).toContain("last-page");
     });
 
     it("should apply correct button styling", () => {
@@ -749,10 +724,10 @@ describe("TablePaginationControls", () => {
         pagesNumber: 5,
       });
 
-      const buttons = wrapper.findAll("button");
+      const buttons = wrapper.findAllComponents({ name: "OButton" });
       buttons.forEach((btn) => {
-        const html = btn.html();
-        expect(html).toBeTruthy();
+        expect(btn.props("variant")).toBe("ghost");
+        expect(btn.props("size")).toBe("icon");
       });
     });
   });

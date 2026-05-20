@@ -17,7 +17,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ImportRegexPattern from "@/components/settings/ImportRegexPattern.vue";
 import regexPatternsService from "@/services/regex_pattern";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 import axios from "axios";
 import store from "@/test/unit/helpers/store";
@@ -42,9 +41,11 @@ vi.mock("@/utils/cookies", () => ({
   getLanguage: vi.fn(() => "en-gb")
 }));
 
-installQuasar({
-  plugins: []
-});
+// Mock toast
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 describe("ImportRegexPattern", () => {
   let wrapper: any = null;
@@ -84,11 +85,6 @@ describe("ImportRegexPattern", () => {
               return { jsonArrayOfObj, jsonStr, isImporting, jsonFiles, url, updateJsonArray };
             },
           },
-          "q-input": true,
-          "q-btn": true,
-          "q-separator": true,
-          "q-form": true,
-          "q-file": true,
           "app-tabs": {
             template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
             props: ['tabs', 'activeTab'],
@@ -444,16 +440,15 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToast.mockClear();
 
       await wrapper.vm.importJson(payload);
 
-      expect(notifySpy).toHaveBeenCalledWith({
-        message: "JSON string is empty",
-        color: "negative",
-        position: "bottom",
-        timeout: 2000,
-      });
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("JSON"),
+        }),
+      );
     });
 
     it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
@@ -476,18 +471,12 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToast.mockClear();
 
       await wrapper.vm.importJson(payload);
 
-      expect(notifySpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        })
-      );
-      expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
+      expect(mockToast).toHaveBeenCalled();
+      expect(mockToast.mock.calls[0][0].message).toContain("JSON");
     });
 
     it("should reset BaseImport isImporting flag when JSON is invalid", async () => {

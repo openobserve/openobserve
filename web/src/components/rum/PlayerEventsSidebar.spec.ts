@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import i18n from "@/locales";
 
@@ -24,10 +22,7 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
   plugins: [quasar.quasar.Loading],
-});
 
 // Mock AppTabs component
 vi.mock("@/components/common/AppTabs.vue", () => ({
@@ -97,48 +92,6 @@ describe("PlayerEventsSidebar Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-input": {
-            template: `
-              <div data-test="q-input">
-                <input v-model="modelValue" @input="$emit('update:model-value', $event.target.value)" />
-              </div>
-            `,
-            props: [
-              "modelValue",
-              "size",
-              "filled",
-              "borderless",
-              "dense",
-              "clearable",
-              "debounce",
-              "placeholder",
-            ],
-            emits: ["update:model-value"],
-          },
-          "q-select": {
-            template: `
-              <div data-test="q-select">
-                <select v-model="modelValue" @change="$emit('update:model-value', Array.from($event.target.selectedOptions, option => option.value))">
-                  <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
-                </select>
-              </div>
-            `,
-            props: [
-              "modelValue",
-              "options",
-              "behavior",
-              "multiple",
-              "filled",
-              "borderless",
-              "dense",
-              "emit-value",
-              "size",
-            ],
-            emits: ["update:model-value"],
-          },
-          "q-separator": {
-            template: '<hr data-test="separator" />',
-          },
           "OIcon": {
             template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],

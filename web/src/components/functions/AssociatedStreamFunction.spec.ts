@@ -16,12 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AssociatedStreamFunction from "./AssociatedStreamFunction.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
-
-installQuasar({ plugins: [] });
 
 // Hoist mocks so they are available when vi.mock factories are hoisted
 const {
@@ -379,7 +376,7 @@ describe("AssociatedStreamFunction", () => {
     });
   });
 
-  describe("Row Expansion (toggleStreamRow)", () => {
+  describe("Row Expansion (onExpandRow)", () => {
     it("should expand a row when clicked", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
@@ -390,7 +387,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       expect(vm.expandedRow.name).toBe("");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
       expect(vm.expandedRow.stream_type).toBe("logs");
     });
@@ -403,10 +400,10 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("");
     });
 
@@ -420,7 +417,7 @@ describe("AssociatedStreamFunction", () => {
       mockStreamFunction.mockResolvedValue(mockStreamFunctionResult);
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
 
       await flushPromises();
       expect(mockStreamFunction).toHaveBeenCalledWith("test-org", "stream1", "logs");
@@ -436,7 +433,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       vm.addFunctionInProgress = true;
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.addFunctionInProgress).toBe(false);
     });
   });
@@ -611,7 +608,7 @@ describe("AssociatedStreamFunction", () => {
       vm.expandedRow = { name: "stream1", stream_type: "metrics" };
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(false);
     });
 
@@ -623,10 +620,11 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.expandedRow = { name: "stream1", stream_type: "logs" };
+      vm.expandedRow.stream_type = "logs";
+      await wrapper.vm.$nextTick();
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(true);
     });
   });
@@ -643,18 +641,23 @@ describe("AssociatedStreamFunction", () => {
       vm.allFunctionsList = [{ name: "func1" }, { name: "func2" }, { name: "func3" }];
       vm.functionsList = [{ name: "func1" }];
 
-      const mockUpdate = vi.fn((cb: any) => cb());
-      vm.filterFn("func", mockUpdate);
+      vm.filterFn("func");
 
-      expect(mockUpdate).toHaveBeenCalled();
       // func1 is already applied; it should be filtered out
       const hasFunc1 = vm.filterFunctions.some((f: any) => f.name === "func1");
       expect(hasFunc1).toBe(false);
     });
   });
 
-  describe("Filter Data (filterData)", () => {
+  describe("Filtered Stream Data (filteredStreamData computed)", () => {
     it("should filter rows by name (case-insensitive)", async () => {
+      mockGetStreams.mockResolvedValue({
+        list: [
+          { name: "STREAM_ONE", stream_type: "logs", stats: null },
+          { name: "stream_two", stream_type: "metrics", stats: null },
+        ],
+      });
+
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -662,17 +665,22 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
-        { name: "STREAM_ONE", stream_type: "logs" },
-        { name: "stream_two", stream_type: "metrics" },
-      ];
+      vm.filterQuery = "stream_one";
+      await wrapper.vm.$nextTick();
 
-      const result = vm.filterData(rows, "stream_one");
+      const result = vm.filteredStreamData;
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("STREAM_ONE");
     });
 
     it("should filter rows by stream_type", async () => {
+      mockGetStreams.mockResolvedValue({
+        list: [
+          { name: "stream1", stream_type: "logs", stats: null },
+          { name: "stream2", stream_type: "metrics", stats: null },
+        ],
+      });
+
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -680,17 +688,19 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
-        { name: "stream1", stream_type: "logs" },
-        { name: "stream2", stream_type: "metrics" },
-      ];
+      vm.filterQuery = "metrics";
+      await wrapper.vm.$nextTick();
 
-      const result = vm.filterData(rows, "metrics");
+      const result = vm.filteredStreamData;
       expect(result).toHaveLength(1);
       expect(result[0].stream_type).toBe("metrics");
     });
 
     it("should return empty array when no match", async () => {
+      mockGetStreams.mockResolvedValue({
+        list: [{ name: "stream1", stream_type: "logs", stats: null }],
+      });
+
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -698,27 +708,10 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [{ name: "stream1", stream_type: "logs" }];
+      vm.filterQuery = "xyz_not_found";
+      await wrapper.vm.$nextTick();
 
-      expect(vm.filterData(rows, "xyz_not_found")).toHaveLength(0);
-    });
-  });
-
-  describe("Pagination", () => {
-    it("should change pagination correctly", async () => {
-      const wrapper = mount(AssociatedStreamFunction, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.qTable = { setPagination: vi.fn() };
-
-      vm.changePagination({ label: "50", value: 50 });
-      expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.qTable.setPagination).toHaveBeenCalledWith({ rowsPerPage: 50 });
+      expect(vm.filteredStreamData).toHaveLength(0);
     });
   });
 

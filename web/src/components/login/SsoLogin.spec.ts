@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import SsoLogin from './SsoLogin.vue';
@@ -29,7 +28,18 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
+const stubsConfig = {
+  OButton: {
+    template: '<button :data-test="$attrs[\'data-test\']" :data-cy="$attrs[\'data-cy\']" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+    props: ['variant', 'size', 'disabled', 'loading', 'block', 'type'],
+    emits: ['click'],
+  },
+  OInput: {
+    template: '<input :data-test="$attrs[\'data-test\']" :data-cy="$attrs[\'data-cy\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ['modelValue', 'label', 'placeholder', 'type'],
+    emits: ['update:modelValue'],
+  },
+};
 
 describe('SsoLogin.vue', () => {
   let wrapper: VueWrapper;
@@ -48,6 +58,7 @@ describe('SsoLogin.vue', () => {
     return mount(SsoLogin, {
       global: {
         plugins: [mockI18n, storeOverride || mockStore],
+        stubs: stubsConfig,
       },
     });
   };

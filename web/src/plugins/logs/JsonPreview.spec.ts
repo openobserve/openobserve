@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive primary/secondary actions via emits.
@@ -232,18 +230,7 @@ describe("JsonPreview Component", () => {
             }
           },
           ODialog: ODialogStub,
-          'q-btn': true,
-          'q-btn-dropdown': true,
-          'q-list': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-select': true,
           'OIcon': true,
-          'q-input': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
           'EqualIcon': true,
           'NotEqualIcon': true
         }
@@ -285,18 +272,7 @@ describe("JsonPreview Component", () => {
             'app-tabs': true,
             'code-query-editor': true,
             ODialog: ODialogStub,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
             'OIcon': true,
-            'q-input': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
               'EqualIcon': true,
             'NotEqualIcon': true
           }
@@ -764,18 +740,7 @@ describe("JsonPreview Component", () => {
             'app-tabs': true,
             'code-query-editor': true,
             ODialog: ODialogStub,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
             'OIcon': true,
-            'q-input': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
               'EqualIcon': true,
             'NotEqualIcon': true
           }

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import RouteTabs from '@/components/RouteTabs.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -10,8 +9,6 @@ vi.mock('vue-router', () => ({
   }),
   useRoute: () => ({ name: '', query: {} }),
 }));
-
-installQuasar();
 
 describe('RouteTabs.vue', () => {
   let wrapper: VueWrapper;

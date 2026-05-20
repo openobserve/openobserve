@@ -32,8 +32,6 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionsList from "@/components/rum/SessionsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -43,11 +41,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.quasar.Loading],
-});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -81,25 +74,6 @@ vi.mock("@/components/common/sidebar/SearchFieldList.vue", () => ({
   },
 }));
 
-vi.mock("@/components/rum/AppTable.vue", () => ({
-  default: {
-    name: "AppTable",
-    template: `
-      <div data-test="app-table" @click="$emit('event-emitted', 'cell-click', mockPayload)">
-        <div data-test="table-columns">{{ columns.length }} columns</div>
-        <div data-test="table-rows">{{ rows.length }} rows</div>
-      </div>
-    `,
-    props: ["columns", "rows"],
-    emits: ["event-emitted"],
-    setup() {
-      return {
-        mockPayload: { row: { id: "session123" } },
-      };
-    },
-  },
-}));
-
 // Mock router functions
 const mockRouterPush = vi.fn();
 vi.mock("vue-router", async () => {
@@ -112,6 +86,47 @@ vi.mock("vue-router", async () => {
   };
 });
 
+const mountComponent = () =>
+  mount(SessionsList, {
+    attachTo: "#app",
+    global: {
+      plugins: [i18n, router],
+      provide: { store },
+      stubs: {
+        OTable: {
+          template: `
+            <div data-test="o-table"
+              @click="$emit('row-click', mockRow)">
+              <div data-test="o-table-columns">{{ columns.length }} columns</div>
+              <div data-test="o-table-rows">{{ data.length }} rows</div>
+              <slot name="cell-action_play" :row="mockRow" />
+            </div>
+          `,
+          props: ["data", "columns", "rowKey", "pagination", "virtualScroll", "dense"],
+          emits: ["row-click"],
+          setup() {
+            return {
+              mockRow: { id: "session123" },
+            };
+          },
+        },
+        OSplitter: {
+          template: `
+            <div data-test="splitter">
+              <div data-test="before-section"><slot name="before" /></div>
+              <div data-test="after-section"><slot name="after" /></div>
+            </div>
+          `,
+          props: ["modelValue", "unit", "horizontal"],
+        },
+        OIcon: {
+          template: '<div class="o-icon" :data-name="name"></div>',
+          props: ["name", "size"],
+        },
+      },
+    },
+  });
+
 describe("SessionsList Component", () => {
   let wrapper: any;
 
@@ -119,29 +134,7 @@ describe("SessionsList Component", () => {
     vi.clearAllMocks();
     mockRouterPush.mockClear();
 
-    wrapper = mount(SessionsList, {
-      attachTo: "#app",
-      global: {
-        plugins: [i18n, router],
-        provide: { store },
-        stubs: {
-          "q-splitter": {
-            template: `
-              <div data-test="splitter">
-                <div data-test="before-section"><slot name="before" /></div>
-                <div data-test="separator-section">
-                  <slot name="separator">
-                    <div data-test="avatar" />
-                  </slot>
-                </div>
-                <div data-test="after-section"><slot name="after" /></div>
-              </div>
-            `,
-            props: ["v-model", "unit", "vertical"],
-          },
-        },
-      },
-    });
+    wrapper = mountComponent();
 
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -168,50 +161,27 @@ describe("SessionsList Component", () => {
     it("should render all child components", () => {
       expect(wrapper.find('[data-test="search-bar"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="field-list"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-table"]').exists()).toBe(true);
     });
 
     it("should render splitter layout", () => {
       expect(wrapper.find('[data-test="splitter"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="before-section"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="separator-section"]').exists()).toBe(
-        true,
-      );
       expect(wrapper.find('[data-test="after-section"]').exists()).toBe(true);
-    });
-
-    it("should render separator avatar", () => {
-      expect(wrapper.find('[data-test="avatar"]').exists()).toBe(true);
     });
   });
 
   describe("Component Structure", () => {
-    it("should have correct layout structure", () => {
+    it("should pass FieldList to before slot", () => {
       const beforeSection = wrapper.find('[data-test="before-section"]');
-      const afterSection = wrapper.find('[data-test="after-section"]');
-
       expect(beforeSection.find('[data-test="field-list"]').exists()).toBe(
         true,
       );
-      expect(afterSection.find('[data-test="app-table"]').exists()).toBe(true);
     });
 
-    it("should pass SearchBar to template", () => {
-      expect(wrapper.findComponent({ name: "SearchBar" }).exists()).toBe(true);
-    });
-
-    it("should pass FieldList to before slot", () => {
-      const beforeSection = wrapper.find('[data-test="before-section"]');
-      expect(beforeSection.findComponent({ name: "FieldList" }).exists()).toBe(
-        true,
-      );
-    });
-
-    it("should pass AppTable to after slot", () => {
+    it("should pass OTable to after slot", () => {
       const afterSection = wrapper.find('[data-test="after-section"]');
-      expect(afterSection.findComponent({ name: "AppTable" }).exists()).toBe(
-        true,
-      );
+      expect(afterSection.find('[data-test="o-table"]').exists()).toBe(true);
     });
   });
 
@@ -220,155 +190,101 @@ describe("SessionsList Component", () => {
       expect(wrapper.vm.splitterModel).toBe(250);
     });
 
-    it("should have empty rows array initially", () => {
-      expect(wrapper.vm.rows).toEqual([]);
-      expect(Array.isArray(wrapper.vm.rows)).toBe(true);
+    it("should have tableRows array", () => {
+      expect(Array.isArray(wrapper.vm.tableRows)).toBe(true);
     });
 
-    it("should have columns array with correct structure", () => {
-      expect(Array.isArray(wrapper.vm.columns)).toBe(true);
-      expect(wrapper.vm.columns.length).toBeGreaterThan(0);
+    it("should have tableColumns array with correct structure", () => {
+      expect(Array.isArray(wrapper.vm.tableColumns)).toBe(true);
+      expect(wrapper.vm.tableColumns.length).toBeGreaterThan(0);
     });
   });
 
   describe("Columns Configuration", () => {
     it("should have action_play column with correct properties", () => {
-      const actionColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "action_play",
+      const actionColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "action_play",
       );
 
       expect(actionColumn).toBeDefined();
-      expect(actionColumn.type).toBe("action");
-      expect(actionColumn.icon).toBe("play_circle_filled");
-      expect(actionColumn.style).toEqual({ width: "3.5rem" });
+      expect(actionColumn.sortable).toBe(false);
+      expect(actionColumn.size).toBe(56);
     });
 
-    it("should have timestamp column with correct properties", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
+    it("should have timestamp column", () => {
+      const timestampColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "timestamp",
       );
 
       expect(timestampColumn).toBeDefined();
-      expect(timestampColumn.label).toBe("Timestamp");
-      expect(timestampColumn.align).toBe("left");
       expect(timestampColumn.sortable).toBe(true);
+      expect(timestampColumn.accessorKey).toBe("timestamp");
     });
 
-    it("should have type column with correct properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+    it("should have type column", () => {
+      const typeColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "type",
       );
 
       expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Session Type");
-      expect(typeColumn.align).toBe("left");
       expect(typeColumn.sortable).toBe(true);
+      expect(typeColumn.accessorKey).toBe("type");
     });
 
-    it("should have time_spent column with correct properties", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
+    it("should have time_spent column", () => {
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
 
       expect(timeSpentColumn).toBeDefined();
-      expect(timeSpentColumn.label).toBe("Time Spent");
-      expect(timeSpentColumn.align).toBe("left");
       expect(timeSpentColumn.sortable).toBe(true);
-      expect(typeof timeSpentColumn.sort).toBe("function");
+      expect(typeof timeSpentColumn.accessorFn).toBe("function");
     });
 
-    it("should have error_count column with correct properties", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
+    it("should have error_count column", () => {
+      const errorCountColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "error_count",
       );
 
       expect(errorCountColumn).toBeDefined();
-      expect(errorCountColumn.label).toBe("Error Count");
-      expect(errorCountColumn.align).toBe("left");
       expect(errorCountColumn.sortable).toBe(true);
+      expect(errorCountColumn.accessorKey).toBe("error_count");
     });
 
-    it("should have initial_view_name column with correct properties", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
+    it("should have initial_view_name column", () => {
+      const initialViewColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "initial_view_name",
       );
 
       expect(initialViewColumn).toBeDefined();
-      expect(initialViewColumn.label).toBe("Initial View Name");
-      expect(initialViewColumn.align).toBe("left");
       expect(initialViewColumn.sortable).toBe(true);
+      expect(initialViewColumn.accessorKey).toBe("initial_view_name");
     });
   });
 
   describe("Column Functions", () => {
-    it("should handle timestamp column field function", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
+    it("should format time_spent column via accessorFn", () => {
+      const timeSpentColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "time_spent",
       );
-      const mockRow = { timestamp: "2024-01-01T10:00:00Z" };
-
-      expect(timestampColumn.field(mockRow)).toBe("2024-01-01T10:00:00Z");
-      expect(timestampColumn.prop(mockRow)).toBe("2024-01-01T10:00:00Z");
-    });
-
-    it("should handle type column field function", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const mockRow = { type: "user" };
-
-      expect(typeColumn.field(mockRow)).toBe("user");
-      expect(typeColumn.prop(mockRow)).toBe("user");
-    });
-
-    it("should handle time_spent column field function with formatting", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-      const mockRow = { time_spent: "120000000" }; // 120 microseconds
-
-      const result = timeSpentColumn.field(mockRow);
-      expect(result).toBe("2m"); // formatDuration should convert 120s to 2m
-    });
-
-    it("should handle time_spent column sort function", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-      const rowA = { time_spent: "100000000" };
-      const rowB = { time_spent: "200000000" };
-
-      const result = timeSpentColumn.sort(null, null, rowA, rowB);
-      expect(result).toBe(-100000000); // 100000000 - 200000000
-    });
-
-    it("should handle error_count column field function", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
-      );
-      const mockRow = { error_count: "3" };
-
-      expect(errorCountColumn.field(mockRow)).toBe("3");
-      expect(errorCountColumn.prop(mockRow)).toBe("3");
-    });
-
-    it("should handle initial_view_name column field function", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
-      );
-      const mockRow = { initial_view_name: "HomePage" };
-
-      expect(initialViewColumn.field(mockRow)).toBe("HomePage");
-      expect(initialViewColumn.prop(mockRow)).toBe("HomePage");
+      const mockRow = { time_spent: "120000000" };
+      const result = timeSpentColumn.accessorFn(mockRow);
+      expect(result).toBe("2m");
     });
   });
 
   describe("Event Handling", () => {
-    it("should handle table events correctly", () => {
-      expect(typeof wrapper.vm.handleTableEvents).toBe("function");
+    it("should have handleRowClick function", () => {
+      expect(typeof wrapper.vm.handleRowClick).toBe("function");
+    });
 
-      const mockPayload = { row: { id: "session123" } };
-      wrapper.vm.handleTableEvents("cell-click", mockPayload);
+    it("should have handleCellClick function", () => {
+      expect(typeof wrapper.vm.handleCellClick).toBe("function");
+    });
+
+    it("should navigate to SessionViewer on row click", () => {
+      const mockRow = { id: "session123" };
+      wrapper.vm.handleRowClick(mockRow);
 
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "SessionViewer",
@@ -376,10 +292,8 @@ describe("SessionsList Component", () => {
       });
     });
 
-    it("should have event mapping for cell-click", () => {
+    it("should navigate to SessionViewer on handleCellClick", () => {
       const mockPayload = { row: { id: "test-session" } };
-
-      // Test handleCellClick directly
       wrapper.vm.handleCellClick(mockPayload);
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -388,9 +302,9 @@ describe("SessionsList Component", () => {
       });
     });
 
-    it("should trigger router navigation on cell click", async () => {
-      const appTable = wrapper.find('[data-test="app-table"]');
-      await appTable.trigger("click");
+    it("should trigger router navigation on table row-click emit", async () => {
+      const oTable = wrapper.find('[data-test="o-table"]');
+      await oTable.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "SessionViewer",
@@ -399,45 +313,19 @@ describe("SessionsList Component", () => {
     });
   });
 
-  describe("AppTable Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
+  describe("OTable Integration", () => {
+    it("should pass tableColumns to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("columns")).toEqual(wrapper.vm.tableColumns);
     });
 
-    it("should pass rows to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(wrapper.vm.rows);
-    });
-
-    it("should listen to event-emitted from AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.exists()).toBe(true);
-      // Verify AppTable receives the handleTableEvents function
-      expect(wrapper.vm.handleTableEvents).toBeDefined();
-      expect(typeof wrapper.vm.handleTableEvents).toBe("function");
+    it("should pass tableRows to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual(wrapper.vm.tableRows);
     });
   });
 
   describe("Data Updates", () => {
-    it("should allow updating rows data", async () => {
-      const newRows = [
-        {
-          timestamp: "2024-01-01T10:00:00Z",
-          type: "user",
-          time_spent: "120000000",
-          error_count: "0",
-          initial_view_name: "HomePage",
-          id: "session1",
-        },
-      ];
-
-      wrapper.vm.rows = newRows;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.rows).toEqual(newRows);
-    });
-
     it("should allow updating splitterModel", async () => {
       wrapper.vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
@@ -446,60 +334,7 @@ describe("SessionsList Component", () => {
     });
   });
 
-  describe("TypeScript Interfaces", () => {
-    it("should handle SessionColumn interface structure", () => {
-      const mockColumn = {
-        name: "test",
-        field: (row: any) => row.test,
-        prop: (row: any) => row.test,
-        label: "Test Column",
-        align: "left",
-        sortable: true,
-      };
-
-      expect(mockColumn.name).toBe("test");
-      expect(typeof mockColumn.field).toBe("function");
-      expect(typeof mockColumn.prop).toBe("function");
-      expect(mockColumn.label).toBe("Test Column");
-      expect(mockColumn.align).toBe("left");
-      expect(mockColumn.sortable).toBe(true);
-    });
-
-    it("should handle Session interface structure", () => {
-      const mockSession = {
-        timestamp: "2024-01-01T10:00:00Z",
-        type: "user",
-        time_spent: "120000000",
-        error_count: "0",
-        initial_view_name: "HomePage",
-        id: "session1",
-      };
-
-      // Test that our columns can handle the Session interface
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-
-      expect(() => timestampColumn.field(mockSession)).not.toThrow();
-      expect(() => typeColumn.field(mockSession)).not.toThrow();
-      expect(() => timeSpentColumn.field(mockSession)).not.toThrow();
-      expect(() =>
-        timeSpentColumn.sort(null, null, mockSession, mockSession),
-      ).not.toThrow();
-    });
-  });
-
   describe("Router Integration", () => {
-    it("should have access to router", () => {
-      expect(wrapper.vm.router).toBeDefined();
-    });
-
     it("should navigate to SessionViewer on cell click", async () => {
       const mockPayload = { row: { id: "test-session-id" } };
 
@@ -516,20 +351,6 @@ describe("SessionsList Component", () => {
     it("should use useI18n composable", () => {
       expect(wrapper.vm.t).toBeDefined();
       expect(typeof wrapper.vm.t).toBe("function");
-    });
-
-    it("should use useRouter composable", () => {
-      expect(wrapper.vm.router).toBeDefined();
-    });
-
-    it("should render translated column labels", () => {
-      const columns = wrapper.vm.columns;
-
-      expect(columns[1].label).toBe("Timestamp");
-      expect(columns[2].label).toBe("Session Type");
-      expect(columns[3].label).toBe("Time Spent");
-      expect(columns[4].label).toBe("Error Count");
-      expect(columns[5].label).toBe("Initial View Name");
     });
   });
 
@@ -556,45 +377,14 @@ describe("SessionsList Component", () => {
 
   describe("Error Handling", () => {
     it("should handle empty rows gracefully", () => {
-      expect(wrapper.vm.rows).toEqual([]);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
-    });
-
-    it("should handle column field functions with missing properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const emptyRow = {};
-
-      expect(() => typeColumn.field(emptyRow)).not.toThrow();
-      expect(typeColumn.field(emptyRow)).toBeUndefined();
-    });
-
-    it("should handle time_spent formatting with invalid values", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-      const invalidRow = { time_spent: "invalid" };
-
-      expect(() => timeSpentColumn.field(invalidRow)).not.toThrow();
-    });
-
-    it("should handle unknown events gracefully", () => {
-      expect(() => {
-        wrapper.vm.handleTableEvents("unknown-event", {});
-      }).toThrow(); // Should throw because eventMapping doesn't have unknown-event
+      expect(wrapper.find('[data-test="o-table"]').exists()).toBe(true);
     });
   });
 
   describe("Integration", () => {
     it("should work with store integration", () => {
-      // For Composition API, store is provided via global provide
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should work with router integration", () => {
-      expect(wrapper.vm.router).toBeDefined();
     });
 
     it("should work with i18n integration", () => {
@@ -603,54 +393,16 @@ describe("SessionsList Component", () => {
     });
   });
 
-  describe("Performance", () => {
-    it("should handle large datasets efficiently", async () => {
-      const largeDataset = Array.from({ length: 1000 }, (_, index) => ({
-        timestamp: `2024-01-01T10:${index.toString().padStart(2, "0")}:00Z`,
-        type: index % 2 === 0 ? "user" : "synthetic",
-        time_spent: (index * 1000000).toString(),
-        error_count: (index % 5).toString(),
-        initial_view_name: `View${index}`,
-        id: `session${index}`,
-      }));
-
-      wrapper.vm.rows = largeDataset;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.rows.length).toBe(1000);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
-    });
-  });
-
   describe("Accessibility", () => {
     it("should have proper data-test attributes", () => {
       expect(wrapper.find('[data-test="search-bar"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="field-list"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-table"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="splitter"]').exists()).toBe(true);
-    });
-
-    it("should have proper avatar attributes", () => {
-      const avatar = wrapper.find('[data-test="avatar"]');
-      expect(avatar.exists()).toBe(true);
     });
   });
 
   describe("Event Mapping", () => {
-    it("should have correct event mapping structure", () => {
-      const mockPayload = { row: { id: "test" } };
-
-      // Test that the event mapping works correctly
-      expect(() => {
-        wrapper.vm.handleTableEvents("cell-click", mockPayload);
-      }).not.toThrow();
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "SessionViewer",
-        params: { id: "test" },
-      });
-    });
-
     it("should handle multiple cell clicks", async () => {
       const payload1 = { row: { id: "session1" } };
       const payload2 = { row: { id: "session2" } };

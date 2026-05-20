@@ -15,12 +15,9 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
 import TraceStatusCell from "./TraceStatusCell.vue";
-
-installQuasar();
 
 describe("TraceStatusCell", () => {
   let wrapper: VueWrapper;

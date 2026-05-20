@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createI18n } from 'vue-i18n';
 import Functions from './Functions.vue';
 
@@ -18,8 +17,6 @@ const MockRouterView = {
     return { MockComponent };
   },
 };
-
-installQuasar({});
 
 describe('Functions.vue', () => {
   let wrapper: any;
@@ -89,27 +86,6 @@ describe('Functions.vue', () => {
           router,
           i18n, ],
         stubs: {
-                    'q-btn': {
-            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
-            emits: ['click'],
-          },
-          'q-splitter': {
-            template: '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            props: ['modelValue', 'unit', 'limits'],
-          },
-          'q-tabs': {
-            template: '<div class="q-tabs" :class="$attrs.class"><slot /></div>',
-            props: ['modelValue', 'indicatorColor', 'inlineLabel', 'vertical'],
-          },
-          'q-route-tab': {
-            template: '<div class="q-route-tab" :class="{ active: name === activeTab }">{{ label }}</div>',
-            props: ['name', 'to', 'label', 'contentClass'],
-            inject: {
-              activeTab: {
-                default: 'functions',
-              },
-            },
-          },
           OTabs: {
             template: '<div class="o-tabs" :class="$attrs.class"><slot /></div>',
             props: ['modelValue', 'orientation'],

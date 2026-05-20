@@ -15,8 +15,6 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { QTable } from "quasar";
 import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -35,7 +33,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({ isMetaOrg: true }),
 }));
 
-installQuasar();
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -154,19 +151,7 @@ describe("RunningQueries", () => {
         },
         stubs: {
           "q-table": QTable,
-          "q-btn": true,
-          "q-input": true,
-          "q-select": true,
-          "q-tab": true,
-          "q-tab-panel": true,
-          "q-tab-panels": true,
-          "q-tabs": true,
-          "q-card": true,
-          "q-card-section": true,
-          "q-card-actions": true,
-          "q-separator": true,
           "OIcon": true,
-          "q-tooltip": true,
           "confirm-dialog": true,
           "query-list": true,
           "running-queries-list": true,

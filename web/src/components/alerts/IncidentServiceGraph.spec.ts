@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -27,8 +26,6 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
     template: '<div data-test="chart-renderer"></div>',
   },
 }));
-
-installQuasar({ plugins: [] });
 
 describe("IncidentServiceGraph.vue", () => {
   let wrapper: VueWrapper<any>;

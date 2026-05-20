@@ -1,12 +1,9 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Others from "@/components/ingestion/Others.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
@@ -38,18 +35,36 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
+const baseStubs = {
+  OSplitter: {
+    template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+    props: ["modelValue", "unit", "horizontal"],
+  },
+  OInput: {
+    template:
+      '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    props: ["modelValue", "placeholder", "clearable"],
+    emits: ["update:modelValue"],
+    inheritAttrs: false,
+  },
+  OIcon: true,
+  OTabs: {
+    template: '<div class="o-tabs-stub"><slot /></div>',
+    props: ["modelValue", "orientation"],
+    emits: ["update:modelValue"],
+  },
+  ORouteTab: {
+    template: '<div class="o-route-tab-stub"></div>',
+    props: ["name", "to", "label", "icon", "title", "default"],
+  },
+  'router-view': true,
 };
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
+const mountOptions = () => ({
+  global: {
+    plugins: [i18n, store],
+    stubs: { ...baseStubs },
+  }
 });
 
 describe("Others Component", () => {
@@ -69,22 +84,14 @@ describe("Others Component", () => {
   });
 
   it("should render component with correct name", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.vm.$options.name).toBe("OthersPage");
   });
 
   it("should initialize with default props", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.props().currOrgIdentifier).toBe("");
   });
@@ -95,20 +102,14 @@ describe("Others Component", () => {
       props: {
         currOrgIdentifier: customOrgId
       },
-      global: {
-        plugins: [i18n, store]
-      }
+      ...mountOptions()
     });
 
     expect(wrapper.props().currOrgIdentifier).toBe(customOrgId);
   });
 
   it("should initialize refs with correct default values", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.tabs).toBe("");
     expect(wrapper.vm.tabsFilter).toBe("");
@@ -117,33 +118,21 @@ describe("Others Component", () => {
   });
 
   it("should set currentOrgIdentifier from store", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.currentOrgIdentifier).toBe("default");
   });
 
   it("should set currentUserEmail from store", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
   });
 
   it("should redirect to airflow route in onBeforeMount when route name is 'others'", async () => {
     mockRouter.currentRoute.value.name = "others";
-    
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+
+    wrapper = mount(Others, mountOptions());
 
     await nextTick();
 
@@ -157,12 +146,8 @@ describe("Others Component", () => {
 
   it("should not redirect in onBeforeMount when route name is not 'others'", async () => {
     mockRouter.currentRoute.value.name = "airflow";
-    
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+
+    wrapper = mount(Others, mountOptions());
 
     await nextTick();
 
@@ -170,11 +155,7 @@ describe("Others Component", () => {
   });
 
   it("should have othersTabs array with correct structure", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     // Access the othersTabs through component instance
     const othersTabs = [
@@ -236,11 +217,7 @@ describe("Others Component", () => {
   });
 
   it("should filter tabs correctly with filteredList computed property", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     // Initially, filteredList should contain all tabs
     expect(wrapper.vm.filteredList).toHaveLength(4);
@@ -248,35 +225,27 @@ describe("Others Component", () => {
     // Filter by "air"
     wrapper.vm.tabsFilter = "air";
     await nextTick();
-    
-    const airflowFiltered = wrapper.vm.filteredList.filter(tab => 
+
+    const airflowFiltered = wrapper.vm.filteredList.filter((tab: any) =>
       tab.label.toLowerCase().includes("air")
     );
     expect(airflowFiltered.length).toBeGreaterThan(0);
   });
 
   it("should filter tabs case-insensitively", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     wrapper.vm.tabsFilter = "CRIBL";
     await nextTick();
 
-    const filtered = wrapper.vm.filteredList.filter(tab => 
+    const filtered = wrapper.vm.filteredList.filter((tab: any) =>
       tab.label.toLowerCase().includes("cribl")
     );
     expect(filtered.length).toBeGreaterThan(0);
   });
 
   it("should return empty array when no tabs match filter", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     wrapper.vm.tabsFilter = "nonexistent";
     await nextTick();
@@ -285,11 +254,7 @@ describe("Others Component", () => {
   });
 
   it("should expose all required properties in return statement", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.t).toBeDefined();
     expect(wrapper.vm.store).toBeDefined();
@@ -307,18 +272,14 @@ describe("Others Component", () => {
   });
 
   it("should handle onUpdated hook correctly when route is 'others'", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     // Clear previous calls
     mockRouter.push.mockClear();
-    
+
     // Trigger onUpdated by changing route name
     mockRouter.currentRoute.value.name = "others";
-    
+
     // Force a re-render to trigger onUpdated
     await wrapper.vm.$forceUpdate();
     await nextTick();
@@ -332,18 +293,14 @@ describe("Others Component", () => {
   });
 
   it("should not redirect in onUpdated when route name is not 'others'", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     // Clear previous calls
     mockRouter.push.mockClear();
-    
+
     // Set route name to something other than 'others'
     mockRouter.currentRoute.value.name = "cribl";
-    
+
     // Force a re-render to trigger onUpdated
     await wrapper.vm.$forceUpdate();
     await nextTick();
@@ -352,32 +309,24 @@ describe("Others Component", () => {
   });
 
   it("should maintain tabs filter reactivity", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     const initialLength = wrapper.vm.filteredList.length;
-    
+
     wrapper.vm.tabsFilter = "airflow";
     await nextTick();
-    
+
     const filteredLength = wrapper.vm.filteredList.length;
     expect(filteredLength).toBeLessThanOrEqual(initialLength);
 
     wrapper.vm.tabsFilter = "";
     await nextTick();
-    
+
     expect(wrapper.vm.filteredList.length).toBe(initialLength);
   });
 
   it("should have correct tab icons with image URLs", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     await nextTick();
 
@@ -388,8 +337,8 @@ describe("Others Component", () => {
       "img:mock-images/ingestion/vercel.svg",
       "img:mock-images/ingestion/heroku.svg"
     ];
-    
-    wrapper.vm.filteredList.forEach((tab, index) => {
+
+    wrapper.vm.filteredList.forEach((tab: any, index: number) => {
       expect(tab.icon).toBe(expectedIcons[index]);
     });
   });
@@ -404,15 +353,11 @@ describe("Others Component", () => {
       email: "updated@example.com"
     });
 
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.currentOrgIdentifier).toBe("updated-org");
     expect(wrapper.vm.currentUserEmail).toBe("updated@example.com");
-    
+
     // Reset store state for other tests
     store.commit('setSelectedOrganization', {
       identifier: "default",
@@ -424,23 +369,15 @@ describe("Others Component", () => {
   });
 
   it("should have correct contentClass for all tabs", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
-    wrapper.vm.filteredList.forEach(tab => {
+    wrapper.vm.filteredList.forEach((tab: any) => {
       expect(tab.contentClass).toBe("tab_content");
     });
   });
 
   it("should update ingestTabType ref", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.ingestTabType).toBe("airflow");
 
@@ -451,11 +388,7 @@ describe("Others Component", () => {
   });
 
   it("should update tabs ref", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.tabs).toBe("");
 
@@ -466,11 +399,7 @@ describe("Others Component", () => {
   });
 
   it("should update splitterModel ref", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
     expect(wrapper.vm.splitterModel).toBe(270);
 
@@ -481,13 +410,9 @@ describe("Others Component", () => {
   });
 
   it("should have correct query parameters in tab routes", () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
+    wrapper = mount(Others, mountOptions());
 
-    wrapper.vm.filteredList.forEach(tab => {
+    wrapper.vm.filteredList.forEach((tab: any) => {
       expect(tab.to.query.org_identifier).toBe("default");
     });
   });

@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Ingestion from "@/views/Ingestion.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -24,8 +23,6 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
-// Install Quasar plugins
-installQuasar();
 
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({
@@ -89,7 +86,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     useLocalOrganization: vi.fn(() => ({ value: "default" })),
     useLocalCurrentUser: vi.fn(() => ({ value: "test-user" })),
   };
-});
 
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -133,12 +129,8 @@ describe("Ingestion", () => {
               props: ['title', 'message', 'modelValue'],
               emits: ['update:ok', 'update:cancel']
             },
-                        'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
-            'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
-            'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
             OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
             ORouteTab: { template: '<div class="o-route-tab-stub"><slot /></div>', props: ['name', 'to', 'label', 'icon'] },
-            'q-separator': { template: '<div class="q-separator"></div>' },
             'router-view': { 
               template: '<div class="router-view" @copy-to-clipboard-fn="$emit(\'copy-to-clipboard-fn\', $event)"><slot /></div>', 
               emits: ['copy-to-clipboard-fn']

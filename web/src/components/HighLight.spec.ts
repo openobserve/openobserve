@@ -15,10 +15,7 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import HighLight from "@/components/HighLight.vue";
-
-installQuasar();
 
 // const init = vi.fn()
 

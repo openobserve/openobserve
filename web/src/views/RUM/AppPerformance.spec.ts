@@ -4,13 +4,9 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppPerformance from "./AppPerformance.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-
-// Install Quasar globally for all tests
-installQuasar();
 
 // Mock the composables
 const mockPerformanceState = {
@@ -158,9 +154,6 @@ describe("AppPerformance.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-                    QSeparator: {
-            template: '<hr class="q-separator" />',
-          },
           OButton: {
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "disabled"],
@@ -269,8 +262,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QSeparator: { template: '<hr />' },
-            QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
             AppTabs: { template: '<div></div>' },
             DateTimePickerDashboard: { template: '<div></div>' },
@@ -293,8 +284,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QSeparator: { template: '<hr />' },
-            QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
             AppTabs: { template: '<div></div>' },
             DateTimePickerDashboard: { template: '<div></div>' },

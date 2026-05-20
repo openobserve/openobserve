@@ -17,11 +17,8 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -130,9 +127,9 @@ const globalConfig = {
     ODrawer: ODrawerStub,
     AddFolder: AddFolderStub,
     OButton: OButtonStub,
-    "q-select": {
+    OSelect: {
       template: `
-        <div class="q-select-stub" :data-disable="String(disable)">
+        <div class="q-select-stub" :data-disable="String(disabled)">
           <select
             :value="modelValue"
             @change="$emit('update:modelValue', $event.target.value)"
@@ -144,7 +141,7 @@ const globalConfig = {
             >{{ opt.label }}</option>
           </select>
         </div>`,
-      props: ["modelValue", "options", "disable"],
+      props: ["modelValue", "options", "disabled", "disable"],
       emits: ["update:modelValue"],
     },
     "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },

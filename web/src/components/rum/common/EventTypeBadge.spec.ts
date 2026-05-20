@@ -15,10 +15,8 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EventTypeBadge from "./EventTypeBadge.vue";
 
-installQuasar();
 
 describe("EventTypeBadge", () => {
   let wrapper: VueWrapper;

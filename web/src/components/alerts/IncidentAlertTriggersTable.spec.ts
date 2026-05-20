@@ -15,11 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import { createI18n } from "vue-i18n";
-
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 
@@ -326,9 +323,9 @@ describe("IncidentAlertTriggersTable", () => {
   });
 
   describe("Pagination", () => {
-    it("should display pagination component", () => {
+    // TODO: Component no longer renders QTablePagination after the Quasar removal — pagination is now done client-side via the table.
+    it.skip("should display pagination component", () => {
       wrapper = mountComponent();
-      // QTablePagination is stubbed, but we can verify it's rendered
       expect(wrapper.findComponent({ name: "QTablePagination" }).exists()).toBe(
         true
       );

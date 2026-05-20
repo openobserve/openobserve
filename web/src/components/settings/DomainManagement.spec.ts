@@ -15,12 +15,9 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
-
-installQuasar();
 
 // Create a unique DOM node for this test file
 const uniqueNodeId = "domain-management-unit-test-app";
@@ -181,12 +178,7 @@ describe("DomainManagement Component", () => {
       props,
       global: {
         plugins: [i18n],
-        stubs: {
-          QDrawer: {
-            template: '<div class="q-drawer-stub"><slot /></div>',
-            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
-          },
-        },
+        stubs: {},
       },
     });
   };
@@ -206,17 +198,9 @@ describe("DomainManagement Component", () => {
       const mainContainer = wrapper.find(".domain_management");
       expect(mainContainer.exists()).toBeTruthy();
 
-      // Check for Claim Parser section title (should contain "Claim Parser")
-      const claimParserTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Claim Parser")
-      );
-      expect(claimParserTitle).toBeTruthy();
-
-      // Check for Domain Restrictions section title
-      const domainRestrictionsTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Domain") || el.text().includes("Restriction")
-      );
-      expect(domainRestrictionsTitle).toBeTruthy();
+      // Check for Claim Parser section title
+      const text = mainContainer.text();
+      expect(text).toContain("Claim Parser");
     });
 
     it("should load domain settings on mount", async () => {
@@ -340,24 +324,16 @@ describe("DomainManagement Component", () => {
 
     it("should show confirmation dialog when removing domain", async () => {
       const vm = wrapper.vm;
-      
+
       // Add a test domain first
       vm.domains.push({ name: "test.com", allowAllUsers: true, allowedEmails: [] });
       await nextTick();
-      
-      // Mock q.dialog instead of Dialog.create
-      const mockDialog = vi.fn().mockReturnValue({
-        onOk: vi.fn((callback) => callback()),
-        onCancel: vi.fn(),
-      });
-      
-      // Replace the dialog method on the component's q object
-      vm.$q.dialog = mockDialog;
-      
-      await vm.removeDomain(0);
-      
-      expect(mockDialog).toHaveBeenCalled();
-      expect(vm.domains).toHaveLength(0);
+
+      // New behavior: removeDomain sets state to open confirmation dialog
+      await vm.removeDomain(vm.domains.length - 1);
+
+      expect(vm.confirmRemoveDomainOpen).toBe(true);
+      expect(vm.pendingRemoveDomainIndex).toBe(vm.domains.length - 1);
     });
   });
 
@@ -558,12 +534,12 @@ describe("DomainManagement Component", () => {
 
     it("should show no domain message when no domains exist", async () => {
       const vm = wrapper.vm;
-      
+
       // Clear all domains
       vm.domains.splice(0, vm.domains.length);
       await nextTick();
-      
-      const noDomainMessage = wrapper.find(".text-center");
+
+      const noDomainMessage = wrapper.find(".domain-card");
       expect(noDomainMessage.exists()).toBeTruthy();
     });
   });

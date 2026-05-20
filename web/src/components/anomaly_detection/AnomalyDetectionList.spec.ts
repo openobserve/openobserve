@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can assert on the props the component forwards + emit
@@ -205,32 +202,32 @@ describe("AnomalyDetectionList - rendering", () => {
 });
 
 describe("AnomalyDetectionList - statusColor", () => {
-  it("returns 'positive' for active enabled row", async () => {
+  it("returns 'success' for active enabled row", async () => {
     const w = await mountComp();
     await flushPromises();
     const color = (w.vm as any).statusColor({ status: "ready", enabled: true });
-    expect(color).toBe("positive");
+    expect(color).toBe("success");
   });
 
-  it("returns 'info' for training enabled row", async () => {
+  it("returns 'primary' for training enabled row", async () => {
     const w = await mountComp();
     await flushPromises();
     const color = (w.vm as any).statusColor({ status: "training", enabled: true });
-    expect(color).toBe("info");
+    expect(color).toBe("primary");
   });
 
-  it("returns 'negative' for failed enabled row", async () => {
+  it("returns 'error' for failed enabled row", async () => {
     const w = await mountComp();
     await flushPromises();
     const color = (w.vm as any).statusColor({ status: "failed", enabled: true });
-    expect(color).toBe("negative");
+    expect(color).toBe("error");
   });
 
-  it("returns 'grey' for disabled row regardless of status", async () => {
+  it("returns 'default' for disabled row regardless of status", async () => {
     const w = await mountComp();
     await flushPromises();
     const color = (w.vm as any).statusColor({ status: "ready", enabled: false });
-    expect(color).toBe("grey");
+    expect(color).toBe("default");
   });
 });
 

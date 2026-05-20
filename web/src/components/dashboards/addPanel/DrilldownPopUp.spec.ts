@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DrilldownPopUp from "@/components/dashboards/addPanel/DrilldownPopUp.vue";
 import i18n from "@/locales";
-
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we can
 // drive primary/secondary button clicks via the emits the component listens to.

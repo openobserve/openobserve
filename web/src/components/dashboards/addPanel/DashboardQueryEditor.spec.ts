@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -79,8 +78,6 @@ import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQuer
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-installQuasar();
 
 // Create a reactive mock dashboard panel data
 const createMockDashboardPanelData = () => {
@@ -276,20 +273,6 @@ describe("DashboardQueryEditor", () => {
               "language",
             ],
             emits: ["update:query", "updateQuery", "runQuery"],
-          },
-          "q-tabs": true, // Stub as true to prevent rendering
-          "q-tab": {
-            template: "<div><slot /></div>",
-            props: ["name", "label"],
-          },
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-            props: ["modelValue", "limits", "disable"],
-          },
-          "q-select": {
-            template: '<div data-test="vrl-function-select"></div>',
-            props: ["modelValue", "options"],
           },
         },
         mocks: {

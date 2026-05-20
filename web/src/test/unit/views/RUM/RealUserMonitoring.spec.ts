@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import RealUserMonitoring from "@/views/RUM/RealUserMonitoring.vue";
 import i18n from "@/locales";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock composables
 vi.mock("@/composables/useSessionReplay", () => ({
@@ -76,7 +75,6 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("RealUserMonitoring.vue", () => {
   let store: any;
@@ -187,7 +185,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -218,9 +215,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
             "OIcon": true,
             AppTabs: true,
           },
@@ -243,9 +237,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
             "OIcon": true,
             AppTabs: true,
           },
@@ -298,7 +289,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: {
               template:
@@ -334,7 +324,6 @@ describe("RealUserMonitoring.vue", () => {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
             },
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -364,7 +353,6 @@ describe("RealUserMonitoring.vue", () => {
                 '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
               components: { component: childComponentStub },
             },
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -390,7 +378,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -427,7 +414,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -449,7 +435,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -470,7 +455,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -491,7 +475,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -585,7 +568,6 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },

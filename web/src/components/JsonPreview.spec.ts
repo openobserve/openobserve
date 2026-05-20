@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 // All vi.mock() calls must come before any component imports — they are hoisted by Vitest.
@@ -45,18 +44,15 @@ vi.mock("@/components/logs/ChunkedContent.vue", () => ({
 }));
 
 const mockNotify = vi.fn();
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
+const mockCopyToClipboard = vi.fn(() => {
+  mockNotify({ type: "positive" });
 });
 
-import JsonPreview from "./JsonPreview.vue";
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: (...args: any[]) => mockCopyToClipboard(...args),
+}));
 
-installQuasar();
+import JsonPreview from "./JsonPreview.vue";
 
 // ── Mount factory ─────────────────────────────────────────────────────────────
 

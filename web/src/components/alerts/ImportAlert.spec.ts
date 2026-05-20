@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { ref } from "vue";
 import ImportAlert from "./ImportAlert.vue";
 
@@ -21,16 +20,6 @@ vi.mock("@/composables/useStreams", () => ({
     getStreams: vi.fn().mockResolvedValue({ list: [{ name: "test-stream" }] }),
   }),
 }));
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
 
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
@@ -67,8 +56,6 @@ vi.mock("axios", () => ({
     })
   }
 }));
-
-installQuasar();
 
 describe("ImportAlert Component - Comprehensive Function Tests", () => {
   let wrapper: any;

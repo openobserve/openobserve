@@ -111,11 +111,7 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionsList from "./SessionsList.vue";
-
-installQuasar({ plugins: [quasar.Notify] });
 
 const defaultProps = {
   streamName: "test-stream",
@@ -162,12 +158,11 @@ async function mountComponent(props = defaultProps) {
     props,
     global: {
       stubs: {
-        QSelect: { template: '<div class="q-select-stub"><slot /></div>' },
-        QPagination: { template: '<div class="q-pagination-stub" />' },
-        QIcon: { template: '<span class="q-icon-stub"><slot /></span>' },
-        QTooltip: { template: '<div class="q-tooltip-stub"><slot /></div>' },
-        QSpinnerHourglass: { template: '<div class="q-spinner-stub" />' },
-        QSkeleton: { template: '<div class="q-skeleton-stub" />' },
+        OSelect: { template: '<div class="q-select-stub"><slot /></div>' },
+        OIcon: { template: '<span class="q-icon-stub"><slot /></span>', props: ["name", "size"] },
+        OTooltip: { template: '<div class="q-tooltip-stub"><slot /></div>', props: ["content"] },
+        OSpinner: { template: '<div class="q-spinner-stub" />' },
+        OSkeleton: { template: '<div class="q-skeleton-stub" />' },
       },
     },
   });

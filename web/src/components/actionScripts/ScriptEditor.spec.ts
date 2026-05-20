@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ScriptEditor from '@/components/actionScripts/ScriptEditor.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('axios');
@@ -10,8 +9,6 @@ vi.mock('vue-i18n', () => ({
     t: (key: string) => key
   })
 }));
-
-installQuasar();
 
 describe('ScriptEditor.vue', () => {
   let wrapper: VueWrapper;
@@ -48,10 +45,10 @@ describe('ScriptEditor.vue', () => {
             props: ['editorId', 'language', 'query']
           },
           'OIcon': {
-            template: '<div class="icon"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
+            template: '<div class="icon"><o-tooltip-stub v-if="$slots.default"><slot></slot></o-tooltip-stub></div>',
             props: ['name', 'size']
           },
-          'q-tooltip': {
+          'OTooltip': {
             template: '<div class="tooltip"><slot></slot></div>',
             props: ['anchor', 'self', 'offset']
           }
