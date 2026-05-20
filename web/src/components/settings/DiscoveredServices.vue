@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="services-header-bar tw:flex tw:justify-between tw:items-center tw:w-full"
         >
           <div
-            class="q-table__title tw:font-[600]"
+            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
             data-test="services-list-title"
           >
             {{ t("settings.correlation.discoveredServicesTitle") }}

@@ -1009,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
@@ -1058,7 +1058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
@@ -1114,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full column flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2 tw:justify-center" style="margin: 15vh auto 2rem;">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />

@@ -82,12 +82,15 @@ import MoreVert from "~icons/material-symbols/more-vert";
 import MenuIcon from "~icons/material-symbols/menu";
 import OpenInNew from "~icons/material-symbols/open-in-new";
 import Pause from "~icons/material-symbols/pause-outline";
+import PauseCircleFilled from "~icons/material-symbols/pause-circle-outline";
 import Person from "~icons/material-symbols/person-outline";
 import PlayArrow from "~icons/material-symbols/play-arrow-outline";
 import Preview from "~icons/material-symbols/preview-outline";
 import QueryStats from "~icons/material-symbols/query-stats";
 import Refresh from "~icons/material-symbols/refresh";
 import Replay from "~icons/material-symbols/replay";
+import Replay10 from "~icons/material-symbols/replay-10";
+import Forward10 from "~icons/material-symbols/forward-10";
 import Schedule from "~icons/material-symbols/schedule-outline";
 import Search from "~icons/material-symbols/search";
 import Send from "~icons/material-symbols/send-outline";
@@ -374,12 +377,15 @@ export const iconRegistry = {
   "menu": MenuIcon,
   "open-in-new": OpenInNew,
   "pause": Pause,
+  "pause-circle-filled": PauseCircleFilled,
   "person": Person,
   "play-arrow": PlayArrow,
   "preview": Preview,
   "query-stats": QueryStats,
   "refresh": Refresh,
   "replay": Replay,
+  "replay-10": Replay10,
+  "forward-10": Forward10,
   "schedule": Schedule,
   "search": Search,
   "send": Send,

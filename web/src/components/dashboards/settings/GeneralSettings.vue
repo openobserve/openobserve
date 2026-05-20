@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column full-height">
+  <div class="tw:flex tw:flex-col tw:h-full">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
     <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">

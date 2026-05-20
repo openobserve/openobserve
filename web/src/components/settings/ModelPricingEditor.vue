@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw:flex tw:flex-col tw:justify-center">
         <div
-          class="q-table__title tw:font-[600] tw:leading-tight"
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:leading-tight"
           data-test="model-pricing-editor-title"
         >
           {{

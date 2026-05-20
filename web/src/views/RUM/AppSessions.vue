@@ -84,26 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:pr-[0.625rem] tw:h-full">
             <div class="card-container tw:h-full">
-              <template v-if="isLoading.length">
-                <div
-                  class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-full"
-                >
-                  <div>
-                    <OSpinner
-                      size="md"
-                      class="tw:mx-auto tw:block"
-                      data-test="app-sessions-loading-indicator"
-                    />
-                    <div class="tw:text-center tw:w-full">
-                      {{ t("rum.loadingSessions") }}
-                    </div>
-                  </div>
-                </div>
-              </template>
-              <template v-else>
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
+                  :loading="isLoading.length > 0"
                   row-key="session_id"
                   pagination="none"
                   virtual-scroll
@@ -134,7 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SessionLocationColumn :column="row" />
                   </template>
                 </OTable>
-              </template>
             </div>
           </div>
         </template>

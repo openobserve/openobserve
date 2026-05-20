@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: 48px; overflow-y: auto"
     >
       <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="tw:flex tw:items-center tw:flex tw:flex-col">
+        <div class="tw:flex tw:flex-row tw:items-center tw:grow">
           <div
-            class="tw:flex tw:items-center q-table__title tw:mx-3 tw:font-semibold tw:text-xl"
+            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold tw:text-xl"
           >
             <span>
               {{ t("search.metrics") }}
@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <syntax-guide-metrics class="tw:mr-2" />
           <MetricLegends class="tw:mr-2" />
         </div>
-        <div class="tw:text-right tw:flex tw:flex-col tw:flex tw:justify-end tw:items-center">
+        <div
+          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center"
+        >
           <DateTimePickerDashboard
             v-if="
               !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
@@ -156,7 +158,6 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
-
 
 export default defineComponent({
   name: "Metrics",
@@ -395,10 +396,7 @@ export default defineComponent({
             if (stream) {
               await makeAutoSQLQuery();
             }
-          } else if (
-            dashboardPanelData.data.queryType === "promql" &&
-            stream
-          ) {
+          } else if (dashboardPanelData.data.queryType === "promql" && stream) {
             query.query = `${stream}{}`;
           }
         }

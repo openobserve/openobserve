@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #top>
         <div class="tw:flex tw:items-center tw:w-full tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:mb-1">
-          <div class="q-table__title" data-test="log-stream-title-text">
+          <div class="tw:text-[15px] tw:font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
           <div class="tw:ml-auto" data-test="stream-association-search-input">
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="q-table__title tw:flex tw:items-center"
+                  class="tw:text-[15px] tw:font-[600] tw:flex tw:items-center"
                   data-test="log-stream-title-text"
                 >
                   {{ t("function.associatedFunctionHeader") }}
@@ -708,10 +708,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-:deep(.q-table__title) {
-  font-size: 15px;
-  font-weight: 600;
-}
+/* q-table__title replaced with inline Tailwind — font-size and weight now set directly on elements */
 
 .confirmBody {
   padding: 11px 1.375rem 0;

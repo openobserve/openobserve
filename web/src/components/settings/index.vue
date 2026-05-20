@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="tw:rounded-md tw:h-full">
-    <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 tw:py-2 o2-management-header">
+    <!-- <div class="head tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:mb-2 tw:px-2 tw:py-2 o2-management-header">
       {{ t("settings.header") }}
     </div> -->
       <OSplitter

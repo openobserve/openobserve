@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
-              class="q-table__title tw:font-[600]"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
               data-test="alert-list-title"
             >
               {{ t("alerts.header") }}
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="!templates.length || !destinations.length"
-                    class="tw:w-full tw:flex column tw:justify-center tw:items-center tw:text-center"
+                    class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
                   >
                     <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">

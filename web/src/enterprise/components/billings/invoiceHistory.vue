@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:py-3" style="min-height: inherit;">
-    <div class="tw:flex tw:px-2 q-table__title tw:font-[600]">
+  <div data-test="invoice-history-container" class="tw:rounded-md tw:py-3" style="min-height: inherit;">
+    <div data-test="invoice-history-title" class="tw:flex tw:px-2 tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
       {{ t("billing.invoiceHistory") }}
     </div>
     <div>

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem]">
         <div class="tw:px-3 tw:py-2">
           <div
-            class="q-table__title tw:w-full tw:pb-2"
+            class="tw:text-xl tw:tracking-[0.005em] tw:w-full tw:pb-2"
             data-test="user-title-text"
           >
             {{ t("quota.header") }}

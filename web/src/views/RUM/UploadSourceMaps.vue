@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1">
+  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
     <!-- Top Header Bar -->
     <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
       <div class="tw:flex tw:items-center tw:gap-3">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 192px); overflow: auto">
+    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
       <div class="upload-form">
         <!-- Input Fields -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
@@ -300,7 +300,7 @@ const uploadSourceMaps = async () => {
 
 <style lang="scss" scoped>
 .upload-source-maps-page {
-  height: calc(100vh - var(--navbar-height) - 1.25rem);
+  height: calc(100vh - var(--navbar-height) - 1rem);
   display: flex;
   flex-direction: column;
   background-color: var(--q-background);

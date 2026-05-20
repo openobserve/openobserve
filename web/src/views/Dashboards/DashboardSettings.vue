@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       style="height: calc(100vh - 65px)"
       disabled
-      horizontal
     >
       <template v-slot:before>
         <div class="functions-tabs" style="width: 100%">

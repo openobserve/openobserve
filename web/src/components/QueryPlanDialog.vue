@@ -22,11 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('search.queryPlan')"
     @update:open="(v) => !v && onClose()"
   >
-    <div class="query-plan-content full-height tw:p-0">
-      <OSplitter v-model="splitterPosition" :horizontal="false" class="full-height">
+    <div class="query-plan-content tw:h-full tw:p-0">
+      <OSplitter v-model="splitterPosition" :horizontal="false" class="tw:h-full">
         <!-- Left Pane: SQL Query -->
         <template #before>
-          <div class="sql-query-pane full-height">
+          <div class="sql-query-pane tw:h-full">
             <div
               class="pane-header tw:p-2 tw:px-[1rem] tw:flex tw:items-center"
               :class="
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
-          <div class="explain-results-pane full-height">
+          <div class="explain-results-pane tw:h-full">
             <div
               class="pane-header tw:p-2 tw:px-[1rem] tw:flex tw:items-center"
               :class="
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSeparator />
 
-            <div v-if="loading" class="tw:flex flex-center tw:p-6 full-height">
+            <div v-if="loading" class="tw:flex flex-center tw:p-6 tw:h-full">
               <div class="tw:text-center">
                 <OSpinner variant="dots" size="lg" />
                 <div class="tw:mt-3">

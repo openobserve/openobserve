@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="sideBarSplitterModel"
               style="width: 100%; height: calc(100vh - 90px) !important"
-              class="full-height"
+              class="tw:h-full"
               horizontal
             >
               <template #before>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-show="expandState.setVariables"
-                  class="tw:flex tw:justify-between tw:pl-2 full-height"
+                  class="tw:flex tw:justify-between tw:pl-2 tw:h-full"
                   style="overflow-y: auto !important"
                 >
                   <div>

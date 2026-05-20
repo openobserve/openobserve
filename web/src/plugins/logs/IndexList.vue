@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
+    class="tw:flex tw:flex-col logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div

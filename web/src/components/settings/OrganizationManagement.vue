@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div>
       <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
-        <div class="q-table__title" data-test="org-management-list-title">
+        <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
           {{ t("settings.organizationManagement") }}
         </div>
         <OInput

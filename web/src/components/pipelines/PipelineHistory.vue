@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="chevron-left"
             />
             <div
-              class="q-table__title tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
