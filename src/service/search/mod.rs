@@ -82,6 +82,7 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        partition::cpu_cores::get_cpu_cores,
         sql::visitor::histogram_interval::{
             convert_histogram_interval_to_seconds, generate_histogram_interval,
         },
@@ -733,13 +734,9 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let cpu_cores =
-        partition::cpu_cores::get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
-
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
-
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -758,32 +755,8 @@ pub async fn search_partition(
         non_ts_order_by_cols: vec![],
     };
 
-    let mut min_step = Duration::try_seconds(1)
-        .unwrap()
-        .num_microseconds()
-        .unwrap();
-    if (is_aggregate && ts_column.is_some()) || enable_align_histogram {
-        let hist_int = if let Some(hist_int) = sql.histogram_interval {
-            hist_int
-        } else {
-            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
-            match convert_histogram_interval_to_seconds(interval) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
-                    );
-                    10
-                }
-            }
-        };
-        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
-        if hist_int > 0 {
-            min_step *= hist_int;
-        }
-    }
-
     // Calculate original step with all factors considered
+    let cpu_cores = get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
@@ -818,6 +791,30 @@ pub async fn search_partition(
     );
 
     // Calculate step with all constraints
+    let mut min_step = Duration::try_seconds(1)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    if (is_aggregate && ts_column.is_some()) || enable_align_histogram {
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
+            match convert_histogram_interval_to_seconds(interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
+                    );
+                    10
+                }
+            }
+        };
+        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
+        if hist_int > 0 {
+            min_step *= hist_int;
+        }
+    }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
