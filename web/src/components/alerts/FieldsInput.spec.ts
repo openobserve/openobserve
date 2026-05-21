@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
 
 const makeField = (overrides: Record<string, any> = {}) => ({
   uuid: Math.random().toString(36).slice(2),
@@ -35,7 +37,7 @@ const streamFields = [
   { label: "Message", value: "message" },
 ];
 
-async function mountComp(props: Record<string, any> = {}) {
+function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
   return mount(FieldsInput, {
     props: {
       fields: [],
@@ -46,165 +48,223 @@ async function mountComp(props: Record<string, any> = {}) {
   });
 }
 
-describe("FieldsInput - rendering with empty fields", () => {
-  it("renders without errors", async () => {
-    const w = await mountComp();
-    expect(w.exists()).toBe(true);
+// ---------------------------------------------------------------------------
+// tests
+// ---------------------------------------------------------------------------
+
+describe("FieldsInput", () => {
+  let wrapper: VueWrapper<any> | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
   });
 
-  it("renders conditions title text", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
+  // ── Renders with minimum props ────────────────────────────────────────────
+
+  describe("renders with minimum props", () => {
+    it("mounts without error", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("renders the conditions title text element", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
+    });
+
+    it("shows the Add Condition button when fields is empty", () => {
+      wrapper = buildWrapper({ fields: [] });
+
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
+    });
+
+    it("does not show condition rows when fields is empty", () => {
+      wrapper = buildWrapper({ fields: [] });
+
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
+    });
   });
 
-  it("shows Add Condition button when fields is empty", async () => {
-    const w = await mountComp({ fields: [] });
-    expect(w.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
+  // ── Empty / null edge cases ───────────────────────────────────────────────
+
+  describe("edge cases — empty fields array", () => {
+    it("hides the Add Condition button once a field is added", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
+    });
   });
 
-  it("does not show condition rows when fields is empty", async () => {
-    const w = await mountComp({ fields: [] });
-    expect(w.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
-  });
-});
+  // ── Rendering with fields ─────────────────────────────────────────────────
 
-describe("FieldsInput - rendering with fields", () => {
-  it("hides Add Condition button when fields is non-empty", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
-  });
+  describe("rendering with non-empty fields", () => {
+    it("renders one condition row per field", () => {
+      wrapper = buildWrapper({ fields: [makeField(), makeField()] });
 
-  it("renders condition rows for each field", async () => {
-    const fields = [makeField(), makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
-    expect(w.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
-  });
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
+    });
 
-  it("renders column select for each field", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-select-column"]').exists()).toBe(true);
-  });
+    it("renders a column select for each field", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
 
-  it("renders operator select for each field", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-operator-select"]').exists()).toBe(true);
-  });
+      expect(wrapper.find('[data-test="alert-conditions-select-column"]').exists()).toBe(true);
+    });
 
-  it("renders value input for each field", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-value-input"]').exists()).toBe(true);
-  });
+    it("renders an operator select for each field", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
 
-  it("renders delete button for each field", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    expect(w.find('[data-test="alert-conditions-delete-condition-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-operator-select"]').exists()).toBe(true);
+    });
+
+    it("renders a value input for each field", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-value-input"]').exists()).toBe(true);
+    });
+
+    it("renders a delete button for each field", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-delete-condition-btn"]').exists()).toBe(true);
+    });
+
+    it("renders the add-condition inline button only on the last row", () => {
+      wrapper = buildWrapper({ fields: [makeField(), makeField()] });
+
+      const addBtns = wrapper.findAll('[data-test="alert-conditions-add-condition-btn"]');
+      expect(addBtns).toHaveLength(1);
+    });
   });
 
-  it("renders add-condition button only on last field row", async () => {
-    const fields = [makeField(), makeField()];
-    const w = await mountComp({ fields });
-    const addBtns = w.findAll('[data-test="alert-conditions-add-condition-btn"]');
-    expect(addBtns).toHaveLength(1);
-  });
-});
+  // ── Interactive elements fire right events ────────────────────────────────
 
-describe("FieldsInput - emit events", () => {
-  it("clicking Add Condition button emits 'add'", async () => {
-    const w = await mountComp({ fields: [] });
-    await w.find('[data-test="alert-conditions-add-btn"]').trigger("click");
-    expect(w.emitted("add")).toBeTruthy();
-    expect(w.emitted("add")!.length).toBe(1);
-  });
+  describe("interactive elements", () => {
+    it("clicking Add Condition button emits 'add'", async () => {
+      wrapper = buildWrapper({ fields: [] });
 
-  it("clicking delete button emits 'remove' with the field", async () => {
-    const field = makeField({ column: "host" });
-    const w = await mountComp({ fields: [field] });
-    await w.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
-    expect(w.emitted("remove")).toBeTruthy();
-    expect((w.emitted("remove") as any[][])[0][0]).toMatchObject({ column: "host" });
-  });
+      await wrapper.find('[data-test="alert-conditions-add-btn"]').trigger("click");
 
-  it("clicking delete button also emits 'input:update'", async () => {
-    const field = makeField({ column: "level" });
-    const w = await mountComp({ fields: [field] });
-    await w.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
-    expect(w.emitted("input:update")).toBeTruthy();
-  });
+      expect(wrapper.emitted("add")).toBeTruthy();
+      expect(wrapper.emitted("add")!.length).toBe(1);
+    });
 
-  it("clicking add-condition-btn on last row emits 'add'", async () => {
-    const fields = [makeField()];
-    const w = await mountComp({ fields });
-    await w.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
-    expect(w.emitted("add")).toBeTruthy();
-  });
-});
+    it("clicking delete button emits 'remove' with the field object", async () => {
+      const field = makeField({ column: "host" });
+      wrapper = buildWrapper({ fields: [field] });
 
-describe("FieldsInput - triggerOperators", () => {
-  it("triggerOperators includes = operator", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).triggerOperators).toContain("=");
+      await wrapper.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
+
+      expect(wrapper.emitted("remove")).toBeTruthy();
+      expect((wrapper.emitted("remove") as any[][])[0][0]).toMatchObject({ column: "host" });
+    });
+
+    it("clicking delete button also emits 'input:update'", async () => {
+      const field = makeField({ column: "level" });
+      wrapper = buildWrapper({ fields: [field] });
+
+      await wrapper.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
+
+      expect(wrapper.emitted("input:update")).toBeTruthy();
+    });
+
+    it("clicking the inline add-condition button emits 'add'", async () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      await wrapper.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
+
+      expect(wrapper.emitted("add")).toBeTruthy();
+    });
   });
 
-  it("triggerOperators includes != operator", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).triggerOperators).toContain("!=");
+  // ── v-if branching ────────────────────────────────────────────────────────
+
+  describe("v-if branching", () => {
+    it("shows the Add Condition button branch (v-if=!fields.length) when fields is empty", () => {
+      wrapper = buildWrapper({ fields: [] });
+
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
+    });
+
+    it("shows condition rows branch (v-else) and hides add-btn when fields is non-empty", () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+    });
   });
 
-  it("triggerOperators includes Contains", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).triggerOperators).toContain("Contains");
+  // ── Props reactivity ──────────────────────────────────────────────────────
+
+  describe("props reactivity", () => {
+    it("switches to rows view when fields prop changes from empty to non-empty", async () => {
+      wrapper = buildWrapper({ fields: [] });
+
+      await wrapper.setProps({ fields: [makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
+    });
+
+    it("switches back to add-btn view when fields prop changes to empty", async () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      await wrapper.setProps({ fields: [] });
+
+      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
+    });
+
+    it("renders correct number of rows after adding a second field", async () => {
+      wrapper = buildWrapper({ fields: [makeField()] });
+
+      await wrapper.setProps({ fields: [makeField(), makeField()] });
+
+      expect(wrapper.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
+    });
   });
 
-  it("triggerOperators includes NotContains", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).triggerOperators).toContain("NotContains");
-  });
+  // ── triggerOperators content ──────────────────────────────────────────────
 
-  it("triggerOperators has 8 items", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).triggerOperators.length).toBe(8);
-  });
-});
+  describe("triggerOperators data", () => {
+    it("exposes triggerOperators on the component instance", () => {
+      wrapper = buildWrapper();
 
-// TODO: filterColumns and newValueMode internal APIs were removed during the
-// ux-revamp refactor (q-select → OSelect). The component no longer exposes them.
-// These tests are skipped until equivalent OSelect-based assertions are written.
-describe.skip("FieldsInput - filterColumns", () => {
-  it("filters columns by keyword", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterColumns("host", (cb: () => void) => cb());
-    const values = (w.vm as any).filteredFields.map((f: any) => f.value);
-    expect(values).toContain("host");
-    expect(values).not.toContain("level");
-  });
+      expect((wrapper.vm as any).triggerOperators).toBeDefined();
+    });
 
-  it("returns all fields when filter is empty", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterColumns("", (cb: () => void) => cb());
-    expect((w.vm as any).filteredFields).toHaveLength(streamFields.length);
-  });
+    it("triggerOperators contains 8 operators", () => {
+      wrapper = buildWrapper();
 
-  it("filterColumns is case-insensitive", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterColumns("HOST", (cb: () => void) => cb());
-    expect((w.vm as any).filteredFields.length).toBeGreaterThan(0);
-  });
-});
+      expect((wrapper.vm as any).triggerOperators.length).toBe(8);
+    });
 
-describe.skip("FieldsInput - newValueMode computed", () => {
-  it("returns empty object when enableNewValueMode=false", async () => {
-    const w = await mountComp({ enableNewValueMode: false });
-    expect((w.vm as any).newValueMode).toEqual({});
-  });
+    it("triggerOperators includes '='", () => {
+      wrapper = buildWrapper();
 
-  it("returns new-value-mode object when enableNewValueMode=true", async () => {
-    const w = await mountComp({ enableNewValueMode: true });
-    expect((w.vm as any).newValueMode).toHaveProperty("new-value-mode", "unique");
+      expect((wrapper.vm as any).triggerOperators).toContain("=");
+    });
+
+    it("triggerOperators includes '!='", () => {
+      wrapper = buildWrapper();
+
+      expect((wrapper.vm as any).triggerOperators).toContain("!=");
+    });
+
+    it("triggerOperators includes 'Contains'", () => {
+      wrapper = buildWrapper();
+
+      expect((wrapper.vm as any).triggerOperators).toContain("Contains");
+    });
+
+    it("triggerOperators includes 'NotContains'", () => {
+      wrapper = buildWrapper();
+
+      expect((wrapper.vm as any).triggerOperators).toContain("NotContains");
+    });
   });
 });

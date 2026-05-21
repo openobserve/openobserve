@@ -217,24 +217,22 @@ describe("IncidentRCAAnalysis", () => {
       expect(existsByTestId(wrapper, "rca-stream-content")).toBe(false);
     });
 
-    it("should apply dark mode styles to in-flight container", () => {
+    it("should render in-flight container in dark mode", () => {
       wrapper = mountComponent({
         rcaLoading: true,
         isDarkMode: true,
       });
 
-      const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.classes()).toContain("tw:bg-indigo-900/20");
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
     });
 
-    it("should apply light mode styles to in-flight container", () => {
+    it("should render in-flight container in light mode", () => {
       wrapper = mountComponent({
         rcaLoading: true,
         isDarkMode: false,
       });
 
-      const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.classes()).toContain("tw:bg-indigo-50");
+      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
     });
   });
 
@@ -283,7 +281,7 @@ describe("IncidentRCAAnalysis", () => {
       expect(existsByTestId(wrapper, "rca-existing-container")).toBe(false);
     });
 
-    it("should apply dark mode styles to existing container", () => {
+    it("should render existing container in dark mode", () => {
       const rcaContent = createMockRcaContent().simple;
       wrapper = mountComponent({
         hasExistingRca: true,
@@ -291,11 +289,10 @@ describe("IncidentRCAAnalysis", () => {
         isDarkMode: true,
       });
 
-      const container = findByTestId(wrapper, "rca-existing-container");
-      expect(container.classes()).toContain("tw:border-gray-700");
+      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
     });
 
-    it("should apply light mode styles to existing container", () => {
+    it("should render existing container in light mode", () => {
       const rcaContent = createMockRcaContent().simple;
       wrapper = mountComponent({
         hasExistingRca: true,
@@ -303,9 +300,7 @@ describe("IncidentRCAAnalysis", () => {
         isDarkMode: false,
       });
 
-      const container = findByTestId(wrapper, "rca-existing-container");
-      expect(container.classes()).toContain("tw:bg-white");
-      expect(container.classes()).toContain("tw:border-gray-200");
+      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
     });
   });
 

@@ -336,12 +336,13 @@ describe("PrebuiltDestinationSelector", () => {
       expect(icon.props("name")).toBe("settings");
     });
 
-    it("should render icons with correct size", () => {
+    it("should render icons with a size prop", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
       const icon = customCard.findComponent({ name: "OIcon" });
 
-      expect(icon.props("size")).toBe("1.5rem");
+      // The OIcon size prop is set to "md" in the template
+      expect(icon.props("size")).toBe("md");
     });
 
     it("should render check icon with positive color when selected", () => {
