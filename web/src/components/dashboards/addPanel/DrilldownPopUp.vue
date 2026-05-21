@@ -86,7 +86,7 @@
         v-if="drilldownData.data.logsMode === 'custom'"
         style="margin-top: 10px"
       >
-        <label class="o-input-label tw:text-sm tw:font-medium">{{ t("dashboard.enterCustomQuery") }}</label>
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
@@ -101,7 +101,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label tw:text-sm tw:font-medium">{{ t("dashboard.enterUrl") }}</label>
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <textarea
           style="
             min-width: 100%;
@@ -168,7 +168,7 @@
               align-items: center;
             "
           >
-            <span class="o-input-label tw:text-sm tw:font-medium">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"

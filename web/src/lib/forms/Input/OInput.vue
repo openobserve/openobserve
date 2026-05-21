@@ -229,17 +229,11 @@ const wrapperClasses = computed(() => [
 
 <template>
   <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
-    <!-- Label -->
-    <!-- Hardcoded hex via inline style for both themes — the previous
-         token-based color (`tw:text-text-primary` -> `--color-text-primary`)
-         was consistently rendering as the disabled-grey across the app in
-         spite of being set to `--color-grey-900` (#171717) in the theme.
-         Inline `style` beats any cascade so labels read as active metadata. -->
     <label
       v-if="label || $slots.tooltip"
       :for="inputId"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
         props.disabled && 'o-input-label--disabled',
       ]"
     >

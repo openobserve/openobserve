@@ -43,11 +43,9 @@ const wrapperClasses = computed(() => {
        together. Without label: render the ToggleGroupRoot directly to keep
        the existing inline-flex/sizing contract. -->
   <div v-if="hasLabel" :class="wrapperClasses">
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         so labels across all form components read consistently. -->
     <span
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none',
+        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
         disabled && 'o-input-label--disabled',
       ]"
     >
