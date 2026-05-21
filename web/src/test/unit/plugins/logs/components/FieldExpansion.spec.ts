@@ -18,18 +18,46 @@ import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import i18n from "@/locales";
 
-// Mock formatLargeNumber utility
-vi.mock("@/utils/zincutils", () => ({
-  formatLargeNumber: vi.fn((num) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
-    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-    return num.toString();
-  }),
-}));
+// Stub FieldValuesPanel so we can inspect passed props
+const FieldValuesPanelStub = {
+  name: "FieldValuesPanel",
+  template: '<div class="field-values-panel-stub" />',
+  props: [
+    "fieldName",
+    "fieldValues",
+    "showMultiSelect",
+    "defaultValuesCount",
+    "theme",
+    "activeIncludeValues",
+    "activeExcludeValues",
+  ],
+  emits: [
+    "add-search-term",
+    "add-multiple-search-terms",
+    "remove-field-filter",
+    "load-more-values",
+    "search-field-values",
+  ],
+};
 
+// Stub OCollapsible: renders trigger + content when open
+const OCollapsibleStub = {
+  name: "OCollapsible",
+  template: `
+    <div class="o-collapsible-stub">
+      <div class="collapsible-trigger" @click="$emit('update:modelValue', !modelValue)">
+        <slot name="trigger" />
+      </div>
+      <div v-if="modelValue" class="collapsible-content">
+        <slot />
+      </div>
+    </div>
+  `,
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+};
 
 describe("FieldExpansion.vue", () => {
-
   const defaultProps = {
     field: {
       name: "status",
@@ -51,608 +79,324 @@ describe("FieldExpansion.vue", () => {
     showQuickMode: true,
   };
 
-  describe("rendering", () => {
-    it("should render field expansion with field name", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template:
-                '<div class="q-expansion-item"><slot name="header" /><slot /></div>',
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-checkbox": true,
-            "q-tooltip": true,
-            EqualIcon: true,
-            NotEqualIcon: true,
+  function createWrapper(overrides: Record<string, unknown> = {}) {
+    return mount(FieldExpansion, {
+      props: { ...defaultProps, ...overrides },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          OCollapsible: OCollapsibleStub,
+          FieldValuesPanel: FieldValuesPanelStub,
+          OButton: {
+            template:
+              '<button class="o-btn-stub" @click="$emit(\'click\', $event)"><slot /></button>',
+            props: ["variant", "size", "disabled"],
+            emits: ["click"],
+          },
+          OIcon: {
+            template: '<span class="o-icon-stub" :data-icon-name="name" />',
+            props: ["name", "size", "title"],
           },
         },
-      });
+      },
+    });
+  }
 
+  describe("rendering", () => {
+    it("renders field name", () => {
+      const wrapper = createWrapper();
       expect(wrapper.text()).toContain("status");
     });
 
-    it("should render field values list", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      expect(wrapper.text()).toContain("200");
-      expect(wrapper.text()).toContain("404");
-      expect(wrapper.text()).toContain("500");
+    it("renders expand button with data-test", () => {
+      const wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="log-search-expand-status-field-btn"]').exists(),
+      ).toBe(true);
     });
 
-    it("should format large numbers", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          fieldValues: {
-            isLoading: false,
-            values: [{ key: "total", count: 1500000 }],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
+    it("renders FieldValuesPanel with mapped field values", () => {
+      const wrapper = createWrapper({ expanded: true });
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.exists()).toBe(true);
+      expect(fvp.props("fieldValues")).toEqual({
+        isLoading: false,
+        values: [
+          { key: "200", count: 1500 },
+          { key: "404", count: 250 },
+          { key: "500", count: 50 },
+        ],
+      });
+    });
+
+    it("passes fieldValues with truthy values to FieldValuesPanel", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        fieldValues: {
+          isLoading: false,
+          values: [
+            { key: "200", count: 1500 },
+            { key: "404", count: 250 },
+            { key: "500", count: 50 },
+          ],
         },
       });
-
-      expect(wrapper.text()).toContain("1.5M");
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("fieldValues").values).toHaveLength(3);
     });
   });
 
   describe("loading state", () => {
-    it("should show loading indicator when isLoading is true", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          fieldValues: {
-            isLoading: true,
-            values: [],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-          },
+    it("passes isLoading to FieldValuesPanel", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        fieldValues: {
+          isLoading: true,
+          values: [],
         },
       });
-
-      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Fetching values...");
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("fieldValues").isLoading).toBe(true);
     });
 
-    it("should hide values list when loading", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          fieldValues: {
-            isLoading: true,
-            values: [{ key: "test", count: 100 }],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-          },
+    it("still passes values when loading", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        fieldValues: {
+          isLoading: true,
+          values: [{ key: "test", count: 100 }],
         },
       });
-
-      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("fieldValues").isLoading).toBe(true);
+      expect(fvp.props("fieldValues").values).toHaveLength(1);
     });
   });
 
   describe("empty state", () => {
-    it("should show 'No values found' when values array is empty", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          fieldValues: {
-            isLoading: false,
-            values: [],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-          },
+    it("passes empty values and errMsg to FieldValuesPanel", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        fieldValues: {
+          isLoading: false,
+          values: [],
+          errMsg: "Failed to fetch values",
         },
       });
-
-      expect(wrapper.text()).toContain("No values found");
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("fieldValues").values).toEqual([]);
+      expect(fvp.props("fieldValues").errMsg).toBe("Failed to fetch values");
     });
 
-    it("should show custom error message when provided", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          fieldValues: {
-            isLoading: false,
-            values: [],
-            errMsg: "Failed to fetch values",
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-          },
+    it("passes undefined errMsg when not provided", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        fieldValues: {
+          isLoading: false,
+          values: [],
         },
       });
-
-      expect(wrapper.text()).toContain("Failed to fetch values");
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("fieldValues").errMsg).toBeUndefined();
     });
   });
 
   describe("field selection", () => {
-    it("should show visibility icon when field is not selected", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          selectedFields: [],
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": {
-              template: '<div class="OIcon" :name="name"></div>',
-              props: ["name"],
-            },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("shows add icon when field is not selected", () => {
+      const wrapper = createWrapper({ selectedFields: [] });
 
-      expect(wrapper.find('[name="outlined-visibility"]').exists()).toBe(false); // Due to stubbing
+      const addIcon = wrapper.find(
+        '[data-test="log-search-index-list-add-status-field-btn"]',
+      );
+      expect(addIcon.exists()).toBe(true);
+
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
+      expect(removeIcon.exists()).toBe(false);
     });
 
-    it("should show visibility_off icon when field is selected", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          selectedFields: ["status"],
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("shows remove icon when field is selected", () => {
+      const wrapper = createWrapper({ selectedFields: ["status"] });
 
-      // Component computes isFieldSelected correctly
-      expect(wrapper.vm).toBeDefined();
+      const addIcon = wrapper.find(
+        '[data-test="log-search-index-list-add-status-field-btn"]',
+      );
+      expect(addIcon.exists()).toBe(false);
+
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
+      expect(removeIcon.exists()).toBe(true);
+    });
+
+    it("emits toggle-field when add icon is clicked", async () => {
+      const wrapper = createWrapper({ selectedFields: [] });
+
+      const addIcon = wrapper.find(
+        '[data-test="log-search-index-list-add-status-field-btn"]',
+      );
+      await addIcon.trigger("click");
+
+      expect(wrapper.emitted("toggle-field")).toBeTruthy();
+      expect(wrapper.emitted("toggle-field")?.[0]).toEqual([
+        defaultProps.field,
+      ]);
+    });
+
+    it("emits toggle-field when remove icon is clicked", async () => {
+      const wrapper = createWrapper({ selectedFields: ["status"] });
+
+      const removeIcon = wrapper.find(
+        '[data-test="log-search-index-list-remove-status-field-btn"]',
+      );
+      await removeIcon.trigger("click");
+
+      expect(wrapper.emitted("toggle-field")).toBeTruthy();
     });
   });
 
   describe("interesting fields", () => {
-    it("should show info icon for interesting fields", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          field: {
-            ...defaultProps.field,
-            isInterestingField: true,
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
+    it("shows info icon for interesting fields", () => {
+      const wrapper = createWrapper({
+        field: {
+          ...defaultProps.field,
+          isInterestingField: true,
         },
       });
 
-      expect(wrapper.exists()).toBe(true);
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
     });
 
-    it("should show info_outline for non-interesting fields", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
+    it("shows info-outline for non-interesting fields", () => {
+      const wrapper = createWrapper({
+        field: {
+          ...defaultProps.field,
+          isInterestingField: false,
         },
       });
 
-      expect(wrapper.exists()).toBe(true);
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
+    });
+
+    it("emits toggle-interesting when interesting icon is clicked", async () => {
+      const wrapper = createWrapper({
+        field: {
+          ...defaultProps.field,
+          isInterestingField: false,
+        },
+      });
+
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      await icon.trigger("click");
+
+      expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
     });
   });
 
   describe("events", () => {
-    it("should emit add-to-filter when filter button is clicked", async () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("emits add-to-filter when filter button is clicked", async () => {
+      const wrapper = createWrapper();
 
-      const buttons = wrapper.findAll("button");
-      if (buttons.length > 0) {
-        await buttons[0].trigger("click");
-        // Check emitted event exists
-        expect(wrapper.emitted()).toBeDefined();
-      }
+      const filterBtn = wrapper.find(
+        '[data-test="log-search-index-list-filter-status-field-btn"]',
+      );
+      expect(filterBtn.exists()).toBe(true);
+      await filterBtn.trigger("click");
+
+      expect(wrapper.emitted("add-to-filter")).toBeTruthy();
+      expect(wrapper.emitted("add-to-filter")?.[0]).toEqual(["status=''"]);
     });
 
-    it("should emit toggle-field when visibility icon is clicked", async () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": {
-              template: '<div class="OIcon" @click="$attrs.onClick"></div>',
-            },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("emits before-show when collapsible expands", async () => {
+      const wrapper = createWrapper({ expanded: false });
 
-      const icons = wrapper.findAll(".OIcon");
-      if (icons.length > 0) {
-        await icons[0].trigger("click");
-        expect(wrapper.emitted()).toBeDefined();
-      }
-    });
+      const trigger = wrapper.find(".collapsible-trigger");
+      await trigger.trigger("click");
 
-    it("should emit toggle-interesting when info icon is clicked", async () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": {
-              template: '<div class="OIcon" @click="$attrs.onClick"></div>',
-            },
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should emit before-show when expansion opens", async () => {
-      const wrapper = mount(FieldExpansion, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template:
-                '<div class="q-expansion-item" @click="$emit(\'before-show\', {})"><slot name="header" /><slot /></div>',
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
-
-      await wrapper.find(".q-expansion-item").trigger("click");
       expect(wrapper.emitted("before-show")).toBeTruthy();
+      expect(wrapper.emitted("before-show")?.[0]).toEqual([
+        null,
+        defaultProps.field,
+      ]);
     });
 
-    it.skip("should emit add-search-term with correct parameters for include", async () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          selectedStreamsCount: 1,
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            EqualIcon: { template: "<div>=" },
-            NotEqualIcon: { template: "<div>!=" },
-          },
-        },
-      });
-
-      const buttons = wrapper.findAll("button");
-      // Find the include button (should have EqualIcon which shows "=")
-      // The include/exclude buttons are rendered after the header buttons
-      // Header has 1 button (add-to-filter), so first include button should be at index 1
-      if (buttons.length > 1) {
-        await buttons[1].trigger("click");
-        expect(wrapper.emitted("add-search-term")).toBeTruthy();
-        expect(wrapper.emitted("add-search-term")?.[0]).toEqual([
-          "status",
-          "200",
-          "include",
-        ]);
-      }
-    });
-  });
-
-  describe("include/exclude buttons", () => {
-    it("should show include/exclude buttons when selectedStreamsCount matches field streams", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          selectedStreamsCount: 1,
-          field: {
-            ...defaultProps.field,
-            streams: ["logs"],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": { template: "<button><slot /></button>" },
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      const buttons = wrapper.findAll("button");
-      expect(buttons.length).toBeGreaterThan(0);
+    it("stays collapsed when expanded prop is false", () => {
+      const wrapper = createWrapper({ expanded: false });
+      expect(wrapper.find(".collapsible-content").exists()).toBe(false);
     });
 
-    it("should hide include/exclude buttons when stream counts do not match", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          selectedStreamsCount: 2,
-          field: {
-            ...defaultProps.field,
-            streams: ["logs"],
-          },
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": { template: "<button><slot /></button>" },
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      // When streams don't match, buttons should not render
-      expect(wrapper.exists()).toBe(true);
+    it("shows content when expanded prop is true", () => {
+      const wrapper = createWrapper({ expanded: true });
+      expect(wrapper.find(".collapsible-content").exists()).toBe(true);
     });
   });
 
   describe("quick mode", () => {
-    it("should show interesting field icon when showQuickMode is true", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          showQuickMode: true,
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("shows interesting field icon when showQuickMode is true", () => {
+      const wrapper = createWrapper({ showQuickMode: true });
 
-      expect(wrapper.exists()).toBe(true);
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
     });
 
-    it("should hide interesting field icon when showQuickMode is false", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          showQuickMode: false,
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "OIcon": true,
-            "q-btn": true,
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-          },
-        },
-      });
+    it("hides interesting field icon when showQuickMode is false", () => {
+      const wrapper = createWrapper({ showQuickMode: false });
 
-      expect(wrapper.exists()).toBe(true);
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(false);
     });
   });
 
   describe("theme support", () => {
-    it("should apply correct classes for dark theme", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          theme: "dark",
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
+    it("renders with dark theme prop", () => {
+      const wrapper = createWrapper({ theme: "dark" });
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should apply correct classes for light theme", () => {
-      const wrapper = mount(FieldExpansion, {
-        props: {
-          ...defaultProps,
-          theme: "light",
-        },
-        global: {
-          plugins: [i18n],
-          stubs: {
-            "q-expansion-item": {
-              template: "<div><slot name='header' /><slot /></div>",
-            },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "OIcon": true,
-            "q-btn": true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
+    it("renders with light theme prop", () => {
+      const wrapper = createWrapper({ theme: "light" });
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("showMultiSelect", () => {
+    it("passes showMultiSelect=true when selectedStreamsCount matches field streams length", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        selectedStreamsCount: 1,
+        field: {
+          ...defaultProps.field,
+          streams: ["logs"],
         },
       });
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("showMultiSelect")).toBe(true);
+    });
 
-      expect(wrapper.exists()).toBe(true);
+    it("passes showMultiSelect=false when stream counts do not match", () => {
+      const wrapper = createWrapper({
+        expanded: true,
+        selectedStreamsCount: 2,
+        field: {
+          ...defaultProps.field,
+          streams: ["logs"],
+        },
+      });
+      const fvp = wrapper.findComponent(FieldValuesPanelStub);
+      expect(fvp.props("showMultiSelect")).toBe(false);
     });
   });
 });

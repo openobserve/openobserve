@@ -15,7 +15,6 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { QTable } from "quasar";
 import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -151,7 +150,7 @@ describe("RunningQueries", () => {
           },
         },
         stubs: {
-          "q-table": QTable,
+          "q-table": true,
           "q-btn": true,
           "q-input": true,
           "q-select": true,

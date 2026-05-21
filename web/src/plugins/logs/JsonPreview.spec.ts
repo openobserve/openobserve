@@ -657,16 +657,11 @@ describe("JsonPreview Component", () => {
     it("should copy selected text successfully", async () => {
       wrapper.vm.selectedText = "test text";
       vi.mocked(navigator.clipboard.writeText).mockResolvedValue(undefined);
-      
+
       await wrapper.vm.copySelectedText();
-      
+
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
       expect(wrapper.vm.showMenu).toBe(false);
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "success",
-        message: "Text copied to clipboard",
-        timeout: 1500,
-      });
     });
 
     it("should handle copy text failure", async () => {

@@ -240,7 +240,15 @@ describe("DetailTable Component", () => {
     expect(wrapper.vm.tab).toBe("json");
     expect(wrapper.vm.selectedRelativeValue).toBe(10);
     expect(wrapper.vm.shouldWrapValues).toBe(true);
-    expect(wrapper.vm.recordSizeOptions).toEqual([10, 20, 50, 100, 200, 500, 1000]);
+    expect(wrapper.vm.recordSizeOptions).toEqual([
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "200", value: 200 },
+      { label: "500", value: 500 },
+      { label: "1000", value: 1000 },
+    ]);
   });
 
   it("should process modelValue in created lifecycle", async () => {
@@ -488,24 +496,21 @@ describe("DetailTable Component", () => {
   });
 
   // Test 31-35: Field Actions
-  it("should render field action buttons in table view", async () => {
+  it("should render table content when tab is table and rowData is not empty", async () => {
     wrapper.vm.tab = "table";
     await nextTick();
-    
-    const actionButton = wrapper.find('[data-test="log-details-include-exclude-field-btn-_timestamp"]');
-    expect(actionButton.exists()).toBe(true);
+
+    const tableContent = wrapper.find('[data-test="log-detail-table-content"]');
+    expect(tableContent.exists()).toBe(true);
   });
 
-  it("should show dropdown menu when field action clicked", async () => {
+  it("should show no data message when rowData is empty", async () => {
     wrapper.vm.tab = "table";
+    wrapper.vm.rowData = [];
     await nextTick();
-    
-    const actionButton = wrapper.find('[data-test="log-details-include-exclude-field-btn-_timestamp"]');
-    await actionButton.trigger("click");
-    await flushPromises();
-    
-    const fieldList = document.querySelector('[data-test="field-list-modal"]');
-    expect(fieldList).toBeDefined();
+
+    const content = wrapper.find('[data-test="log-detail-table-content"]');
+    expect(content.text()).toContain("No data available.");
   });
 
   it("should call toggleIncludeSearchTerm when include button clicked", () => {

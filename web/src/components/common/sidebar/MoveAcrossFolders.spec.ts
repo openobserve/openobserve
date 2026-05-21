@@ -216,7 +216,7 @@ describe('MoveAcrossFolders.vue', () => {
     expect(drawer.props('title')).toBe('Move Pipelines To Another Folder');
   });
 
-  // Test 4: Current folder input display
+  // Test 4: Current folder name displayed via OInput modelValue
   it('should display current folder name in input field', () => {
     wrapper = createWrapper({
       activeFolderId: 'folder1',
@@ -225,7 +225,8 @@ describe('MoveAcrossFolders.vue', () => {
 
     const currentFolderInput = wrapper.find('[data-test="alerts-folder-move-name"]');
     expect(currentFolderInput.exists()).toBe(true);
-    expect(currentFolderInput.element.value).toBe('Test Folder 1');
+    // OInput uses :model-value prop; assert on the component prop
+    expect(currentFolderInput.props('modelValue')).toBe('Test Folder 1');
   });
 
   // Test 5: SelectFolderDropDown component integration
@@ -290,57 +291,45 @@ describe('MoveAcrossFolders.vue', () => {
     expect(wrapper.vm.getModuleName()).toBe('alert_ids');
   });
 
-  // Test 11: Successful form submission
+  // Test 11: Successful form submission (migrated — no form validation)
   it('should handle successful form submission', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
-    const mockResetValidation = vi.fn();
-
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1', 'alert2'],
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = {
-      validate: mockValidate,
-      resetValidation: mockResetValidation,
-    };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockValidate).toHaveBeenCalled();
     expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
       mockStore,
-      { alert_ids: ['alert1', 'alert2'], dst_folder_id: { value: 'folder2' } },
+      { alert_ids: ['alert1', 'alert2'], dst_folder_id: 'folder2' },
       'alerts',
       'folder1'
     );
   });
 
-  // Test 12: Form submission with validation failure
-  it('should handle form validation failure', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(false);
-
+  // Test 12: onSubmit calls move API directly without form validation
+  it('should call move API when onSubmit executes', async () => {
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1'],
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
+    mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
-    const result = await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit.execute();
 
-    expect(mockValidate).toHaveBeenCalled();
-    expect(mockMoveModuleToAnotherFolder).not.toHaveBeenCalled();
-    expect(result).toBeUndefined();
+    expect(mockMoveModuleToAnotherFolder).toHaveBeenCalled();
   });
 
   // Test 13: Form submission error handling
   it('should handle form submission errors', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
     const error = new Error('Move operation failed');
 
     wrapper = createWrapper({
@@ -349,8 +338,7 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockRejectedValue(error);
 
     await wrapper.vm.onSubmit.execute();
@@ -362,7 +350,6 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 14: Form submission error handling without error message
   it('should handle form submission errors without message', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
     const error = {};
 
     wrapper = createWrapper({
@@ -371,8 +358,7 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'pipelines',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockRejectedValue(error);
 
     await wrapper.vm.onSubmit.execute();
@@ -384,46 +370,38 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 15: Event emission on successful move
   it('should emit updated event on successful move', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
-
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1'],
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
     const emittedEvents = wrapper.emitted('updated');
     expect(emittedEvents).toBeTruthy();
-    expect(emittedEvents[0]).toEqual(['folder1', { value: 'folder2' }]);
+    expect(emittedEvents[0]).toEqual(['folder1', 'folder2']);
   });
 
-  // Test 16: Form reset on successful submission
-  it('should reset form validation on successful submission', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
-    const mockResetValidation = vi.fn();
-
+  // Test 16: Shows success notification on successful submission
+  it('should show positive notification on successful submission', async () => {
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1'],
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = {
-      validate: mockValidate,
-      resetValidation: mockResetValidation,
-    };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockResetValidation).toHaveBeenCalled();
+    expect(mockShowPositiveNotification).toHaveBeenCalledWith('alerts Moved successfully', {
+      timeout: 2000,
+    });
   });
 
   // Test 17: Component name verification
@@ -483,13 +461,12 @@ describe('MoveAcrossFolders.vue', () => {
     expect(drawer.props('secondaryButtonLabel')).toBe('Cancel');
   });
 
-  // Test 24: Form element existence
-  it('should render form element with correct data-test attribute', () => {
+  // Test 24: Drawer renders with correct body section
+  it('should render body section inside ODrawer for pipelines type', () => {
     wrapper = createWrapper({ type: 'pipelines' });
 
-    const form = wrapper.find('[data-test="pipelines-folder-move-form"]');
-    expect(form.exists()).toBe(true);
-    expect(form.element.tagName).toBe('FORM');
+    const body = wrapper.find('[data-test="pipelines-folder-move-body"]');
+    expect(body.exists()).toBe(true);
   });
 
   // Test 25: Body section exists inside drawer
@@ -498,7 +475,7 @@ describe('MoveAcrossFolders.vue', () => {
     expect(wrapper.find('[data-test="alerts-folder-move-body"]').exists()).toBe(true);
   });
 
-  // Test 26: Input field properties
+  // Test 26: Input field properties — OInput uses disabled prop
   it('should render input field with correct properties', () => {
     wrapper = createWrapper({
       activeFolderId: 'folder1',
@@ -507,7 +484,8 @@ describe('MoveAcrossFolders.vue', () => {
 
     const input = wrapper.find('[data-test="alerts-folder-move-name"]');
     expect(input.exists()).toBe(true);
-    expect(input.attributes('disabled')).toBeDefined();
+    // OInput uses a `disabled` prop, not an HTML attribute
+    expect(input.props('disabled')).toBe(true);
   });
 
   // Test 27: Primary button loading state
@@ -594,11 +572,12 @@ describe('MoveAcrossFolders.vue', () => {
     expect(wrapper.vm.getImageURL).toBeDefined();
   });
 
-  // Test 34: moveFolderForm ref initialization
-  it('should expose moveFolderForm ref', () => {
-    wrapper = createWrapper();
-    // The ref exists on the instance — populated when the form mounts
-    expect(wrapper.vm.moveFolderForm).toBeDefined();
+  // Test 34: Component exposes selectedFolder as a ref
+  it('should expose selectedFolder with correct initial value', () => {
+    wrapper = createWrapper({ activeFolderId: 'folder1', type: 'alerts' });
+    expect(wrapper.vm.selectedFolder).toBeDefined();
+    expect(wrapper.vm.selectedFolder.value).toBe('folder1');
+    expect(wrapper.vm.selectedFolder.label).toBe('Test Folder 1');
   });
 
   // Test 35: onSubmit function existence
@@ -610,23 +589,20 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 36: Form submission data structure for pipelines
   it('should create correct data structure for pipelines type', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
-
     wrapper = createWrapper({
       activeFolderId: 'pipeline1',
       moduleId: ['pipe1', 'pipe2'],
       type: 'pipelines',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'default' } };
+    wrapper.vm.selectedFolder = { label: 'Default', value: 'default' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
     expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
       mockStore,
-      { pipeline_ids: ['pipe1', 'pipe2'], dst_folder_id: { value: 'default' } },
+      { pipeline_ids: ['pipe1', 'pipe2'], dst_folder_id: 'default' },
       'pipelines',
       'pipeline1'
     );
@@ -634,7 +610,6 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 37: Error handling with custom error object
   it('should handle error object with custom message property', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
     const customError = { message: 'Custom error message' };
 
     wrapper = createWrapper({
@@ -643,8 +618,7 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockRejectedValue(customError);
 
     await wrapper.vm.onSubmit.execute();
@@ -696,25 +670,24 @@ describe('MoveAcrossFolders.vue', () => {
     expect(drawer.props('primaryButtonDisabled')).toBe(false);
   });
 
-  // Test 41: Form validation with undefined form
-  it('should handle undefined moveFolderForm gracefully', async () => {
+  // Test 41: Handles API error gracefully when move fails
+  it('should handle API error gracefully when move fails', async () => {
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1'],
       type: 'alerts',
     });
 
-    // Don't set moveFolderForm — useLoading wraps the underlying function and catches in fn
-    try {
-      await wrapper.vm.onSubmit.execute();
-    } catch (error) {
-      expect(error).toBeDefined();
-    }
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
+    mockMoveModuleToAnotherFolder.mockRejectedValue(new Error('API Error'));
+
+    await wrapper.vm.onSubmit.execute();
+
+    expect(mockShowErrorNotification).toHaveBeenCalled();
   });
 
   // Test 42: Multiple module IDs handling
   it('should handle multiple module IDs in submission', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
     const multipleIds = ['id1', 'id2', 'id3', 'id4', 'id5'];
 
     wrapper = createWrapper({
@@ -723,15 +696,14 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
     expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
       mockStore,
-      { alert_ids: multipleIds, dst_folder_id: { value: 'folder2' } },
+      { alert_ids: multipleIds, dst_folder_id: 'folder2' },
       'alerts',
       'folder1'
     );
@@ -791,7 +763,6 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 48: Complex error object handling
   it('should handle error with nested message property', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
     const nestedError = {
       response: { data: { message: 'Nested error message' } },
       message: 'Top level message',
@@ -803,8 +774,7 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockRejectedValue(nestedError);
 
     await wrapper.vm.onSubmit.execute();
@@ -834,7 +804,6 @@ describe('MoveAcrossFolders.vue', () => {
   // Test 51: Edge case - very long module ID array
   it('should handle very long module ID arrays', async () => {
     const longModuleIds = Array.from({ length: 100 }, (_, i) => `module-${i}`);
-    const mockValidate = vi.fn().mockResolvedValue(true);
 
     wrapper = createWrapper({
       activeFolderId: 'folder1',
@@ -842,15 +811,14 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = { validate: mockValidate, resetValidation: vi.fn() };
-    wrapper.vm.selectedFolder = { value: { value: 'folder2' } };
+    wrapper.vm.selectedFolder = { label: 'Folder 2', value: 'folder2' };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     await wrapper.vm.onSubmit.execute();
 
     expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
       mockStore,
-      { alert_ids: longModuleIds, dst_folder_id: { value: 'folder2' } },
+      { alert_ids: longModuleIds, dst_folder_id: 'folder2' },
       'alerts',
       'folder1'
     );
@@ -864,24 +832,16 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 53: Comprehensive integration test
   it('should perform complete move workflow integration test', async () => {
-    const mockValidate = vi.fn().mockResolvedValue(true);
-    const mockResetValidation = vi.fn();
-
     wrapper = createWrapper({
       activeFolderId: 'folder1',
       moduleId: ['alert1', 'alert2'],
       type: 'alerts',
     });
 
-    wrapper.vm.moveFolderForm = {
-      validate: mockValidate,
-      resetValidation: mockResetValidation,
-    };
-
     // Simulate folder selection through the dropdown (public API)
     const selectDropdown = wrapper.findComponent({ name: 'SelectFolderDropDown' });
     await selectDropdown.vm.$emit('folder-selected', {
-      value: { value: 'folder2' },
+      value: 'folder2',
       label: 'Target Folder',
     });
     await nextTick();
@@ -893,10 +853,9 @@ describe('MoveAcrossFolders.vue', () => {
     await drawer.vm.$emit('click:primary');
     await flushPromises();
 
-    expect(mockValidate).toHaveBeenCalled();
     expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
       mockStore,
-      { alert_ids: ['alert1', 'alert2'], dst_folder_id: { value: 'folder2' } },
+      { alert_ids: ['alert1', 'alert2'], dst_folder_id: 'folder2' },
       'alerts',
       'folder1'
     );
@@ -904,6 +863,5 @@ describe('MoveAcrossFolders.vue', () => {
       timeout: 2000,
     });
     expect(wrapper.emitted('updated')).toBeTruthy();
-    expect(mockResetValidation).toHaveBeenCalled();
   });
 });

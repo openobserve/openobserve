@@ -17,7 +17,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
+import { createRouter, createMemoryHistory } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -541,17 +542,81 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+            RouterView: true,
+          },
+        },
       });
 
       expect(() => {
         testWrapper.unmount();
       }).not.toThrow();
+    });
+
+    it("should redirect to curl when route name is ingestLogs on beforeMount", () => {
+      const pushSpy = vi.fn();
+      const mockIngestLogsRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            name: "ingestLogs",
+          },
+        ],
+      });
+      mockIngestLogsRouter.push = pushSpy;
+
+      const testWrapper = mount(Index, {
+        props: mockProps,
+        global: {
+          plugins: [store, mockIngestLogsRouter, i18n],
+          stubs: {
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+            RouterView: true,
+          },
+        },
+      });
+
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "curl" }),
+      );
+      testWrapper.unmount();
+    });
+
+    it("should redirect to curl when route name becomes ingestLogs on updated", async () => {
+      // Create a router whose route name can be changed to trigger onUpdated
+      const mockIngestLogsRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "curl" },
+          { path: "/ingest", name: "ingestLogs" },
+        ],
+      });
+
+      const testWrapper = mount(Index, {
+        props: mockProps,
+        global: {
+          plugins: [store, mockIngestLogsRouter, i18n],
+          stubs: {
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+            RouterView: true,
+          },
+        },
+      });
+
+      // Navigate to ingestLogs route to trigger onUpdated redirect
+      await mockIngestLogsRouter.push({ name: "ingestLogs" });
+      await flushPromises();
+
+      // The onUpdated hook should have redirected to "curl"
+      expect(mockIngestLogsRouter.currentRoute.value.name).toBe("curl");
+      testWrapper.unmount();
     });
   });
 });

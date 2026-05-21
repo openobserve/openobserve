@@ -137,21 +137,27 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": { template: "<div class='q-toggle' />" },
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OButtonGroup: { template: "<div><slot /></div>" },
+            OSwitch: {
+              template: '<div data-test="logs-search-bar-show-query-toggle-btn" />',
+              props: ["modelValue", "size", "disabled"],
+            },
+            ODropdown: {
+              template: "<div><slot name='trigger' /><slot /></div>",
+              props: ["open"],
+              emits: ["update:open"],
+            },
+            OButton: true,
+            OIcon: true,
+            OTooltip: true,
+            OSelect: true,
+            OInput: true,
           },
         },
       });
 
-      expect(wrapper.find(".q-toggle").exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(true);
     });
 
     it("should render save button", () => {

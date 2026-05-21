@@ -135,10 +135,6 @@ describe("QueryList", () => {
     wrapperNoData.unmount();
   });
 
-  it("should initialize pagination with rowsPerPage 0", () => {
-    expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
-  });
-
   it("should expose t function for translations", () => {
     expect(typeof wrapper.vm.t).toBe("function");
   });

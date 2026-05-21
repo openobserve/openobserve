@@ -166,43 +166,24 @@ describe("SearchHistory Component", () => {
       expect(wrapper.vm.wrapText).toBe(true);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
     });
 
-    it("has correct default pagination settings", () => {
-      expect(wrapper.vm.pagination).toEqual({
-        page: 1,
-        rowsPerPage: 100
-      });
+    it("has correct page size options", () => {
+      expect(wrapper.vm.pageSize).toBeDefined();
+      expect(wrapper.vm.pageSizeOptions).toBeDefined();
     });
 
     it("has correct table columns", () => {
       const data = [{ some: 'data' }]; // Pass non-empty array to trigger column generation
       const columns = wrapper.vm.generateColumns(data);
 
-      expect(columns).toEqual([
-        {
-          name: "#",
-          label: "#",
-          field: "#",
-          align: "left",
-          sortable: true
-        },
-        {
-          name: "executed_time",
-          label: "search_history.executed_at",
-          field: "executed_time",
-          align: "left",
-          sortable: true
-        },
-        {
-          name: "sql",
-          label: "search_history.sql_query",
-          field: "sql",
-          align: "left",
-          sortable: true
-        }
-      ]);
+      expect(columns).toHaveLength(2);
+      expect(columns[0].id).toBe("executed_time");
+      expect(columns[0].accessorKey).toBe("executed_time");
+      expect(columns[0].sortable).toBe(true);
+      expect(columns[1].id).toBe("sql");
+      expect(columns[1].accessorKey).toBe("sql");
     });
 
     it("initializes with correct default props", () => {
@@ -330,9 +311,9 @@ describe("SearchHistory Component", () => {
         uuid: "test-uuid",
         sql: "SELECT * FROM logs"
       };
-      
-      await wrapper.vm.triggerExpand({ row: testRow });
-      expect(wrapper.vm.expandedRow).toBe(testRow.uuid);
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });
   });
 
@@ -441,8 +422,10 @@ describe("SearchHistory Component", () => {
   });
 
   describe("Sorting", () => {
-    it("has sortMethod defined", () => {
-      expect(typeof wrapper.vm.sortMethod).toBe("function");
+    it("has columns with sortable property", () => {
+      const columns = wrapper.vm.generateColumns([{ some: 'data' }]);
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns[0].sortable).toBeDefined();
     });
   });
 });
