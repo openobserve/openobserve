@@ -22,7 +22,8 @@ describe("OFormTime", () => {
       global: { components: { OFormTime } },
     });
     expect(wrapper.exists()).toBe(true);
-    expect(wrapper.find("input[type='time']").exists()).toBe(true);
+    // OTime renders a custom clock trigger (role="group"), not <input type="time">
+    expect(wrapper.find('[role="group"]').exists()).toBe(true);
   });
 
   it("shows validator error after change", async () => {
@@ -37,10 +38,20 @@ describe("OFormTime", () => {
       },
       global: { components: { OFormTime } },
     });
-    const input = wrapper.find("input");
-    await input.setValue("");
-    await input.trigger("blur");
+
+    // OTime uses a custom clock popup (no native <input>).
+    // Use OForm's publicly exposed TanStack form API to exercise validation.
+    const formRef = wrapper.vm as unknown as { form: { setFieldValue: (n: string, v: string) => void; validateField: (n: string, c: string) => Promise<unknown>; getFieldMeta: (n: string) => Record<string, unknown>; setFieldMeta: (n: string, u: Record<string, unknown>) => void } };
+
+    // Trigger onChange validation with an empty value
+    formRef.form.setFieldValue("meet", "");
+    await formRef.form.validateField("meet", "change");
+
+    // Mark field as touched so the error message is displayed
+    const meta = formRef.form.getFieldMeta("meet") as Record<string, unknown>;
+    formRef.form.setFieldMeta("meet", { ...meta, isTouched: true });
     await flushPromises();
+
     expect(wrapper.text()).toContain("Required");
   });
 });

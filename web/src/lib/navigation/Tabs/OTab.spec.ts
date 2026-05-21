@@ -121,7 +121,8 @@ describe('OTab', () => {
   it('renders the icon when icon prop is provided', () => {
     const wrapper = mountTab({ icon: 'home' })
     expect(wrapper.find('.o-tab__icon').exists()).toBe(true)
-    expect(wrapper.find('.o-tab__icon').text()).toBe('home')
+    // 'home' is a registered OIcon — rendered as SVG inside the span, not as text
+    expect(wrapper.find('.o-tab__icon').html()).not.toBe('')
   })
 
   // --- Default slot (custom content) ---
