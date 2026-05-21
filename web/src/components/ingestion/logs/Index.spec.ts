@@ -61,7 +61,7 @@ function buildMountOptions() {
           template:
             '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
-        OTabs: true,
+        OTabs: { template: '<div><slot /></div>' },
         ORouteTab: true,
         "router-view": true,
       },

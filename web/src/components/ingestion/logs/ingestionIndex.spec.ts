@@ -223,43 +223,50 @@ describe("IngestLogs Index Component", () => {
 
     it("should handle content with whitespace", async () => {
       const mockContent = { innerText: "  test content  " };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "  test content  ",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with special characters", async () => {
       const mockContent = { innerText: "test@#$%^&*()content" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test@#$%^&*()content");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test@#$%^&*()content",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with newlines", async () => {
       const mockContent = { innerText: "line1\nline2\nline3" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("line1\nline2\nline3");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "line1\nline2\nline3",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with HTML entities", async () => {
       const mockContent = { innerText: "test &amp; content &lt; &gt;" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test &amp; content &lt; &gt;");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test &amp; content &lt; &gt;",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should track analytics with correct current route name", async () => {
       const mockContent = { innerText: "test" };
-      (copyToClipboard as any).mockResolvedValue(true);
       wrapper.vm.router.currentRoute.value.name = "fluentbit";
 
       // Get the mocked segment analytics module
@@ -268,10 +275,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith("Button Click", 
+      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith(
+        "Button Click",
         expect.objectContaining({
-          ingestion: "fluentbit"
-        })
+          ingestion: "fluentbit",
+        }),
       );
     });
   });
@@ -327,7 +335,7 @@ describe("IngestLogs Index Component", () => {
   // Template and UI Tests
   describe("Template and UI", () => {
     it("should render splitter component", () => {
-      expect(wrapper.find('q-splitter-stub').exists()).toBe(true);
+      expect(wrapper.find("o-splitter-stub").exists()).toBe(true);
     });
 
     it("should have template structure", () => {
