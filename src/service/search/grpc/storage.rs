@@ -239,10 +239,8 @@ pub async fn search(
             .observe(cached_ratio);
     }
 
-    // linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu
-    let target_partitions = (cfg.limit.cpu_num as i64
-        + ((cfg.limit.query_thread_num as i64 - cfg.limit.cpu_num as i64) as f64
-            * (1.0 - cached_ratio)) as i64) as usize;
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
 
     log::info!(
         "[trace_id {trace_id}] search->storage: session target_partitions: {target_partitions}"
@@ -512,10 +510,8 @@ pub async fn tantivy_search(
             .observe(cached_ratio);
     }
 
-    // linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu
-    let target_partitions = (cfg.limit.cpu_num as i64
-        + ((cfg.limit.query_thread_num as i64 - cfg.limit.cpu_num as i64) as f64
-            * (1.0 - cached_ratio)) as i64) as usize;
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
 
     log::info!(
         "[trace_id {trace_id}] search->tantivy: session target_partitions: {target_partitions}",
@@ -994,6 +990,17 @@ async fn search_tantivy_index(
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
+}
+
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub(crate) fn calc_target_partitions(
+    cpu_num: usize,
+    query_thread_num: usize,
+    cached_ratio: f64,
+) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
 }
 
 /// if simple distinct without filter, we need to warm up the field
