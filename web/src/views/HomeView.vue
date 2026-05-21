@@ -281,26 +281,12 @@ export default defineComponent({
   align-items: center;
   gap: 0.25rem;
   user-select: none;
-
-  &:hover {
-    color: var(--color-tabs-hover-text);
-    background: var(--color-tabs-hover-bg);
-
-    .home-tab-drag-handle {
-      opacity: 0.6;
-    }
-  }
 }
 
 .home-tab-drag-handle {
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity 0.15s;
   cursor: grab;
-  flex-shrink: 0;
-
-  &:active {
-    cursor: grabbing;
-  }
 }
 
 .home-tab-dragging {
