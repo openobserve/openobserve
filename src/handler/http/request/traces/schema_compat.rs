@@ -120,6 +120,7 @@ pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
 /// new `gen_ai_*` columns. Streams missing from the cache default to `false`
 /// (legacy) so query SQL never references columns that aren't there for an
 /// unknown stream.
+#[allow(dead_code)]
 pub(super) async fn stream_has_gen_ai_fields(
     org_id: &str,
     stream_name: &str,

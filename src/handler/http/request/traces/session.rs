@@ -14,12 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{
-    TIMESTAMP_COL_NAME, get_config,
-    meta::stream::StreamType,
-    metrics,
-    utils::json,
-};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
 use hashbrown::{HashMap, HashSet};
 use serde::Serialize;
 use tracing::{Instrument, Span};

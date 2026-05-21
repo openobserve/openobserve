@@ -19,10 +19,7 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
-        search::{
-            SearchPartitionRequest, StreamResponses, TimeOffset,
-            default_use_cache,
-        },
+        search::{SearchPartitionRequest, StreamResponses, TimeOffset, default_use_cache},
         stream::StreamType,
     },
     metrics,
