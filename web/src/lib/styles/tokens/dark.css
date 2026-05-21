@@ -105,6 +105,11 @@
     --color-collapsible-trigger-hover-bg: var(--color-primary-900);
     --color-collapsible-trigger-active-bg: var(--color-primary-800);
 
+    /* OFieldList / OFieldRow / OFieldLabel */
+    --color-field-list-row-hover-bg:   var(--color-primary-900);
+    --color-field-list-actions-bg:     var(--color-surface-subtle);
+    --color-field-list-expansion-bg:   var(--color-surface-subtle);
+
     /* Badge — tokens that change on dark backgrounds */
     /* default: brighten bg for contrast against dark panel backgrounds (grey-700 blends into grey-900) */
     --color-badge-default-solid-bg: var(--color-grey-500);

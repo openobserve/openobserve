@@ -19,71 +19,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :model-value="isExpanded"
     @update:model-value="handleToggle"
     class="field-expansion-item tw:w-full tw:rounded-[0.375rem] tw:overflow-hidden"
+    trigger-class="tw:px-0! tw:py-0!"
   >
     <template #trigger>
-      <div
-        class="tw:flex content-center tw:truncate tw:w-full field-expansion-header tw:relative"
+      <OFieldRow
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
-        <div
-          class="field_label tw:flex-1 tw:min-w-0"
+        <span class="field-type-container">
+          <OIcon
+            class="field-expand-icon"
+            :name="isExpanded ? 'expand-more' : 'chevron-right'"
+            size="sm"
+          />
+        </span>
+        <OFieldLabel
+          :field="field"
+          :show-type-icon="false"
           :data-test="`logs-field-list-item-${field.name}`"
-        >
-          <div class="tw:truncate tw:flex tw:flex-1 tw:min-w-0">
-            <span class="field-type-container">
-              <OIcon
-                class="field-expand-icon"
-                :name="isExpanded ? 'expand-more' : 'chevron-right'"
-                size="sm"
-              />
-            </span>
-            {{ field.name }}
-          </div>
-        </div>
-        <OIcon
+        />
+
+        <OButton
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
-          :name="field.isInterestingField ? 'info' : 'info-outline'"
-          size="sm"
+          variant="ghost-neutral"
+          class="tw:gap-0! tw:mr-[0.25rem]"
           :title="
             field.isInterestingField
               ? 'Remove from interesting fields'
               : 'Add to interesting fields'
           "
-          class="tw:cursor-pointer tw:flex-shrink-0"
-          @click.stop="
-            $emit('toggle-interesting', field, field.isInterestingField)
-          "
-        />
-        <div class="field_overlay">
+          size="icon"
+          @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+        >
+          <OIcon :name="field.isInterestingField ? 'info' : 'info-outline'" size="sm" />
+        </OButton>
+
+        <template #actions>
           <OButton
             v-if="field.isSchemaField && showFilterIcon"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-            variant="ghost"
-            size="icon-xs-circle"
+            variant="ghost-neutral"
+            size="icon"
             @click.stop="$emit('add-to-filter', `${field.name}=''`)"
           >
-            <OIcon name="add" size="xs" />
+            <OIcon name="add" size="sm" />
           </OButton>
-          <OIcon
+          <OButton
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
-            name="visibility"
-            size="sm"
-            title="Add field to table"
+            variant="ghost-neutral"
+            size="icon"
+            class="tw:gap-0!"
             @click.stop="$emit('toggle-field', field)"
-          />
-          <OIcon
+          >
+            <OIcon name="visibility" size="sm" />
+          </OButton>
+          <OButton
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
-            name="visibility-off"
-            size="sm"
-            title="Remove field from table"
+            variant="ghost-neutral"
+            class="tw:gap-0!"
+            size="icon"
             @click.stop="$emit('toggle-field', field)"
-          />
-        </div>
-      </div>
+          >
+            <OIcon name="visibility-off" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+            v-if="showQuickMode"
+            variant="ghost-neutral"
+            class="tw:gap-0!"
+            :title="
+              field.isInterestingField
+                ? 'Remove from interesting fields'
+                : 'Add to interesting fields'
+            "
+            size="icon"
+            @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+          >
+            <OIcon :name="field.isInterestingField ? 'info' : 'info-outline'" size="sm" />
+          </OButton>
+        </template>
+      </OFieldRow>
     </template>
 
     <div class="tw:pl-4 tw:pr-0 tw:py-0">
@@ -114,6 +132,8 @@ import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 
 interface Props {
   field: any;
@@ -247,13 +267,7 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 }
 
 :deep(.field-expansion-item button[data-state]) {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
   min-height: 24px !important;
-}
-
-:deep(.field-expansion-item button:hover) {
-  background-color: var(--o2-hover-accent);
 }
 
 :deep(.field-expansion-item button[data-state="open"]) {
@@ -270,19 +284,4 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
   margin-bottom: 0.375rem;
 }
 
-.field_overlay {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  display: none;
-  align-items: center;
-  padding: 0 0.25rem;
-  gap: 0.375rem;
-  background-color: var(--o2-hover-accent);
-}
-
-.field-expansion-header:hover .field_overlay {
-  display: flex;
-}
 </style>

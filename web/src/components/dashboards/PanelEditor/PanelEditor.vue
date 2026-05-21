@@ -80,15 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:flex-col scroll card-container"
                 :style="fieldListContainerStyle"
               >
-                <div class="column" style="height: 100%">
-                  <div class="col-auto tw:p-2">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
-                  <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
-                    <PanelFieldList :editMode="editMode" />
-                  </div>
+                <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
+                  <PanelFieldList :editMode="editMode" />
                 </div>
               </div>
             </div>
@@ -460,11 +453,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="column"
                   style="height: 100%"
                 >
-                  <div class="col-auto tw:p-2">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
                   <div class="tw:flex tw:flex-col" style="width: 100%">
                     <PanelFieldList :editMode="editMode" />
                   </div>
