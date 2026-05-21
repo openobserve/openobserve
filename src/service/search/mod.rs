@@ -69,7 +69,7 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        partition::cpu_cores::get_cpu_cores,
+        partition::{cpu_cores::get_cpu_cores, stream_files::collect_stream_files},
         sql::visitor::histogram_interval::{
             convert_histogram_interval_to_seconds, generate_histogram_interval,
         },
@@ -677,43 +677,20 @@ pub async fn search_partition(
         || ((ts_column.is_none() || apply_over_hits)
             && !(req.streaming_output && is_streaming_aggregate));
 
-    let stream_files = partition::stream_files::collect_stream_files(
-        trace_id,
-        user_id,
-        &sql,
-        use_single_partition,
-    )
-    .await?;
+    let stream_files = collect_stream_files(trace_id, user_id, &sql, use_single_partition).await?;
     let files = stream_files.files;
     let max_query_range = stream_files.max_query_range;
     let max_query_range_in_hour = stream_files.max_query_range_in_hour;
-    log::info!(
-        "[trace_id {trace_id}] max_query_range: {max_query_range}, max_query_range_in_hour: {max_query_range_in_hour}",
-    );
-
     let file_list_took = start.elapsed().as_millis() as usize;
-    let (is_histogram_eligible, _) = is_eligible_for_histogram(
-        &req.sql, // `is_multi_stream_search` will always be false for search_partition
-        false,
-    )
-    .unwrap_or((false, false));
-
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {file_list_took} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, max_query_range: {max_query_range}, max_query_range_in_hour: {max_query_range_in_hour}, took: {file_list_took} ms",
         (req.start_time, req.end_time),
         files.len(),
     );
 
-    if use_single_partition {
-        let mut response = search::SearchPartitionResponse::default();
-        response.partitions.push([req.start_time, req.end_time]);
-        response.max_query_range = max_query_range_in_hour;
-        response.histogram_interval = sql.histogram_interval;
-        response.is_histogram_eligible = is_histogram_eligible;
-        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
-        return Ok(response);
-    };
-
+    // `is_multi_stream_search` will always be false for search_partition
+    let (is_histogram_eligible, _) =
+        is_eligible_for_histogram(&req.sql, false).unwrap_or((false, false));
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
@@ -742,10 +719,11 @@ pub async fn search_partition(
         total_secs += 1;
     }
 
-    #[cfg(feature = "enterprise")]
-    if is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs {
+    if use_single_partition
+        || (is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
+    {
         log::info!(
-            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({total_secs}) <= aggs_min_num_partition_secs ({}), returning single partition",
+            "[trace_id {trace_id}] search_partition: return single partition because (using single partition {use_single_partition}) or (total_secs ({total_secs}) <= aggs_min_num_partition_secs ({})) is true",
             cfg.limit.aggs_min_num_partition_secs
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
@@ -756,16 +734,13 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-
     // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
     let max_partition_num = cfg.limit.query_partition_max_num.max(1);
     if part_num > max_partition_num {
         part_num = max_partition_num;
     }
-
     log::info!(
-        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, part_num: {part_num}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
-        resp.original_size,
+        "[trace_id {trace_id}] search_partition: original_size: {original_size}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, part_num: {part_num}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
         cfg.limit.query_group_base_speed,
         cfg.limit.query_partition_by_secs,
     );
@@ -830,6 +805,11 @@ pub async fn search_partition(
         add_mini_partition = true;
     }
 
+    log::debug!(
+        "[trace_id {trace_id}] search_partition: total_secs: {total_secs}, partition_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {}",
+        is_histogram || enable_align_histogram
+    );
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -865,17 +845,6 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    log::debug!(
-        "[trace_id {trace_id}] total_secs: {total_secs}, partition_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {}",
-        is_histogram || enable_align_histogram
-    );
-    // create a partition generator
-    let generator = partition::PartitionGenerator::new(
-        min_step,
-        cfg.limit.search_mini_partition_duration_secs,
-        is_histogram || enable_align_histogram,
-    );
-
     #[cfg(feature = "enterprise")]
     let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
         prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
@@ -886,7 +855,11 @@ pub async fn search_partition(
         resp.streaming_id = streaming_id.clone();
     }
 
-    // Generate partitions
+    let generator = partition::PartitionGenerator::new(
+        min_step,
+        cfg.limit.search_mini_partition_duration_secs,
+        is_histogram || enable_align_histogram,
+    );
     let partitions = generator.generate_partitions(
         req.start_time,
         req.end_time,
