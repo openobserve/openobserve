@@ -53,14 +53,13 @@ export default class ChartTypeSelector {
 
   //  Stream Type select - waits for stream list to load after selection
   async selectStreamType(type) {
-    // Click the dropdown
+    // Click the dropdown trigger
     await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
 
-    await this.page
-      .getByRole("option", { name: type })
-      .locator("div")
-      .nth(2)
-      .click();
+    // Wait for popover, then pick option by text (OSelect uses o-select-option data-test)
+    const streamTypePopover = this.page.locator('[data-test="index-dropdown-stream_type-popover"]');
+    await streamTypePopover.waitFor({ state: "visible", timeout: 10000 });
+    await streamTypePopover.getByText(type, { exact: true }).first().click();
 
     // CRITICAL: Wait for stream list API call to complete after changing type
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
@@ -81,17 +80,17 @@ export default class ChartTypeSelector {
         await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
 
-        // Log all available options in dropdown for debugging (OSelect popover + options share parent data-test).
+        // Wait for popover to open, then type via keyboard (OSelect wrapper div doesn't accept fill directly)
+        const popover = this.page.locator('[data-test="index-dropdown-stream-popover"]');
+        await popover.waitFor({ state: "visible", timeout: 10000 });
+        await this.page.keyboard.press("Control+a");
+        await this.page.keyboard.type(streamName);
+
+        // Log available options after filtering
         const allOptions = await this.page
           .locator('[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]')
           .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
-
-        await streamInput.press("Control+a");
-        await streamInput.fill(streamName);
-
-        // Wait for dropdown options to filter
-        await this.page.locator('[data-test="index-dropdown-stream-popover"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
           .locator('[data-test="index-dropdown-stream-option"]', { hasText: streamName })
@@ -120,9 +119,8 @@ export default class ChartTypeSelector {
   // Search field and added for X, Y,Breakdown etc.
 
   async searchAndAddField(fieldName, target) {
-    const searchInput = this.page.locator(
-      '[data-test="index-field-search-input"]'
-    );
+    // o-field-list-search is a div wrapper — scope fill to its inner input
+    const searchInput = this.page.locator('[data-test="o-field-list-search"] input');
     await searchInput.click();
     await searchInput.fill(fieldName);
 
@@ -151,26 +149,16 @@ export default class ChartTypeSelector {
       throw new Error(`Invalid target type: ${target}`);
     }
 
-    // Locate the specific field item container using the exact field name in the data-test attribute
-    // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
-    // Fail fast on genuine suffix collisions (different data-test values)
-    const fieldItems = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
-    // Wait for at least one match to appear after search filtering
-    await fieldItems.first().waitFor({ state: "visible", timeout: 5000 });
-    const matchCount = await fieldItems.count();
-    if (matchCount > 1) {
-      const attrs = await fieldItems.evaluateAll(els => els.map(e => e.getAttribute('data-test')));
-      const uniqueAttrs = [...new Set(attrs)];
-      if (uniqueAttrs.length > 1) {
-        throw new Error(`Ambiguous field match for "${fieldName}": ${attrs.join(', ')}`);
-      }
-    }
-    const fieldItem = fieldItems.first();
+    // New data-test format: o-field-list-row-{fieldName}
+    const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
+    await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
 
-    // Now locate the button within that field item
+    // Add button is hidden until hover — reveal it first
+    await fieldItem.first().scrollIntoViewIfNeeded();
+    await fieldItem.first().hover();
+
+    // Now locate and click the button within the field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
-
-    // Click the button
     await button.waitFor({ state: "visible", timeout: 5000 });
     await button.click();
     await searchInput.fill(""); // Clear the search input
