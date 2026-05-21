@@ -666,7 +666,6 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
-
     let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
         &req.sql,
         ts_column.as_deref(),
@@ -678,15 +677,10 @@ pub async fn search_partition(
         || ((ts_column.is_none() || apply_over_hits)
             && !(req.streaming_output && is_streaming_aggregate));
 
-    let query_duration_secs = (req.end_time - req.start_time) / 1000 / 1000;
     let stream_files = partition::stream_files::collect_stream_files(
         trace_id,
-        org_id,
         user_id,
-        stream_type,
-        &sql.schemas,
-        sql.time_range,
-        query_duration_secs,
+        &sql,
         use_single_partition,
     )
     .await?;

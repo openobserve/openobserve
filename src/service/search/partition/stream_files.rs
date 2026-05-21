@@ -13,26 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::cmp::max;
 
 use chrono::Utc;
 use config::{
     get_config,
-    meta::{
-        sql::TableReferenceExt,
-        stream::{StreamSettings, StreamType},
-    },
+    meta::{sql::TableReferenceExt, stream::StreamSettings},
 };
-use datafusion::common::TableReference;
-use hashbrown::HashMap;
-use infra::{
-    cache::stats,
-    errors::Error,
-    file_list::FileId,
-    schema::{SchemaCache, unwrap_stream_settings},
-};
+use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
-use crate::common::utils::stream::get_settings_max_query_range;
+use crate::{common::utils::stream::get_settings_max_query_range, service::search::sql::Sql};
 
 /// Result of collecting stream file information across all streams in a query.
 pub struct StreamFiles {
@@ -44,20 +34,20 @@ pub struct StreamFiles {
 /// For each stream in the query, either queries the actual file list or
 /// estimates file metadata from stream statistics (when using single partition
 /// or using approximate partitioning).
-#[allow(clippy::too_many_arguments)]
 pub async fn collect_stream_files(
     trace_id: &str,
-    org_id: &str,
     user_id: Option<&str>,
-    stream_type: StreamType,
-    schemas: &HashMap<TableReference, Arc<SchemaCache>>,
-    time_range: (i64, i64),
-    query_duration_secs: i64,
+    sql: &Sql,
     use_single_partition: bool,
 ) -> Result<StreamFiles, Error> {
     let cfg = get_config();
-    let mut files = Vec::with_capacity(schemas.len() * 10);
+    let org_id = &sql.org_id;
+    let stream_type = sql.stream_type;
+    let schemas = &sql.schemas;
+    let time_range = sql.time_range;
+    let query_duration_secs = (time_range.1 - time_range.0) / 1000 / 1000;
 
+    let mut files = Vec::with_capacity(schemas.len() * 10);
     let mut max_query_range = 0;
     let mut max_query_range_in_hour = 0;
 
@@ -81,18 +71,11 @@ pub async fn collect_stream_files(
                 time_range,
             )
             .await?;
-            max_query_range = max(
-                max_query_range,
+            let settings_max_query_range =
                 get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await
-                    * 3600
-                    * 1_000_000,
-            );
-            max_query_range_in_hour = max(
-                max_query_range_in_hour,
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await,
-            );
+                    .await;
+            max_query_range = max(max_query_range, settings_max_query_range * 3600 * 1_000_000);
+            max_query_range_in_hour = max(max_query_range_in_hour, settings_max_query_range);
             files.extend(stream_files);
         } else {
             let data_retention = if stream_settings.data_retention > 0 {
