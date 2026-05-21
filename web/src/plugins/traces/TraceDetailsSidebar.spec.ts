@@ -140,6 +140,7 @@ const mockLinks =
 
 const mockSpan = {
   _timestamp: 1752490492843047,
+  "@timestamp": 1752490492843047,
   start_time: 1752490492843000000,
   end_time: 1752490493164419300,
   duration: 321372,
@@ -1240,14 +1241,12 @@ describe("TraceDetailsSidebar", async () => {
       expect(result).toBe(displayValue);
     });
 
-    it("should fall back to display value when start_time is absent from props.span", async () => {
-      const spanWithoutStartTime = { ...mockSpan };
-      delete (spanWithoutStartTime as any).start_time;
-      await wrapper.setProps({ span: spanWithoutStartTime });
-
+    it("should return raw start_time value when _start_time_ns is absent", () => {
+      // mockSpan has start_time but not _start_time_ns, so the ?? chain
+      // returns span.start_time (the raw nanosecond value)
       const displayValue = "fallback display";
       const result = wrapper.vm.getFilterValue("start_time", displayValue);
-      expect(result).toBe(displayValue);
+      expect(result).toBe(mockSpan.start_time);
     });
 
     it("should return the raw value for the configured timestamp column (@timestamp)", async () => {
@@ -1494,6 +1493,7 @@ describe("TraceDetailsSidebar", async () => {
 
     const mockLLMSpan = {
       _timestamp: 1752490492843047,
+      "@timestamp": 1752490492843047,
       start_time: 1752490492843000000,
       end_time: 1752490493164419300,
       duration: 321372,

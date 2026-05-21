@@ -185,7 +185,7 @@ describe("SearchSchedulersList Component", () => {
     it("initializes with correct default state", () => {
       expect(wrapper.vm.columnsToBeRendered).toEqual([]);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
       expect(wrapper.vm.showSearchResults).toBe(false);
     });
@@ -295,9 +295,9 @@ describe("SearchSchedulersList Component", () => {
         trace_id: "test-uuid",
         sql: "SELECT * FROM logs"
       };
-      
-      await wrapper.vm.triggerExpand({ row: testRow });
-      expect(wrapper.vm.expandedRow).toBe(testRow.trace_id);
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });
 
     it("shows correct status text and icons", () => {

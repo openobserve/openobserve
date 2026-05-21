@@ -109,6 +109,27 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     validatePanel: mockValidatePanel,
     isOutDated: false,
     onActivated: vi.fn(),
+    addXAxisItem: vi.fn(),
+    addYAxisItem: vi.fn(),
+    addZAxisItem: vi.fn(),
+    addBreakDownAxisItem: vi.fn(),
+    addFilteredItem: vi.fn(),
+    isAddXAxisNotAllowed: false,
+    isAddBreakdownNotAllowed: false,
+    isAddYAxisNotAllowed: false,
+    isAddZAxisNotAllowed: false,
+    promqlMode: false,
+    addLatitude: vi.fn(),
+    addLongitude: vi.fn(),
+    addWeight: vi.fn(),
+    addMapName: vi.fn(),
+    addMapValue: vi.fn(),
+    addSource: vi.fn(),
+    addTarget: vi.fn(),
+    addValue: vi.fn(),
+    cleanupDraggingFields: vi.fn(),
+    updateGroupedFields: vi.fn(),
+    fetchPromQLLabels: vi.fn(),
   })),
 }));
 
@@ -118,6 +139,27 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetAggregationFunction: mockResetAggregationFunction,
     validatePanel: mockValidatePanel,
+    addXAxisItem: vi.fn(),
+    addYAxisItem: vi.fn(),
+    addZAxisItem: vi.fn(),
+    addBreakDownAxisItem: vi.fn(),
+    addFilteredItem: vi.fn(),
+    isAddXAxisNotAllowed: false,
+    isAddBreakdownNotAllowed: false,
+    isAddYAxisNotAllowed: false,
+    isAddZAxisNotAllowed: false,
+    promqlMode: false,
+    addLatitude: vi.fn(),
+    addLongitude: vi.fn(),
+    addWeight: vi.fn(),
+    addMapName: vi.fn(),
+    addMapValue: vi.fn(),
+    addSource: vi.fn(),
+    addTarget: vi.fn(),
+    addValue: vi.fn(),
+    cleanupDraggingFields: vi.fn(),
+    updateGroupedFields: vi.fn(),
+    fetchPromQLLabels: vi.fn(),
   })),
 }));
 
@@ -142,6 +184,7 @@ vi.mock("lodash-es", () => ({
       return obj;
     }
   }),
+  throttle: vi.fn((fn: (...args: any[]) => any) => fn),
 }));
 
 // Mock sqlUtils with isSimpleSelectAllQuery function
