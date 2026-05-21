@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       ref="selectRef"
       style="min-width: 150px"
-      v-model="selectedValue"
+      :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
       :options="computedOptions"
@@ -191,6 +191,15 @@ export default defineComponent({
         );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
+    });
+
+    // When "Select All" is active, feed OSelect all individual option values so
+    // every checkbox appears ticked. Otherwise pass the real selection as-is.
+    const oSelectModelValue = computed(() => {
+      if (props.variableItem.multiSelect && isAllSelected.value) {
+        return computedOptions.value.map((opt: any) => opt.value);
+      }
+      return selectedValue.value;
     });
 
     const closePopUpWhenValueIsSet = async () => {
@@ -390,6 +399,7 @@ export default defineComponent({
 
     return {
       selectedValue,
+      oSelectModelValue,
       computedOptions,
       onSearch,
       currentSearchTerm,
