@@ -146,19 +146,21 @@
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
 
-    /* Input (OInput, OTextarea) */
+    /* Input (OInput, OTextarea) — disabled-bg uses grey-700 (#404040) which
+       sits noticeably brighter than the enabled `surface-panel` grey-900
+       (#171717) so disabled fields are visually obvious in dark mode. */
     --color-input-bg: var(--color-surface-panel);
     --color-input-border: var(--color-border-strong);
-    --color-input-disabled-bg: var(--color-surface-subtle);
+    --color-input-disabled-bg: var(--color-grey-700);
     --color-input-disabled-text: var(--color-text-secondary);
     --color-input-placeholder: var(--color-text-disabled);
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
-    /* Select (OSelect) */
+    /* Select (OSelect) — same disabled-bg strategy as input. */
     --color-select-bg: var(--color-surface-panel);
     --color-select-border: var(--color-border-strong);
-    --color-select-disabled-bg: var(--color-surface-subtle);
+    --color-select-disabled-bg: var(--color-grey-700);
     --color-select-disabled-text: var(--color-text-secondary);
     --color-select-placeholder: var(--color-text-disabled);
     --color-select-error-text: var(--color-error-400);
@@ -170,13 +172,17 @@
     --color-select-item-selected-text: var(--color-primary-200);
     --color-select-item-disabled: var(--color-text-disabled);
 
-    /* Switch (OSwitch) */
+    /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
+       mode. OFF uses primary outline + primary thumb (interactive signal).
+       ON gets a primary-filled track + white thumb (handled in the Vue
+       template). DISABLED stays grey + dashed so it's clearly distinct
+       from both OFF and ON. */
     --color-switch-border: var(--color-primary-500);
-    --color-switch-border-off: var(--color-grey-600);
-    --color-switch-thumb-off: var(--color-grey-500);
+    --color-switch-border-off: var(--color-primary-500);
+    --color-switch-thumb-off: var(--color-primary-500);
     --color-switch-thumb-on: var(--color-primary-500);
-    --color-switch-disabled-border: var(--color-grey-500);
-    --color-switch-disabled-thumb: var(--color-grey-500);
+    --color-switch-disabled-border: var(--color-grey-600);
+    --color-switch-disabled-thumb: var(--color-grey-600);
 
     /* Checkbox (OCheckbox) */
     --color-checkbox-bg: var(--color-surface-panel);
@@ -186,13 +192,14 @@
     --color-checkbox-disabled-bg: var(--color-surface-subtle);
     --color-checkbox-disabled-border: var(--color-border-default);
 
-    /* Radio (ORadio) */
+    /* Radio (ORadio) — same rationale as switch: primary outline by default
+       (signals interactivity), grey only when disabled. */
     --color-radio-bg: var(--color-surface-panel);
-    --color-radio-border: var(--color-border-strong);
+    --color-radio-border: var(--color-primary-500);
     --color-radio-checked-border: var(--color-primary-500);
     --color-radio-checked-dot: var(--color-primary-500);
     --color-radio-disabled-bg: var(--color-surface-subtle);
-    --color-radio-disabled-border: var(--color-border-default);
+    --color-radio-disabled-border: var(--color-grey-600);
 
     /* Slider (OSlider) */
     --color-slider-track: var(--color-grey-700);

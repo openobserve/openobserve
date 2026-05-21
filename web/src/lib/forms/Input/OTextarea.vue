@@ -94,10 +94,12 @@ const wrapperClasses = computed(() => [
   hasError.value
     ? "tw:border-input-border-error"
     : "tw:border-input-border tw:hover:border-input-border-hover",
+  /* Single-border focus — see OInput.vue for rationale. */
   "tw:focus-within:border-input-border-focus",
-  "tw:focus-within:ring-2 tw:focus-within:ring-input-focus-ring",
+  /* Same opacity+dashed treatment as OInput so disabled textareas are
+     visually obvious vs enabled ones. */
   props.disabled
-    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed"
+    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed tw:border-dashed"
     : "",
 ]);
 </script>
@@ -115,7 +117,10 @@ const wrapperClasses = computed(() => [
     <label
       v-if="label || $slots.tooltip"
       :for="textareaId"
-      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      :class="[
+        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        props.disabled && 'o-input-label--disabled',
+      ]"
     >
       {{ label }}
       <OIcon
@@ -123,7 +128,7 @@ const wrapperClasses = computed(() => [
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-input-label"
+        class="tw:cursor-help"
       ><slot name="tooltip" /></OIcon>
     </label>
 

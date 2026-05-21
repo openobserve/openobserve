@@ -216,13 +216,12 @@ size="xs" class="warning" />{{
         >
           <template #trigger>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="sm"
               style="max-width: 250px"
               class="org-selector-trigger tw:text-ellipsis tw:overflow-hidden"
             >
               <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full tw:gap-2">
-                <OIcon name="workspaces" size="sm" class="tw:opacity-70 tw:shrink-0" />
                 <div class="tw:flex tw:flex-col tw:truncate tw:text-left">
                   {{ userClickedOrg?.label || "" }}
                 </div>

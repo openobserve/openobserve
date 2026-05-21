@@ -327,6 +327,154 @@ code {
   transition: transform 0.6s ease;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Form-field label color
+// ═══════════════════════════════════════════════════════════════
+// `.o-input-label` is applied by OInput / OTextarea / OSelect / OCombobox.
+// Use hardcoded hex per theme — the `--color-text-primary` token was
+// resolving to a muted grey at consumer sites (likely cascade conflict),
+// so this is the authoritative source of label color across the app.
+// Form-field labels — bold + dark high-contrast color in both modes.
+// Inline `tw:text-[15px] tw:font-bold` classes on each component set the
+// font weight/size; this rule supplies the color and acts as the single
+// shared CSS hook (.o-input-label) so consumers can target labels globally.
+.o-input-label {
+  color: #171717;
+}
+html.dark .o-input-label,
+body.body--dark .o-input-label {
+  color: #fafafa;
+}
+
+/* Disabled label — same weight + size, just mute the color so users can
+   tell at a glance which fields are disabled vs enabled. */
+.o-input-label--disabled {
+  color: #737373 !important;
+}
+html.dark .o-input-label--disabled,
+body.body--dark .o-input-label--disabled {
+  color: #737373 !important;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Cursor affordances — global
+//
+// Every interactive element should have `cursor: pointer`, disabled
+// elements should have `cursor: not-allowed`, and draggable elements
+// should have `cursor: grab` (and `grabbing` while being dragged).
+// These rules are applied app-wide so consumers don't have to remember.
+// ═══════════════════════════════════════════════════════════════
+
+// Pointer cursor for everything clickable.
+button:not(:disabled):not([aria-disabled="true"]),
+a[href]:not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]):not([disabled]),
+[role="tab"]:not([aria-disabled="true"]):not([disabled]),
+[role="menuitem"]:not([aria-disabled="true"]):not([disabled]),
+[role="option"]:not([aria-disabled="true"]):not([disabled]),
+[role="switch"]:not(:disabled):not([aria-disabled="true"]),
+[role="checkbox"]:not(:disabled):not([aria-disabled="true"]),
+[role="radio"]:not(:disabled):not([aria-disabled="true"]),
+label:has(input:not(:disabled)),
+summary,
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+// Not-allowed cursor for any disabled / aria-disabled element.
+button:disabled,
+button[aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled],
+[aria-disabled="true"],
+.is-disabled {
+  cursor: not-allowed !important;
+}
+
+// Grab / grabbing cursor for draggable elements. The `:active` variant
+// produces the closed-hand cursor while the drag is in progress.
+[draggable="true"],
+.draggable,
+.drag-handle {
+  cursor: grab;
+}
+[draggable="true"]:active,
+.draggable:active,
+.drag-handle:active,
+.is-dragging,
+[data-dragging="true"] {
+  cursor: grabbing !important;
+}
+
+// Text inputs should keep the text cursor (override the broad button
+// pointer rule above so it doesn't bleed into inputs nested inside an
+// `<a>` or `[role="button"]` wrapper).
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+textarea {
+  cursor: text;
+}
+input[type="text"]:disabled,
+input[type="email"]:disabled,
+input[type="password"]:disabled,
+input[type="number"]:disabled,
+input[type="search"]:disabled,
+input[type="url"]:disabled,
+input[type="tel"]:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Destructive-icon hover affordance
+//
+// When an interactive element (button / link / role="button") contains a
+// destructive OIcon (`data-destructive-icon="true"` is set automatically by
+// OIcon.vue for delete / bin icons), the entire interactive element shows
+// the soft-red hover background. The icon's own span :hover also fires —
+// either one wins, so cursor anywhere over the button surfaces the red bg.
+//
+// Light mode: `--color-error-100` (#fee2e2) — light pink.
+// Dark mode:  translucent red so the hover signal reads against the dark
+//             surface without blinding. Same red hue, low alpha.
+// ═══════════════════════════════════════════════════════════════
+button:has([data-destructive-icon="true"]):hover,
+a:has([data-destructive-icon="true"]):hover,
+[role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: var(--color-error-100, #fee2e2) !important;
+}
+
+html.dark button:has([data-destructive-icon="true"]):hover,
+body.body--dark button:has([data-destructive-icon="true"]):hover,
+html.dark a:has([data-destructive-icon="true"]):hover,
+body.body--dark a:has([data-destructive-icon="true"]):hover,
+html.dark [role="button"]:has([data-destructive-icon="true"]):hover,
+body.body--dark [role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+// The OIcon span's own :hover state (used when the destructive icon is
+// rendered standalone, without a button wrapper). Mirror the dark-mode rule
+// so standalone icons get the same treatment.
+html.dark [data-destructive-icon="true"]:hover,
+body.body--dark [data-destructive-icon="true"]:hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
 .ai-hover-btn:hover .ai-icon {
   transform: rotate(180deg);
 }

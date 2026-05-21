@@ -28,12 +28,35 @@ const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
   lg: "tw:size-8",   // 32px
   xl: "tw:size-10",  // 40px
 };
+
+/** Project rule: every bin/delete icon renders in the destructive (red) color
+ *  by default. The OIcon itself owns this so we don't have to thread a class
+ *  through every consumer (`<OIcon name="delete" />` etc. — there are ~30+
+ *  sites across the codebase). Consumers can still override by passing
+ *  `class="tw:text-..."` since custom class wins via attribute-fallthrough. */
+const isDestructiveIcon = computed<boolean>(() =>
+  Boolean(
+    props.name &&
+      (props.name === "delete" ||
+        props.name === "delete-outline" ||
+        props.name === "delete-forever" ||
+        props.name === "delete-sweep" ||
+        props.name === "bin-line" ||
+        props.name === "bin-fill"),
+  ),
+);
 </script>
 
 <template>
   <span
     class="tw:inline-flex tw:shrink-0 tw:items-center tw:justify-center tw:align-middle"
-    :class="sizeClasses[size]"
+    :class="[
+      sizeClasses[size],
+      isDestructiveIcon
+        ? 'tw:text-[var(--o2-destructive,#dc2626)] tw:rounded tw:transition-colors hover:tw:bg-[var(--color-error-100,#fee2e2)]'
+        : '',
+    ]"
+    :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"
     v-bind="
       label
         ? { role: 'img', 'aria-label': label }

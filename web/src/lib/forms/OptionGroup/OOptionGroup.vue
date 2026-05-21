@@ -60,13 +60,13 @@ function handleCheckbox(val: (string | number)[]) {
 
 <template>
   <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
+    <!-- Label — uses the same `o-input-label` styling as every other form
+         component so all form labels read consistently. -->
     <div
       v-if="$slots.label || label || $slots.tooltip"
       :class="[
-        'tw:text-xs tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
-        disabled
-          ? 'tw:text-option-group-label-disabled'
-          : 'tw:text-option-group-label',
+        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        disabled && 'o-input-label--disabled',
       ]"
     >
       <slot name="label">{{ label }}</slot>
@@ -75,10 +75,7 @@ function handleCheckbox(val: (string | number)[]) {
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        :class="[
-          'tw:cursor-help',
-          disabled ? 'tw:text-option-group-label-disabled' : 'tw:text-option-group-label',
-        ]"
+        class="tw:cursor-help"
       ><slot name="tooltip" /></OIcon>
     </div>
 
