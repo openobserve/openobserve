@@ -21,7 +21,7 @@ import { nextTick } from "vue";
 // Mock all external modules before the component is imported
 // ---------------------------------------------------------------------------
 
-const mockToast = vi.fn();
+const mockToast = vi.fn(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
 }));

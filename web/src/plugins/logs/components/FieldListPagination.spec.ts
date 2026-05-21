@@ -54,7 +54,7 @@ const quasarStubs = {
   OTooltip: {
     name: "OTooltip",
     template:
-      '<div class="o-tooltip-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
+      '<div class="o-tooltip-stub" :data-test="$attrs[\'data-test\']">{{ content }}<slot /></div>',
     props: ["anchor", "self", "maxWidth", "content", "side", "align"],
   },
   QSeparator: {

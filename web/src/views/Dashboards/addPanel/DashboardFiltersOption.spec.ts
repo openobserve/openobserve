@@ -537,7 +537,8 @@ describe("DashboardFiltersOption", () => {
       expect(filtersLayout.classes()).toContain("axis-container");
       expect(filtersLayout.classes()).toContain("droppable");
       expect(filtersLayout.classes()).toContain("scroll");
-      expect(filtersLayout.classes()).toContain("row");
+      // "row" class was removed during UI refactor — replaced by tw:flex
+      expect(filtersLayout.classes()).toContain("tw:flex");
     });
   });
 

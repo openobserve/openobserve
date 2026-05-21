@@ -240,12 +240,14 @@ describe("OBadge", () => {
 
   // ── Accessibility ───────────────────────────────────────────────────────
 
-  it("sets tabindex=0 on clickable badge", () => {
+  it("renders as a focusable button when clickable", () => {
     const wrapper = mount(OBadge, {
       props: { clickable: true },
       slots: { default: "x" },
     });
-    expect(wrapper.attributes("tabindex")).toBe("0");
+    // When clickable, the root element is a <button> which is natively
+    // focusable — no explicit tabindex needed.
+    expect(wrapper.element.tagName.toLowerCase()).toBe("button");
   });
 
   it("does not set tabindex when not clickable", () => {
@@ -263,10 +265,13 @@ describe("OBadge", () => {
 
   it("icon span has aria-hidden=true", () => {
     const wrapper = mount(OBadge, {
-      props: { icon: "check" },
+      // Use an icon name that is NOT in the OIcon SVG registry so the
+      // fallback material-icons-outlined span renders (with aria-hidden).
+      props: { icon: "check_circle_outline" },
       slots: { default: "x" },
     });
     const iconSpan = wrapper.find(".material-icons-outlined");
+    expect(iconSpan.exists()).toBe(true);
     expect(iconSpan.attributes("aria-hidden")).toBe("true");
   });
 });
