@@ -90,8 +90,8 @@ vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
 const ConfirmDialogStub = {
   template: `
     <div class="confirm-dialog" data-test="confirm-dialog" v-if="modelValue">
-      <div class="dialog-title">{{ title }}</div>
-      <div class="dialog-message">{{ message }}</div>
+      <div class="dialog-title" data-test="dialog-title">{{ title }}</div>
+      <div class="dialog-message" data-test="dialog-message">{{ message }}</div>
       <button data-test="ok-button" @click="$emit('update:ok')">OK</button>
       <button data-test="cancel-button" @click="$emit('update:cancel')">Cancel</button>
     </div>
@@ -425,7 +425,7 @@ describe("QueryTypeSelector", () => {
 
       const dialog = wrapper.find('[data-test="confirm-dialog"]');
       expect(dialog.exists()).toBeTruthy();
-      expect(dialog.find(".dialog-title").text()).toBe("Change Query Mode");
+      expect(dialog.find('[data-test="dialog-title"]').text()).toBe("Change Query Mode");
     });
 
     it("should handle confirmation dialog OK", async () => {

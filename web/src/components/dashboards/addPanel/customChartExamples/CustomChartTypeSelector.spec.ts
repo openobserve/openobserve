@@ -85,7 +85,7 @@ describe("CustomChartTypeSelector", () => {
   });
 
   it("renders chart category sections", () => {
-    const categories = wrapper.findAll("[data-category]");
+    const categories = wrapper.findAll('[data-test="chart-category-section"]');
     expect(categories.length).toBeGreaterThan(0);
   });
 

@@ -1,5 +1,9 @@
 <template>
-  <div v-if="shouldShowJoins" class="joins-container">
+  <div
+    v-if="shouldShowJoins"
+    class="joins-container"
+    data-test="dashboard-joins-container"
+  >
     <div class="joins-header">
       <div class="layout-name">{{ t("panel.joins") }}</div>
       <span class="layout-separator">:</span>

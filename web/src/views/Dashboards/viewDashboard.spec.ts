@@ -262,6 +262,23 @@ describe("ViewDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Mock native Fullscreen API (not present in JSDOM)
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      writable: true,
+      value: null,
+    });
+
     // Clear global mock spies
     global.mockRouterPush.mockClear();
     global.mockRouterReplace.mockClear();

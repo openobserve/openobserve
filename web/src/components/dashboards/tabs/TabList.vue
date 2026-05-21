@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="dashboard-tab-list-container"
     style="display: flex; align-items: center"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"

@@ -194,7 +194,9 @@ describe("TableRenderer", () => {
 
     it("should render the table-wrapper div", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".table-wrapper").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-table-renderer-wrapper"]').exists(),
+      ).toBe(true);
     });
 
     it("should render the TenstackTable with correct data-test attribute", () => {

@@ -97,7 +97,9 @@ describe("SortByBtnGrp", () => {
     it("should render button group", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[role="group"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists(),
+      ).toBe(true);
     });
 
     it("should render clear sort button", () => {

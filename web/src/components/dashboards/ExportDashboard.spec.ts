@@ -100,8 +100,8 @@ describe("ExportDashboard", () => {
 
     const exportButton = wrapper.find('[data-test="export-dashboard"]');
     expect(exportButton.exists()).toBe(true);
-    // The download icon is rendered via the icon-left slot as OIcon
-    expect(exportButton.html()).toContain("download");
+    // The download icon is rendered via OButton's icon-left prop using OIcon
+    expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(true);
   });
 
   it("should call downloadDashboard when button is clicked", async () => {

@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { createStore } from "vuex";
 
-
 const mockStore = createStore({
   state: {
     organizationData: {
@@ -63,6 +62,16 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
+// Stub OSelect to avoid heavy listbox/reka-ui rendering
+const OSelectStub = {
+  name: "OSelect",
+  inheritAttrs: false,
+  props: ["modelValue", "options", "label", "labelPosition", "searchable"],
+  emits: ["update:modelValue"],
+  template:
+    '<div data-test="stream-field-select" :data-options="JSON.stringify(options)" @click="$emit(\'update:modelValue\', $attrs.testValue)"></div>',
+};
+
 describe("StreamFieldSelect", () => {
   let wrapper: any;
 
@@ -98,6 +107,9 @@ describe("StreamFieldSelect", () => {
           dashboardPanelDataPageKey: "dashboard",
           ...provide,
         },
+        stubs: {
+          OSelect: OSelectStub,
+        },
       },
     });
   };
@@ -116,11 +128,11 @@ describe("StreamFieldSelect", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have q-select component", async () => {
+    it("should render OSelect component", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
+      const sel = wrapper.findComponent({ name: "OSelect" });
+      expect(sel.exists()).toBe(true);
     });
   });
 
@@ -132,7 +144,7 @@ describe("StreamFieldSelect", () => {
     });
 
     it("should accept modelValue prop", async () => {
-      const modelValue = { field: "test_field", streamAlias: "s1" };
+      const modelValue = { field: "field1", streamAlias: "s1" };
       wrapper = createWrapper({ modelValue });
       await flushPromises();
       expect(wrapper.props().modelValue).toEqual(modelValue);
@@ -141,13 +153,15 @@ describe("StreamFieldSelect", () => {
     it("should handle empty streams array", async () => {
       wrapper = createWrapper({ streams: [] });
       await flushPromises();
-      expect(wrapper.vm.options).toEqual([]);
+      // flatOptions should be empty when no streams
+      expect(wrapper.vm.flatOptions).toEqual([]);
     });
 
     it("should handle empty modelValue", async () => {
       wrapper = createWrapper({ modelValue: {} });
       await flushPromises();
-      expect(wrapper.vm.displayValue).toBe("");
+      // selectValue should be undefined (no modelValue.field)
+      expect(wrapper.vm.selectValue).toBeUndefined();
     });
   });
 
@@ -155,242 +169,149 @@ describe("StreamFieldSelect", () => {
     it("should fetch fields for streams", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.options.length).toBeGreaterThanOrEqual(0);
+      // flatOptions should include items after fetching
+      expect(wrapper.vm.flatOptions.length).toBeGreaterThan(0);
     });
 
     it("should create options from stream schema", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      // Options should be initialized automatically
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
+      expect(Array.isArray(wrapper.vm.flatOptions)).toBe(true);
     });
 
-    it("should initialize filteredOptions with all options", async () => {
+    it("should include header rows when multiple streams provided", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      // FilteredOptions should be initialized automatically
-      expect(wrapper.vm.filteredOptions).toBeDefined();
+      const headers = wrapper.vm.flatOptions.filter((o: any) => o.header);
+      expect(headers.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should include field option rows", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const items = wrapper.vm.flatOptions.filter((o: any) => !o.header);
+      // 2 streams x 3 fields = 6 items
+      expect(items.length).toBe(6);
     });
 
     it("should handle streams with aliases", async () => {
       const streamsWithAlias = [{ stream: "logs", streamAlias: "log_alias" }];
       wrapper = createWrapper({ streams: streamsWithAlias });
       await flushPromises();
-      // Options should be populated automatically
-      expect(wrapper.vm.options.length).toBeGreaterThanOrEqual(0);
+      // For one stream, header should not be present, but fields should be
+      const items = wrapper.vm.flatOptions.filter((o: any) => !o.header);
+      expect(items.length).toBe(3);
     });
 
     it("should handle streams without aliases", async () => {
       const streamsNoAlias = [{ stream: "logs", streamAlias: null }];
       wrapper = createWrapper({ streams: streamsNoAlias });
       await flushPromises();
-      // Options should be populated automatically
-      expect(wrapper.vm.options.length).toBeGreaterThanOrEqual(0);
+      const items = wrapper.vm.flatOptions.filter((o: any) => !o.header);
+      expect(items.length).toBe(3);
+    });
+
+    it("should label group with alias when streamAlias is set", async () => {
+      const streamsWithAlias = [{ stream: "logs", streamAlias: "log_alias" }];
+      wrapper = createWrapper({ streams: streamsWithAlias });
+      await flushPromises();
+      // Single stream: no header row, but flatOptions value uses the label
+      const item = wrapper.vm.flatOptions.find((o: any) => !o.header);
+      expect(item.value).toContain("logs(log_alias)");
+    });
+
+    it("should label group with stream name when no streamAlias", async () => {
+      const streamsNoAlias = [{ stream: "logs", streamAlias: null }];
+      wrapper = createWrapper({ streams: streamsNoAlias });
+      await flushPromises();
+      const item = wrapper.vm.flatOptions.find((o: any) => !o.header);
+      expect(item.value.startsWith("logs")).toBe(true);
     });
   });
 
-  describe("Field Selection", () => {
-    it("should select a field", async () => {
+  describe("Field Selection / onSelect", () => {
+    it("should emit update:modelValue on onSelect with valid key", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const field = {
-        name: "test_field",
-        stream: { stream: "stream1", streamAlias: "s1" },
-      };
+      const item = wrapper.vm.flatOptions.find((o: any) => !o.header);
+      wrapper.vm.onSelect(item.value);
 
-      wrapper.vm.selectField(field);
-      await flushPromises();
-
-      expect(wrapper.vm.internalModel.field).toBe("test_field");
-      expect(wrapper.vm.internalModel.streamAlias).toBe("s1");
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toHaveProperty("field");
     });
 
-    it("should update displayValue on field selection", async () => {
+    it("should map onSelect key to field & streamAlias", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const field = {
-        name: "selected_field",
-        stream: { stream: "stream1", streamAlias: "s1" },
-      };
+      const item = wrapper.vm.flatOptions.find((o: any) => !o.header);
+      wrapper.vm.onSelect(item.value);
 
-      wrapper.vm.selectField(field);
-      await flushPromises();
-
-      expect(wrapper.vm.displayValue).toBe("selected_field");
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted![0][0].field).toBe(item.label);
     });
 
-    it("should emit update:modelValue on field selection", async () => {
+    it("should not emit on null key", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const field = {
-        name: "emit_field",
-        stream: { stream: "stream1", streamAlias: "s1" },
-      };
+      wrapper.vm.onSelect(null);
 
-      wrapper.vm.selectField(field);
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    });
-  });
-
-  describe("Field Filtering", () => {
-    it("should filter fields based on search text", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [
-            { name: "field1" },
-            { name: "field2" },
-            { name: "another" },
-          ],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("field", update);
-
-      expect(update).toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
     });
 
-    it("should show all options when search is empty", async () => {
+    it("should fall back to raw value for unknown keys", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [{ name: "field1" }, { name: "field2" }],
-        },
-      ];
+      wrapper.vm.onSelect("unknown-key");
 
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("", update);
-
-      expect(update).toHaveBeenCalled();
-      expect(wrapper.vm.filteredOptions).toEqual(wrapper.vm.options);
-    });
-
-    it("should filter by stream name", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "logs_stream",
-          children: [{ name: "field1" }],
-        },
-        {
-          label: "metrics_stream",
-          children: [{ name: "field2" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("logs", update);
-
-      expect(update).toHaveBeenCalled();
-    });
-
-    it("should filter by field name", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [{ name: "timestamp" }, { name: "message" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("time", update);
-
-      expect(update).toHaveBeenCalled();
-    });
-
-    it("should handle case-insensitive filtering", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "Stream1",
-          children: [{ name: "Field1" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("FIELD", update);
-
-      expect(update).toHaveBeenCalled();
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toEqual({
+        field: "unknown-key",
+        streamAlias: undefined,
+      });
     });
   });
 
-  describe("Display Value Handling", () => {
-    it("should update displayValue from modelValue", async () => {
-      const modelValue = { field: "test_field", streamAlias: "s1" };
+  describe("selectValue Computed", () => {
+    it("should compute selectValue from modelValue", async () => {
+      const modelValue = { field: "field1", streamAlias: "s1" };
       wrapper = createWrapper({ modelValue });
       await flushPromises();
 
-      expect(wrapper.vm.displayValue).toBe("test_field");
+      // selectValue should contain the field name
+      expect(wrapper.vm.selectValue).toContain("field1");
     });
 
-    it("should handle undefined field in modelValue", async () => {
-      const modelValue = { streamAlias: "s1" };
+    it("should return undefined when modelValue has no field", async () => {
+      wrapper = createWrapper({ modelValue: {} });
+      await flushPromises();
+      expect(wrapper.vm.selectValue).toBeUndefined();
+    });
+
+    it("should fall back to field-only match if alias mismatch", async () => {
+      const modelValue = { field: "field1", streamAlias: "nonexistent" };
       wrapper = createWrapper({ modelValue });
       await flushPromises();
-
-      expect(wrapper.vm.displayValue).toBe("");
-    });
-
-    it("should update input value manually", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.updateInputValue("manual_field");
-
-      expect(wrapper.vm.displayValue).toBe("manual_field");
-    });
-
-    it("should handle null value in updateInputValue", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.updateInputValue(null as any);
-
-      // Should not update with null
-      expect(wrapper.vm.displayValue).toBeDefined();
+      // Should still find a match by field name only
+      expect(wrapper.vm.selectValue).toContain("field1");
     });
   });
 
   describe("Watchers", () => {
-    it("should emit on internalModel change", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.internalModel = { field: "new_field", streamAlias: "s1" };
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    });
-
-    it("should update from external modelValue changes", async () => {
+    it("should react to external modelValue changes", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       await wrapper.setProps({
-        modelValue: { field: "external_field", streamAlias: "s2" },
+        modelValue: { field: "field2", streamAlias: "s2" },
       });
 
-      expect(wrapper.vm.internalModel.field).toBe("external_field");
-      expect(wrapper.vm.displayValue).toBe("external_field");
+      expect(wrapper.vm.selectValue).toContain("field2");
     });
 
     it("should refetch fields when streams change", async () => {
@@ -402,62 +323,8 @@ describe("StreamFieldSelect", () => {
       await flushPromises();
 
       expect(wrapper.props().streams).toEqual(newStreams);
-    });
-  });
-
-  describe("Stream Loading", () => {
-    it("should initialize with streams", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should initialize with stream data
-      expect(wrapper.vm.options).toBeDefined();
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
-    });
-
-    it("should handle stream data loading", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Streams should trigger loading automatically
-      expect(wrapper.vm.options).toBeDefined();
-    });
-
-    it("should handle stream loading initialization", async () => {
-      const errorSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should initialize without errors
-      expect(wrapper.exists()).toBe(true);
-
-      errorSpy.mockRestore();
-    });
-  });
-
-  describe("Expansion Items", () => {
-    it("should render expansion items for streams", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should open first stream by default", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // First stream should be default-opened
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should group streams correctly", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Options should be grouped automatically
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
+      const items = wrapper.vm.flatOptions.filter((o: any) => !o.header);
+      expect(items.length).toBe(3);
     });
   });
 
@@ -465,48 +332,21 @@ describe("StreamFieldSelect", () => {
     it("should handle null streams", async () => {
       wrapper = createWrapper({ streams: null as any });
       await flushPromises();
-
-      // Should handle null gracefully
-      expect(wrapper.vm.options).toEqual([]);
+      expect(wrapper.vm.flatOptions).toEqual([]);
     });
 
-    it("should handle stream without schema", async () => {
-      wrapper = createWrapper();
+    it("should handle empty streams without crashing", async () => {
+      wrapper = createWrapper({ streams: [] });
       await flushPromises();
-
-      // Should handle missing schema gracefully
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.vm.flatOptions).toEqual([]);
     });
 
-    it("should handle field without name", async () => {
+    it("should handle stream loading errors gracefully", async () => {
+      // useStreams is mocked above to resolve; this test just verifies it doesn't throw
       wrapper = createWrapper();
       await flushPromises();
-
-      const field = {
-        name: undefined,
-        stream: { stream: "stream1", streamAlias: "s1" },
-      };
-
-      wrapper.vm.selectField(field as any);
-
-      expect(wrapper.vm.internalModel).toBeDefined();
-    });
-
-    it("should handle filter with special characters", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [{ name: "field@#$" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("@#$", update);
-
-      expect(update).toHaveBeenCalled();
+      expect(wrapper.exists()).toBe(true);
     });
   });
 
@@ -514,14 +354,12 @@ describe("StreamFieldSelect", () => {
     it("should fetch fields on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
-
-      expect(wrapper.vm.options).toBeDefined();
+      expect(wrapper.vm.flatOptions.length).toBeGreaterThan(0);
     });
 
     it("should handle unmount gracefully", async () => {
       wrapper = createWrapper();
       await flushPromises();
-
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
@@ -540,132 +378,6 @@ describe("StreamFieldSelect", () => {
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Q-Select Properties", () => {
-    it("should have use-input enabled", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
-    });
-
-    it("should have hide-selected enabled", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
-    });
-
-    it("should have fill-input enabled", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
-    });
-
-    it("should use menu behavior", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const qSelect = wrapper.findComponent({ name: "QSelect" });
-      expect(qSelect.exists()).toBe(true);
-    });
-  });
-
-  describe("Filter Edge Cases", () => {
-    it("should handle filter with displayValue", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.displayValue = "current_value";
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("current_value", update);
-
-      expect(update).toHaveBeenCalled();
-    });
-
-    it("should reset filter when empty", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [{ name: "field1" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("", update);
-
-      expect(wrapper.vm.filteredOptions).toEqual(wrapper.vm.options);
-    });
-
-    it("should handle filter with no matches", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.options = [
-        {
-          label: "stream1",
-          children: [{ name: "field1" }],
-        },
-      ];
-
-      const update = vi.fn((callback) => callback());
-      wrapper.vm.filterFields("nonexistent", update);
-
-      expect(update).toHaveBeenCalled();
-    });
-  });
-
-  describe("Stream Alias Display", () => {
-    it("should display stream with alias", async () => {
-      const streams = [{ stream: "logs", streamAlias: "log_data" }];
-      wrapper = createWrapper({ streams });
-      await flushPromises();
-
-      // Options should be populated automatically with stream info
-      if (wrapper.vm.options.length > 0) {
-        // Should contain either stream name or alias
-        expect(wrapper.vm.options[0].label).toBeDefined();
-      }
-    });
-
-    it("should display stream without alias", async () => {
-      const streams = [{ stream: "metrics", streamAlias: null }];
-      wrapper = createWrapper({ streams });
-      await flushPromises();
-
-      // Options should be populated automatically with stream info
-      if (wrapper.vm.options.length > 0) {
-        // Should contain stream name
-        expect(wrapper.vm.options[0].label).toBeDefined();
-      }
-    });
-  });
-
-  describe("Stream Field Select Ref", () => {
-    it("should have streamFieldSelect ref", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.streamFieldSelect).toBeDefined();
-    });
-
-    it("should call updateInputValue on ref", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.updateInputValue("test");
-
-      expect(wrapper.vm.displayValue).toBe("test");
     });
   });
 });

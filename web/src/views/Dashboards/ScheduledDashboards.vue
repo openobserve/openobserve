@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div
+      data-test="scheduled-dashboards-container"
       class="scheduled-dashboards"
       :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'"
     >

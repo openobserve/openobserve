@@ -15,8 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="html-editor card-container" style="width: 100%; height: 100%; overflow: hidden">
-    <div style="width: 100%; height: 100%">
+  <div
+    data-test="dashboard-custom-html-editor-container"
+    class="html-editor card-container"
+    style="width: 100%; height: 100%; overflow: hidden"
+  >
+    <div
+      data-test="dashboard-custom-html-editor-inner"
+      style="width: 100%; height: 100%"
+    >
       <OSplitter
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
@@ -24,7 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-html-editor-splitter"
       >
         <template #before>
-          <div class="tw:flex tw:flex-col" style="height: 100%; display: flex; flex-direction: column;">
+          <div
+            data-test="dashboard-custom-html-editor-flex-col"
+            class="tw:flex tw:flex-col"
+            style="height: 100%; display: flex; flex-direction: column;"
+          >
             <CodeQueryEditor
               language="html"
               v-model:query="htmlContent"

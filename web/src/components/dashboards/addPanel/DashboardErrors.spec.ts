@@ -112,7 +112,7 @@ describe("DashboardErrors", () => {
       const errors = ["First error", "Second error", "Third error"];
       wrapper = mountComponent(errors);
 
-      const listItems = wrapper.findAll("li");
+      const listItems = wrapper.findAll('[data-test="dashboard-errors-list-item"]');
       expect(listItems).toHaveLength(3);
       expect(listItems[0].text()).toBe("First error");
       expect(listItems[1].text()).toBe("Second error");
@@ -130,7 +130,7 @@ describe("DashboardErrors", () => {
     it("renders numeric and boolean error values as strings", () => {
       wrapper = mountComponent([123, true, "string"] as any);
 
-      const items = wrapper.findAll("li");
+      const items = wrapper.findAll('[data-test="dashboard-errors-list-item"]');
       expect(items).toHaveLength(3);
       expect(items[0].text()).toBe("123");
       expect(items[1].text()).toBe("true");
@@ -140,7 +140,7 @@ describe("DashboardErrors", () => {
     it("handles empty string errors", () => {
       wrapper = mountComponent(["", "Valid error", "  "]);
 
-      const items = wrapper.findAll("li");
+      const items = wrapper.findAll('[data-test="dashboard-errors-list-item"]');
       expect(items).toHaveLength(3);
     });
 
@@ -148,21 +148,21 @@ describe("DashboardErrors", () => {
       const longError = "A".repeat(500);
       wrapper = mountComponent([longError]);
 
-      expect(wrapper.find("li").text()).toBe(longError);
+      expect(wrapper.find('[data-test="dashboard-errors-list-item"]').text()).toBe(longError);
     });
 
     it("handles special characters in error messages", () => {
       const specialError = "Error with <html> & symbols: @#$%^&*()";
       wrapper = mountComponent([specialError]);
 
-      expect(wrapper.find("li").text()).toBe(specialError);
+      expect(wrapper.find('[data-test="dashboard-errors-list-item"]').text()).toBe(specialError);
     });
 
     it("handles many errors", () => {
       const manyErrors = Array.from({ length: 100 }, (_, i) => `Error ${i + 1}`);
       wrapper = mountComponent(manyErrors);
 
-      expect(wrapper.findAll("li")).toHaveLength(100);
+      expect(wrapper.findAll('[data-test="dashboard-errors-list-item"]')).toHaveLength(100);
     });
   });
 
@@ -186,7 +186,7 @@ describe("DashboardErrors", () => {
     it("expands when the expand bar is clicked", async () => {
       wrapper = mountComponent(["Test error"]);
 
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       await expandBar.trigger("click");
       await wrapper.vm.$nextTick();
 
@@ -197,7 +197,7 @@ describe("DashboardErrors", () => {
     it("collapses when clicked again", async () => {
       wrapper = mountComponent(["Test error"]);
 
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       // First click: expand
       await expandBar.trigger("click");
       await wrapper.vm.$nextTick();
@@ -214,7 +214,7 @@ describe("DashboardErrors", () => {
     it("dispatches a resize event when expand bar is clicked", async () => {
       wrapper = mountComponent(["Test error"]);
 
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       await expandBar.trigger("click");
       await flushPromises();
 
@@ -226,7 +226,7 @@ describe("DashboardErrors", () => {
     it("dispatches resize on each toggle", async () => {
       wrapper = mountComponent(["Test error"]);
 
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       // Toggle 3 times
       await expandBar.trigger("click");
       await flushPromises();
@@ -258,7 +258,7 @@ describe("DashboardErrors", () => {
       wrapper = mountComponent(["Initial error"]);
 
       // Collapse first
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       await expandBar.trigger("click");
       await wrapper.vm.$nextTick();
 
@@ -281,7 +281,7 @@ describe("DashboardErrors", () => {
     it("renders expand bar with inline background style", () => {
       wrapper = mountComponent(["Test error"]);
 
-      const expandBar = wrapper.find(".expand-bar");
+      const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
       expect(expandBar.attributes("style")).toBeDefined();
     });
 

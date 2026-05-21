@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="dashboard-custom-chart-editor-container"
     class="markdown-editor card-container"
     style="
       width: 100%;
@@ -26,9 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
+      data-test="dashboard-custom-chart-editor-inner"
       style="width: 100%; height: 100%; display: flex; flex-direction: column"
     >
       <div
+        data-test="dashboard-custom-chart-editor-flex-col"
         class="tw:flex tw:flex-col"
         style="height: 100%; display: flex; flex-direction: column"
       >

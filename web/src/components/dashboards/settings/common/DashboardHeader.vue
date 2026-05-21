@@ -15,10 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mb-2">
-      <div v-if="backButton" class="col-auto">
+  <div data-test="dashboard-header-root">
+    <div
+      data-test="dashboard-header-row"
+      class="tw:flex tw:items-center tw:flex-nowrap tw:mb-2"
+    >
+      <div
+        v-if="backButton"
+        data-test="dashboard-header-back-button-container"
+        class="col-auto"
+      >
         <OButton
+          data-test="dashboard-header-back-button"
           variant="outline"
           size="icon-xs"
           class="tw:mr-2"
@@ -27,16 +35,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
       </div>
-      <div class="tw:flex tw:flex-col tw:flex-1">
-        <div class="tw:text-xl tw:font-semibold">
+      <div
+        data-test="dashboard-header-title-container"
+        class="tw:flex tw:flex-col tw:flex-1"
+      >
+        <div
+          data-test="dashboard-header-title"
+          class="tw:text-xl tw:font-semibold"
+        >
           {{ title }}
         </div>
       </div>
-      <div class="col-auto">
+      <div data-test="dashboard-header-right-slot-container" class="col-auto">
         <slot name="right"></slot>
       </div>
     </div>
-    <OSeparator class="tw:mb-2" />
+    <OSeparator data-test="dashboard-header-separator" class="tw:mb-2" />
   </div>
 </template>
 

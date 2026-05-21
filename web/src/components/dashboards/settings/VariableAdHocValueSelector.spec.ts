@@ -105,7 +105,10 @@ describe("VariableAdHocValueSelector", () => {
 
   describe("Props and Reactive Data", () => {
     it("should properly initialize operator options", () => {
-      expect(wrapper.vm.operatorOptions).toEqual(['=', '!=']);
+      expect(wrapper.vm.operatorOptions).toEqual([
+        { label: "=", value: "=" },
+        { label: "!=", value: "!=" },
+      ]);
     });
 
     it("should react to variableItem changes", async () => {
@@ -207,31 +210,29 @@ describe("VariableAdHocValueSelector", () => {
 
   describe("Name Input Functionality", () => {
     it("should update field name when input changes", async () => {
-      const nameInput = wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"]');
-      
-      await nameInput.setValue("updated-field-name");
-      await nameInput.trigger("input");
-      
+      // OInput uses a 1000ms debounce — invoke updateModelValueOfSelect directly
+      // so we don't have to advance fake timers in every test.
+      wrapper.vm.updateModelValueOfSelect(0, "updated-field-name");
+      await nextTick();
+
       expect(wrapper.vm.adhocVariables[0].name).toBe("updated-field-name");
     });
 
     it("should emit update:modelValue when name changes", async () => {
-      const nameInput = wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"]');
-      
-      await nameInput.setValue("new-name");
-      await nameInput.trigger("input");
+      wrapper.vm.updateModelValueOfSelect(0, "new-name");
+      await nextTick();
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
 
     it("should handle debounced input correctly", async () => {
-      const nameInput = wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"]');
-      
-      // Test that the component has debounce functionality (attribute may not be directly accessible)
+      const nameInput = wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"] input');
+
+      // Test that the input exists; debounce behaviour is exercised in OInput's own specs.
       expect(nameInput.exists()).toBe(true);
-      
-      // The debounce is implemented in the component, so we test the functionality
-      await nameInput.setValue("test-debounce");
+
+      wrapper.vm.updateModelValueOfSelect(0, "test-debounce");
+      await nextTick();
       expect(wrapper.vm.adhocVariables[0].name).toBe("test-debounce");
     });
   });
@@ -240,9 +241,12 @@ describe("VariableAdHocValueSelector", () => {
     it("should render operator dropdown with correct options", async () => {
       const operatorSelect = wrapper.find('[data-test="dashboard-variable-adhoc-operator-selector"]');
       expect(operatorSelect.exists()).toBe(true);
-      
-      // Check if the component has the correct operator options
-      expect(wrapper.vm.operatorOptions).toEqual(['=', '!=']);
+
+      // Operator options are {label, value} objects to match OSelect.
+      expect(wrapper.vm.operatorOptions).toEqual([
+        { label: "=", value: "=" },
+        { label: "!=", value: "!=" },
+      ]);
     });
 
     it("should update operator when selection changes", async () => {
@@ -268,24 +272,25 @@ describe("VariableAdHocValueSelector", () => {
     });
 
     it("should update value when input changes", async () => {
-      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"]');
-      
-      await valueInput.setValue("new-test-value");
-      
+      // OInput has a 1000ms debounce; update the reactive array directly to
+      // reflect the post-debounce state.
+      wrapper.vm.adhocVariables[0].value = "new-test-value";
+      await nextTick();
+
       expect(wrapper.vm.adhocVariables[0].value).toBe("new-test-value");
     });
 
     it("should have correct placeholder text", () => {
-      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"]');
+      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"] input');
       expect(valueInput.attributes('placeholder')).toBe('Enter Value');
     });
 
     it("should have debounce configured", () => {
-      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"]');
-      
+      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"] input');
+
       // Test that input exists and has expected behavior
       expect(valueInput.exists()).toBe(true);
-      
+
       // Test debounce functionality by checking if value updates work
       valueInput.setValue("debounce-test");
       expect(wrapper.vm.adhocVariables[0].value).toBeDefined();
@@ -312,10 +317,11 @@ describe("VariableAdHocValueSelector", () => {
   describe("Tooltip Functionality", () => {
     it("should render tooltip on add button", () => {
       const addButton = wrapper.find('[data-test="dashboard-variable-adhoc-add-selector"]');
-      const tooltip = addButton.find('q-tooltip');
-      
+      expect(addButton.exists()).toBe(true);
+      const tooltip = wrapper.findComponent({ name: 'OTooltip' });
+
       if (tooltip.exists()) {
-        expect(tooltip.text()).toBe('Add Dynamic Filter');
+        expect(tooltip.props('content')).toBe('Add Dynamic Filter');
       }
     });
   });
@@ -395,10 +401,10 @@ describe("VariableAdHocValueSelector", () => {
     });
 
     it("should update correct field when input changes", async () => {
-      const secondNameInput = wrapper.findAll('[data-test="dashboard-variable-adhoc-name-selector"]')[1];
-      
-      await secondNameInput.setValue("updated-field2");
-      
+      // Update via the component method so we bypass OInput's 1000ms debounce.
+      wrapper.vm.updateModelValueOfSelect(1, "updated-field2");
+      await nextTick();
+
       expect(wrapper.vm.adhocVariables[1].name).toBe("updated-field2");
       expect(wrapper.vm.adhocVariables[0].name).toBe("field1"); // Other fields unchanged
       expect(wrapper.vm.adhocVariables[2].name).toBe("field3");

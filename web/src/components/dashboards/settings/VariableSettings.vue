@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </DashboardHeader>
       <div>
-        <div class="variables-list-header">
+        <div class="variables-list-header" data-test="dashboard-variables-list-header">
           <div class="header-item"></div>
           <div class="header-item">#</div>
           <div class="header-item">{{ t("dashboard.name") }}</div>

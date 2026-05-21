@@ -678,13 +678,13 @@ describe("AddSettingVariable", () => {
     });
 
     it("should have mergedStreamsFilteredOptions computed property", () => {
-      expect(wrapper.vm.mergedStreamsFilteredOptions).toBeDefined();
-      expect(Array.isArray(wrapper.vm.mergedStreamsFilteredOptions)).toBe(true);
+      expect(wrapper.vm.mergedStreamOptionsWithLabel).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedStreamOptionsWithLabel)).toBe(true);
     });
 
     it("should have mergedFieldsFilteredOptions computed property", () => {
-      expect(wrapper.vm.mergedFieldsFilteredOptions).toBeDefined();
-      expect(Array.isArray(wrapper.vm.mergedFieldsFilteredOptions)).toBe(true);
+      expect(wrapper.vm.mergedFieldOptionsWithLabel).toBeDefined();
+      expect(Array.isArray(wrapper.vm.mergedFieldOptionsWithLabel)).toBe(true);
     });
 
     it("should have dashboardVariablesFilterItems that produces $ prefixed options", () => {
@@ -698,8 +698,8 @@ describe("AddSettingVariable", () => {
     });
 
     it("should expose mergedStreamsFilterFn and mergedFieldsFilterFn for autocomplete", () => {
-      expect(wrapper.vm.mergedStreamsFilterFn).toBeDefined();
-      expect(wrapper.vm.mergedFieldsFilterFn).toBeDefined();
+      expect(wrapper.vm.streamsFilterFn).toBeDefined();
+      expect(wrapper.vm.fieldsFilterFn).toBeDefined();
     });
 
     it("should skip schema fetch when stream is a variable reference", async () => {

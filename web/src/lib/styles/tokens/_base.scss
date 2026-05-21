@@ -57,19 +57,23 @@
   --color-primary-900: #16303c;
 
   /* --- Grey palette --- */
+  /* Tailwind "neutral" palette — true greys with no blue undertone.
+     Previously used "gray" (#1f2937, #111827, …) which has a cool/blue tint,
+     causing inputs / selects / dropdowns / dialogs to read as dark blue in
+     dark mode. Neutral matches user expectation of "dark grey, not blue". */
   --color-grey-0:   #ffffff;
-  --color-grey-50:  #f9fafb;
-  --color-grey-100: #f3f4f6;
-  --color-grey-200: #e5e7eb;
-  --color-grey-300: #d1d5db;
-  --color-grey-400: #9ca3af;
-  --color-grey-500: #6b7280;
-  --color-grey-600: #4b5563;
-  --color-grey-700: #374151;
-  --color-grey-800: #1f2937;
-  --color-grey-850: #17212e;
-  --color-grey-900: #111827;
-  --color-grey-950: #030712;
+  --color-grey-50:  #fafafa;
+  --color-grey-100: #f5f5f5;
+  --color-grey-200: #e5e5e5;
+  --color-grey-300: #d4d4d4;
+  --color-grey-400: #a3a3a3;
+  --color-grey-500: #737373;
+  --color-grey-600: #525252;
+  --color-grey-700: #404040;
+  --color-grey-800: #262626;
+  --color-grey-850: #1f1f1f;
+  --color-grey-900: #171717;
+  --color-grey-950: #0a0a0a;
 
   /* --- Error palette --- */
   --color-error-50:  #fef2f2;

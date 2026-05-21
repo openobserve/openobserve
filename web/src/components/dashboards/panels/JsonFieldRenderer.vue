@@ -15,23 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :class="['json-field-renderer', { 'json-structured': isValidJSON }]">
+  <div
+    :class="['json-field-renderer', { 'json-structured': isValidJSON }]"
+    data-test="json-field-renderer"
+  >
     <div v-if="parsedData === null || parsedData === undefined">
       {{ value }}
     </div>
     <div v-else-if="Array.isArray(parsedData)">
       <!-- Array of primitives: ["a", "b", "c"] -> render as lines -->
-      <div v-if="isArrayOfPrimitives" class="json-array-items">
+      <div
+        v-if="isArrayOfPrimitives"
+        class="json-array-items"
+        data-test="json-array-items"
+      >
         <div
           v-for="(item, index) in definedItems"
           :key="index"
           class="json-array-item"
+          data-test="json-array-item"
         >
           <span :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
       </div>
       <!-- Array of objects: [{"user": "admin"}, ...] -> render each object -->
-      <div v-else class="json-array-objects">
+      <div v-else class="json-array-objects" data-test="json-array-objects">
         <div
           v-for="(item, index) in definedItems"
           :key="index"
@@ -41,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="json-brace">{</span>
             <template v-for="(val, key) in getDefinedEntries(item)" :key="key">
               <span class="json-key-value">
-                <span class="json-key" :style="{ color: keyColor }">{{ key }}</span>
+                <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
                 <span class="json-colon">: </span>
                 <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
               </span>
@@ -54,11 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Single object: {"key": "value"} -> render key-value pairs -->
-    <div v-else-if="typeof parsedData === 'object'" class="json-object">
+    <div
+      v-else-if="typeof parsedData === 'object'"
+      class="json-object"
+      data-test="json-object"
+    >
       <span class="json-brace">{</span>
       <template v-for="(val, key, idx) in definedObjectEntries" :key="key">
         <span class="json-key-value">
-          <span class="json-key" :style="{ color: keyColor }">{{ key }}</span>
+          <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
           <span class="json-colon">: </span>
           <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
         </span>
