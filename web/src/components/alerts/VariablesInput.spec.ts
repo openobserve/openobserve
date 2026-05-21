@@ -19,7 +19,6 @@ import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar();
 
 const mockStore = {
   state: {

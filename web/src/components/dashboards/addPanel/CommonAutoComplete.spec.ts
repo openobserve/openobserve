@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 // Mock store
 const mockStore = {
@@ -55,7 +54,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
 
 describe("CommonAutoComplete", () => {
   let wrapper: any;
@@ -82,20 +80,22 @@ describe("CommonAutoComplete", () => {
           store: mockStore,
         },
         stubs: {
-          "q-input": {
+          "OInput": {
+            name: "OInput",
             template: `
-              <div class="q-input-stub" :data-test="$attrs['data-test']">
-                <input 
-                  :value="modelValue" 
+              <div class="o-input-stub" :data-test="$attrs['data-test']">
+                <input
+                  data-test="o-input-native"
+                  :value="modelValue"
                   @input="$emit('update:modelValue', $event.target.value)"
                   @focus="$emit('focus', $event)"
                   @blur="$emit('blur', $event)"
                 />
-                <label v-if="label">{{ label }}</label>
+                <label data-test="o-input-label" v-if="label">{{ label }}</label>
                 <slot name="label"></slot>
               </div>
             `,
-            props: ["modelValue", "dense", "filled", "label"],
+            props: ["modelValue", "label"],
             emits: ["update:modelValue", "focus", "blur"],
             inheritAttrs: false,
           },
@@ -156,7 +156,7 @@ describe("CommonAutoComplete", () => {
 
     it("should handle label prop", () => {
       wrapper = createWrapper({ label: "Custom Label" });
-      const label = wrapper.find("label");
+      const label = wrapper.find('[data-test="o-input-label"]');
       expect(label.text()).toBe("Custom Label");
     });
 
@@ -189,7 +189,7 @@ describe("CommonAutoComplete", () => {
     });
 
     it("should emit update:modelValue when input changes", async () => {
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       await input.setValue("new value");
       
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -202,7 +202,7 @@ describe("CommonAutoComplete", () => {
     });
 
     it("should show options on focus", async () => {
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       await input.trigger("focus");
       
       expect(wrapper.vm.showOptions).toBe(true);
@@ -210,7 +210,7 @@ describe("CommonAutoComplete", () => {
 
     it("should hide options on blur", async () => {
       wrapper.vm.showOptions = true;
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       await input.trigger("blur");
       
       expect(wrapper.vm.showOptions).toBe(false);
@@ -223,7 +223,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const optionsContainer = wrapper.find(".options-container");
+      const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
       expect(optionsContainer.exists()).toBeTruthy();
     });
 
@@ -232,7 +232,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = false;
       await wrapper.vm.$nextTick();
       
-      const optionsContainer = wrapper.find(".options-container");
+      const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
       expect(optionsContainer.exists()).toBeFalsy();
     });
 
@@ -242,7 +242,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const optionsContainer = wrapper.find(".options-container");
+      const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
       expect(optionsContainer.exists()).toBeFalsy();
     });
 
@@ -260,7 +260,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const options = wrapper.findAll(".option");
+      const options = wrapper.findAll('[data-test="common-auto-complete-option"]');
       options.forEach((option, index) => {
         expect(option.text()).toBe(mockFilteredOptions[index].label);
       });
@@ -275,7 +275,7 @@ describe("CommonAutoComplete", () => {
     });
 
     it("should emit update:modelValue when option is selected", async () => {
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
       
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -283,7 +283,7 @@ describe("CommonAutoComplete", () => {
     });
 
     it("should hide options when option is selected", async () => {
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
       
       expect(wrapper.vm.showOptions).toBe(false);
@@ -295,7 +295,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
       
       expect(customFn).toHaveBeenCalledWith(mockFilteredOptions[0].value);
@@ -318,7 +318,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const optionsContainer = wrapper.find(".options-container");
+      const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
       expect(optionsContainer.attributes("style")).toContain("background-color: white");
     });
 
@@ -328,7 +328,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const optionsContainer = wrapper.find(".options-container");
+      const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
       const style = optionsContainer.attributes("style");
       // Check for either hex or rgb format of the same dark color
       expect(style).toMatch(/(background-color: #2d2d2d|background-color: rgb\(45, 45, 45\))/);
@@ -338,10 +338,10 @@ describe("CommonAutoComplete", () => {
   describe("Slots", () => {
     it("should render label slot when provided", () => {
       wrapper = createWrapper({}, {
-        label: '<span class="custom-label">Custom Label</span>',
+        label: '<span data-test="custom-label">Custom Label</span>',
       });
-      
-      const customLabel = wrapper.find(".custom-label");
+
+      const customLabel = wrapper.find('[data-test="custom-label"]');
       expect(customLabel.exists()).toBeTruthy();
       expect(customLabel.text()).toBe("Custom Label");
     });
@@ -407,14 +407,16 @@ describe("CommonAutoComplete", () => {
   describe("Styling and Layout", () => {
     it("should have relative container", () => {
       wrapper = createWrapper();
-      const container = wrapper.find(".relative");
+      const container = wrapper.find('[data-test="common-auto-complete-container"]');
       expect(container.exists()).toBeTruthy();
+      expect(container.classes()).toContain("tw:relative");
     });
 
     it("should have correct container styling", () => {
       wrapper = createWrapper();
-      const container = wrapper.find("div[style*='margin-top: 5px']");
+      const container = wrapper.find('[data-test="common-auto-complete-container"]');
       expect(container.exists()).toBeTruthy();
+      expect(container.attributes("style")).toContain("margin-top: 5px");
     });
 
     it("should apply option styling", async () => {
@@ -422,7 +424,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       
-      const options = wrapper.findAll(".option");
+      const options = wrapper.findAll('[data-test="common-auto-complete-option"]');
       options.forEach(option => {
         expect(option.classes()).toContain("option");
       });
@@ -474,7 +476,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       
       // Focus to show options
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       await input.trigger("focus");
       expect(wrapper.vm.showOptions).toBe(true);
       
@@ -490,7 +492,7 @@ describe("CommonAutoComplete", () => {
     it("should handle form-like behavior", async () => {
       wrapper = createWrapper();
       
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       
       // Focus and show options
       await input.trigger("focus");
@@ -498,7 +500,7 @@ describe("CommonAutoComplete", () => {
       await wrapper.vm.$nextTick();
       
       // Select option
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
       
       expect(wrapper.vm.showOptions).toBe(false);
@@ -534,11 +536,11 @@ describe("CommonAutoComplete", () => {
       // Test reactivity
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".options-container").exists()).toBeTruthy();
+      expect(wrapper.find('[data-test="common-auto-complete-options-container"]').exists()).toBeTruthy();
       
       wrapper.vm.showOptions = false;
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".options-container").exists()).toBeFalsy();
+      expect(wrapper.find('[data-test="common-auto-complete-options-container"]').exists()).toBeFalsy();
     });
   });
 
@@ -564,7 +566,7 @@ describe("CommonAutoComplete", () => {
   describe("Edge Cases", () => {
     it("should handle rapid focus/blur events", async () => {
       wrapper = createWrapper();
-      const input = wrapper.find("input");
+      const input = wrapper.find('[data-test="o-input-native"]');
       
       for (let i = 0; i < 5; i++) {
         await input.trigger("focus");
@@ -599,7 +601,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
 
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
 
       expect(wrapper.emitted("select")).toBeTruthy();
@@ -611,7 +613,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
 
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
 
       // Both events should be emitted
@@ -628,7 +630,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
 
-      const option = wrapper.find(".option");
+      const option = wrapper.find('[data-test="common-auto-complete-option"]');
       await option.trigger("mousedown");
 
       expect(wrapper.emitted("select")).toBeTruthy();

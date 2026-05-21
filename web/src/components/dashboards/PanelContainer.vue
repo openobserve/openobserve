@@ -34,7 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="drag-indicator" size="sm"
           data-test="dashboard-panel-drag"
         />
-        <div :title="props.data.title" class="panelHeader">
+        <div
+          :title="props.data.title"
+          class="panelHeader"
+          data-test="dashboard-panel-header"
+        >
           {{ props.data.title }}
         </div>
         <div class="tw:flex-1" />

@@ -15,12 +15,10 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-installQuasar();
 
 // Create a unique DOM node for this test file
 const uniqueNodeId = "domain-management-unit-test-app";

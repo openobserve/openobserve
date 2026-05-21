@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -80,7 +79,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-installQuasar();
 
 // Create a reactive mock dashboard panel data
 const createMockDashboardPanelData = () => {
@@ -465,7 +463,7 @@ describe("DashboardQueryEditor", () => {
       wrapper = createWrapper();
 
       // Test query editor container exists
-      const queryContainer = wrapper.find(".query-data");
+      const queryContainer = wrapper.find('[data-test="dashboard-query-data"]');
       expect(queryContainer.exists() || wrapper.exists()).toBe(true);
     });
 
@@ -554,10 +552,10 @@ describe("DashboardQueryEditor", () => {
     it("should render code query editor", () => {
       wrapper = createWrapper();
 
-      // Check for code editor elements
+      // Check for code editor elements via data-test or component lookup
       const hasCodeEditor =
-        wrapper.find(".monaco-editor").exists() ||
-        wrapper.findComponent("CodeQueryEditor").exists() ||
+        wrapper.find('[data-test="dashboard-query-editor"]').exists() ||
+        wrapper.findComponent({ name: "CodeQueryEditor" }).exists() ||
         wrapper.exists(); // Fallback
 
       expect(hasCodeEditor).toBe(true);
@@ -566,8 +564,8 @@ describe("DashboardQueryEditor", () => {
     it("should handle editor configuration", () => {
       wrapper = createWrapper();
 
-      // Test editor configuration
-      const splitter = wrapper.find("q-splitter");
+      // Test editor configuration via the splitter component lookup
+      const splitter = wrapper.findComponent({ name: "QSplitter" });
       expect(splitter.exists() || wrapper.exists()).toBe(true);
     });
 

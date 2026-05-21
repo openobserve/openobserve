@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
 import * as zincutils from '@/utils/zincutils';
@@ -30,7 +29,6 @@ vi.mock('@/components/SanitizedHtmlRenderer.vue', () => ({
 
 const mockOrganizationsService = organizationsService as any;
 
-installQuasar({ plugins: {} });
 
 describe('MemberSubscription.vue', () => {
   let wrapper: any;

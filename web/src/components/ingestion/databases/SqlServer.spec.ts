@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SqlServer from './SqlServer.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -88,7 +87,6 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   let wrapper: VueWrapper<any>;

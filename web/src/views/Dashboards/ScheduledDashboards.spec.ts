@@ -136,17 +136,17 @@ describe('ScheduledDashboards', () => {
           // ODrawer stub — renders default slot + header-right slot so child markup mounts
           'ODrawer': {
             name: 'ODrawer',
-            template: `<div class="o-drawer-mock" :data-open="open">
-              <div class="o-drawer-header-right"><slot name="header-right" /></div>
-              <div class="o-drawer-body"><slot /></div>
+            template: `<div data-test="o-drawer-mock" class="o-drawer-mock" :data-open="open">
+              <div data-test="o-drawer-header-right" class="o-drawer-header-right"><slot name="header-right" /></div>
+              <div data-test="o-drawer-body" class="o-drawer-body"><slot /></div>
             </div>`,
             props: ['open', 'width', 'title', 'subTitle', 'showClose', 'persistent', 'size'],
             emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
           },
           'OTable': {
             name: 'OTable',
-            template: `<div class="o-table-mock">
-              <div class="o-table-body"><slot name="cell-name" /><slot name="cell-tab" /><slot name="cell-time_range" /><slot name="cell-frequency" /><slot name="cell-last_triggered_at" /><slot name="cell-created_at" /><slot name="empty" /></div>
+            template: `<div data-test="o-table-mock" class="o-table-mock">
+              <div data-test="o-table-body" class="o-table-body"><slot name="cell-name" :row="{ name: 'test' }" /><slot name="cell-tab" :row="{ tab: 'test' }" /><slot name="cell-time_range" :row="{ time_range: 'test' }" /><slot name="cell-frequency" :row="{ frequency: 'test' }" /><slot name="cell-last_triggered_at" :row="{ last_triggered_at: 'test' }" /><slot name="cell-created_at" :row="{ created_at: 'test' }" /><slot name="empty" /></div>
             </div>`,
             props: {
               data: { type: Array, default: () => [] },
@@ -161,35 +161,41 @@ describe('ScheduledDashboards', () => {
           },
           'AppTabs': {
             name: 'AppTabs',
-            template: '<div class="app-tabs-mock"></div>',
+            template: '<div data-test="app-tabs-mock" class="app-tabs-mock"></div>',
             props: ['tabs', 'activeTab'],
             emits: ['update:activeTab']
           },
           'NoData': {
             name: 'NoData',
-            template: '<div class="no-data-mock">No data available</div>'
+            template: '<div data-test="no-data-mock" class="no-data-mock">No data available</div>'
           },
           'q-input': {
             name: 'q-input',
-            template: '<input class="q-input-mock" />',
+            template: '<input data-test="q-input-mock" class="q-input-mock" />',
             props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
+            emits: ['update:modelValue']
+          },
+          'OInput': {
+            name: 'OInput',
+            template: '<input class="q-input-mock" :data-test="$attrs[\'data-test\'] || \'q-input-mock\'" />',
+            props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue']
           },
           'q-btn': {
             name: 'q-btn',
-            template: '<button class="q-btn-mock"><slot /></button>',
+            template: '<button data-test="q-btn-mock" class="q-btn-mock"><slot /></button>',
             props: ['class', 'padding', 'color', 'no-caps', 'label', 'round', 'flat', 'icon'],
             emits: ['click']
           },
           'OButton': {
             name: 'OButton',
-            template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+            template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\'] || \'q-btn-mock\'" @click="$emit(\'click\')"><slot /></button>',
             props: ['variant', 'size', 'disabled', 'loading', 'active'],
             emits: ['click']
           },
           'OIcon': {
             name: 'OIcon',
-            template: '<div class="OIcon-mock"></div>',
+            template: '<div data-test="o-icon-mock" class="OIcon-mock"></div>',
             props: ['name']
           }
         }
@@ -237,13 +243,13 @@ describe('ScheduledDashboards', () => {
     it('should apply dark-mode class when theme is dark', () => {
       mockStore.state.theme = 'dark';
       const wrapper = createWrapper();
-      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('dark-mode');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('dark-mode');
     });
 
-    it('should apply bg-white class when theme is light', () => {
+    it('should apply light-mode class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('bg-white');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('tw:bg-white');
     });
   });
 
@@ -422,7 +428,7 @@ describe('ScheduledDashboards', () => {
   describe('Search and Filter', () => {
     it('should render search input', () => {
       const wrapper = createWrapper();
-      const searchInput = wrapper.find('.q-input-mock');
+      const searchInput = wrapper.find('[data-test="alert-list-search-input"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -508,12 +514,14 @@ describe('ScheduledDashboards', () => {
   describe('Loading States', () => {
     it('should show loading spinner when loading is true', () => {
       const wrapper = createWrapper({ loading: true });
-      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(true);
+      const table = wrapper.findComponent({ name: 'OTable' });
+      expect(table.exists()).toBe(true);
+      expect(table.props('loading')).toBe(true);
     });
 
     it('should show no data message when not loading and no reports', () => {
       const wrapper = createWrapper({ loading: false, reports: [] });
-      expect(wrapper.find('.no-data-mock').exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-data-mock"]').exists()).toBe(true);
     });
   });
 
@@ -552,22 +560,22 @@ describe('ScheduledDashboards', () => {
 
     it('should render AppTabs component inside ODrawer header', () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('.app-tabs-mock').exists()).toBe(true);
+      expect(wrapper.find('[data-test="app-tabs-mock"]').exists()).toBe(true);
     });
 
     it('should render OTable component', () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('.o-table-mock').exists()).toBe(true);
+      expect(wrapper.find('[data-test="scheduled-dashboard-table"]').exists()).toBe(true);
     });
 
     it('should render search input', () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('.q-input-mock').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-list-search-input"]').exists()).toBe(true);
     });
 
     it('should render action buttons', () => {
       const wrapper = createWrapper();
-      expect(wrapper.findAll('.q-btn-mock').length).toBeGreaterThan(0);
+      expect(wrapper.findAll('[data-test="alert-list-add-alert-btn"]').length).toBeGreaterThan(0);
     });
   });
 });

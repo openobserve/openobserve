@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock utilities
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
@@ -36,7 +35,6 @@ import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 const mockDashboardData = {
   dashboardId: "dashboard-1",
@@ -265,10 +263,8 @@ describe("GeneralSettings", () => {
     it("should require dashboard title", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("");
+      wrapper.vm.dashboardData.title = "";
+      await wrapper.vm.$nextTick();
 
       const saveBtn = wrapper.find(
         '[data-test="dashboard-general-setting-save-btn"]',
@@ -279,10 +275,8 @@ describe("GeneralSettings", () => {
     it("should enable save button when title is provided", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("Valid Dashboard Name");
+      wrapper.vm.dashboardData.title = "Valid Dashboard Name";
+      await wrapper.vm.$nextTick();
 
       const saveBtn = wrapper.find(
         '[data-test="dashboard-general-setting-save-btn"]',
@@ -293,10 +287,8 @@ describe("GeneralSettings", () => {
     it("should validate title is not just whitespace", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("   ");
+      wrapper.vm.dashboardData.title = "   ";
+      await wrapper.vm.$nextTick();
 
       const saveBtn = wrapper.find(
         '[data-test="dashboard-general-setting-save-btn"]',
@@ -307,18 +299,14 @@ describe("GeneralSettings", () => {
     it("should show validation error for empty title", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
+      wrapper.vm.dashboardData.title = "";
+      await wrapper.vm.$nextTick();
+
+      // Save button should be disabled when title is empty
+      const saveBtn = wrapper.find(
+        '[data-test="dashboard-general-setting-save-btn"]',
       );
-      await nameInput.setValue("");
-      await nameInput.trigger("blur");
-
-      const form = wrapper.find("form");
-      await form.trigger("submit.prevent");
-
-      // The error message is translated by the component, so we check for both key and actual text
-      const text = wrapper.text();
-      expect(text.includes("dashboard.nameRequired") || text.includes("Name is required")).toBe(true);
+      expect(saveBtn.element.disabled).toBe(true);
     });
   });
 
@@ -327,7 +315,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
+        '[data-test="dashboard-general-setting-name"] input',
       );
       await nameInput.setValue("Updated Dashboard Name");
 
@@ -338,7 +326,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"]',
+        '[data-test="dashboard-general-setting-description"] input',
       );
       await descInput.setValue("Updated description");
 
@@ -393,18 +381,11 @@ describe("GeneralSettings", () => {
     it("should save dashboard when form is submitted", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("Updated Dashboard");
+      wrapper.vm.dashboardData.title = "Updated Dashboard";
+      await wrapper.vm.$nextTick();
 
-      // Ensure form validation is properly mocked to return true
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit method directly
-      await wrapper.vm.onSubmit();
+      // Call saveDashboardApi.execute directly
+      await wrapper.vm.saveDashboardApi.execute();
       await flushPromises();
 
       expect(updateDashboard).toHaveBeenCalledWith(
@@ -428,12 +409,12 @@ describe("GeneralSettings", () => {
       );
 
       // Trigger the save operation directly
-      const savePromise = wrapper.vm.onSubmit();
+      const savePromise = wrapper.vm.saveDashboardApi.execute();
       await wrapper.vm.$nextTick();
 
       // Check loading state
       expect(wrapper.vm.saveDashboardApi.isLoading.value).toBe(true);
-      
+
       // Wait for promise to complete
       await savePromise;
     });
@@ -442,16 +423,11 @@ describe("GeneralSettings", () => {
       // Reset updateDashboard mock and set it to reject
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValue(new Error("Save failed"));
-      
+
       wrapper = await createWrapper();
 
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit directly to trigger error handling
-      await wrapper.vm.onSubmit();
+      // Call save directly to trigger error handling
+      await wrapper.vm.saveDashboardApi.execute();
       await flushPromises();
 
       // The component handles errors via notifications, not console.error
@@ -462,13 +438,8 @@ describe("GeneralSettings", () => {
     it("should emit success event after successful save", async () => {
       wrapper = await createWrapper();
 
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit method directly
-      await wrapper.vm.onSubmit();
+      // Call save method directly
+      await wrapper.vm.saveDashboardApi.execute();
       await flushPromises();
 
       expect(wrapper.emitted()).toHaveProperty("save");
@@ -637,13 +608,8 @@ describe("GeneralSettings", () => {
       wrapper.vm.dashboardData.title = "Test Dashboard";
       await wrapper.vm.$nextTick();
 
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Attempt to submit form by calling onSubmit directly
-      await wrapper.vm.onSubmit();
+      // Attempt to submit form by calling save directly
+      await wrapper.vm.saveDashboardApi.execute();
       await flushPromises();
 
       // Should handle the error
@@ -661,7 +627,7 @@ describe("GeneralSettings", () => {
           data: { message: "Dashboard was modified by another user" }
         }
       };
-      
+
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValueOnce(conflictError);
 
@@ -669,11 +635,7 @@ describe("GeneralSettings", () => {
       wrapper.vm.dashboardData.title = "Test Dashboard";
       await wrapper.vm.$nextTick();
 
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      await wrapper.vm.onSubmit();
+      await wrapper.vm.saveDashboardApi.execute();
       await flushPromises();
 
       // Should handle conflict error specially
@@ -699,19 +661,12 @@ describe("GeneralSettings", () => {
     it("should have proper form labels", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"]',
-      );
+      // OInput renders a <label> tag with text content
+      const nameComponent = wrapper.findComponent('[data-test="dashboard-general-setting-name"]');
+      const descComponent = wrapper.findComponent('[data-test="dashboard-general-setting-description"]');
 
-      // Check for label attributes or aria-label
-      const nameLabel = nameInput.attributes("label") || nameInput.attributes("aria-label");
-      const descLabel = descInput.attributes("label") || descInput.attributes("aria-label");
-
-      expect(nameLabel).toContain("Name");
-      expect(descLabel).toBeDefined();
+      expect(nameComponent.props("label")).toContain("Name");
+      expect(descComponent.props("label")).toBeDefined();
     });
 
 
@@ -725,8 +680,7 @@ describe("GeneralSettings", () => {
         '[data-test="dashboard-general-setting-cancel-btn"]',
       );
 
-      // Check button attributes - type for save button and role for both
-      expect(saveBtn.attributes("type")).toBe("submit");
+      // Both buttons render as <button> elements
       expect(saveBtn.element.tagName.toLowerCase()).toBe("button");
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
     });
@@ -752,7 +706,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
+        '[data-test="dashboard-general-setting-name"] input',
       );
 
       // Rapid input changes

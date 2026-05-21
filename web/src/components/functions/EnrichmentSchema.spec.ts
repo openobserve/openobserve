@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import EnrichmentSchema from './EnrichmentSchema.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -110,7 +109,6 @@ function buildMountOptions(store: any = mockStore, props: Record<string, unknown
   };
 }
 
-installQuasar();
 
 describe('EnrichmentSchema.vue Branch Coverage', () => {
   const mockSchemaData = {

@@ -2839,6 +2839,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
+      /* v8 ignore next */ // unreachable in tests: Vue 3 Options API auto-unwraps refs on `this`, so loadingState here is a primitive boolean not a Ref
       this.loadingState.value = false;
     }
   },

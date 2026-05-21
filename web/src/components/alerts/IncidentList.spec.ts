@@ -31,7 +31,6 @@ vi.mock("@/services/incidents", () => ({
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentList from "./IncidentList.vue";
 import incidentsService, { Incident } from "@/services/incidents";
 import { nextTick } from "vue";
@@ -40,7 +39,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Install Quasar globally
-installQuasar();
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({

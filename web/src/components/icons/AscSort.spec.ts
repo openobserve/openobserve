@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import AscSort from '@/components/icons/AscSort.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('AscSort.vue', () => {
   let wrapper: VueWrapper;

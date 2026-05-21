@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
-          <div class="drag-handle">
+          <div class="drag-handle" data-test="dashboard-column-order-drag-handle">
             <OIcon
               name="drag-indicator"
               size="md"
@@ -68,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="column-number">{{ index + 1 }}.</div>
+          <div class="column-number" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
 
           <!-- Column name -->
-          <div class="column-name">{{ column }}</div>
+          <div class="column-name" data-test="dashboard-column-order-column-name">{{ column }}</div>
 
           <!-- Actions -->
-          <div class="column-actions">
+          <div class="column-actions" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"

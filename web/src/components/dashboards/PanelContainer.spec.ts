@@ -15,14 +15,12 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 
-installQuasar();
 
 // Mock shortURL service
 vi.mock('@/services/short_url', () => ({
@@ -36,6 +34,12 @@ vi.mock('@/services/short_url', () => ({
 // Mock addPanel utility
 vi.mock('@/utils/commons', () => ({
   addPanel: vi.fn().mockResolvedValue(undefined)
+}));
+
+// Mock the toast helper (the component now uses toast() not q.notify()).
+const toastMock = vi.fn(() => vi.fn());
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => toastMock(...args),
 }));
 
 // ── ODialog stub ─────────────────────────────────────────────────────────────
@@ -212,9 +216,25 @@ describe("PanelContainer", () => {
               :data-open="String(open)"
             ></div>`,
           },
+          // ShowLegendsPopup is loaded via defineAsyncComponent in the
+          // component, which never resolves synchronously in tests. Stub
+          // it directly so the legends-wiring tests can find it via
+          // findComponent({ name: 'ShowLegendsPopup' }).
+          'ShowLegendsPopup': {
+            name: 'ShowLegendsPopup',
+            inheritAttrs: false,
+            props: ['open', 'panelData'],
+            emits: ['update:open'],
+            template: `<div
+              data-test="panel-container-legends-dialog"
+              :data-open="String(open)"
+            ></div>`,
+          },
           'PanelSchemaRenderer': {
+            name: 'PanelSchemaRenderer',
             template: '<div data-test="panel-schema-renderer"></div>',
-            props: ['panelSchema', 'selectedTimeObj', 'width', 'height']
+            props: ['panelSchema', 'selectedTimeObj', 'width', 'height'],
+            emits: ['show-legends']
           },
           'SinglePanelMove': {
             template: '<div data-test="single-panel-move"></div>',
@@ -227,7 +247,7 @@ describe("PanelContainer", () => {
           'PanelErrorButtons': {
             template: `<div>
               <q-btn v-if="error" data-test="panel-error-data" class="warning">
-                <q-tooltip>{{ error }}</q-tooltip>
+                <q-tooltip data-test="panel-error-tooltip">{{ error }}</q-tooltip>
               </q-btn>
               <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
                 <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
@@ -241,7 +261,11 @@ describe("PanelContainer", () => {
               <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
                 <q-tooltip>Partial data</q-tooltip>
               </q-btn>
-              <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
+              <span
+                v-if="lastTriggeredAt && !viewOnly"
+                class="lastRefreshedAt"
+                data-test="panel-last-refreshed-at"
+              >
                 <RelativeTime :timestamp="lastTriggeredAt" />
               </span>
             </div>`,
@@ -291,7 +315,7 @@ describe("PanelContainer", () => {
     it("should display panel title", () => {
       wrapper = createWrapper();
 
-      const header = wrapper.find('.panelHeader');
+      const header = wrapper.find('[data-test="dashboard-panel-header"]');
       expect(header.text()).toBe("Test Panel");
       expect(header.attributes('title')).toBe("Test Panel");
     });
@@ -380,7 +404,7 @@ describe("PanelContainer", () => {
       const errorBtn = wrapper.find('[data-test="panel-error-data"]');
       expect(errorBtn.exists()).toBe(true);
       
-      const tooltip = errorBtn.find('q-tooltip');
+      const tooltip = errorBtn.find('[data-test="panel-error-tooltip"]');
       if (tooltip.exists()) {
         expect(tooltip.text().trim()).toBe(errorMessage);
       } else {
@@ -745,14 +769,14 @@ describe("PanelContainer", () => {
 
     it("should show loading notification during duplication", async () => {
       wrapper = createWrapper();
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      toastMock.mockClear();
 
       const duplicatePromise = wrapper.vm.onDuplicatePanel(mockPanelData);
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          spinner: true,
-          message: "Please wait..."
+          variant: "loading",
+          message: "Please wait...",
         })
       );
 
@@ -792,14 +816,13 @@ describe("PanelContainer", () => {
     it("should show error when panel has no queries", async () => {
       const panelWithoutQueries = { ...mockPanelData, queries: [] };
       wrapper = createWrapper({ data: panelWithoutQueries });
-
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      toastMock.mockClear();
 
       await wrapper.vm.createAlertFromPanel();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'negative'
+          variant: 'error'
         })
       );
     });
@@ -810,14 +833,13 @@ describe("PanelContainer", () => {
         queries: [{ query: 'SELECT * FROM test', fields: {} }]
       };
       wrapper = createWrapper({ data: panelWithoutStream });
-
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      toastMock.mockClear();
 
       await wrapper.vm.createAlertFromPanel();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'negative'
+          variant: 'error'
         })
       );
     });
@@ -830,14 +852,13 @@ describe("PanelContainer", () => {
       };
       wrapper = createWrapper({ data: unsupportedPanel });
       await wrapper.vm.metaDataValue({ queries: [{ query: 'SELECT * FROM test' }] });
-
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      toastMock.mockClear();
 
       await wrapper.vm.createAlertFromPanel();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'warning'
+          variant: 'warning'
         })
       );
     });
@@ -1209,7 +1230,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLastTriggeredAtUpdate(timestamp);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('.lastRefreshedAt').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
     });
 
     it("should hide last refreshed time in view-only mode", async () => {
@@ -1219,7 +1240,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.handleLastTriggeredAtUpdate(timestamp);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('.lastRefreshedAt').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(false);
     });
   });
 
@@ -1365,13 +1386,13 @@ describe("PanelContainer", () => {
       expect(qBar.classes()).toContain('dark-mode');
     });
 
-    it("should apply light mode theme", async () => {
+    it("should NOT apply dark-mode class in light mode", async () => {
       store.state.theme = 'light';
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
-      expect(qBar.classes()).toContain('transparent');
+      expect(qBar.classes()).not.toContain('dark-mode');
     });
   });
 
@@ -1545,12 +1566,13 @@ describe("PanelContainer", () => {
     const findQueryInspector = (w: any) =>
       w.findComponent({ name: "QueryInspector" });
 
-    // Helper: legends ODialog has no data-test attribute on the source so it
-    // is the only ODialog with `data-test` absent. We identify it by size="lg".
-    const findLegendsDialog = (w: any) =>
-      w.findAllComponents({ name: "ODialog" }).find(
-        (d: any) => d.props("size") === "lg"
-      );
+    // Helper: ShowLegendsPopup is the legends dialog wrapper rendered by
+    // PanelContainer. We find it by component name (it's loaded async in
+    // the source; the spec stubs it so it resolves synchronously).
+    const findLegendsDialog = (w: any) => {
+      const c = w.findComponent({ name: "ShowLegendsPopup" });
+      return c.exists() ? c : undefined;
+    };
 
     it("should render QueryInspector and legends ODialog", () => {
       wrapper = createWrapper();
@@ -1589,15 +1611,13 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.showViewPanel).toBe(false);
     });
 
-    it("should render legends ODialog closed by default with size=lg", async () => {
+    it("should render legends dialog closed by default", async () => {
       wrapper = createWrapper();
-      // Allow defineAsyncComponent (ShowLegendsPopup) to resolve before asserting.
       await wrapper.vm.$nextTick();
 
       const dialog = findLegendsDialog(wrapper);
       expect(dialog).toBeTruthy();
-      expect(dialog.props("open")).toBe(false);
-      expect(dialog.props("size")).toBe("lg");
+      expect(dialog!.props("open")).toBe(false);
     });
 
     it("should open legends ODialog when showLegendsDialog becomes true", async () => {

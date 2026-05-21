@@ -16,10 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="dashboard-custom-markdown-editor-container"
     class="markdown-editor card-container"
     style="width: 100%; height: 100%; overflow: hidden"
   >
-    <div style="width: 100%; height: 100%">
+    <div
+      data-test="dashboard-custom-markdown-editor-inner"
+      style="width: 100%; height: 100%"
+    >
       <OSplitter
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
@@ -27,7 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div class="tw:flex tw:flex-col" style="height: 100%; display: flex; flex-direction: column;">
+          <div
+            data-test="dashboard-custom-markdown-editor-flex-col"
+            class="tw:flex tw:flex-col"
+            style="height: 100%; display: flex; flex-direction: column;"
+          >
             <CodeQueryEditor
               language="markdown"
               v-model:query="markdownContent"
@@ -39,7 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <div class="splitter-vertical splitter-enabled"></div>
+          <div
+            data-test="dashboard-custom-markdown-editor-splitter-separator"
+            class="splitter-vertical splitter-enabled"
+          ></div>
           <div
             class="tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
             style="top: 10px; left: 3.5px"

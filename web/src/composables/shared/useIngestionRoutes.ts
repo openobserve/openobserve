@@ -763,6 +763,7 @@ const useIngestionRoutes = () => {
         },
         {
           path: "ai-integrations",
+          name: "ai-integrations",
           component: AIIntegrations,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -770,7 +771,6 @@ const useIngestionRoutes = () => {
           children: [
             {
               path: "",
-              name: "ai-integrations",
               redirect: () => {
                 const first = aiCategories[0].integrations[0];
                 return { name: first.routeName };

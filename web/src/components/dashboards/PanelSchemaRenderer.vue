@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.custom_error_handeling
         "
         class="errorMessage"
+        data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
         <div style="height: 80%; width: 100%">
@@ -164,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema?.error_config?.custom_error_message
         "
         class="customErrorMessage"
+        data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
@@ -228,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
+          data-test="panel-schema-renderer-annotation-button"
           variant="outline"
           size="icon-circle"
           @click="toggleAddAnnotationMode"

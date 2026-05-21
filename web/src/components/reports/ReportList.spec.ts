@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
@@ -75,7 +74,6 @@ vi.mock("@/utils/commons", () => ({
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
 
-installQuasar({ config: { platform } });
 
 const REPORT_SCHEDULED = {
   report_id: "uuid-scheduled",

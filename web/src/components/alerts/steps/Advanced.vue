@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="localTemplate"
               :options="formattedTemplates"
               clearable
+              :placeholder="t('alerts.advanced.selectTemplate')"
               class="tw:min-w-[240px] tw:max-w-[300px]"
               @update:model-value="emitTemplateUpdate"
             >
@@ -257,7 +258,7 @@ export default defineComponent({
     const store = useStore();
 
     // Template override
-    const localTemplate = ref(props.template);
+    const localTemplate = ref<string | undefined>(props.template || undefined);
     const formattedTemplates = computed(() =>
       props.templates.map((t: any) => t.name),
     );
@@ -268,7 +269,7 @@ export default defineComponent({
     watch(
       () => props.template,
       (newVal) => {
-        localTemplate.value = newVal;
+        localTemplate.value = newVal || undefined;
       },
     );
     const localVariables = ref<Variable[]>([...props.contextAttributes]);

@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 
 // Mock external dependencies
@@ -63,7 +62,6 @@ vi.mock("marked", () => ({
   }),
 }));
 
-installQuasar();
 
 describe("MarkdownRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -424,7 +422,7 @@ describe("MarkdownRenderer", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
@@ -446,7 +444,7 @@ describe("MarkdownRenderer", () => {
       
       wrapper = createWrapper({ markdownContent: longContent });
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
       expect(container.attributes('style')).toContain('overflow: auto');
     });
   });

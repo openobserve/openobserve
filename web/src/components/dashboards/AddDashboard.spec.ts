@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock dashboard service
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -57,7 +56,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import dashboardService from "@/services/dashboards";
 
-installQuasar();
 
 describe("AddDashboard", () => {
   let wrapper: any;
@@ -190,19 +188,19 @@ describe("AddDashboard", () => {
       expect(wrapper.vm.dashboardData.description).toBe("");
     });
 
-    it("should update dashboardData when inputs change", async () => {
+    it("should update dashboardData when inputs change via OForm", async () => {
       wrapper = createWrapper();
 
-      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
-      const descInput = wrapper.find(
-        '[data-test="add-dashboard-description"]',
-      );
+      // The OForm exposes a form via the addDashboardForm ref. Updating
+      // the form's underlying state mirrors what the inputs would do.
+      const formRef = wrapper.vm.addDashboardForm;
+      expect(formRef).toBeTruthy();
+      formRef.form.setFieldValue("name", "New Name");
+      formRef.form.setFieldValue("description", "New Description");
+      await wrapper.vm.$nextTick();
 
-      await nameInput.setValue("New Name");
-      await descInput.setValue("New Description");
-
-      expect(wrapper.vm.dashboardData.name).toBe("New Name");
-      expect(wrapper.vm.dashboardData.description).toBe("New Description");
+      expect(formRef.form.state.values.name).toBe("New Name");
+      expect(formRef.form.state.values.description).toBe("New Description");
     });
   });
 
@@ -225,13 +223,28 @@ describe("AddDashboard", () => {
     });
   });
 
+  // Helper: stub the addDashboardForm ref so submit can pass through validation
+  // and read the supplied values (mirrors what an OForm-driven submission does).
+  const stubFormWith = (
+    name: string,
+    description = "",
+    { valid = true }: { valid?: boolean } = {},
+  ) => {
+    wrapper.vm.addDashboardForm = {
+      validate: vi.fn().mockResolvedValue(valid),
+      resetValidation: vi.fn(),
+      form: {
+        state: {
+          values: { name, description },
+        },
+      },
+    };
+  };
+
   describe("Form Submission", () => {
     it("should create a new dashboard when submit is called with a valid name", async () => {
       wrapper = createWrapper();
-
-      wrapper.vm.dashboardData.name = "New Dashboard";
-      wrapper.vm.dashboardData.description = "Dashboard description";
-      await wrapper.vm.$nextTick();
+      stubFormWith("New Dashboard", "Dashboard description");
 
       await wrapper.vm.submit();
       await flushPromises();
@@ -250,8 +263,8 @@ describe("AddDashboard", () => {
 
     it("should emit 'updated' after a successful submission", async () => {
       wrapper = createWrapper();
+      stubFormWith("New Dashboard");
 
-      wrapper.vm.dashboardData.name = "New Dashboard";
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -262,9 +275,8 @@ describe("AddDashboard", () => {
 
     it("should reset dashboardData after successful submission", async () => {
       wrapper = createWrapper();
+      stubFormWith("Test Dashboard", "Test Description");
 
-      wrapper.vm.dashboardData.name = "Test Dashboard";
-      wrapper.vm.dashboardData.description = "Test Description";
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -277,8 +289,8 @@ describe("AddDashboard", () => {
 
     it("should show a positive notification on success", async () => {
       wrapper = createWrapper();
+      stubFormWith("Test Dashboard");
 
-      wrapper.vm.dashboardData.name = "Test Dashboard";
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -298,7 +310,7 @@ describe("AddDashboard", () => {
         label: "Folder 1",
       });
 
-      wrapper.vm.dashboardData.name = "Folder Dashboard";
+      stubFormWith("Folder Dashboard");
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -313,12 +325,8 @@ describe("AddDashboard", () => {
       wrapper = createWrapper();
 
       // Stub the form ref so validate() resolves false.
-      wrapper.vm.addDashboardForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
+      stubFormWith("Anything", "", { valid: false });
 
-      wrapper.vm.dashboardData.name = "Anything";
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -334,7 +342,7 @@ describe("AddDashboard", () => {
       );
 
       wrapper = createWrapper();
-      wrapper.vm.dashboardData.name = "Test Dashboard";
+      stubFormWith("Test Dashboard");
       await wrapper.vm.submit();
       await flushPromises();
 
@@ -346,7 +354,7 @@ describe("AddDashboard", () => {
       vi.mocked(dashboardService.create).mockRejectedValueOnce({});
 
       wrapper = createWrapper();
-      wrapper.vm.dashboardData.name = "Test Dashboard";
+      stubFormWith("Test Dashboard");
       await wrapper.vm.submit();
       await flushPromises();
 

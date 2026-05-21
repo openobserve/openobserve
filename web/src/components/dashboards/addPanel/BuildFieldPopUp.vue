@@ -15,8 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px">
-    <div>
+  <div
+    data-test="dashboard-build-field-popup-container"
+    style="padding: 3px 16px 16px 16px; display: flex; gap: 16px"
+  >
+    <div data-test="dashboard-build-field-popup-left-section">
       <OInput
         data-test="dashboard-x-item-input"
         :label="t('common.label')"
@@ -26,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SortByBtnGrp :fieldObj="modelValue" />
       </div>
     </div>
-    <div>
+    <div data-test="dashboard-build-field-popup-right-section">
       <div v-if="!customQuery && !modelValue.isDerived" class="tw:mr-1 tw:mb-2">
         <DynamicFunctionPopUp
           :modelValue="modelValue"

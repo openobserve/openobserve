@@ -15,14 +15,12 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import BillingService from "@/services/billings";
 import InvoiceTable from "./invoiceTable.vue";
 
-installQuasar();
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

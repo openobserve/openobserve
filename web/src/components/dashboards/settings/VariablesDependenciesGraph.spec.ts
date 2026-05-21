@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 
@@ -30,7 +29,6 @@ vi.mock("../panels/ChartRenderer.vue", () => ({
   default: MockChartRenderer
 }));
 
-installQuasar();
 
 describe("VariablesDependenciesGraph", () => {
   let wrapper: VueWrapper<any>;
@@ -239,7 +237,7 @@ describe("VariablesDependenciesGraph", () => {
 
   describe("Component Styling and Layout", () => {
     it("should have correct container styling", () => {
-      const container = wrapper.find('div');
+      const container = wrapper.find('[data-test="dashboard-variables-dependencies-graph-container"]');
       expect(container.attributes('style')).toContain('height: 100%');
       expect(container.attributes('style')).toContain('width: 100%');
     });

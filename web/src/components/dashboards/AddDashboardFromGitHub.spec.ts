@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddDashboardFromGitHub from "./AddDashboardFromGitHub.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -43,13 +42,58 @@ const s3FileListXml = (folderPath: string, files: string[]): string => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${keys}\n</ListBucketResult>`;
 };
 
-installQuasar({ plugins: [] });
 
 import dashboardsService from "@/services/dashboards";
 
-// ── ODialog / ODrawer / OButton stubs ────────────────────────────────────────
-// Each renders the slots the component relies on so children remain queryable
-// in tests, and re-emits the events the test suite drives state through.
+const OIconStub = {
+  name: "OIcon",
+  props: ["name", "size"],
+  template: '<span class="OIcon">{{ name }}</span>',
+};
+
+const OSpinnerStub = {
+  name: "OSpinner",
+  props: ["size"],
+  template: '<div data-test-stub="o-spinner" :data-size="size"></div>',
+};
+
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "placeholder", "clearable"],
+  emits: ["update:modelValue"],
+  template: `
+    <div data-test-stub="o-input">
+      <slot name="icon-left" />
+      <input
+        :value="modelValue"
+        :placeholder="placeholder"
+        :data-test="$attrs['data-test']"
+        @input="$emit('update:modelValue', $event.target.value)"
+      />
+    </div>
+  `,
+};
+
+const OCheckboxStub = {
+  name: "OCheckbox",
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template:
+    '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+};
+
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options", "label"],
+  emits: ["update:modelValue"],
+  template: `
+    <div data-test-stub="o-select" :data-test="$attrs['data-test']">
+      <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+        <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+      </select>
+    </div>
+  `,
+};
 const ODrawerStub = {
   name: "ODrawer",
   props: [
@@ -171,44 +215,11 @@ describe("AddDashboardFromGitHub Component", () => {
           ODrawer: ODrawerStub,
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          "OIcon": {
-            template: '<span class="OIcon">{{ $attrs.name }}</span>',
-          },
-          "q-input": {
-            template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-list": {
-            template: '<ul class="q-list"><slot /></ul>',
-          },
-          "q-item": {
-            template:
-              '<li class="q-item" @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></li>',
-            emits: ["click"],
-          },
-          "q-item-section": {
-            template: '<div class="q-item-section"><slot /></div>',
-          },
-          "q-item-label": {
-            template: '<span class="q-item-label"><slot /></span>',
-          },
-          "q-checkbox": {
-            template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-select": {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
-            props: ["modelValue", "options"],
-          },
-          AddFolder: {
-            template: '<div class="add-folder-mock"></div>',
-            emits: ["update:modelValue", "close"],
-          },
+          OIcon: OIconStub,
+          OSpinner: OSpinnerStub,
+          OInput: OInputStub,
+          OCheckbox: OCheckboxStub,
+          OSelect: OSelectStub,
         },
       },
     });
@@ -243,9 +254,12 @@ describe("AddDashboardFromGitHub Component", () => {
 
   afterEach(() => {
     if (wrapper) {
-      wrapper.unmount();
+      try {
+        wrapper.unmount();
+      } catch {
+        // Component may already be destroyed — ignore unmount errors
+      }
     }
-    vi.unstubAllGlobals();
   });
 
   describe("Component Initialization", () => {
@@ -600,10 +614,7 @@ describe("AddDashboardFromGitHub Component", () => {
       });
       await flushPromises();
 
-      expect(wrapper.vm.selectedFolderObj).toEqual({
-        label: "New Folder",
-        value: "new-folder-id",
-      });
+      expect(wrapper.vm.selectedFolderObj).toBe("new-folder-id");
     });
 
     it("should not update selectedFolderObj when newFolder has no data", async () => {
@@ -707,7 +718,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
       wrapper = createWrapper({ modelValue: false });
       wrapper.vm.selectedDashboards = [preloadedDashboard];
-      wrapper.vm.selectedFolderObj = { label: "Old Folder", value: "old" };
+      wrapper.vm.selectedFolderObj = "old";
       await wrapper.vm.handleNext();
       await flushPromises();
 
@@ -847,7 +858,7 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
       wrapper.vm.showFolderSelection = true;
-      wrapper.vm.selectedFolderObj = { label: "default", value: "default" };
+      wrapper.vm.selectedFolderObj = "default";
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
@@ -901,7 +912,7 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper.vm.selectedDashboards = [
         { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
       ];
-      wrapper.vm.selectedFolderObj = { label: "default", value: "default" };
+      wrapper.vm.selectedFolderObj = "default";
       wrapper.vm.showFolderSelection = true;
       await wrapper.vm.$nextTick();
 

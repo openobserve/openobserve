@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ScriptEditor from '@/components/actionScripts/ScriptEditor.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('axios');
@@ -11,7 +10,6 @@ vi.mock('vue-i18n', () => ({
   })
 }));
 
-installQuasar();
 
 describe('ScriptEditor.vue', () => {
   let wrapper: VueWrapper;

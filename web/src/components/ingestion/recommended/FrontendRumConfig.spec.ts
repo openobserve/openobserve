@@ -16,7 +16,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import FrontendRumConfig from "@/components/ingestion/recommended/FrontendRumConfig.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
@@ -32,7 +31,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-installQuasar();
 
 describe("FrontendRumConfig Component", () => {
   let wrapper: any = null;

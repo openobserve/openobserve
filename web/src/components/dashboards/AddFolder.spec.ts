@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFolder from "./AddFolder.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({
@@ -128,34 +126,54 @@ describe("AddFolder", () => {
     expect(wrapper.vm.folderData.description).toBe("Test description");
   });
 
-  it("should update folder name when input changes", async () => {
+  // Helper: stub the addFolderForm ref so submit can pass through validation
+  // and supplies the form values that onSubmit reads.
+  const stubFormWith = (
+    wrapper: any,
+    name: string,
+    description = "",
+    { valid = true }: { valid?: boolean } = {},
+  ) => {
+    wrapper.vm.addFolderForm = {
+      validate: vi.fn().mockResolvedValue(valid),
+      resetValidation: vi.fn(),
+      form: {
+        state: {
+          values: { name, description },
+        },
+      },
+    };
+  };
+
+  it("should update folder name via OForm field setter", async () => {
     const wrapper = createWrapper();
 
-    const nameInput = wrapper.find('[data-test="dashboard-folder-add-name"]');
-    await nameInput.setValue("My New Folder");
+    const formRef = wrapper.vm.addFolderForm;
+    expect(formRef).toBeTruthy();
+    formRef.form.setFieldValue("name", "My New Folder");
+    await wrapper.vm.$nextTick();
 
-    expect(wrapper.vm.folderData.name).toBe("My New Folder");
+    expect(formRef.form.state.values.name).toBe("My New Folder");
   });
 
-  it("should update folder description when input changes", async () => {
+  it("should update folder description via OForm field setter", async () => {
     const wrapper = createWrapper();
 
-    const descInput = wrapper.find(
-      '[data-test="dashboard-folder-add-description"]',
-    );
-    await descInput.setValue("My folder description");
+    const formRef = wrapper.vm.addFolderForm;
+    expect(formRef).toBeTruthy();
+    formRef.form.setFieldValue("description", "My folder description");
+    await wrapper.vm.$nextTick();
 
-    expect(wrapper.vm.folderData.description).toBe("My folder description");
+    expect(formRef.form.state.values.description).toBe(
+      "My folder description",
+    );
   });
 
   it("should emit update:modelValue on successful folder creation", async () => {
     const wrapper = createWrapper({ editMode: false });
+    stubFormWith(wrapper, "Test Folder");
 
-    wrapper.vm.folderData.name = "Test Folder";
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -163,11 +181,9 @@ describe("AddFolder", () => {
 
   it("should emit update:modelValue on successful folder update in edit mode", async () => {
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
+    stubFormWith(wrapper, "Test Folder", "Test description");
 
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -175,12 +191,9 @@ describe("AddFolder", () => {
 
   it("should not emit update:modelValue when name is empty (validation fails)", async () => {
     const wrapper = createWrapper();
+    stubFormWith(wrapper, "", "", { valid: false });
 
-    wrapper.vm.folderData.name = "";
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
@@ -188,12 +201,9 @@ describe("AddFolder", () => {
 
   it("should not emit update:modelValue when name is whitespace-only", async () => {
     const wrapper = createWrapper();
+    stubFormWith(wrapper, "   ", "", { valid: false });
 
-    wrapper.vm.folderData.name = "   ";
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
@@ -213,12 +223,9 @@ describe("AddFolder", () => {
     );
 
     const wrapper = createWrapper({ editMode: false });
+    stubFormWith(wrapper, "Valid Folder");
 
-    wrapper.vm.folderData.name = "Valid Folder";
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     // No update:modelValue should be emitted on failure
@@ -232,11 +239,9 @@ describe("AddFolder", () => {
     );
 
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
+    stubFormWith(wrapper, "Test Folder", "Test description");
 
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
@@ -244,9 +249,7 @@ describe("AddFolder", () => {
 
   it("submit() should trigger onSubmit.execute", async () => {
     const wrapper = createWrapper({ editMode: false });
-
-    wrapper.vm.folderData.name = "Programmatic Folder";
-    await flushPromises();
+    stubFormWith(wrapper, "Programmatic Folder");
 
     await wrapper.vm.submit();
     await flushPromises();
@@ -256,13 +259,9 @@ describe("AddFolder", () => {
 
   it("should reset folder data after successful creation", async () => {
     const wrapper = createWrapper({ editMode: false });
+    stubFormWith(wrapper, "Folder To Reset", "desc");
 
-    wrapper.vm.folderData.name = "Folder To Reset";
-    wrapper.vm.folderData.description = "desc";
-    await flushPromises();
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
+    await wrapper.vm.submit();
     await flushPromises();
 
     expect(wrapper.vm.folderData.name).toBe("");

@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
 
 // Mock Leaflet
@@ -155,7 +154,6 @@ Object.defineProperty(window, 'removeEventListener', {
   value: removeEventListenerSpy,
 });
 
-installQuasar();
 
 describe("GeoMapRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -520,14 +518,12 @@ describe("GeoMapRenderer", () => {
 
     it("should have correct wrapper div styling", () => {
       wrapper = createWrapper();
-      
-      const wrapperDivs = wrapper.findAll('div');
-      expect(wrapperDivs.length).toBeGreaterThan(0);
-      
-      const firstDiv = wrapperDivs[0];
-      expect(firstDiv.attributes('style')).toContain('padding: 5px');
-      expect(firstDiv.attributes('style')).toContain('height: 100%');
-      expect(firstDiv.attributes('style')).toContain('width: 100%');
+
+      const rootDiv = wrapper.find('[data-test="dashboard-geomap-renderer"]');
+      expect(rootDiv.exists()).toBe(true);
+      expect(rootDiv.attributes('style')).toContain('padding: 5px');
+      expect(rootDiv.attributes('style')).toContain('height: 100%');
+      expect(rootDiv.attributes('style')).toContain('width: 100%');
     });
   });
 

@@ -135,9 +135,6 @@ describe("Condition Component - OR Operator Tests", () => {
       }
     });
 
-    const notifyMock = vi.fn();
-    wrapper.vm.$q.notify = notifyMock;
-
     await flushPromises();
     await wrapper.vm.getFields();
     await flushPromises();

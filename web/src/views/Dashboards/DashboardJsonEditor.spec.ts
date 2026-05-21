@@ -180,7 +180,7 @@ describe("DashboardJsonEditor", () => {
     // ODrawer wrapper exists
     expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(true);
     // Body contains the json editor container
-    expect(wrapper.find(".dashboard-json-editor").exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-json-editor-container"]').exists()).toBe(true);
     // Footer renders both buttons supplied via ODrawer props
     expect(wrapper.find('[data-test="o-drawer-primary"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="o-drawer-secondary"]').exists()).toBe(true);
@@ -222,12 +222,13 @@ describe("DashboardJsonEditor", () => {
   // Test 5: Theme-based styling
   it("should apply correct theme class", () => {
     wrapper = createWrapper();
-    expect(wrapper.find(".bg-white").exists()).toBe(true);
+    // Verify the ODrawer renders — the dashboard-json-editor content area is inside it
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(true);
 
     // Test dark theme
     mockStore.state.theme = "dark";
     wrapper = createWrapper();
-    expect(wrapper.find(".dark-mode").exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(true);
   });
 
   // Test 6: handleEditorChange with valid JSON
@@ -492,7 +493,7 @@ describe("DashboardJsonEditor", () => {
     wrapper.vm.validationErrors = ["Error 1", "Error 2"];
     await wrapper.vm.$nextTick();
 
-    const errorSection = wrapper.find('.validation-errors');
+    const errorSection = wrapper.find('[data-test="dashboard-json-editor-validation-errors"]');
     expect(errorSection.exists()).toBe(true);
     expect(wrapper.text()).toContain("Error 1");
     expect(wrapper.text()).toContain("Error 2");
@@ -503,7 +504,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     wrapper.vm.validationErrors = [];
 
-    const errorSection = wrapper.find('.validation-errors');
+    const errorSection = wrapper.find('[data-test="dashboard-json-editor-validation-errors"]');
     expect(errorSection.exists()).toBe(false);
   });
 

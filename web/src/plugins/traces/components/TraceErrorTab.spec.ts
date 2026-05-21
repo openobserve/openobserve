@@ -14,23 +14,30 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { tempQuasarPlugin } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
+tempQuasarPlugin();
 
-// ─── Quasar mock — override useQuasar with a notify spy ────────────────────
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
+// ─── Toast & Quasar mocks ───────────────────────────────────────────────────
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  toastRecords: [],
+  useToast: () => ({ toast: mockToast, toasts: [] }),
 }));
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    useQuasar: () => ({ notify: mockNotify, dialog: vi.fn() }),
+    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
   };
 });
 
@@ -48,7 +55,7 @@ import TraceErrorTab from "./TraceErrorTab.vue";
 // ─── Default mock helpers ──────────────────────────────────────────────────
 
 function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
-  return {
+  const merged = {
     hasSpanError: false,
     hasExceptionEvents: [] as any[],
     spanStatusCode: null as string | null,
@@ -60,6 +67,19 @@ function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
     errorBannerMessage: "" as string,
     statusCodeTitle: "" as string,
     ...overrides,
+  };
+
+  return {
+    hasSpanError: ref(merged.hasSpanError),
+    hasExceptionEvents: ref(merged.hasExceptionEvents),
+    spanStatusCode: ref(merged.spanStatusCode),
+    spanGrpcStatusCode: ref(merged.spanGrpcStatusCode),
+    spanErrorType: ref(merged.spanErrorType),
+    spanDbResponseStatusCode: ref(merged.spanDbResponseStatusCode),
+    spanProcessExitCode: ref(merged.spanProcessExitCode),
+    errorBannerTitle: ref(merged.errorBannerTitle),
+    errorBannerMessage: ref(merged.errorBannerMessage),
+    statusCodeTitle: ref(merged.statusCodeTitle),
   };
 }
 
@@ -615,7 +635,7 @@ describe("TraceErrorTab", () => {
         );
         expect(expandedRow.text()).toContain("Stacktrace:");
         // Python-specific formatting
-        expect(expandedRow.find(".stacktrace-content").html()).toContain(
+        expect(expandedRow.find('[data-test="exception-stacktrace-container"]').html()).toContain(
           "stack-file",
         );
       });
@@ -650,7 +670,7 @@ describe("TraceErrorTab", () => {
           const expandedRow = wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
           );
-          expect(expandedRow.find(".copy-btn").exists()).toBe(false);
+          expect(expandedRow.find('[data-test="exception-copy-stacktrace-btn"]').exists()).toBe(false);
         });
       });
     });
@@ -669,7 +689,7 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         expect(copyBtn.exists()).toBe(true);
 
         await copyBtn.trigger("click");
@@ -684,14 +704,14 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockNotify).toHaveBeenCalledWith(
+        expect(mockToast).toHaveBeenCalledWith(
           expect.objectContaining({
             message: "Stacktrace copied to clipboard",
-            color: "positive",
+            variant: "success",
           }),
         );
       });

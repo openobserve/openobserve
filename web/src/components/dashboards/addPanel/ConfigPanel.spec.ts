@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { computed } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
@@ -28,7 +27,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
-installQuasar();
 
 const mockDashboardPanelData = {
   data: {
@@ -261,10 +259,10 @@ describe("ConfigPanel", () => {
     it("should update description when input changes", async () => {
       wrapper = createWrapper();
 
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
-      await descriptionInput.setValue("New description");
+      await descriptionInput.vm.$emit("update:modelValue", "New description");
 
       expect(wrapper.vm.dashboardPanelData.data.description).toBe(
         "New description",
@@ -371,11 +369,11 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const stepValueInput = wrapper.find(
+      const stepValueInput = wrapper.findComponent(
         '[data-test="dashboard-config-step-value"]',
       );
       if (stepValueInput.exists()) {
-        await stepValueInput.setValue("60");
+        await stepValueInput.vm.$emit("update:modelValue", "60");
         expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("60");
       } else {
         // Just verify the component exists
@@ -442,10 +440,10 @@ describe("ConfigPanel", () => {
     it("should emit configuration changes", async () => {
       wrapper = createWrapper();
 
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
-      await descriptionInput.setValue("Updated description");
+      await descriptionInput.vm.$emit("update:modelValue", "Updated description");
 
       // Check if the component data was updated
       expect(wrapper.vm.dashboardPanelData.data.description).toBe(
@@ -490,10 +488,10 @@ describe("ConfigPanel", () => {
     it("should preserve configuration when switching modes", async () => {
       wrapper = createWrapper({}, { promqlMode: false });
 
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
-      await descriptionInput.setValue("Test description");
+      await descriptionInput.vm.$emit("update:modelValue", "Test description");
 
       // Verify description was set
       expect(wrapper.vm.dashboardPanelData.data.description).toBe(
@@ -526,11 +524,11 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const stepValueInput = wrapper.find(
+      const stepValueInput = wrapper.findComponent(
         '[data-test="dashboard-config-step-value"]',
       );
       if (stepValueInput.exists()) {
-        await stepValueInput.setValue("-1");
+        await stepValueInput.vm.$emit("update:modelValue", "-1");
         expect(
           wrapper.vm.dashboardPanelData.data.config.step_value,
         ).toBeDefined();
@@ -543,11 +541,11 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const stepValueInput = wrapper.find(
+      const stepValueInput = wrapper.findComponent(
         '[data-test="dashboard-config-step-value"]',
       );
       if (stepValueInput.exists()) {
-        await stepValueInput.setValue("invalid");
+        await stepValueInput.vm.$emit("update:modelValue", "invalid");
         expect(
           wrapper.vm.dashboardPanelData.data.config.step_value,
         ).toBeDefined();
@@ -872,17 +870,14 @@ describe("ConfigPanel", () => {
     it("should handle top results others when no breakdown field", () => {
       wrapper = createWrapper(); // Default has empty breakdown
 
-      const topResultsOthersToggle = wrapper.find(
+      const topResultsOthersToggle = wrapper.findComponent(
         '[data-test="dashboard-config-top_results_others"]',
       );
       // The toggle exists for line charts even without breakdown
       expect(topResultsOthersToggle.exists()).toBe(true);
 
-      // Check if it has disabled attribute or class
-      const isDisabled =
-        topResultsOthersToggle.attributes("disabled") !== undefined ||
-        topResultsOthersToggle.classes().includes("disabled");
-      expect(isDisabled).toBe(true);
+      // The OSwitch should have disabled=true prop because breakdown is empty
+      expect(topResultsOthersToggle.props("disabled")).toBe(true);
     });
   });
 
@@ -983,11 +978,11 @@ describe("ConfigPanel", () => {
     it("should update no value replacement when input changes", async () => {
       wrapper = createWrapper();
 
-      const noValueReplacementInput = wrapper.find(
+      const noValueReplacementInput = wrapper.findComponent(
         '[data-test="dashboard-config-no-value-replacement"]',
       );
       if (noValueReplacementInput.exists()) {
-        await noValueReplacementInput.setValue("N/A");
+        await noValueReplacementInput.vm.$emit("update:modelValue", "N/A");
         expect(
           wrapper.vm.dashboardPanelData.data.config.no_value_replacement,
         ).toBe("N/A");
@@ -1249,14 +1244,14 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper();
       const emitSpy = vi.spyOn(wrapper.vm, "$emit");
 
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
 
       // Rapid changes
-      await descriptionInput.setValue("A");
-      await descriptionInput.setValue("AB");
-      await descriptionInput.setValue("ABC");
+      await descriptionInput.vm.$emit("update:modelValue", "A");
+      await descriptionInput.vm.$emit("update:modelValue", "AB");
+      await descriptionInput.vm.$emit("update:modelValue", "ABC");
 
       // Should not emit for every character change
       expect(emitSpy).not.toHaveBeenCalledTimes(3);
@@ -1561,10 +1556,10 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper();
 
       const specialCharsDescription = "Special chars: <>\"'&\n\t\n\\/@#$%^&*()";
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
-      await descriptionInput.setValue(specialCharsDescription);
+      await descriptionInput.vm.$emit("update:modelValue", specialCharsDescription);
 
       expect(wrapper.vm.dashboardPanelData.data.description).toBe(
         specialCharsDescription,
@@ -1575,10 +1570,10 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper();
 
       const longDescription = "A".repeat(10000); // Very long description
-      const descriptionInput = wrapper.find(
+      const descriptionInput = wrapper.findComponent(
         '[data-test="dashboard-config-description"]',
       );
-      await descriptionInput.setValue(longDescription);
+      await descriptionInput.vm.$emit("update:modelValue", longDescription);
 
       expect(wrapper.vm.dashboardPanelData.data.description).toBe(
         longDescription,
@@ -1589,12 +1584,11 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const stepValueInput = wrapper.find(
+      const stepValueInput = wrapper.findComponent(
         '[data-test="dashboard-config-step-value"]',
       );
       if (stepValueInput.exists()) {
-        await stepValueInput.trigger("focus");
-        await stepValueInput.setValue("30");
+        await stepValueInput.vm.$emit("update:modelValue", "30");
 
         expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("30");
       }
@@ -1748,11 +1742,11 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const stepValueInput = wrapper.find(
+      const stepValueInput = wrapper.findComponent(
         '[data-test="dashboard-config-step-value"]',
       );
       if (stepValueInput.exists()) {
-        await stepValueInput.setValue("30.5");
+        await stepValueInput.vm.$emit("update:modelValue", "30.5");
         expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(
           "30.5",
         );
@@ -1980,7 +1974,7 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({}, { promqlMode: true });
       await wrapper.vm.$nextTick();
 
-      const formElements = wrapper.findAll("input, select, textarea, button");
+      const formElements = wrapper.findAll("[data-test]");
       expect(formElements.length).toBeGreaterThan(0);
 
       // Each form element should be keyboard accessible
@@ -2308,11 +2302,11 @@ describe("ConfigPanel", () => {
 
       wrapper = createWrapper({ dashboardPanelData: tableData });
 
-      const rowsPerPageInput = wrapper.find(
+      const rowsPerPageInput = wrapper.findComponent(
         '[data-test="dashboard-config-rows-per-page"]',
       );
       if (rowsPerPageInput.exists()) {
-        await rowsPerPageInput.setValue(25);
+        await rowsPerPageInput.vm.$emit("update:modelValue", 25);
         expect(
           wrapper.vm.dashboardPanelData.data.config
             .table_pagination_rows_per_page,
@@ -2423,7 +2417,7 @@ describe("ConfigPanel", () => {
   describe("Search Bar Rendering", () => {
     it("should render the config-search-wrapper for non-custom_chart panels", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".config-search-wrapper").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-search-wrapper"]').exists()).toBe(true);
     });
 
     it("should NOT render config-search-wrapper for custom_chart panel type", () => {
@@ -2432,13 +2426,13 @@ describe("ConfigPanel", () => {
         data: { ...mockDashboardPanelData.data, type: "custom_chart" },
       };
       wrapper = createWrapper({ dashboardPanelData: customChartData });
-      expect(wrapper.find(".config-search-wrapper").exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-search-wrapper"]').exists()).toBe(false);
     });
 
     it("should render the expand/collapse toggle button", () => {
       wrapper = createWrapper();
       // The toggle-all button appears inside config-search-wrapper
-      const btn = wrapper.find(".config-search-wrapper button");
+      const btn = wrapper.find('[data-test="dashboard-config-toggle-all-sections-btn"]');
       expect(btn.exists()).toBe(true);
     });
   });
@@ -2623,21 +2617,21 @@ describe("ConfigPanel", () => {
   describe("No results empty state", () => {
     it("is not shown when no search query", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".config-no-results").exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-no-results"]').exists()).toBe(false);
     });
 
     it("is shown when search query matches nothing", async () => {
       wrapper = createWrapper();
       wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".config-no-results").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-no-results"]').exists()).toBe(true);
     });
 
     it("displays the search query text in the empty state message", async () => {
       wrapper = createWrapper();
       wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".config-no-results").text()).toContain("zzznomatch_xyz_abc");
+      expect(wrapper.find('[data-test="dashboard-config-no-results"]').text()).toContain("zzznomatch_xyz_abc");
     });
 
     it("is hidden again when search is cleared", async () => {
@@ -2646,15 +2640,15 @@ describe("ConfigPanel", () => {
       await wrapper.vm.$nextTick();
       wrapper.vm.searchQuery = "";
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".config-no-results").exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-no-results"]').exists()).toBe(false);
     });
   });
 
   describe("Section expansion items render", () => {
-    it("renders q-expansion-item for general section", () => {
+    it("renders OCollapsible for general section", () => {
       wrapper = createWrapper();
       // The general section expansion item uses isSectionVisible('general') via v-show
-      const expansionItems = wrapper.findAllComponents({ name: "QExpansionItem" });
+      const expansionItems = wrapper.findAllComponents({ name: "OCollapsible" });
       expect(expansionItems.length).toBeGreaterThan(0);
     });
   });

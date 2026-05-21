@@ -1,5 +1,6 @@
 ﻿<template>
   <div
+    data-test="dynamic-function-popup-root"
     :class="
       !customQuery && !fields.isDerived
         ? 'tw:flex tw:gap-2'
@@ -7,10 +8,10 @@
     "
   >
     <div style="width: auto; padding-right: 12px; padding-top: 12px">
-      <div class="text-label-bold tw:pb-3">Property</div>
+      <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-label-normal tw:text-sm">Label</div>
+          <div class="text-label-normal tw:text-sm" data-test="dynamic-function-popup-label-text">Label</div>
           <input
             v-model="fields.label"
             :class="[

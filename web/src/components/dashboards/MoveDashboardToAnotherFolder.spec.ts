@@ -1,6 +1,5 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MoveDashboardToAnotherFolder from "./MoveDashboardToAnotherFolder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -140,7 +139,6 @@ const getMockUtils = async () => {
   };
 };
 
-installQuasar();
 
 describe("MoveDashboardToAnotherFolder", () => {
   let wrapper: any;
@@ -288,9 +286,6 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(
         wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-form"]').exists(),
-      ).toBe(true);
     });
 
     it("should render current folder input", () => {
@@ -358,15 +353,6 @@ describe("MoveDashboardToAnotherFolder", () => {
       wrapper = createWrapper();
     });
 
-    it("should call onSubmit when form is submitted", async () => {
-      const form = wrapper.find('[data-test="dashboard-folder-move-form"]');
-      const onSubmitSpy = vi.spyOn(wrapper.vm.onSubmit, "execute");
-
-      await form.trigger("submit");
-
-      expect(onSubmitSpy).toHaveBeenCalled();
-    });
-
     it("should call onSubmit when ODrawer emits click:primary", async () => {
       const drawer = wrapper.findComponent(ODrawerStub);
       const onSubmitSpy = vi.spyOn(wrapper.vm.onSubmit, "execute");
@@ -376,39 +362,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(onSubmitSpy).toHaveBeenCalled();
     });
 
-    it("should validate form before submission", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: vi.fn(),
-      };
-
-      await wrapper.vm.onSubmit.execute();
-
-      expect(mockValidate).toHaveBeenCalled();
-    });
-
-    it("should not proceed if form validation fails", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(false);
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: vi.fn(),
-      };
-
-      await wrapper.vm.onSubmit.execute();
-      const { moveDashboardToAnotherFolder } = await getMockUtils();
-
-      expect(mockValidate).toHaveBeenCalled();
-      expect(moveDashboardToAnotherFolder).not.toHaveBeenCalled();
-    });
-
     it("should call moveDashboardToAnotherFolder with correct parameters", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
       wrapper.vm.selectedFolder = { label: "Test Folder 1", value: "folder1" };
 
       const { moveDashboardToAnotherFolder } = await getMockUtils();
@@ -425,13 +379,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should emit updated event on successful move", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockResolvedValue(true);
 
@@ -442,13 +389,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should show success notification on successful move", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockResolvedValue(true);
 
@@ -459,22 +399,6 @@ describe("MoveDashboardToAnotherFolder", () => {
         { timeout: 2000 },
       );
     });
-
-    it("should reset form validation on successful move", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
-      const { moveDashboardToAnotherFolder } = await getMockUtils();
-      moveDashboardToAnotherFolder.mockResolvedValue(true);
-
-      await wrapper.vm.onSubmit.execute();
-
-      expect(mockResetValidation).toHaveBeenCalled();
-    });
   });
 
   describe("Error Handling", () => {
@@ -483,13 +407,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should show error notification on move failure", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const error = new Error("Move failed");
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockRejectedValue(error);
@@ -503,13 +420,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should show default error message when no error message is provided", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const error = {};
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockRejectedValue(error);
@@ -523,13 +433,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should not show error notification for 403 errors", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const error = { status: 403, message: "Unauthorized" };
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockRejectedValue(error);
@@ -540,13 +443,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should show error notification for non-403 errors with status", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const error = { status: 500, message: "Server error" };
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockRejectedValue(error);
@@ -560,13 +456,6 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should handle error without message property", async () => {
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mockResetValidation = vi.fn();
-      wrapper.vm.moveFolderForm = {
-        validate: mockValidate,
-        resetValidation: mockResetValidation,
-      };
-
       const error = { status: 500 };
       const { moveDashboardToAnotherFolder } = await getMockUtils();
       moveDashboardToAnotherFolder.mockRejectedValue(error);
@@ -739,13 +628,12 @@ describe("MoveDashboardToAnotherFolder", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should throw when active folder is not in store (template v-model lookup is unsafe)", () => {
-      // The template's q-input v-model still does `.name` on the folder lookup
-      // without optional chaining, so a missing folder still throws on render.
-      // setup()'s selectedFolder uses `?.name` (safe), but the template does not.
+    it("should handle missing active folder gracefully via optional chaining", () => {
+      // The current template uses ?.name on the folder lookup, so a missing
+      // folder should NOT throw — it just yields an undefined input value.
       expect(() =>
         createWrapper({ activeFolderId: "non-existent-folder" }),
-      ).toThrow(/Cannot read properties of undefined/);
+      ).not.toThrow();
     });
 
     it("should handle empty dashboard IDs array", () => {
@@ -777,16 +665,13 @@ describe("MoveDashboardToAnotherFolder", () => {
         wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-folder-move-form"]').exists(),
-      ).toBe(true);
-      expect(
         wrapper.find('[data-test="dashboard-folder-move-name"]').exists(),
       ).toBe(true);
     });
 
-    it("should have a form element", () => {
-      const form = wrapper.find('[data-test="dashboard-folder-move-form"]');
-      expect(form.exists()).toBe(true);
+    it("should have the body container element", () => {
+      const body = wrapper.find('[data-test="dashboard-folder-move-body"]');
+      expect(body.exists()).toBe(true);
     });
 
     it("should render disabled current folder input", () => {

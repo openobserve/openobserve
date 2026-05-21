@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddTab from "./AddTab.vue";
 
 // Mock vue-router
@@ -152,7 +151,6 @@ const ODrawerStub = {
   inheritAttrs: false,
 };
 
-installQuasar();
 
 describe("AddTab", () => {
   let wrapper: VueWrapper<any>;
@@ -160,7 +158,76 @@ describe("AddTab", () => {
   let mockEditTab: any;
   let mockGetDashboard: any;
 
+  // OForm/OFormInput stubs that expose the minimum shape the component
+  // touches (.form.state.values.name and setFieldValue) plus the form-level
+  // validate / resetValidation methods invoked in setup/onSubmit.
+  const formState = { values: { name: "" } };
+  const OFormStub = {
+    name: "OForm",
+    props: ["defaultValues"],
+    emits: ["submit"],
+    template: `<form data-test-stub="o-form" @submit.prevent="$emit('submit', $event)"><slot /></form>`,
+    methods: {
+      validate() {
+        return Promise.resolve(true);
+      },
+      resetValidation() {
+        return Promise.resolve();
+      },
+    },
+    setup() {
+      // expose state via a `form` object mirroring tanstack/vue-form shape.
+      return {
+        form: {
+          state: formState,
+          setFieldValue(field: string, value: any) {
+            formState.values[field as "name"] = value;
+          },
+        },
+      };
+    },
+  };
+  const OFormInputStub = {
+    name: "OFormInput",
+    props: ["name", "label", "validators", "modelValue", "rules"],
+    emits: ["update:modelValue"],
+    template: `<input
+      data-test="dashboard-add-tab-name"
+      :name="name"
+      :rules="rules"
+      :value="modelValue"
+      @input="onInput"
+    />`,
+    methods: {
+      onInput(event: Event) {
+        const val = (event.target as HTMLInputElement).value;
+        // Mirror the form state so the component's submit reads the latest value.
+        formState.values.name = val;
+        this.$emit("update:modelValue", val);
+      },
+    },
+  };
+
+  // Helper to build a form-shaped mock with the surface the migrated component
+  // touches: validate(), resetValidation(), form.state.values.name, and
+  // form.setFieldValue.
+  const makeFormMock = (validateResult = true, currentName = "") => {
+    const state = { values: { name: currentName } };
+    return {
+      validate: vi.fn().mockResolvedValue(validateResult),
+      resetValidation: vi.fn(),
+      form: {
+        state,
+        setFieldValue(field: string, value: any) {
+          state.values[field as "name"] = value;
+        },
+      },
+    };
+  };
+
   const createWrapper = (props = {}) => {
+    // Reset shared form state between mounts.
+    formState.values.name = "";
     return mount(AddTab, {
       props: {
         dashboardId: "test-dashboard-id",
@@ -171,25 +238,8 @@ describe("AddTab", () => {
         plugins: [],
         stubs: {
           ODrawer: ODrawerStub,
-          "q-form": {
-            template:
-              "<form ref=\"addTabForm\" @submit.prevent=\"$emit('submit', $event)\"><slot /></form>",
-            emits: ["submit"],
-            methods: {
-              validate: () => Promise.resolve(true),
-              resetValidation: () => Promise.resolve(),
-            },
-          },
-          "q-input": {
-            template: `<input
-              :value="modelValue"
-              @input="$emit('update:modelValue', $event.target.value)"
-              data-test="dashboard-add-tab-name"
-              :rules="rules"
-            />`,
-            props: ["modelValue", "label", "rules", "lazy-rules"],
-            emits: ["update:modelValue"],
-          },
+          OForm: OFormStub,
+          OFormInput: OFormInputStub,
         },
       },
     });
@@ -329,7 +379,7 @@ describe("AddTab", () => {
     it("should render form with name input", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find("form").exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
       expect(
         wrapper.find('[data-test="dashboard-add-tab-name"]').exists(),
       ).toBe(true);
@@ -348,11 +398,11 @@ describe("AddTab", () => {
     it("should validate name field with rules", () => {
       wrapper = createWrapper();
 
-      const nameInput = wrapper.find('[data-test="dashboard-add-tab-name"]');
-      expect(nameInput.exists()).toBe(true);
-
-      // Input should have validation rules
-      expect(nameInput.attributes("rules")).toBeDefined();
+      // Migrated form uses OFormInput with :validators prop. Verify the
+      // OFormInput stub received a validators array.
+      const formInput = wrapper.findComponent({ name: "OFormInput" });
+      expect(formInput.exists()).toBe(true);
+      expect(Array.isArray(formInput.props("validators"))).toBe(true);
     });
   });
 
@@ -370,7 +420,9 @@ describe("AddTab", () => {
       const nameInput = wrapper.find('[data-test="dashboard-add-tab-name"]');
       await nameInput.setValue("New Tab Name");
 
-      expect(wrapper.vm.tabData.name).toBe("New Tab Name");
+      // OFormInput stub mirrors typed value into the shared form state; the
+      // component reads it during onSubmit, not via v-model into tabData.
+      expect(formState.values.name).toBe("New Tab Name");
     });
 
     it("should reset form data after successful submission", async () => {
@@ -390,10 +442,9 @@ describe("AddTab", () => {
       wrapper.vm.tabData.name = "New Tab";
 
       // Mock form validation to return true
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -408,10 +459,9 @@ describe("AddTab", () => {
     it("should call addTab when the ODrawer primary button is clicked", async () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "From Primary";
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await findDrawer(wrapper).vm.$emit("click:primary");
       await wrapper.vm.$nextTick();
@@ -428,10 +478,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "New Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -445,10 +494,9 @@ describe("AddTab", () => {
     it("should emit update:open(false) after successful add", async () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "New Tab";
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -461,10 +509,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "New Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -499,10 +546,9 @@ describe("AddTab", () => {
       // tabData is now { tabId: "tab1", name: "Tab 1", panels: [] } from the mock
       wrapper.vm.tabData.name = "Updated Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -519,10 +565,9 @@ describe("AddTab", () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
       wrapper.vm.tabData = { tabId: "tab1", name: "Updated Tab", panels: [] };
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -536,10 +581,9 @@ describe("AddTab", () => {
     it("should emit update:open(false) after successful edit", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
       wrapper.vm.tabData = { tabId: "tab1", name: "Updated Tab", panels: [] };
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -552,10 +596,9 @@ describe("AddTab", () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
       wrapper.vm.tabData.name = "Updated Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -611,10 +654,7 @@ describe("AddTab", () => {
     it("should not submit if form validation fails", async () => {
       wrapper = createWrapper();
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
+      wrapper.vm.addTabForm = makeFormMock(false, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -635,10 +675,9 @@ describe("AddTab", () => {
 
       mockAddTab.mockRejectedValue(conflictError);
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -654,10 +693,9 @@ describe("AddTab", () => {
       const generalError = new Error("Network error");
       mockAddTab.mockRejectedValue(generalError);
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -672,10 +710,9 @@ describe("AddTab", () => {
 
       mockAddTab.mockRejectedValue({});
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -691,10 +728,9 @@ describe("AddTab", () => {
 
       mockEditTab.mockRejectedValue({});
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -726,10 +762,9 @@ describe("AddTab", () => {
       wrapper = createWrapper({ folderId: "custom-folder" });
       wrapper.vm.tabData.name = "Test Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -745,10 +780,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "Test Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -768,10 +802,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "Test Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 
@@ -823,10 +856,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
 
       const mockValidate = vi.fn().mockResolvedValue(true);
-      wrapper.vm.addTabForm = {
-        validate: mockValidate,
-        resetValidation: vi.fn(),
-      };
+      const mock = makeFormMock(true, wrapper.vm.tabData.name);
+      mock.validate = mockValidate;
+      wrapper.vm.addTabForm = mock;
 
       await wrapper.vm.onSubmit.execute();
 
@@ -838,10 +870,9 @@ describe("AddTab", () => {
       wrapper.vm.tabData.name = "Test Tab";
 
       const mockResetValidation = vi.fn();
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: mockResetValidation,
-      };
+      const mock = makeFormMock(true, wrapper.vm.tabData.name);
+      mock.resetValidation = mockResetValidation;
+      wrapper.vm.addTabForm = mock;
 
       await wrapper.vm.onSubmit.execute();
 
@@ -893,10 +924,9 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "Test Tab";
 
-      wrapper.vm.addTabForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn(),
-      };
+      // OForm-shaped mock so the component's submit path can read
+      // addTabForm.value.form.state.values.name without throwing.
+      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
       await wrapper.vm.onSubmit.execute();
 

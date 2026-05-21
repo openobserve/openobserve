@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="categoryIndex"
             class="chart-category-section tw:mb-6"
             :data-category="category.chartLabel"
+            data-test="chart-category-section"
           >
             <div class="tw:text-xl tw:font-semibold tw:mb-3 text-weight-medium">
               {{ category.chartLabel }}

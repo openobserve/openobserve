@@ -16,12 +16,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Stub ODrawer so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
@@ -170,11 +168,13 @@ describe("SelectFolderDropdown", () => {
   it("should emit folder-selected when selectedFolder changes", async () => {
     const wrapper = createWrapper({}, store, router);
 
-    wrapper.vm.selectedFolder = { label: "Folder 1", value: "folder1" };
+    // selectedFolder is now a primitive string id; the watcher emits the
+    // backward-compatible {label, value} object to listeners.
+    wrapper.vm.selectedFolder = "folder1";
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted("folder-selected")).toBeTruthy();
-    expect(wrapper.emitted("folder-selected")![0]).toEqual([
+    expect(wrapper.emitted("folder-selected")!.at(-1)).toEqual([
       { label: "Folder 1", value: "folder1" },
     ]);
   });
@@ -182,19 +182,14 @@ describe("SelectFolderDropdown", () => {
   it("should select default folder initially", () => {
     const wrapper = createWrapper({}, store, router);
 
-    expect(wrapper.vm.selectedFolder).toEqual({
-      label: "default",
-      value: "default",
-    });
+    // selectedFolder is a primitive id string, not an option object.
+    expect(wrapper.vm.selectedFolder).toBe("default");
   });
 
   it("should select active folder if provided", () => {
     const wrapper = createWrapper({ activeFolderId: "folder1" }, store, router);
 
-    expect(wrapper.vm.selectedFolder).toEqual({
-      label: "Folder 1",
-      value: "folder1",
-    });
+    expect(wrapper.vm.selectedFolder).toBe("folder1");
   });
 
   it("should update folder list after adding new folder", async () => {
@@ -206,10 +201,7 @@ describe("SelectFolderDropdown", () => {
     await wrapper.vm.updateFolderList(newFolder);
 
     expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    expect(wrapper.vm.selectedFolder).toEqual({
-      label: "New Folder",
-      value: "newFolder123",
-    });
+    expect(wrapper.vm.selectedFolder).toBe("newFolder123");
   });
 
   it("should handle null newFolder data gracefully", async () => {
@@ -233,7 +225,7 @@ describe("SelectFolderDropdown", () => {
   it("should handle activeFolderId as null", () => {
     const wrapper = createWrapper({ activeFolderId: null }, store, router);
 
-    expect(wrapper.vm.selectedFolder.value).toBe("default");
+    expect(wrapper.vm.selectedFolder).toBe("default");
   });
 
   // ── ODrawer migration coverage ─────────────────────────────────────────
@@ -361,10 +353,7 @@ describe("SelectFolderDropdown", () => {
       });
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      expect(wrapper.vm.selectedFolder).toEqual({
-        label: "Brand New",
-        value: "brand-new",
-      });
+      expect(wrapper.vm.selectedFolder).toBe("brand-new");
     });
   });
 
@@ -376,10 +365,7 @@ describe("SelectFolderDropdown", () => {
         router,
       );
 
-      expect(wrapper.vm.selectedFolder).toEqual({
-        label: "Folder 1",
-        value: "folder1",
-      });
+      expect(wrapper.vm.selectedFolder).toBe("folder1");
 
       // mutate folders so 'folder1' is no longer present — should fall back
       // to the default placeholder.
@@ -388,10 +374,7 @@ describe("SelectFolderDropdown", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.selectedFolder).toEqual({
-        label: "default",
-        value: "default",
-      });
+      expect(wrapper.vm.selectedFolder).toBe("default");
     });
 
     it("computedStyle returns an empty string", () => {

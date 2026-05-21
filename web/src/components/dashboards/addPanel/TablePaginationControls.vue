@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isFirstPage"
         @click="$emit('firstPage')"
         icon-left="first-page"
+        data-test="dashboard-table-pagination-first-page"
       >
       </OButton>
       <OButton
@@ -52,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isFirstPage"
         @click="$emit('prevPage')"
         icon-left="chevron-left"
+        data-test="dashboard-table-pagination-prev-page"
       >
       </OButton>
       <OButton
@@ -61,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isLastPage"
         @click="$emit('nextPage')"
         icon-left="chevron-right"
+        data-test="dashboard-table-pagination-next-page"
       >
       </OButton>
       <OButton
@@ -70,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isLastPage"
         @click="$emit('lastPage')"
         icon-left="last-page"
+        data-test="dashboard-table-pagination-last-page"
       >
       </OButton>
     </template>

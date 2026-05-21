@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -256,13 +255,29 @@ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("ViewDashboard", () => {
   let wrapper: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock native Fullscreen API (not present in JSDOM)
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      writable: true,
+      value: null,
+    });
 
     // Clear global mock spies
     global.mockRouterPush.mockClear();

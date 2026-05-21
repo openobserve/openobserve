@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createI18n } from 'vue-i18n';
 import Functions from './Functions.vue';
 
@@ -19,7 +18,6 @@ const MockRouterView = {
   },
 };
 
-installQuasar({});
 
 describe('Functions.vue', () => {
   let wrapper: any;

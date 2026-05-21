@@ -23,79 +23,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-close="true"
     @keydown.stop
   >
-    <div class="tw:rounded-md">
-      <div class="o2-input">
-        <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pb-2 tw:pl-3 tw:pt-3">
-          <div class="tw:flex tw:items-center tw:w-full">
-            <div class="tw:w-full" data-test="add-destination-title">
-              <div
-                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
-              >
-                External Destination
-                <div>
-                  <OButton variant="ghost" size="icon" v-close-popup>
-                    <OIcon name="cancel" size="xs" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <OSeparator />
-        <div class="tw:flex tw:gap-2 tw:px-4">
-          <OSwitch
-            data-test="create-stream-toggle"
-            class="tw:mb-2 tw:h-[36px] tw:mr-3 tw:mt-3"
-            :label="'Create new Destination'"
-            v-model="createNewDestination"
-          />
+    <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+      <OSwitch
+        data-test="create-stream-toggle"
+        :label="'Create new Destination'"
+        v-model="createNewDestination"
+      />
 
-          <div v-if="createNewDestination" class="tw:mt-2 tw:mb-3 tw:w-full">
-            <!-- Create New Destination Form -->
-            <CreateDestinationForm
-              @created="handleDestinationCreated"
-              @cancel="handleCancel"
-            />
-          </div>
-
-          <!-- Select Existing Destination -->
-          <div v-else class="tw:w-full">
-            <div class="tw:w-full tw:py-1 destination-method-select">
-              <OSelect
-                data-test="external-destination-select"
-                v-model="selectedDestination"
-                :label="'Destination *'"
-                :options="getFormattedDestinations"
-                class="showLabelOnTop"
-                tabindex="0"
-              />
-            </div>
-
-            <!-- Action buttons for existing destination selection -->
-            <div class="tw:flex tw:gap-2 tw:mt-3 tw:mb-3">
-              <OButton
-                v-if="pipelineObj.isEditNode"
-                data-test="add-destination-delete-btn"
-                variant="outline-destructive"
-                size="sm-action"
-                @click="openDeleteDialog"
-              >{{ t("pipeline.deleteNode") }}</OButton>
-              <OButton
-                data-test="add-destination-cancel-btn"
-                variant="outline"
-                size="sm-action"
-                @click="handleCancel"
-              >{{ t('alerts.cancel') }}</OButton>
-              <OButton
-                data-test="add-destination-save-btn"
-                variant="primary"
-                size="sm-action"
-                @click="saveDestination"
-              >{{ t('alerts.save') }}</OButton>
-            </div>
-          </div>
-        </div>
+      <div v-if="createNewDestination" class="tw:w-full">
+        <!-- Create New Destination Form -->
+        <CreateDestinationForm
+          @created="handleDestinationCreated"
+          @cancel="handleCancel"
+        />
       </div>
+
+      <!-- Select Existing Destination -->
+      <template v-else>
+        <OSelect
+          data-test="external-destination-select"
+          v-model="selectedDestination"
+          :label="'Destination *'"
+          :options="getFormattedDestinations"
+          class="destination-method-select"
+          tabindex="0"
+        />
+
+        <!-- Action buttons for existing destination selection -->
+        <div class="tw:flex tw:gap-2">
+          <OButton
+            v-if="pipelineObj.isEditNode"
+            data-test="add-destination-delete-btn"
+            variant="outline-destructive"
+            size="sm-action"
+            @click="openDeleteDialog"
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
+            data-test="add-destination-cancel-btn"
+            variant="outline"
+            size="sm-action"
+            @click="handleCancel"
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            data-test="add-destination-save-btn"
+            variant="primary"
+            size="sm-action"
+            @click="saveDestination"
+          >{{ t('alerts.save') }}</OButton>
+        </div>
+      </template>
     </div>
   </ODrawer>
   <confirm-dialog
@@ -113,11 +89,9 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

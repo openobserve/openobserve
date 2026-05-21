@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
-        <div class="radio-group">
+        <div class="radio-group" data-test="dashboard-tab-delete-radio-group">
           <ORadioGroup v-model="action" orientation="vertical" class="tw:gap-4">
             <div style="display: flex; flex-direction: row">
               <ORadio

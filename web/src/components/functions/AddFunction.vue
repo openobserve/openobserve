@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-    <div class="card-container tw:mb-[0.8rem]">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
+    <div class="card-container tw:mb-[0.8rem] tw:shrink-0">
       <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:flex">
-
-
+    <div class="tw:flex tw:flex-1 tw:min-h-0">
       <div
-        class="tw:flex tw:overflow-auto "
-        :style="{
-          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
-        }"
+        class="tw:flex tw:overflow-hidden tw:min-h-0"
+        :class="[
+          store.state.isAiChatEnabled && !isAddFunctionComponent
+            ? 'tw:w-3/4'
+            : 'tw:w-full',
+        ]"
       >
         <OSplitter
           v-model="splitterModel"
@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :horizontal="false"
         >
           <template v-slot:before>
-            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <div class="add-function-name-input tw:pb-2 o2-input">
+            <div class="tw:px-3 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
+              <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai-reason="''"
                       :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('function.enterFunctionPrompt')"
-                      editor-height="calc(100vh - 194px)"
+                      editor-height="100%"
                       @update:query="handleFunctionUpdate"
                       @language-change="handleLanguageChange"
                       @toggle-nlp-mode="handleToggleNlpMode"
@@ -124,10 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
       </div>
-      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-        <O2AIChat :style="{
-          height: `calc(100vh - (112px + ${heightOffset}px))`
-        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      <div
+        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+        :class="[
+          'tw:w-1/4 tw:max-w-full tw:min-w-[75px]',
+          heightOffset ? 'ai-chat-with-offset' : '',
+          store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+        ]"
+      >
+        <O2AIChat
+          class="tw:h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
+          :is-open="store.state.isAiChatEnabled"
+          @close="store.state.isAiChatEnabled = false"
+          :aiChatInputContext="aiChatInputContext"
+        />
       </div>
     </div>
   </div>  
@@ -686,6 +696,10 @@ export default defineComponent({
   :deep(.date-time-button) {
     width: 100%;
   }
+}
+
+.ai-chat-with-offset {
+  --ai-chat-offset: 75px;
 }
 </style>
 <style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper">
+  <div class="table-wrapper" data-test="dashboard-table-renderer-wrapper">
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"

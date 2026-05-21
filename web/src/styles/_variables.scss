@@ -314,7 +314,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-card-text: #{$o2-gray-1400};         // Card text color
   --o2-popover-background: #{$o2-gray-100};  // Popover background
   --o2-popover-text: #{$o2-gray-1400};      // Popover text
-  
+  --o2-code-bg: #{$o2-gray-200};            // Code block background
+
   // Borders & Dividers
   --o2-border: #{$o2-gray-300};             // Standard borders
   --o2-border-input: #{$o2-gray-500};       // Input field borders
@@ -515,11 +516,12 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-text-3: var(--o2-text-label);
   
   // Component Colors
-  --o2-card-background: #{$o2-dark-gray-1300}; // Card background
+  --o2-card-background: #{$o2-dark-gray-200}; // Card background
   --o2-card-text: #D3D3D3;        // Card text
   --o2-popover-background: #{$o2-dark-gray-1300}; // Popover background
   --o2-popover-text: #D3D3D3;     // Popover text
-  
+  --o2-code-bg: #{$o2-dark-gray-200};    // Code block background
+
   // Borders & Dividers
   --o2-border: #{$o2-dark-gray-800};         // Standard borders
   --o2-border-input: #{$o2-dark-gray-1000};   // Input borders

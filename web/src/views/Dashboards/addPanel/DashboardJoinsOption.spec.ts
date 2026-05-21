@@ -2,7 +2,6 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 
 // Mock composables
@@ -37,7 +36,6 @@ const i18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe("DashboardJoinsOption", () => {
   let wrapper: any;
@@ -64,7 +62,9 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("renders correctly when joins are allowed", () => {
-    expect(wrapper.find(".joins-container").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="dashboard-joins-container"]').exists(),
+    ).toBe(true);
   });
 
   it("adds a new join when add button is clicked", async () => {
@@ -290,7 +290,9 @@ describe("DashboardJoinsOption", () => {
       },
     });
 
-    expect(defaultWrapper.find(".joins-container").exists()).toBe(true);
+    expect(
+      defaultWrapper.find('[data-test="dashboard-joins-container"]').exists(),
+    ).toBe(true);
   });
 
   it("handles stream with special characters", async () => {

@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MarkLineConfig from "@/components/dashboards/addPanel/MarkLineConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -41,7 +40,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("MarkLineConfig", () => {
   let wrapper: any;
@@ -346,12 +344,7 @@ describe("MarkLineConfig", () => {
 
       // Value input should be present for xAxis type
       const valueInputs = wrapper
-        .findAll("input")
-        .filter(
-          (input) =>
-            input.attributes("label") === "Value" ||
-            input.element.getAttribute("data-test")?.includes("value"),
-        );
+        .findAll('[data-test*="dashboard-config-markline-value"]');
       expect(valueInputs.length).toBeGreaterThanOrEqual(0);
     });
 

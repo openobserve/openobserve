@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardSettings from "./DashboardSettings.vue";
 
 // Mock child components
@@ -85,7 +84,6 @@ vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
-installQuasar();
 
 describe("DashboardSettings.vue", () => {
   let wrapper: VueWrapper;
@@ -197,9 +195,9 @@ describe("DashboardSettings.vue", () => {
       store = createMockStore("light");
       wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("bg-white");
+      expect(mainContainer.classes()).toContain("tw:bg-white");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -207,10 +205,10 @@ describe("DashboardSettings.vue", () => {
       store = createMockStore("dark");
       wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       expect(mainContainer.classes()).toContain("dark-mode");
-      expect(mainContainer.classes()).not.toContain("bg-white");
+      expect(mainContainer.classes()).not.toContain("tw:bg-white");
     });
 
     it("should pass the title 'Dashboard Settings' to ODrawer", () => {
@@ -231,7 +229,7 @@ describe("DashboardSettings.vue", () => {
     it("should render splitter with correct model value", () => {
       wrapper = mountComponent();
 
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists()).toBe(true);
       expect(splitter.props("modelValue")).toBe(220);
     });
@@ -393,7 +391,7 @@ describe("DashboardSettings.vue", () => {
     it("should handle splitter model value changes", async () => {
       wrapper = mountComponent();
 
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists()).toBe(true);
 
       // Test initial splitter value
@@ -477,10 +475,10 @@ describe("DashboardSettings.vue", () => {
 
       wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("bg-white");
+      expect(mainContainer.classes()).toContain("tw:bg-white");
     });
 
     it("should handle null theme state", () => {
@@ -490,10 +488,10 @@ describe("DashboardSettings.vue", () => {
 
       wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("bg-white");
+      expect(mainContainer.classes()).toContain("tw:bg-white");
     });
 
     it("should handle empty templates array", () => {

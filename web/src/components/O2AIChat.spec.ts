@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
@@ -109,7 +108,6 @@ vi.mock("@/composables/contextProviders", () => ({
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
 
-installQuasar();
 
 // ── Stub definitions ─────────────────────────────────────────────────────────
 

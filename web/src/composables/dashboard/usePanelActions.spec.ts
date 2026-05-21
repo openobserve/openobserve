@@ -19,10 +19,10 @@ import {
   usePanelAlertCreation,
   usePanelDownload,
 } from "./usePanelActions";
-import { exportFile } from "quasar";
+import { downloadFile } from "@/utils/dom";
 
-vi.mock("quasar", () => ({
-  exportFile: vi.fn(),
+vi.mock("@/utils/dom", () => ({
+  downloadFile: vi.fn(),
 }));
 
 describe("usePanelActions", () => {
@@ -186,12 +186,12 @@ describe("usePanelActions", () => {
 
     it("exports SQL chart data as CSV and shows success notification", () => {
       const deps = makeDeps();
-      (exportFile as any).mockReturnValue(true);
+      (downloadFile as any).mockReturnValue(true);
       const api = usePanelDownload(deps as any);
 
       api.downloadDataAsCSV("chart");
 
-      expect(exportFile).toHaveBeenCalledWith(
+      expect(downloadFile).toHaveBeenCalledWith(
         "chart.csv",
         expect.stringContaining("a,b"),
         "text/csv",
@@ -205,12 +205,12 @@ describe("usePanelActions", () => {
     it("exports PromQL filtered data as JSON", () => {
       const deps = makeDeps();
       deps.panelSchema.value.queryType = "promql";
-      (exportFile as any).mockReturnValue(true);
+      (downloadFile as any).mockReturnValue(true);
       const api = usePanelDownload(deps as any);
 
       api.downloadDataAsJSON("prom");
 
-      expect(exportFile).toHaveBeenCalledWith(
+      expect(downloadFile).toHaveBeenCalledWith(
         "prom.json",
         JSON.stringify(deps.filteredData.value, null, 2),
         "application/json",

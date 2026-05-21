@@ -225,7 +225,7 @@ const getDefaultField = () => {
   return {
     uuid: crypto.randomUUID(),
     name: "",
-    type: "",
+    type: undefined,
     index_type: [],
   };
 };

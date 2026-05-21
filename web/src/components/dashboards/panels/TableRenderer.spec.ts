@@ -19,7 +19,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: (optsRef: any) => ({
     __v_isRef: true,
@@ -132,7 +131,6 @@ import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -196,7 +194,9 @@ describe("TableRenderer", () => {
 
     it("should render the table-wrapper div", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".table-wrapper").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-table-renderer-wrapper"]').exists(),
+      ).toBe(true);
     });
 
     it("should render the TenstackTable with correct data-test attribute", () => {

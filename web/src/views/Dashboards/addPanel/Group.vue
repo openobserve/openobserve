@@ -1,10 +1,15 @@
 <template>
-  <div class="group" :style="`--group-index: ${groupNestedIndex}`">
-    <div class="group-conditions">
+  <div
+    class="group"
+    data-test="dashboard-group"
+    :style="`--group-index: ${groupNestedIndex}`"
+  >
+    <div class="group-conditions" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
         class="condition-group"
+        data-test="dashboard-group-condition-group"
       >
         <Group
           v-if="condition.filterType === 'group'"

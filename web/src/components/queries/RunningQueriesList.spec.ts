@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { QTable } from 'quasar';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import RunningQueriesList from '@/components/queries/RunningQueriesList.vue';
 import store from '@/test/unit/helpers/store';
 
@@ -59,7 +58,6 @@ const mockRows = [
   }
 ];
 
-installQuasar();
 
 describe('RunningQueriesList.vue', () => {
   let wrapper: VueWrapper<any>;

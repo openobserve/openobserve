@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import PipelineIcon from '@/components/icons/PipelineIcon.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('PipelineIcon.vue', () => {
   let wrapper: VueWrapper;

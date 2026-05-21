@@ -29,47 +29,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="stream-routing-container tw:w-full tw:pt-1 tw:pb-3 tw:px-3">
-      <div>
+    <div class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
         <!-- Node Name -->
-        <div class="o2-input tw:w-full tw:py-2">
-          <OInput
-            v-model="nodeName"
-            :label="t('pipeline.nodeName') + ' *'"
-            :error="!!nodeNameError"
-            :error-message="nodeNameError"
-            @update:model-value="nodeNameError = ''"
-            data-test="llm-evaluation-node-name-input"
-          />
-        </div>
+        <OInput
+          v-model="nodeName"
+          :label="t('pipeline.nodeName') + ' *'"
+          :error="!!nodeNameError"
+          :error-message="nodeNameError"
+          @update:model-value="nodeNameError = ''"
+          data-test="llm-evaluation-node-name-input"
+        />
 
         <!-- LLM Span Identifier -->
-        <div class="o2-input tw:w-full tw:py-2">
-          <OSelect
-            v-model="llmSpanIdentifier"
-            :options="streamFields"
-            labelKey="label"
-            valueKey="value"
-            searchable
-            :label="t('pipeline.llmSpanIdentifierLabel')"
-            :loading="loadingFields"
-            data-test="llm-evaluation-span-identifier-select"
-          >
-            <template #empty>
-              <span>{{ t("pipeline.noFieldsFound") }}</span>
-            </template>
-          </OSelect>
-        </div>
+        <OSelect
+          v-model="llmSpanIdentifier"
+          :options="streamFields"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          :label="t('pipeline.llmSpanIdentifierLabel')"
+          :loading="loadingFields"
+          data-test="llm-evaluation-span-identifier-select"
+        >
+          <template #empty>
+            <span>{{ t("pipeline.noFieldsFound") }}</span>
+          </template>
+        </OSelect>
 
         <!-- Evaluation Template Selection -->
-        <div class="o2-input tw:w-full tw:py-2 tw:flex tw:items-center gap-2">
+        <div class="tw:flex tw:items-end tw:gap-2">
           <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
             labelKey="name"
+            valueKey="id"
             :label="t('pipeline.evaluationTemplate')"
-            style="flex: 1"
             :loading="loadingTemplates"
+            class="tw:flex-1"
             data-test="llm-evaluation-template-select"
           >
             <template #empty>
@@ -83,7 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loadingTemplates"
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
-            class="tw:mt-3"
             icon-left="refresh"
           />
         </div>
@@ -96,8 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- Sampling Rate -->
-        <div v-if="enableSampling" class="tw:px-1 tw:mb-2">
-          <div class="tw:text-sm tw:mb-2">
+        <div v-if="enableSampling" class="tw:flex tw:flex-col tw:gap-2">
+          <div class="tw:text-sm">
             {{ t("pipeline.samplingRate") }}:
             {{ (samplingRate * 100).toFixed(0) }}%
           </div>
@@ -132,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="saveLlmEvaluationNode"
           >{{ t('alerts.save') }}</OButton>
         </div>
-      </div>
     </div>
     </div>
   </ODrawer>
@@ -193,7 +187,7 @@ export default defineComponent({
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
     const loadingFields = ref(false);
-    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
+    const selectedTemplate = ref<string | undefined>(undefined);
     const availableTemplates = ref<any[]>([]);
     const loadingTemplates = ref(false);
 
@@ -322,17 +316,13 @@ export default defineComponent({
       await fetchAvailableTemplates();
 
       if (savedTemplate) {
-        // Editing: restore saved template by ID to get full object (needed to display name)
-        const match = availableTemplates.value.find(
-          (t: any) => t.id === savedTemplate,
-        );
-        selectedTemplate.value = match || null;
+        selectedTemplate.value = savedTemplate;
       } else if (
         !pipelineObj.isEditNode &&
         availableTemplates.value.length > 0
       ) {
-        // New node: default to first template
-        selectedTemplate.value = availableTemplates.value[0];
+        // New node: default to first template (only after templates have loaded)
+        selectedTemplate.value = availableTemplates.value[0]?.id || undefined;
       }
     });
 
@@ -376,12 +366,7 @@ export default defineComponent({
         sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
       };
 
-      // Add template if selected, otherwise explicitly set to null (to clear any previously saved value)
-      if (selectedTemplate.value) {
-        nodeData.eval_template = selectedTemplate.value.id;
-      } else {
-        nodeData.eval_template = null;
-      }
+      nodeData.eval_template = selectedTemplate.value || null;
 
       addNode(nodeData);
 

@@ -191,6 +191,7 @@ size="xs"
 
             <!-- Expand button (embedded mode) -->
             <OButton
+              v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
               variant="outline"
               size="icon-xs"
@@ -206,6 +207,7 @@ size="xs"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
+              buttonClass="tw:mr-1!"
               size="icon-xs"
             />
 

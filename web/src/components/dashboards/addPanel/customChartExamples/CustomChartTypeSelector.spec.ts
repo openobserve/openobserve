@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CustomChartTypeSelector from "./CustomChartTypeSelector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -55,7 +54,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
 
 const mountComponent = () =>
   mount(CustomChartTypeSelector, {
@@ -87,7 +85,7 @@ describe("CustomChartTypeSelector", () => {
   });
 
   it("renders chart category sections", () => {
-    const categories = wrapper.findAll("[data-category]");
+    const categories = wrapper.findAll('[data-test="chart-category-section"]');
     expect(categories.length).toBeGreaterThan(0);
   });
 

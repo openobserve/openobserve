@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -32,7 +31,6 @@ vi.mock("@/services/model_pricing", () => ({
 // Component import must come after all vi.mock() declarations.
 import TestModelMatchDialog from "./TestModelMatchDialog.vue";
 
-installQuasar();
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -132,6 +130,28 @@ const OButtonStub = {
   template: `<button data-test="o-button-stub" @click="$emit('click')"><slot /></button>`,
 };
 
+const OInputStub = {
+  name: "OInput",
+  props: ["modelValue", "placeholder"],
+  emits: ["update:modelValue"],
+  template: `
+    <div data-test="o-input-stub">
+      <slot name="icon-left" />
+      <input
+        :value="modelValue"
+        :placeholder="placeholder"
+        @input="$emit('update:modelValue', $event.target.value)"
+      />
+      <slot name="icon-right" />
+    </div>
+  `,
+  methods: {
+    focus() {
+      /* no-op for tests */
+    },
+  },
+};
+
 // ── Mount factory ────────────────────────────────────────────────────────────
 
 function mountDialog(props: Record<string, unknown> = {}) {
@@ -141,6 +161,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
       stubs: {
         ODialog: ODialogStub,
         OButton: OButtonStub,
+        OInput: OInputStub,
         "q-input": QInputStub,
         "OIcon": QIconStub,
         OBadge: OBadgeStub,
@@ -231,6 +252,7 @@ describe("TestModelMatchDialog", () => {
           stubs: {
             ODialog: ODialogStub,
             OButton: OButtonStub,
+            OInput: OInputStub,
             "q-input": QInputStub,
             "OIcon": QIconStub,
             OBadge: OBadgeStub,

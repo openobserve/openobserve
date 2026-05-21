@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabList from "./TabList.vue";
 
 // Mock vue-router
@@ -40,7 +39,6 @@ vi.mock("./AddTab.vue", () => ({
   },
 }));
 
-installQuasar();
 
 describe("TabList", () => {
   let wrapper: VueWrapper<any>;
@@ -259,9 +257,10 @@ describe("TabList", () => {
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.exists()).toBe(true);
 
-      const tooltip = addButton.find('[data-test="tooltip-wrapper"]');
+      // Migrated to OTooltip with :content prop; verify prop instead of DOM.
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Add Tab");
+      expect(tooltip.props("content")).toBe("Add Tab");
     });
 
     it("should open add tab dialog when clicked", async () => {
@@ -285,7 +284,7 @@ describe("TabList", () => {
     it("should handle mouseover event", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
       await container.trigger("mouseover");
 
       expect(wrapper.vm.isHovered).toBe(true);
@@ -294,7 +293,7 @@ describe("TabList", () => {
     it("should handle mouseleave event", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
       await container.trigger("mouseover");
       expect(wrapper.vm.isHovered).toBe(true);
 
@@ -305,7 +304,7 @@ describe("TabList", () => {
     it("should show add button on hover", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
       await container.trigger("mouseover");
 
       expect(wrapper.vm.isHovered).toBe(true);
@@ -367,7 +366,7 @@ describe("TabList", () => {
       wrapper = createWrapper({ viewOnly: false });
 
       // Simulate hover to show the add button
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
       await container.trigger("mouseover");
 
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
@@ -533,7 +532,7 @@ describe("TabList", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
       expect(container.attributes("style")).toContain("display: flex");
     });
 
@@ -592,9 +591,8 @@ describe("TabList", () => {
 
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.exists()).toBe(true);
-      expect(addButton.find('[data-test="tooltip-wrapper"]').text()).toBe(
-        "Add Tab",
-      );
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.props("content")).toBe("Add Tab");
     });
 
     it("should prevent click propagation on tabs", () => {

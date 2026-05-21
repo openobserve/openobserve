@@ -16,7 +16,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Hoist copyToClipboard mock so it can be referenced inside vi.mock factory below.
 const { mockCopyToClipboard } = vi.hoisted(() => ({
@@ -46,8 +45,12 @@ vi.mock("@tanstack/vue-virtual", () => ({
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn, copyToClipboard: mockCopyToClipboard };
+  return { ...actual, debounce: (fn: any) => fn };
 });
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -102,7 +105,6 @@ vi.stubGlobal("CSS", { supports: () => false });
 
 import TenstackTable from "@/components/TenstackTable.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -1403,7 +1405,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT pass the raw ISO 'T' separator to the clipboard when a timestamp format function is defined", async () => {
@@ -1456,7 +1460,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should copy the raw value unchanged when the column has no format function", async () => {
@@ -1474,7 +1480,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", {
+        silent: true,
+      });
     });
 
     it("should copy the formatted value for a center-aligned timestamp column", async () => {
@@ -1498,7 +1506,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 
@@ -1554,7 +1564,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT contain the ISO 'T' separator in the copied pivot timestamp value", async () => {
@@ -1631,7 +1643,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 });

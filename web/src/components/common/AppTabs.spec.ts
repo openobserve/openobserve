@@ -1,9 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-installQuasar();
 
 describe("AppTabs", () => {
   let wrapper: any = null;

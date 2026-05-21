@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import User from "@/views/User.vue";
 import Users from "@/components/iam/users/User.vue";
 import i18n from "@/locales";
@@ -23,7 +22,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 
-installQuasar();
 
 describe("User.vue Component", () => {
   let wrapper: any;
