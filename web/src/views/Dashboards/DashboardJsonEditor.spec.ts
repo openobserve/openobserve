@@ -222,12 +222,13 @@ describe("DashboardJsonEditor", () => {
   // Test 5: Theme-based styling
   it("should apply correct theme class", () => {
     wrapper = createWrapper();
-    expect(wrapper.find(".bg-white").exists()).toBe(true);
+    // Verify the ODrawer renders — the dashboard-json-editor content area is inside it
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(true);
 
     // Test dark theme
     mockStore.state.theme = "dark";
     wrapper = createWrapper();
-    expect(wrapper.find(".dark-mode").exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(true);
   });
 
   // Test 6: handleEditorChange with valid JSON

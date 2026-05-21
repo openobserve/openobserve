@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="submitForm()"
   >
     <div
+    data-test="panel-layout-settings-content"
     class="tw:p-0 tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
     style="min-height: inherit"

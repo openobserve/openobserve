@@ -207,9 +207,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-@import "../styles/menu-variables";
-@import "../styles/menu-animations";
-
 .nav-menu-item {
   display: block;
   text-decoration: none;

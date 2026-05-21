@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import AssociatedRegexPatterns, { PatternAssociation } from './AssociatedRegexPatterns.vue';
-import { installQuasar } from '@/test/unit/helpers';
 import regexPatternsService from '@/services/regex_pattern';
+
+// Hoisted mock for toast — must be defined before vi.mock (which is hoisted)
+const mockToast = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
 vi.mock('@/utils/zincutils', () => ({
@@ -24,6 +26,11 @@ vi.mock('vue-i18n', () => ({
   }),
 }));
 
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: mockToast,
+  useToast: () => ({ toast: mockToast, toasts: [] }),
+}));
+
 // Create a simple mock store
 const mockStore = {
   state: {
@@ -38,8 +45,6 @@ const mockStore = {
 vi.mock('vuex', () => ({
   useStore: () => mockStore,
 }));
-
-installQuasar();
 
 describe('AssociatedRegexPatterns.vue', () => {
   let wrapper: VueWrapper;
@@ -77,16 +82,16 @@ describe('AssociatedRegexPatterns.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Reset mock store
     mockStore.state.organizationData = { regexPatterns: [] };
     mockStore.state.selectedOrganization = { identifier: 'test-org' };
-    
+
     // Setup service mocks
     vi.mocked(regexPatternsService.list).mockResolvedValue({
       data: { patterns: mockRegexPatterns },
     });
-    
+
     vi.mocked(regexPatternsService.test).mockResolvedValue({
       data: { results: ['test output'] },
     });
@@ -101,17 +106,10 @@ describe('AssociatedRegexPatterns.vue', () => {
         global: {
           mocks: {
             $t: (key: string) => key,
-            $q: {
-              notify: vi.fn(),
-            },
           },
           stubs: {
             FullViewContainer: true,
             ConfirmDialog: true,
-            'q-expansion-item': {
-              template: '<div><slot /><slot name="default" /></div>',
-              methods: { toggle: vi.fn() },
-            },
           },
           config: {
             warnHandler: () => {}, // Suppress Vue warnings in tests
@@ -154,7 +152,7 @@ describe('AssociatedRegexPatterns.vue', () => {
           checkCurrentUserClickedPattern: vi.fn(),
           handleFilterMethod: vi.fn((rows: any[], terms: string) => {
             if (!terms) return rows;
-            return rows.filter(row => row?.name?.toLowerCase().includes(terms.toLowerCase()));
+            return rows.filter((row: any) => row?.name?.toLowerCase().includes(terms.toLowerCase()));
           }),
           closeDialog: vi.fn(),
           updateRegexPattern: vi.fn(),
@@ -263,7 +261,7 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should check current user clicked pattern correctly', () => {
       const vm = wrapper.vm as any;
       vm.userClickedPattern = { pattern_name: 'test-pattern-1' };
-      
+
       // Since we're mocking, we'll just verify the method can be called
       expect(typeof vm.checkCurrentUserClickedPattern).toBe('function');
     });
@@ -516,7 +514,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         'checkIfPatternIsAppliedAndUpdate',
       ];
 
-      requiredMethods.forEach(method => {
+      requiredMethods.forEach((method) => {
         expect(typeof vm[method]).toBe('function');
       });
     });
@@ -546,7 +544,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         'appliedPatternsMap',
       ];
 
-      requiredProperties.forEach(property => {
+      requiredProperties.forEach((property) => {
         expect(vm[property]).toBeDefined();
       });
     });
@@ -579,7 +577,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should maintain component stability with null values', () => {
       const vm = wrapper.vm as any;
-      
+
       // Test setting various properties to null
       expect(() => {
         vm.userClickedPattern = null;
@@ -614,9 +612,10 @@ describe('AssociatedRegexPatterns.vue', () => {
       expect(typeof wrapper.vm.testStringOutput).toBe('function');
     });
 
-    it('should integrate with Quasar components', () => {
-      // Quasar plugin is installed globally via installQuasar()
+    it('should integrate with toast notification system', () => {
+      // toast is mocked at module level
       expect(wrapper.vm).toBeDefined();
+      expect(mockToast).toBeDefined();
     });
   });
 
@@ -640,7 +639,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       // Test the behavior with empty applied patterns
       vm.appliedPatterns = [];
       vm.appliedPatternsMap = new Map();
-      
+
       expect(vm.appliedPatterns).toHaveLength(0);
       expect(vm.appliedPatternsMap.size).toBe(0);
     });
@@ -651,12 +650,12 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.userClickedPattern = { pattern_id: 'test' };
       vm.appliedPatternsExpandedRef = { toggle: vi.fn() };
       vm.allPatternsExpandedRef = { toggle: vi.fn() };
-      
+
       // Simulate unmount cleanup
       vm.userClickedPattern = null;
       vm.appliedPatternsExpandedRef = null;
       vm.allPatternsExpandedRef = null;
-      
+
       expect(vm.userClickedPattern).toBeNull();
       expect(vm.appliedPatternsExpandedRef).toBeNull();
       expect(vm.allPatternsExpandedRef).toBeNull();
@@ -666,7 +665,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       // Mock empty store
       mockStore.state.organizationData.regexPatterns = [];
       const vm = wrapper.vm as any;
-      
+
       await vm.getRegexPatterns();
       expect(regexPatternsService.list).toHaveBeenCalledWith('test-org');
     });
@@ -675,7 +674,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       // Mock store with patterns
       mockStore.state.organizationData.regexPatterns = mockRegexPatterns;
       const vm = wrapper.vm as any;
-      
+
       // Should use cached patterns instead of fetching
       expect(vm.allPatterns).toBeDefined();
     });
@@ -685,10 +684,10 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should update form state when userClickedPattern changes', () => {
       const vm = wrapper.vm as any;
       const newPattern = { pattern_id: 'pattern-2', pattern_name: 'new-pattern' };
-      
+
       // Simulate watcher behavior
       vm.userClickedPattern = newPattern;
-      
+
       // In the mocked component, values maintain their defaults
       expect(vm.policy).toBe('Redact');
       expect(Array.isArray(vm.apply_at)).toBe(true);
@@ -697,11 +696,11 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should handle userClickedPattern with applied settings', () => {
       const vm = wrapper.vm as any;
       const appliedPattern = mockProps.data[0];
-      
+
       // Mock the applied pattern in map
       vm.appliedPatternsMap.set(appliedPattern.pattern_id, appliedPattern);
       vm.userClickedPattern = appliedPattern;
-      
+
       // Should use applied pattern settings
       expect(vm.policy).toBe('Redact');
     });
@@ -710,12 +709,12 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       const patternWithBoth = {
         ...mockProps.data[0],
-        apply_at: 'Both'
+        apply_at: 'Both',
       };
-      
+
       vm.appliedPatternsMap.set(patternWithBoth.pattern_id, patternWithBoth);
       vm.userClickedPattern = patternWithBoth;
-      
+
       // The mock doesn't simulate the watcher behavior, just test structure
       expect(Array.isArray(vm.apply_at)).toBe(true);
       expect(vm.policy).toBe('Redact');
@@ -731,14 +730,14 @@ describe('AssociatedRegexPatterns.vue', () => {
           pattern_id: 'pattern-new',
           policy: 'Mask',
           apply_at: 'AtSearch',
-        }
+        },
       ];
-      
+
       // Simulate data change
       vm.appliedPatterns = [...newData];
-      vm.appliedPatternsMap = new Map(newData.map(p => [p.pattern_id, p]));
+      vm.appliedPatternsMap = new Map(newData.map((p: any) => [p.pattern_id, p]));
       vm.isFormDirty = true;
-      
+
       expect(vm.appliedPatterns).toHaveLength(2);
       expect(vm.appliedPatternsMap.size).toBe(2);
       expect(vm.isFormDirty).toBe(true);
@@ -770,7 +769,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       vm.userClickedPattern = mockProps.data[0];
       vm.apply_at = ['AtIngestion', 'AtSearch'];
-      
+
       // Should convert to 'Both'
       expect(vm.apply_at).toHaveLength(2);
     });
@@ -780,52 +779,52 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should set loading state during fetch', async () => {
       const vm = wrapper.vm as any;
       vm.listLoading = false;
-      
+
       // For mock component, test that function exists and can be called
       expect(typeof vm.getRegexPatterns).toBe('function');
       const promise = vm.getRegexPatterns();
-      
+
       await promise;
       expect(vm.listLoading).toBe(false);
     });
 
     it('should process and format patterns correctly', async () => {
       const vm = wrapper.vm as any;
-      
+
       await vm.getRegexPatterns();
-      
+
       expect(regexPatternsService.list).toHaveBeenCalledWith('test-org');
       expect(mockStore.dispatch).toHaveBeenCalledWith('setRegexPatterns', expect.any(Array));
     });
 
     it('should handle fetch error gracefully', async () => {
       const vm = wrapper.vm as any;
-      const mockNotify = vi.fn();
-      vm.$q = { notify: mockNotify };
-      
+
       // Mock service to reject
       vi.mocked(regexPatternsService.list).mockRejectedValueOnce(
-        new Error('Network error')
+        new Error('Network error'),
       );
-      
+
       await vm.getRegexPatterns();
-      
+
       expect(vm.listLoading).toBe(false);
+      // If the real component's getRegexPatterns runs, it would call toast with error
+      // For the mock wrapper, getRegexPatterns is a vi.fn() that does nothing
     });
 
     it('should update resultTotal after successful fetch', async () => {
       const vm = wrapper.vm as any;
-      
+
       await vm.getRegexPatterns();
-      
+
       expect(typeof vm.resultTotal).toBe('number');
     });
 
     it('should format patterns with counter and timestamps', async () => {
       const vm = wrapper.vm as any;
-      
+
       await vm.getRegexPatterns();
-      
+
       // Patterns should have additional formatting
       const patterns = vm.allPatterns;
       if (patterns.length > 0) {
@@ -845,11 +844,11 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
       vm.testLoading = false;
-      
+
       // Test the function exists and can be called
       expect(typeof vm.testStringOutput).toBe('function');
       const promise = vm.testStringOutput();
-      
+
       await promise;
       expect(vm.testLoading).toBe(false);
     });
@@ -859,9 +858,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
       vm.expandState.outputString = false;
-      
+
       await vm.testStringOutput();
-      
+
       // Mock component maintains its state
       expect(typeof vm.expandState).toBe('object');
     });
@@ -870,9 +869,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
-      
+
       await vm.testStringOutput();
-      
+
       // Mock component behavior
       expect(typeof vm.outputString).toBe('string');
     });
@@ -881,17 +880,17 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
-      const mockNotify = vi.fn();
-      vm.$q = { notify: mockNotify };
-      
+
       // Mock service to reject
       vi.mocked(regexPatternsService.test).mockRejectedValueOnce(
-        new Error('Test failed')
+        new Error('Test failed'),
       );
-      
+
       await vm.testStringOutput();
-      
+
       expect(vm.testLoading).toBe(false);
+      // If the real component's testStringOutput runs, it would call toast with error
+      // For the mock wrapper, testStringOutput is a vi.fn() that does nothing
     });
 
     it('should clear output string before test', async () => {
@@ -899,9 +898,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
       vm.outputString = 'previous output';
-      
+
       await vm.testStringOutput();
-      
+
       // Mock component behavior
       expect(typeof vm.outputString).toBe('string');
     });
@@ -911,7 +910,7 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should return true for applied pattern', () => {
       const vm = wrapper.vm as any;
       vm.appliedPatternsMap.set('pattern-1', mockProps.data[0]);
-      
+
       // Mock function exists
       expect(typeof vm.checkIfPatternIsAppliedAndUpdate).toBe('function');
       const result = vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
@@ -931,9 +930,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.appliedPatternsMap.set('pattern-1', appliedPattern);
       vm.policy = 'Redact'; // Different from applied
       vm.hasPatternChanges = false;
-      
+
       vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
-      
+
       // Mock doesn't change state, just verify call
       expect(typeof vm.isFormDirty).toBe('boolean');
     });
@@ -944,9 +943,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.appliedPatternsMap.set('pattern-1', appliedPattern);
       vm.apply_at = ['AtIngestion']; // Different from applied
       vm.hasPatternChanges = false;
-      
+
       vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
-      
+
       // Mock doesn't change state, just verify call
       expect(typeof vm.isFormDirty).toBe('boolean');
     });
@@ -957,9 +956,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.policy = 'Mask'; // Different from applied
       vm.hasPatternChanges = true;
       vm.isFormDirty = false;
-      
+
       vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
-      
+
       // Should remain false because hasPatternChanges is true
       expect(vm.isFormDirty).toBe(false);
     });
@@ -970,9 +969,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.appliedPatternsMap.set('pattern-1', appliedPattern);
       vm.apply_at = ['AtIngestion', 'AtSearch'];
       vm.hasPatternChanges = false;
-      
+
       vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
-      
+
       // Should not mark as dirty since Both = ['AtIngestion', 'AtSearch']
       expect(vm.isFormDirty).toBe(false);
     });
@@ -983,9 +982,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.appliedPatternsMap.set('pattern-1', appliedPattern);
       vm.apply_at = [];
       vm.hasPatternChanges = false;
-      
+
       vm.checkIfPatternIsAppliedAndUpdate('pattern-1');
-      
+
       expect(vm.isFormDirty).toBe(false);
     });
   });
@@ -1012,7 +1011,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         pattern_id: 'pattern-2',
         pattern_name: 'new-pattern',
         pattern: '\\w+',
-        description: 'New pattern'
+        description: 'New pattern',
       };
       vm.userClickedPattern = newPattern;
       vm.policy = 'Mask';
@@ -1030,23 +1029,20 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should show error if apply_at is empty when adding', () => {
       const vm = wrapper.vm as any;
-      const mockNotify = vi.fn();
-      vm.$q = { notify: mockNotify };
       vm.userClickedPattern = { pattern_id: 'pattern-2' };
-      vm.apply_at = [];
 
       // 'pattern-2' is NOT in the map so checkIfPatternIsApplied returns false
       vm.appliedPatternsMap.delete('pattern-2');
 
       // Override the hardcoded apply_at for this test
-      const originalApplyAt = vm.apply_at;
       vm.apply_at = [];
-      
+
       vm.handleAddOrRemovePattern();
-      
+
       // Should have shown error (in real implementation)
       // For mocked version, just verify it handles the empty case
       expect(vm.apply_at).toHaveLength(0);
+      // In the real component, handleAddOrRemovePattern would call toast() with error
     });
 
     it('should set apply_at to Both for two values', () => {
@@ -1055,7 +1051,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         pattern_id: 'pattern-2',
         pattern_name: 'new-pattern',
         pattern: '\\w+',
-        description: 'New pattern'
+        description: 'New pattern',
       };
       vm.apply_at = ['AtIngestion', 'AtSearch'];
 
@@ -1073,7 +1069,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         pattern_id: 'pattern-2',
         pattern_name: 'new-pattern',
         pattern: '\\w+',
-        description: 'New pattern'
+        description: 'New pattern',
       };
       vm.userClickedPattern = newPattern;
       vm.policy = 'Mask';
@@ -1109,9 +1105,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       vm.outputString = 'some output';
       vm.expandState.outputString = true;
       vm.expandState.regexTestString = false;
-      
+
       vm.resetInputValues();
-      
+
       // Mock component maintains its initial state
       expect(typeof vm.testString).toBe('string');
       expect(typeof vm.outputString).toBe('string');
@@ -1130,9 +1126,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       vm.hasPatternChanges = true;
       vm.isFormDirty = true;
-      
+
       vm.closeDialog();
-      
+
       // Mock component state
       expect(typeof vm.hasPatternChanges).toBe('boolean');
       expect(typeof vm.isFormDirty).toBe('boolean');
@@ -1144,9 +1140,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       vm.isFormDirty = true;
       vm.hasPatternChanges = true;
-      
+
       vm.updateRegexPattern();
-      
+
       // Mock component state doesn't change automatically
       expect(typeof vm.isFormDirty).toBe('boolean');
       expect(typeof vm.hasPatternChanges).toBe('boolean');
@@ -1157,13 +1153,15 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should have debouncedEmit function', () => {
       const vm = wrapper.vm as any;
       // Mock component may not have this function exposed
-      expect(vm.debouncedEmit === undefined || typeof vm.debouncedEmit === 'function').toBe(true);
+      expect(vm.debouncedEmit === undefined || typeof vm.debouncedEmit === 'function').toBe(
+        true,
+      );
     });
 
     it('should handle debounced emit parameters', () => {
       const vm = wrapper.vm as any;
       const pattern = mockProps.data[0];
-      
+
       // Mock component behavior - function may not exist
       if (vm.debouncedEmit) {
         expect(() => {
@@ -1180,11 +1178,11 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       const specialPattern = {
         pattern_name: 'test@#$%^&*()pattern',
-        pattern_id: 'special-pattern'
+        pattern_id: 'special-pattern',
       };
-      
+
       vm.userClickedPattern = specialPattern;
-      
+
       // Mock function behavior
       expect(typeof vm.checkCurrentUserClickedPattern).toBe('function');
     });
@@ -1194,11 +1192,11 @@ describe('AssociatedRegexPatterns.vue', () => {
       const longName = 'a'.repeat(1000);
       const longPattern = {
         pattern_name: longName,
-        pattern_id: 'long-pattern'
+        pattern_id: 'long-pattern',
       };
-      
+
       vm.userClickedPattern = longPattern;
-      
+
       // Mock function behavior
       expect(typeof vm.checkCurrentUserClickedPattern).toBe('function');
     });
@@ -1209,19 +1207,19 @@ describe('AssociatedRegexPatterns.vue', () => {
         pattern_id: 'incomplete',
         // Missing other properties
       };
-      
+
       vm.userClickedPattern = incompletePattern;
-      
+
       expect(() => vm.checkCurrentUserClickedPattern(undefined)).not.toThrow();
     });
 
     it('should handle concurrent pattern operations', () => {
       const vm = wrapper.vm as any;
-      
+
       // Simulate concurrent add/remove operations
       vm.hasPatternChanges = true;
       vm.isFormDirty = true;
-      
+
       // Both flags should be handled correctly
       // Mock doesn't modify state automatically, just test function exists
       expect(typeof vm.hasPatternChanges).toBe('boolean');
@@ -1230,15 +1228,15 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle large applied patterns map', () => {
       const vm = wrapper.vm as any;
-      
+
       // Create large map
       for (let i = 0; i < 1000; i++) {
         vm.appliedPatternsMap.set(`pattern-${i}`, {
           pattern_id: `pattern-${i}`,
-          pattern_name: `Pattern ${i}`
+          pattern_name: `Pattern ${i}`,
         });
       }
-      
+
       expect(vm.appliedPatternsMap.size).toBe(1000);
       // Test that function can handle large datasets
       expect(typeof vm.checkIfPatternIsApplied).toBe('function');
@@ -1253,40 +1251,38 @@ describe('AssociatedRegexPatterns.vue', () => {
   describe('Service Error Handling', () => {
     it('should handle network errors in getRegexPatterns', async () => {
       const vm = wrapper.vm as any;
-      
+
       vi.mocked(regexPatternsService.list).mockRejectedValueOnce({
-        response: { data: { message: 'Network error' } }
+        response: { data: { message: 'Network error' } },
       });
-      
+
       await vm.getRegexPatterns();
-      
+
       expect(vm.listLoading).toBe(false);
     });
 
     it('should handle errors without response data', async () => {
       const vm = wrapper.vm as any;
-      
-      vi.mocked(regexPatternsService.list).mockRejectedValueOnce(
-        new Error('Generic error')
-      );
-      
+
+      vi.mocked(regexPatternsService.list).mockRejectedValueOnce(new Error('Generic error'));
+
       await vm.getRegexPatterns();
-      
+
       expect(vm.listLoading).toBe(false);
     });
 
     it('should handle service timeout errors', async () => {
       const vm = wrapper.vm as any;
-      
+
       vi.mocked(regexPatternsService.test).mockRejectedValueOnce({
-        response: { data: { message: 'Request timeout' } }
+        response: { data: { message: 'Request timeout' } },
       });
-      
+
       vm.userClickedPattern = { pattern: '\\d+' };
       vm.testString = '123';
-      
+
       await vm.testStringOutput();
-      
+
       expect(vm.testLoading).toBe(false);
     });
   });
@@ -1294,18 +1290,18 @@ describe('AssociatedRegexPatterns.vue', () => {
   describe('Performance and Memory', () => {
     it('should handle memory cleanup properly', () => {
       const vm = wrapper.vm as any;
-      
+
       // Set up large data structures
       vm.appliedPatternsMap = new Map();
       for (let i = 0; i < 100; i++) {
         vm.appliedPatternsMap.set(`pattern-${i}`, { id: i });
       }
-      
+
       // Clear everything
       vm.appliedPatternsMap.clear();
       vm.allPatterns = [];
       vm.appliedPatterns = [];
-      
+
       expect(vm.appliedPatternsMap.size).toBe(0);
       expect(vm.allPatterns).toHaveLength(0);
       expect(vm.appliedPatterns).toHaveLength(0);
@@ -1313,13 +1309,13 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle rapid state changes efficiently', () => {
       const vm = wrapper.vm as any;
-      
+
       // Rapid state changes
       for (let i = 0; i < 100; i++) {
         vm.isFormDirty = !vm.isFormDirty;
         vm.hasPatternChanges = !vm.hasPatternChanges;
       }
-      
+
       // Should not crash or cause issues
       expect(typeof vm.isFormDirty).toBe('boolean');
       expect(typeof vm.hasPatternChanges).toBe('boolean');
@@ -1331,7 +1327,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       const requiredMethods = [
         'testStringOutput',
-        'closeDialog', 
+        'closeDialog',
         'getRegexPatterns',
         'checkIfPatternIsApplied',
         'handlePatternClick',
@@ -1340,10 +1336,10 @@ describe('AssociatedRegexPatterns.vue', () => {
         'updateRegexPattern',
         'handleAddOrRemovePattern',
         'checkIfPatternIsAppliedAndUpdate',
-        'resetInputValues'
+        'resetInputValues',
       ];
 
-      requiredMethods.forEach(method => {
+      requiredMethods.forEach((method) => {
         expect(typeof vm[method]).toBe('function');
       });
     });
@@ -1371,10 +1367,10 @@ describe('AssociatedRegexPatterns.vue', () => {
         'testLoading',
         'outputString',
         'expandState',
-        'isFormDirty'
+        'isFormDirty',
       ];
 
-      requiredProperties.forEach(property => {
+      requiredProperties.forEach((property) => {
         expect(vm[property]).toBeDefined();
       });
     });
@@ -1382,14 +1378,16 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should have debounced emit functionality exposed', () => {
       const vm = wrapper.vm as any;
       // Mock component may not have this function exposed
-      expect(vm.debouncedEmit === undefined || typeof vm.debouncedEmit === 'function').toBe(true);
+      expect(vm.debouncedEmit === undefined || typeof vm.debouncedEmit === 'function').toBe(
+        true,
+      );
     });
   });
 
   describe('transformApplyAtValue Function', () => {
     it('should transform "Both" to array with AtIngestion and AtSearch', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue('Both');
         expect(result).toEqual(['AtIngestion', 'AtSearch']);
@@ -1401,7 +1399,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should transform "AtIngestion" to array with single value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue('AtIngestion');
         expect(result).toEqual(['AtIngestion']);
@@ -1413,7 +1411,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should transform "AtSearch" to array with single value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue('AtSearch');
         expect(result).toEqual(['AtSearch']);
@@ -1425,7 +1423,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle empty string value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue('');
         expect(result).toEqual(['']);
@@ -1437,7 +1435,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle null value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue(null as any);
         expect(result).toEqual([null]);
@@ -1449,7 +1447,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle undefined value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue(undefined as any);
         expect(result).toEqual([undefined]);
@@ -1462,7 +1460,7 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should handle custom string values', () => {
       const vm = wrapper.vm as any;
       const customValue = 'CustomValue';
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue(customValue);
         expect(result).toEqual([customValue]);
@@ -1474,11 +1472,11 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should be case sensitive for "Both" value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const resultLowercase = vm.transformApplyAtValue('both');
         const resultUppercase = vm.transformApplyAtValue('BOTH');
-        
+
         expect(resultLowercase).toEqual(['both']);
         expect(resultUppercase).toEqual(['BOTH']);
       } else {
@@ -1491,15 +1489,15 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should always return an array', () => {
       const vm = wrapper.vm as any;
       const testValues = ['Both', 'AtIngestion', 'AtSearch', '', 'random', null, undefined];
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
-        testValues.forEach(value => {
+        testValues.forEach((value) => {
           const result = vm.transformApplyAtValue(value);
           expect(Array.isArray(result)).toBe(true);
         });
       } else {
         // Test that arrays are arrays
-        testValues.forEach(value => {
+        testValues.forEach((value) => {
           const result = value === 'Both' ? ['AtIngestion', 'AtSearch'] : [value];
           expect(Array.isArray(result)).toBe(true);
         });
@@ -1508,7 +1506,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle whitespace in "Both" value', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.transformApplyAtValue === 'function') {
         const result = vm.transformApplyAtValue(' Both ');
         expect(result).toEqual([' Both ']);
@@ -1522,7 +1520,7 @@ describe('AssociatedRegexPatterns.vue', () => {
   describe('showWarningToRemovePattern Function', () => {
     it('should set showWarningDialogToRemovePattern to true', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.showWarningToRemovePattern === 'function') {
         vm.showWarningDialogToRemovePattern = false;
         vm.showWarningToRemovePattern();
@@ -1535,7 +1533,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should be callable without errors', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.showWarningToRemovePattern === 'function') {
         expect(() => vm.showWarningToRemovePattern()).not.toThrow();
       } else {
@@ -1547,7 +1545,7 @@ describe('AssociatedRegexPatterns.vue', () => {
   describe('handleCancelRemovePattern Function', () => {
     it('should set showWarningDialogToRemovePattern to false', () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.handleCancelRemovePattern === 'function') {
         vm.showWarningDialogToRemovePattern = true;
         vm.handleCancelRemovePattern();
@@ -1560,16 +1558,16 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should restore previous apply_at values', async () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.handleCancelRemovePattern === 'function') {
         // Set up scenario
         vm.userClickedPattern = {
           pattern_id: 'test-pattern',
-          apply_at: 'Both'
+          apply_at: 'Both',
         };
-        
+
         await vm.handleCancelRemovePattern();
-        
+
         // Mock component may not change state automatically
         expect(Array.isArray(vm.apply_at)).toBe(true);
       } else {
@@ -1579,13 +1577,13 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle userClickedPattern with undefined apply_at', async () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.handleCancelRemovePattern === 'function') {
         vm.userClickedPattern = {
-          pattern_id: 'test-pattern'
+          pattern_id: 'test-pattern',
           // apply_at is undefined
         };
-        
+
         await expect(vm.handleCancelRemovePattern()).resolves.not.toThrow();
       } else {
         expect(true).toBe(true); // Pass if function doesn't exist in mock
@@ -1594,10 +1592,10 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle null userClickedPattern', async () => {
       const vm = wrapper.vm as any;
-      
+
       if (typeof vm.handleCancelRemovePattern === 'function') {
         vm.userClickedPattern = null;
-        
+
         await expect(vm.handleCancelRemovePattern()).resolves.not.toThrow();
       } else {
         expect(true).toBe(true); // Pass if function doesn't exist in mock
@@ -1605,7 +1603,7 @@ describe('AssociatedRegexPatterns.vue', () => {
     });
   });
 
-  describe('Close button emit behavior (ODrawer migration)', () => {
+  describe('Close button emit behavior', () => {
     it('should emit closeDialog when header close button is clicked', async () => {
       const closeBtn = wrapper.find('[data-test="associated-regex-patterns-close-btn"]');
       if (closeBtn.exists()) {
@@ -1620,7 +1618,7 @@ describe('AssociatedRegexPatterns.vue', () => {
     it('should emit closeDialog when footer cancel button is clicked', async () => {
       const vm = wrapper.vm as any;
       // Footer is only rendered when userClickedPattern is set
-      if (typeof wrapper.setData !== 'function') {
+      if (typeof (wrapper as any).setData !== 'function') {
         // Drive the same path the OButton would: emit directly
         (wrapper as any).vm.$emit?.('closeDialog');
         expect(true).toBe(true);
@@ -1645,7 +1643,8 @@ describe('AssociatedRegexPatterns.vue', () => {
       expect(typeof vm.closeDialog).toBe('function');
       vm.closeDialog();
       // Mock wrapper path: vm.closeDialog is a vi.fn(); real path: emits closeDialog
-      const emitted = typeof wrapper.emitted === 'function' ? wrapper.emitted('closeDialog') : undefined;
+      const emitted =
+        typeof wrapper.emitted === 'function' ? wrapper.emitted('closeDialog') : undefined;
       if (emitted) {
         expect(emitted).toBeTruthy();
       } else {
@@ -1661,11 +1660,11 @@ describe('AssociatedRegexPatterns.vue', () => {
       const patternWithLongDesc = {
         pattern_id: 'long-desc-pattern',
         pattern_name: 'Long Description Pattern',
-        description: longDescription
+        description: longDescription,
       };
-      
+
       vm.userClickedPattern = patternWithLongDesc;
-      
+
       expect(vm.userClickedPattern.description).toBe(longDescription);
       expect(vm.userClickedPattern.description.length).toBe(10000);
     });
@@ -1675,27 +1674,23 @@ describe('AssociatedRegexPatterns.vue', () => {
       const specialPattern = {
         pattern_id: 'special-regex',
         pattern_name: 'Special Regex Pattern',
-        pattern: '(?:^|\\s)(\\d{4}-\\d{2}-\\d{2})(?:\\s|$)'
+        pattern: '(?:^|\\s)(\\d{4}-\\d{2}-\\d{2})(?:\\s|$)',
       };
-      
+
       vm.userClickedPattern = specialPattern;
-      
+
       expect(vm.userClickedPattern.pattern).toContain('(?:');
       expect(vm.userClickedPattern.pattern).toContain('\\d{');
     });
 
     it('should handle multiple simultaneous API calls', async () => {
       const vm = wrapper.vm as any;
-      
+
       // Simulate multiple calls
-      const promises = [
-        vm.getRegexPatterns(),
-        vm.getRegexPatterns(),
-        vm.getRegexPatterns()
-      ];
-      
+      const promises = [vm.getRegexPatterns(), vm.getRegexPatterns(), vm.getRegexPatterns()];
+
       await Promise.all(promises);
-      
+
       expect(regexPatternsService.list).toHaveBeenCalled();
     });
 
@@ -1716,7 +1711,7 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should maintain component stability under stress', () => {
       const vm = wrapper.vm as any;
-      
+
       // Rapid-fire operations
       for (let i = 0; i < 1000; i++) {
         vm.handlePatternClick({ pattern_id: `pattern-${i % 10}` });
@@ -1724,7 +1719,7 @@ describe('AssociatedRegexPatterns.vue', () => {
         vm.policy = i % 2 === 0 ? 'Redact' : 'Mask';
         vm.apply_at = i % 3 === 0 ? ['AtIngestion'] : ['AtSearch'];
       }
-      
+
       // Component should remain stable
       expect(typeof vm.policy).toBe('string');
       expect(Array.isArray(vm.apply_at)).toBe(true);
@@ -1732,14 +1727,14 @@ describe('AssociatedRegexPatterns.vue', () => {
 
     it('should handle circular reference patterns gracefully', () => {
       const vm = wrapper.vm as any;
-      
+
       // Create circular reference
       const patternA = { pattern_id: 'a', references: null };
       const patternB = { pattern_id: 'b', references: patternA };
       patternA.references = patternB;
-      
+
       vm.userClickedPattern = patternA;
-      
+
       // Should handle without infinite loops
       expect(vm.userClickedPattern.pattern_id).toBe('a');
       expect(vm.userClickedPattern.references.pattern_id).toBe('b');

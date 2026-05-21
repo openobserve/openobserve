@@ -282,19 +282,24 @@ describe("PanelLayoutSettings.vue", () => {
       expect(emittedLayout).not.toBe(wrapper.vm.updatedLayout);
     });
 
-    it("should call panelFormRef.submit when submitForm is invoked", () => {
-      const submitSpy = vi.fn();
-      wrapper.vm.panelFormRef = { submit: submitSpy };
+    it("should emit save:layout when submitForm is invoked with valid height", () => {
+      wrapper.vm.updatedLayout.h = 5; // valid positive height
+      wrapper.vm.heightError = "";
 
       wrapper.vm.submitForm();
 
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      const emittedEvents = wrapper.emitted("save:layout");
+      expect(emittedEvents).toBeTruthy();
+      expect(emittedEvents!.length).toBe(1);
     });
 
-    it("should safely no-op when submitForm is called without a form ref", () => {
-      wrapper.vm.panelFormRef = null;
-      // Should not throw
-      expect(() => wrapper.vm.submitForm()).not.toThrow();
+    it("should set height error when submitForm is called with zero height", () => {
+      wrapper.vm.updatedLayout.h = 0;
+
+      wrapper.vm.submitForm();
+
+      expect(wrapper.vm.heightError).toBeTruthy();
+      expect(wrapper.emitted("save:layout")).toBeFalsy();
     });
   });
 
@@ -380,16 +385,16 @@ describe("PanelLayoutSettings.vue", () => {
       expect(saveEvents![0][0]).toEqual(defaultProps.layout);
     });
 
-    it("does not throw when click:primary fires before form ref resolves", async () => {
+    it("does not throw when click:primary fires with zero/invalid height", async () => {
       wrapper = mountWithDrawer();
-      // Force panelFormRef to null to simulate the edge case where the form
-      // hasn't mounted yet but the primary button is clicked.
-      wrapper.vm.panelFormRef = null;
+      // Set invalid height so submitForm sets an error instead of emitting save:layout
+      wrapper.vm.updatedLayout.h = 0;
+      wrapper.vm.heightError = "";
       const drawer = wrapper.findComponent(ODrawerStub);
 
       expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
       await nextTick();
-      // save:layout should NOT have been emitted because submit was no-op
+      // save:layout should NOT have been emitted because height is invalid
       expect(wrapper.emitted("save:layout")).toBeFalsy();
     });
   });
@@ -418,14 +423,15 @@ describe("PanelLayoutSettings.vue", () => {
 
       await nextTick();
 
-      const innerDiv = wrapper.find(".q-pa-none").element;
-      expect(innerDiv.className).toContain("dark-mode");
+      const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
+      expect(contentDiv.exists()).toBe(true);
+      expect(contentDiv.attributes("class")).toContain("dark-mode");
     });
 
     it("should apply light mode class when theme is light", () => {
-      const innerDiv = wrapper.find(".q-pa-none").element;
-      expect(innerDiv.className).toContain("bg-white");
-      expect(innerDiv.className).not.toContain("dark-mode");
+      const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
+      expect(contentDiv.exists()).toBe(true);
+      expect(contentDiv.attributes("class")).not.toContain("dark-mode");
     });
 
     it("should expose panel layout title via ODrawer prop", () => {

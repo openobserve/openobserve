@@ -266,6 +266,7 @@ export default defineComponent({
       t,
       filterStreamFn,
       filterOptions,
+      filterListFn,
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
