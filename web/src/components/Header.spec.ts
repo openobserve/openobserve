@@ -32,7 +32,6 @@ vi.mock("@/utils/cookies", () => ({
   removeToken: vi.fn(),
 }));
 
-
 describe("Header Component", () => {
   let wrapper: any;
   let mockStore: any;
@@ -200,7 +199,7 @@ describe("Header Component", () => {
       await logoWrapper.vm.$nextTick();
 
       // Verify the OpenObserve logo is rendered
-      const openobserveLogo = logoWrapper.find('.openobserve-logo');
+      const openobserveLogo = logoWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       logoWrapper.unmount();
@@ -260,7 +259,7 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify the logo exists and check that dark theme is applied
-      const openobserveLogo = darkWrapper.find('.openobserve-logo');
+      const openobserveLogo = darkWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       // The logo src should contain 'dark' in the path
@@ -292,7 +291,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo is NOT in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(false);
 
       // Verify the custom logo text IS displayed
@@ -324,7 +323,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo IS in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       // Verify the custom logo text is also displayed
@@ -730,15 +729,15 @@ describe("Header Component", () => {
     it("should emit updateOrganization when organization is selected", async () => {
       const newOrg = { identifier: "new-org", label: "New Organization" };
 
-      // handleOrgSelection was renamed to handleOrgSelect during migration
-      // and now takes an identifier (matching the OSelect value contract).
+      // handleOrgSelection takes the org object directly (matching the
+      // OTable row-click contract used by the org dropdown).
       await wrapper.setProps({
         organizations: [
           { identifier: "test-org", label: "Test Organization" },
           newOrg,
         ],
       });
-      await wrapper.vm.handleOrgSelect("new-org");
+      await wrapper.vm.handleOrgSelection(newOrg);
 
       expect(wrapper.emitted("update:selectedOrg")).toBeTruthy();
       expect(wrapper.emitted("update:selectedOrg")[0]).toEqual([newOrg]);
@@ -1038,7 +1037,7 @@ describe("Header Component", () => {
       await lightWrapper.vm.$nextTick();
 
       // Verify light theme logo is used
-      const logo = lightWrapper.find('.openobserve-logo');
+      const logo = lightWrapper.find('[data-test="header-openobserve-logo"]');
       expect(logo.exists()).toBe(true);
 
       const logoSrc = logo.attributes('src');
@@ -1063,7 +1062,7 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify dark theme logo is used
-      const logo = darkWrapper.find('.openobserve-logo');
+      const logo = darkWrapper.find('[data-test="header-openobserve-logo"]');
       expect(logo.exists()).toBe(true);
 
       const logoSrc = logo.attributes('src');
@@ -1170,7 +1169,7 @@ describe("Header Component", () => {
 
       // Verify default OpenObserve logo is rendered instead
       expect(html).toContain('openobserve-logo');
-      const imgs = wrapper.findAll('img');
+      const imgs = wrapper.findAll('[data-test="header-openobserve-logo"]');
       expect(imgs.length).toBeGreaterThan(0);
       expect(imgs[0].attributes('src')).toContain('openobserve');
     });

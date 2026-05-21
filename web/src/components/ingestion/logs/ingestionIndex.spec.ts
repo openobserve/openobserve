@@ -16,7 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -46,13 +46,20 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn()
-  };
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
+
+// Keep a simple quasar mock to prevent import errors from transitive dependencies
+vi.mock("quasar", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
+const mockCopyToClipboardOptions = {
+  successMessage: "Content Copied Successfully!",
+  errorMessage: "Error while copy content.",
+  timeout: 5000,
+};
 
 
 describe("IngestLogs Index Component", () => {
@@ -77,10 +84,10 @@ describe("IngestLogs Index Component", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          "q-splitter": true,
-          "q-tabs": true,
-          "q-route-tab": true,
-          "router-view": true
+          OSplitter: true,
+          OTabs: true,
+          ORouteTab: true,
+          RouterView: true,
         }
       }
     });
@@ -166,22 +173,18 @@ describe("IngestLogs Index Component", () => {
 
     it("should copy content to clipboard successfully", async () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test content",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle clipboard copy failure", () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockRejectedValue(new Error("Copy failed"));
+      (copyToClipboard as any).mockRejectedValueOnce(new Error("Copy failed"));
 
       // Test that the function doesn't throw when called
       expect(() => {
@@ -191,8 +194,7 @@ describe("IngestLogs Index Component", () => {
 
     it("should track segment analytics on copy", async () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      
+
       // Get the mocked segment analytics module
       const segmentModule = await import("@/services/segment_analytics");
       const mockSegmentAnalytics = segmentModule.default;
@@ -210,17 +212,13 @@ describe("IngestLogs Index Component", () => {
 
     it("should handle empty content", async () => {
       const mockContent = { innerText: "" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with whitespace", async () => {

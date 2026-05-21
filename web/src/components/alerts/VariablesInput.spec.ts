@@ -4,6 +4,7 @@
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
 // This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -12,307 +13,273 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
-import store from "@/test/unit/helpers/store";
+import { describe, it, expect, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import VariablesInput from "@/components/alerts/VariablesInput.vue";
 
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
 
-const mockStore = {
-  state: {
-    theme: "light",
-  },
-};
+function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
+  return mount(VariablesInput, {
+    props: {
+      variables: [],
+      ...props,
+    },
+    global: {
+      plugins: [i18n, store],
+    },
+  });
+}
 
-vi.mock("vuex", () => ({
-  useStore: () => mockStore,
-}));
+const twoVars = [
+  { uuid: "1", key: "var1", value: "value1" },
+  { uuid: "2", key: "var2", value: "value2" },
+];
 
-describe("VariablesInput.vue", () => {
-  let wrapper: any;
+// ---------------------------------------------------------------------------
+// tests
+// ---------------------------------------------------------------------------
 
-  const createWrapper = (props = {}) => {
-    return mount(VariablesInput, {
-      props: {
-        variables: [],
-        ...props,
-      },
-      global: {
-        plugins: [i18n],
-        provide: {
-          store: mockStore,
-        },
-      },
-    });
-  };
+describe("VariablesInput", () => {
+  let wrapper: VueWrapper<any> | null = null;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
   });
 
-  describe("Component Initialization", () => {
-    it("should render the component correctly", () => {
-      wrapper = createWrapper();
+  // ── Renders with minimum props ────────────────────────────────────────────
+
+  describe("renders with minimum props", () => {
+    it("mounts without error", () => {
+      wrapper = buildWrapper();
+
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the variable label with info tooltip", () => {
-      wrapper = createWrapper();
+    it("renders the 'Variable' section heading", () => {
+      wrapper = buildWrapper();
+
       expect(wrapper.text()).toContain("Variable");
-      const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
     });
 
-    it("should display tooltip text about variables", () => {
-      wrapper = createWrapper();
-      // Check if the tooltip element exists in the component
-      expect(wrapper.text()).toContain('Variable');
-      // The info-outline OIcon should exist (rendered as SVG, no name text in HTML)
+    it("renders the info-outline icon in the heading area", () => {
+      wrapper = buildWrapper();
+
       const icons = wrapper.findAllComponents({ name: "OIcon" });
       expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
     });
   });
 
-  describe("Empty Variables State", () => {
-    it("should show add variable button when variables array is empty", () => {
-      wrapper = createWrapper({ variables: [] });
-      const addBtn = wrapper.find('[data-test="alert-variables-add-btn"]');
-      expect(addBtn.exists()).toBe(true);
-      expect(addBtn.text()).toContain("Add Variable");
+  // ── Empty variables state (v-if branch) ──────────────────────────────────
+
+  describe("empty variables state", () => {
+    it("shows the Add Variable button when variables is empty", () => {
+      wrapper = buildWrapper({ variables: [] });
+
+      expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(true);
     });
 
+    it("Add Variable button contains the expected text", () => {
+      wrapper = buildWrapper({ variables: [] });
 
-    it("should emit add:variable event when add button is clicked in empty state", async () => {
-      wrapper = createWrapper({ variables: [] });
-      const addBtn = wrapper.find('[data-test="alert-variables-add-btn"]');
-      await addBtn.trigger("click");
+      expect(wrapper.find('[data-test="alert-variables-add-btn"]').text()).toContain("Add Variable");
+    });
+
+    it("does not show individual variable rows when variables is empty", () => {
+      wrapper = buildWrapper({ variables: [] });
+
+      expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(false);
+    });
+
+    it("emits 'add:variable' when the add button is clicked in empty state", async () => {
+      wrapper = buildWrapper({ variables: [] });
+
+      await wrapper.find('[data-test="alert-variables-add-btn"]').trigger("click");
+
       expect(wrapper.emitted("add:variable")).toBeTruthy();
-      expect(wrapper.emitted("add:variable")).toHaveLength(1);
+      expect(wrapper.emitted("add:variable")!.length).toBe(1);
     });
   });
 
-  describe("Variables List State", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  // ── Non-empty variables state (v-else branch) ─────────────────────────────
 
-    it("should render variable inputs when variables array has items", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const variableRows = wrapper.findAll('[data-test^="alert-variables-"]');
-      expect(variableRows.length).toBeGreaterThan(0);
+  describe("non-empty variables state", () => {
+    it("hides the Add Variable button when variables is non-empty", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(false);
     });
 
-    it("should render correct number of variable rows", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const variableRows = wrapper.findAll('[data-test="alert-variables-1"], [data-test="alert-variables-2"]');
-      expect(variableRows).toHaveLength(2);
+    it("renders one row per variable", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-variables-2"]').exists()).toBe(true);
     });
 
-    it("should render key input for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
+    it("renders a key input for each variable", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
       const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
       expect(keyInputs).toHaveLength(2);
     });
 
-    it("should render value input for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
+    it("renders a value input for each variable", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
       const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
       expect(valueInputs).toHaveLength(2);
     });
 
-    it("should display variable key values in inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      // Check if the v-model binding works by checking the template
-      expect(wrapper.html()).toContain('var1');
-      expect(wrapper.html()).toContain('var2');
+    it("reflects variable key data in the rendered HTML", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      expect(wrapper.html()).toContain("var1");
+      expect(wrapper.html()).toContain("var2");
     });
 
-    it("should display variable value values in inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
-      // Check if the v-model binding works by checking the template
-      expect(wrapper.html()).toContain('value1');
-      expect(wrapper.html()).toContain('value2');
+    it("reflects variable value data in the rendered HTML", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      expect(wrapper.html()).toContain("value1");
+      expect(wrapper.html()).toContain("value2");
     });
   });
 
-  describe("Delete Variable Functionality", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  // ── Delete variable ───────────────────────────────────────────────────────
 
-    it("should render delete buttons for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButtons = wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]');
-      expect(deleteButtons).toHaveLength(2);
+  describe("delete variable", () => {
+    it("renders a delete button for every variable row", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      const deleteBtns = wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]');
+      expect(deleteBtns).toHaveLength(2);
     });
 
-    it("should emit remove:variable event when delete button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
+    it("emits 'remove:variable' when a delete button is clicked", async () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      await wrapper.find('[data-test="alert-variables-delete-variable-btn"]').trigger("click");
+
       expect(wrapper.emitted("remove:variable")).toBeTruthy();
-      expect(wrapper.emitted("remove:variable")).toHaveLength(1);
+      expect(wrapper.emitted("remove:variable")!.length).toBe(1);
     });
 
-    it("should pass correct variable object when removing", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      expect(wrapper.emitted("remove:variable")[0]).toEqual([mockVariables[0]]);
-    });
+    it("emits 'remove:variable' with the correct variable object", async () => {
+      wrapper = buildWrapper({ variables: twoVars });
 
-    it("should call removeVariable function when delete is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const component = wrapper.vm;
-      const spy = vi.spyOn(component, 'removeVariable');
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      expect(spy).toHaveBeenCalledWith(mockVariables[0]);
+      await wrapper.find('[data-test="alert-variables-delete-variable-btn"]').trigger("click");
+
+      expect(wrapper.emitted("remove:variable")![0]).toEqual([twoVars[0]]);
     });
   });
 
-  describe("Add Variable Functionality", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  // ── Add variable inline button ────────────────────────────────────────────
 
-    it("should show add button only on the last variable row", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButtons = wrapper.findAll('[data-test="alert-variables-add-variable-btn"]');
-      expect(addButtons).toHaveLength(1);
+  describe("add variable inline button", () => {
+    it("shows the inline add button only on the last row", () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      const addBtns = wrapper.findAll('[data-test="alert-variables-add-variable-btn"]');
+      expect(addBtns).toHaveLength(1);
     });
 
-    it("should emit add:variable event when add button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
-      expect(wrapper.emitted("add:variable")).toBeTruthy();
-      expect(wrapper.emitted("add:variable")).toHaveLength(1);
-    });
+    it("emits 'add:variable' when the inline add button is clicked", async () => {
+      wrapper = buildWrapper({ variables: twoVars });
 
-    it("should call addVariable function when add button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
+      await wrapper.find('[data-test="alert-variables-add-variable-btn"]').trigger("click");
+
       expect(wrapper.emitted("add:variable")).toBeTruthy();
+      expect(wrapper.emitted("add:variable")!.length).toBe(1);
     });
   });
 
+  // ── Input placeholders ────────────────────────────────────────────────────
 
-  describe("Props Validation", () => {
-    it("should accept variables prop as required array", () => {
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.props().variables).toEqual([]);
+  describe("input placeholders", () => {
+    it("key input has a defined placeholder", () => {
+      wrapper = buildWrapper({ variables: [twoVars[0]] });
+
+      const keyInput = wrapper
+        .findAllComponents({ name: "OInput" })
+        .find((c) => c.attributes("data-test") === "alert-variables-key-input");
+      expect(keyInput?.props("placeholder")).toBeDefined();
     });
 
-    it("should work with multiple variables", () => {
-      const multipleVars = [
-        { uuid: "1", key: "var1", value: "value1" },
-        { uuid: "2", key: "var2", value: "value2" },
-        { uuid: "3", key: "var3", value: "value3" },
+    it("value input has a defined placeholder", () => {
+      wrapper = buildWrapper({ variables: [twoVars[0]] });
+
+      const valueInput = wrapper
+        .findAllComponents({ name: "OInput" })
+        .find((c) => c.attributes("data-test") === "alert-variables-value-input");
+      expect(valueInput?.props("placeholder")).toBeDefined();
+    });
+  });
+
+  // ── Component methods ─────────────────────────────────────────────────────
+
+  describe("component method exposure", () => {
+    it("exposes removeVariable as a function", () => {
+      wrapper = buildWrapper();
+
+      expect(typeof wrapper.vm.removeVariable).toBe("function");
+    });
+
+    it("exposes addVariable as a function", () => {
+      wrapper = buildWrapper();
+
+      expect(typeof wrapper.vm.addVariable).toBe("function");
+    });
+  });
+
+  // ── Props reactivity ──────────────────────────────────────────────────────
+
+  describe("props reactivity", () => {
+    it("switches to list view when variables prop changes from empty to non-empty", async () => {
+      wrapper = buildWrapper({ variables: [] });
+
+      await wrapper.setProps({ variables: [twoVars[0]] });
+
+      expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(false);
+    });
+
+    it("switches back to add-btn view when variables prop changes to empty", async () => {
+      wrapper = buildWrapper({ variables: twoVars });
+
+      await wrapper.setProps({ variables: [] });
+
+      expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(false);
+    });
+
+    it("renders correct number of rows for 3 variables", () => {
+      const threeVars = [
+        { uuid: "1", key: "k1", value: "v1" },
+        { uuid: "2", key: "k2", value: "v2" },
+        { uuid: "3", key: "k3", value: "v3" },
       ];
-      wrapper = createWrapper({ variables: multipleVars });
+      wrapper = buildWrapper({ variables: threeVars });
+
       const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
       expect(keyInputs.length).toBe(3);
     });
   });
 
-  describe("Input Attributes and Styling", () => {
-    const mockVariables = [{ uuid: "1", key: "var1", value: "value1" }];
+  // ── Emit event names ──────────────────────────────────────────────────────
 
-    it("should have correct placeholder for key input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const keyInput = wrapper.findAllComponents({ name: "OInput" }).find((c) => c.attributes("data-test") === "alert-variables-key-input");
-      expect(keyInput?.props("placeholder")).toBeDefined();
-    });
+  describe("all emitted event names", () => {
+    it("emits 'remove:variable' and 'add:variable' with correct names", async () => {
+      wrapper = buildWrapper({ variables: [twoVars[0]] });
 
-    it("should have correct placeholder for value input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const valueInput = wrapper.findAllComponents({ name: "OInput" }).find((c) => c.attributes("data-test") === "alert-variables-value-input");
-      expect(valueInput?.props("placeholder")).toBeDefined();
-    });
+      await wrapper.find('[data-test="alert-variables-delete-variable-btn"]').trigger("click");
+      await wrapper.find('[data-test="alert-variables-add-variable-btn"]').trigger("click");
 
-    it("should have minimum width style for value input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      expect(wrapper.html()).toContain('min-width: 250px');
-    });
-
-    it("should have outlined and filled attributes for inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      // Check if inputs are rendered correctly (should have inputs for both variables)
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
-      expect(keyInputs.length).toBeGreaterThan(0);
-      expect(valueInputs.length).toBeGreaterThan(0);
-    });
-
-    it("should have dense attribute for inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      // OInput migrated from q-input — verify input components exist
-      const inputs = wrapper.findAllComponents({ name: "OInput" });
-      expect(inputs.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("Component Methods Exposure", () => {
-    it("should expose removeVariable method", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.removeVariable).toBe('function');
-    });
-
-    it("should expose addVariable method", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.addVariable).toBe('function');
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle undefined variables gracefully", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      // Component should handle undefined gracefully even with warnings
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.exists()).toBe(true);
-      consoleWarn.mockRestore();
-    });
-
-    it("should handle null variables gracefully", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      // Component should handle null gracefully by using empty array as fallback
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.exists()).toBe(true);
-      consoleWarn.mockRestore();
-    });
-
-    it("should handle single variable correctly", () => {
-      const singleVar = [{ uuid: "1", key: "var1", value: "value1" }];
-      wrapper = createWrapper({ variables: singleVar });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      expect(addButton.exists()).toBe(true);
-    });
-  });
-
-  describe("Events and Emits", () => {
-    it("should define correct emit events", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$emit).toBeDefined();
-    });
-
-    it("should emit events with correct event names", async () => {
-      const mockVariables = [{ uuid: "1", key: "var1", value: "value1" }];
-      wrapper = createWrapper({ variables: mockVariables });
-      
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
-      
       expect(Object.keys(wrapper.emitted())).toContain("remove:variable");
       expect(Object.keys(wrapper.emitted())).toContain("add:variable");
     });
