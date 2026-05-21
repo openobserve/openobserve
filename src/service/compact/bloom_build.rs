@@ -36,7 +36,7 @@
 //! can't tell those apart. Coverage gaps caused by config changes are
 //! handled by an out-of-band backfill CLI (see DESIGN.md).
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Context;
 use bytes::Bytes;
@@ -48,6 +48,10 @@ use config::{
 use infra::{
     bloom::{BloomWriter, FieldBloom, path::bloom_path},
     file_list as infra_file_list, storage,
+};
+use tantivy::Directory;
+use tantivy_utils::puffin_directory::{
+    caching_directory::CachingDirectory, footer_cache::FooterCache,
 };
 
 use crate::service::{
@@ -215,34 +219,31 @@ async fn build_blooms_for_file(
     file: &FileKey,
     target_fields: &[String],
 ) -> anyhow::Result<Vec<FieldBloom>> {
-    let Some(ttv_path) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
+    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
         return Ok(Vec::new()); // not an indexable file
     };
     if file.meta.index_size == 0 {
         return Ok(Vec::new()); // no .ttv was emitted
     }
-    let dir = get_tantivy_directory(
-        "bloom_build",
-        &file.account,
-        &ttv_path,
-        file.meta.index_size,
-    )
-    .await
-    .context("open puffin dir")?;
-    let index = tantivy::Index::open(dir).context("open tantivy index")?;
+    let file_account = file.account.clone();
+    let puffin_dir = Arc::new(
+        get_tantivy_directory(
+            "bloom_build",
+            &file_account,
+            &ttv_file_name,
+            file.meta.index_size,
+        )
+        .await
+        .context("open puffin dir")?,
+    );
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
+    let index = tantivy::Index::open(reader_directory)?;
+
     // file.id is the file_list row id, assigned by the INSERT that
     // happened in `write_file_list` before this build runs. Always > 0
     // by the time we get here.
     let file_id = file.id as u64;
-    build_blooms_from_index(&index, file_id, target_fields, 0.01)
+    build_blooms_from_index(&index, file_id, target_fields, 0.01).await
 }
-
-// NOTE: there is intentionally no per-rebuild `.bf` GC in this module.
-// The append-only invariant (we never re-stamp a file that already has
-// a non-zero `bloom_ver`) means a `.bf` that's referenced when written
-// stays referenced for as long as any of its files exist — including
-// after dump (dumped rows preserve `bloom_ver` and so still reference
-// the original `.bf`). Deletion is left to the outer data-retention
-// sweep that removes the entire `bloom/{org}/{stream}/{date}/`
-// directory when the date partition itself ages out, alongside parquet
-// and tantivy files.

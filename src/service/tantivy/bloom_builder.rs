@@ -22,9 +22,13 @@
 //! Used by the compactor `merge_files()` hook to build per-(file, field)
 //! blooms after the .ttv file is written.
 
+use std::collections::HashSet;
+
 use anyhow::Context;
+use hashbrown::HashMap;
 use infra::bloom::{BloomBuilder, FieldBloom};
 use tantivy::Index;
+use tantivy_utils::puffin_directory::reader::warm_up_terms;
 
 /// Build blooms for the given fields against an already-opened tantivy
 /// `Index`. The caller pairs the resulting `FieldBloom`s with their
@@ -36,7 +40,7 @@ use tantivy::Index;
 ///   everywhere.
 /// - Terms across all segments of the index are merged into one bloom per field. Today
 ///   `create_tantivy_index` produces a single segment, but this is robust to that changing.
-pub fn build_blooms_from_index(
+pub async fn build_blooms_from_index(
     index: &Index,
     file_id: u64,
     fields: &[String],
@@ -54,6 +58,25 @@ pub fn build_blooms_from_index(
         .try_into()
         .context("open tantivy reader")?;
     let searcher = reader.searcher();
+
+    let warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> = HashMap::new();
+    let mut need_all_term_fields = HashSet::new();
+    let need_fast_field = HashSet::new();
+
+    for field in fields {
+        let Ok(field) = schema.get_field(field) else {
+            continue;
+        };
+        need_all_term_fields.insert(field);
+    }
+
+    warm_up_terms(
+        &searcher,
+        &warm_terms,
+        need_all_term_fields,
+        need_fast_field,
+    )
+    .await?;
 
     let mut builder = BloomBuilder::new().with_fpp(fpp);
 
@@ -171,6 +194,7 @@ mod tests {
             ],
             0.01,
         )
+        .await
         .unwrap();
 
         // 3 fields with terms — missing_field skipped silently.
@@ -227,7 +251,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let blooms = build_blooms_from_index(&index, 1, &[], 0.01).unwrap();
+        let blooms = build_blooms_from_index(&index, 1, &[], 0.01).await.unwrap();
         assert!(blooms.is_empty());
     }
 }

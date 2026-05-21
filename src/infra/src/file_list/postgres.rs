@@ -512,19 +512,16 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query_for_merge", "file_list"])
             .inc();
 
-        let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
+    WHERE stream = $1 AND date >= $2 AND date <= $3;
                 "#;
 
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(max_size)
             .fetch_all(&pool)
             .await;
         let time = start.elapsed().as_secs_f64();
