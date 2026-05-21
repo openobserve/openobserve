@@ -143,9 +143,9 @@ describe("ColorBySeriesPopUp", () => {
     expect(dialog.props("title")).toBe("Color by series");
   });
 
-  it("forwards the width to ODialog", () => {
+  it("forwards size='lg' to ODialog", () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("width")).toBe(40);
+    expect(dialog.props("size")).toBe("lg");
   });
 
   it("forwards open prop from parent to ODialog", () => {

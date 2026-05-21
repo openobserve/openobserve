@@ -12,10 +12,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div style="display: flex; align-items: center">
+  <div data-test="dashboard-color-palette-root">
+    <div
+      data-test="dashboard-color-palette-flex-container"
+      style="display: flex; align-items: center"
+    >
       <!-- dropdown to select color palette type/mode -->
       <OSelect
+        data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
         :options="colorOptions"
         :label="t('dashboard.colorPalette')"
@@ -27,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- color picker for fixed and shades typed color mode -->
       <div
+        data-test="dashboard-color-palette-color-input-wrapper"
         class="color-input-wrapper"
         v-if="
           ['fixed', 'shades'].includes(
@@ -36,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="margin-top: 30px; margin-left: 5px"
       >
         <input
+          data-test="dashboard-color-palette-color-input"
           type="color"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
         />

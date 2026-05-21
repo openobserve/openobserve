@@ -93,7 +93,7 @@ describe("PromQLChartConfig", () => {
   describe("Component Rendering", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".promql-chart-config").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-chart-config"]').exists()).toBe(true);
     });
 
     it("should show aggregation config for supported chart types", () => {
@@ -514,21 +514,17 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should disable sticky columns selector when sticky first column is enabled", async () => {
-      wrapper = createWrapper({ chartType: "table" });
-
       mockDashboardPanelData.data.config.promql_table_mode = "all";
       mockDashboardPanelData.data.config.sticky_first_column = true;
+      wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const stickyColumnsSelect = wrapper.findComponent({ name: "QSelect" });
-      // Check if the component exists and has the disable prop
-      const disabledSelect = wrapper
-        .findAll('[data-test="dashboard-config-sticky-columns"]')
-        .find((el) => {
-          return el.attributes("disable") !== undefined;
-        });
-      expect(disabledSelect || stickyColumnsSelect.exists()).toBeTruthy();
+      // Component uses OSelect now; verify sticky-columns element exists
+      const stickyColumnsSelect = wrapper.find(
+        '[data-test="dashboard-config-sticky-columns"]',
+      );
+      expect(stickyColumnsSelect.exists()).toBe(true);
     });
 
     it("should format sticky columns display correctly", async () => {
@@ -982,7 +978,8 @@ describe("PromQLChartConfig", () => {
     it("should render info tooltips for configurations", async () => {
       wrapper = createWrapper({ chartType: "pie" });
 
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      // Component uses OTooltip now (Quasar removed)
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
 

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <div>
       <div
+        data-test="dashboard-errors-expand-bar"
         class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:cursor-pointer expand-bar"
         :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--o2-header-menu-bg)' : 'var(--color-primary-100)' }"
         @click="onDropDownClick"
@@ -40,12 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:flex tw:flex-col">
         <div data-test="dashboard-error">
-          <ul class="tw:list-disc tw:list-inside tw:px-3">
+          <ul
+            data-test="dashboard-errors-list"
+            class="tw:list-disc tw:list-inside tw:px-3"
+          >
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
               style="color: red"
               class="tw:py-1"
+              data-test="dashboard-errors-list-item"
             >
               {{ item }}
             </li>

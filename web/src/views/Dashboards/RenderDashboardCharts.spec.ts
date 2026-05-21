@@ -614,8 +614,8 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       await nextTick();
       // The migrated markup must not include the old Quasar dialog selectors
-      expect(wrapper.find("q-dialog-stub").exists()).toBe(false);
-      expect(wrapper.find("q-card-stub").exists()).toBe(false);
+      expect(wrapper.find('[data-test="q-dialog-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="q-card-stub"]').exists()).toBe(false);
     });
   });
 

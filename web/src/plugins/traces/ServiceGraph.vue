@@ -152,7 +152,7 @@
       </div>
     </div>
     <OCardSection
-      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
+      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0  service-graph-container"
     >
       <!-- Graph Visualization -->
       <OCard class="graph-card tw:h-full">
@@ -162,7 +162,7 @@
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div v-if="loading" class="tw:flex flex-center tw:h-full">
+            <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:h-full">
               <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
                 <OSpinner size="xl" />
                 <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
@@ -172,7 +172,7 @@
             </div>
             <div
               v-else-if="error"
-              class="tw:flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
@@ -192,9 +192,9 @@
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="tw:flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
             >
-              <div>
+              <div class="tw:text-center">
                 <OIcon name="hub" style="width: 5em; height: 5em;" />
                 <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">
                   No Service Graph Data

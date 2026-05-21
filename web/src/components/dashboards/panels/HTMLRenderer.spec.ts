@@ -416,7 +416,7 @@ describe("HTMLRenderer", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
@@ -437,7 +437,7 @@ describe("HTMLRenderer", () => {
       
       wrapper = createWrapper({ htmlContent: longContent });
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.attributes('style')).toContain('overflow: auto');
     });
   });

@@ -168,7 +168,7 @@ describe("PromQLTableChart", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find(".promql-table-chart").exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-table-chart"]').exists()).toBe(true);
     });
 
     it("should render TableRenderer component", () => {

@@ -1,6 +1,6 @@
 <template>
   Sort By:
-  <OButtonGroup>
+  <OButtonGroup data-test="dashboard-sort-by-btn-group">
     <OButton
       :active="!fieldObj.sortBy"
       variant="outline"

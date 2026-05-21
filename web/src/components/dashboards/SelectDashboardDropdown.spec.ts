@@ -194,10 +194,8 @@ describe("SelectDashboardDropdown", () => {
     const wrapper = mountComponent({}, store);
     await flushPromises();
 
-    expect(wrapper.vm.selectedDashboard).toEqual({
-      label: "Dashboard 1",
-      value: "dash1",
-    });
+    // selectedDashboard stores the value (id), not the option object.
+    expect(wrapper.vm.selectedDashboard).toBe("dash1");
   });
 
   describe("ODrawer migration", () => {
@@ -321,10 +319,8 @@ describe("SelectDashboardDropdown", () => {
       await flushPromises();
 
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-      expect(wrapper.vm.selectedDashboard).toEqual({
-        label: "Dashboard 1",
-        value: "dash1",
-      });
+      // selectedDashboard stores the value (id), not the option object.
+      expect(wrapper.vm.selectedDashboard).toBe("dash1");
     });
 
     it("should emit dashboard-list-updated after refresh", async () => {

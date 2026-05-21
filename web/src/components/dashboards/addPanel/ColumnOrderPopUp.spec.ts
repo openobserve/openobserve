@@ -170,7 +170,7 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.text()).toContain(
         "Columns will be displayed in their default order",
       );
-      expect(wrapper.findComponent({ name: "QIcon" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(true);
     });
 
     it("should not show draggable list in empty state", () => {
@@ -616,12 +616,12 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const columnRow = wrapper.find(".column-order-row");
+      const columnRow = wrapper.find('[data-test="column-order-row-0"]');
       expect(columnRow.exists()).toBe(true);
-      expect(columnRow.find(".drag-handle").exists()).toBe(true);
-      expect(columnRow.find(".column-number").exists()).toBe(true);
-      expect(columnRow.find(".column-name").exists()).toBe(true);
-      expect(columnRow.find(".column-actions").exists()).toBe(true);
+      expect(columnRow.find('[data-test="dashboard-column-order-drag-handle"]').exists()).toBe(true);
+      expect(columnRow.find('[data-test="dashboard-column-order-column-number"]').exists()).toBe(true);
+      expect(columnRow.find('[data-test="dashboard-column-order-column-name"]').exists()).toBe(true);
+      expect(columnRow.find('[data-test="dashboard-column-order-column-actions"]').exists()).toBe(true);
     });
 
     it("should have tooltips on move buttons", async () => {
@@ -632,7 +632,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });

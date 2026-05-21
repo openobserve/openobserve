@@ -317,7 +317,7 @@ describe("JsonFieldRenderer Component", () => {
     it("should render raw value when parsedData is null", () => {
       wrapper = createWrapper(null);
       // null parsedData falls through to first condition
-      expect(wrapper.find(".json-field-renderer").exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-field-renderer"]').exists()).toBe(true);
     });
 
     it("should render raw string value when it is not valid JSON", () => {
@@ -329,17 +329,17 @@ describe("JsonFieldRenderer Component", () => {
   describe("Template Rendering - Arrays", () => {
     it("should render array of primitives", () => {
       wrapper = createWrapper(["apple", "banana", "cherry"]);
-      expect(wrapper.find(".json-array-items").exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-array-items"]').exists()).toBe(true);
     });
 
     it("should render array of objects", () => {
       wrapper = createWrapper([{ user: "admin" }, { user: "guest" }]);
-      expect(wrapper.find(".json-array-objects").exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-array-objects"]').exists()).toBe(true);
     });
 
     it("should render each item in primitive array", () => {
       wrapper = createWrapper(["item1", "item2"]);
-      const items = wrapper.findAll(".json-array-item");
+      const items = wrapper.findAll('[data-test="json-array-item"]');
       expect(items).toHaveLength(2);
     });
   });
@@ -347,12 +347,12 @@ describe("JsonFieldRenderer Component", () => {
   describe("Template Rendering - Objects", () => {
     it("should render single object", () => {
       wrapper = createWrapper({ name: "John", age: 30 });
-      expect(wrapper.find(".json-object").exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-object"]').exists()).toBe(true);
     });
 
     it("should render key-value pairs for object", () => {
       wrapper = createWrapper({ name: "Alice" });
-      const keyElements = wrapper.findAll(".json-key");
+      const keyElements = wrapper.findAll('[data-test="json-key"]');
       expect(keyElements.length).toBeGreaterThan(0);
     });
 

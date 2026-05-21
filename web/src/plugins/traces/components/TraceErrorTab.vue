@@ -146,58 +146,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="_index"
       pagination="none"
       :show-global-filter="false"
-      class="o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+      expansion="multiple"
+      :expanded-ids="expandedExceptionIds"
+      @update:expanded-ids="expandedExceptionIds = $event"
+      class="trace-detail-tab-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
     >
       <template #cell-@timestamp="{ row }">
-        <div
-          :data-test="`trace-event-detail-${row[timestampColumn]}`"
-          class="tw:flex tw:flex tw:items-center tw:flex-nowrap tw:cursor-pointer"
-          @click="expandEvent(row._index)"
-        >
-          <OButton
-            variant="ghost"
-            size="icon-xs-sq"
-            class="tw:mr-1"
-            :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${row._index}`"
-            @click.capture.stop="expandEvent(row._index)"
-          >
-            <OIcon
-              :name="
-                expandedEvents[String(row._index)] ? 'expand-more' : 'chevron-right'
-              "
-              size="sm"
-            />
-          </OButton>
-          <span>{{ formatTimestamp(row) }}</span>
-        </div>
-        <div
-          v-if="expandedEvents[String(row._index)]"
-          :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${row._index}`"
-          class="exception-details-container tw:mt-2"
-        >
-          <div class="exception-content">
-            <div class="exception-field">
-              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.typeLabel") }}</span>
-              <span class="exception-type">{{ row["exception.type"] }}</span>
+        <span>{{ formatTimestamp(row) }}</span>
+      </template>
+
+      <template #cell-type="{ row }">
+        <span
+          v-html="highlightTextMatch(row['exception.type'], searchQuery)"
+        />
+      </template>
+
+      <template #expansion="{ row }">
+        <div class="tw:px-4 tw:py-3 tw:bg-[var(--o2-card-background)] tw:rounded">
+          <div class="tw:space-y-3">
+            <!-- Exception Type -->
+            <div class="tw:space-y-1">
+              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.typeLabel") }}</span>
+              <span class="exception-type tw:text-sm">{{ row["exception.type"] }}</span>
             </div>
-            <div class="exception-field">
-              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.messageLabel") }}</span>
-              <div class="exception-message">
+
+            <!-- Exception Message -->
+            <div class="tw:space-y-1">
+              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.messageLabel") }}</span>
+              <div class="exception-message tw:text-sm">
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
-            <div class="exception-field">
-              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.escapedLabel") }}</span>
-              <span class="exception-value">{{ row["exception.escaped"] }}</span>
+
+            <!-- Exception Escaped -->
+            <div class="tw:space-y-1">
+              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.escapedLabel") }}</span>
+              <span class="tw:text-sm">{{ row["exception.escaped"] }}</span>
             </div>
-            <div class="exception-field">
-              <div class="stacktrace-header">
-                <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.stacktraceLabel") }}</span>
+
+            <!-- Stacktrace -->
+            <div class="tw:space-y-2">
+              <div class="tw:flex tw:items-center tw:justify-between">
+                <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm">{{ t("traces.stacktraceLabel") }}</span>
                 <OButton
                   v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
                   variant="secondary"
                   size="icon-sm"
                   class="copy-btn"
+                  data-test="exception-copy-stacktrace-btn"
                   @click="copyStackTrace(row['exception.stacktrace'])"
                 >
                   <OIcon name="content-copy" size="sm" />
@@ -206,32 +202,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="stacktrace-container"
+                class="stacktrace-container tw:bg-[var(--o2-code-bg)] tw:rounded tw:p-3 tw:overflow-x-auto tw:max-h-[600px] tw:overflow-y-auto"
+                data-test="exception-stacktrace-container"
               >
-                <pre
-                  class="stacktrace-content"
-                  v-html="
-                    DOMPurify.sanitize(
-                      formatStackTrace(row['exception.stacktrace']),
-                    )
-                  "
-                ></pre>
+                <div class="stacktrace-content" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
-              <div v-else class="stacktrace-empty">
+              <div v-else class="stacktrace-empty tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:italic tw:py-4 tw:px-3 tw:border tw:border-dashed tw:border-[var(--o2-border)] tw:rounded" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="tw:mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
             </div>
           </div>
         </div>
-      </template>
-
-      <template #cell-type="{ row }">
-        <span
-          class="tw:cursor-pointer"
-          @click="expandEvent(row._index)"
-          v-html="highlightTextMatch(row['exception.type'], searchQuery)"
-        />
       </template>
     </OTable>
   </template>
@@ -279,13 +261,13 @@ const {
 
 const timestampColumn = computed(() => store.state.zoConfig.timestamp_column);
 
-const expandedEvents: any = ref({});
+const expandedExceptionIds = ref<string[]>([]);
 
 const exceptionData = computed(() =>
-  hasExceptionEvents.value.map((event: any, index: number) => ({
+  hasExceptionEvents.value?.map((event: any, index: number) => ({
     ...event,
     _index: index,
-  })),
+  })) || [],
 );
 
 const formatTimestamp = (row: any) =>
@@ -301,6 +283,9 @@ const exceptionEventColumns: OTableColumnDef[] = [
     accessorKey: "@timestamp",
     meta: { align: "left" },
     sortable: true,
+    size: 200,
+    minSize: 200,
+    maxSize: 200,
   },
   {
     id: "type",
@@ -308,26 +293,24 @@ const exceptionEventColumns: OTableColumnDef[] = [
     accessorKey: "exception.type",
     meta: { align: "left" },
     sortable: true,
+    size: undefined,
+    minSize: 100,
   },
 ];
 
 watch(
   hasExceptionEvents,
   (events) => {
-    const expanded: Record<string, boolean> = {};
+    // Auto-expand all exception rows when hasExceptionEvents changes
+    const expandedIds: string[] = [];
     events.forEach((_: any, index: number) => {
-      expanded[index.toString()] = true;
+      expandedIds.push(index.toString());
     });
-    expandedEvents.value = expanded;
+    expandedExceptionIds.value = expandedIds;
   },
   { immediate: true },
 );
 
-const expandEvent = (index: number) => {
-  if (expandedEvents.value[index.toString()])
-    delete expandedEvents.value[index.toString()];
-  else expandedEvents.value[index.toString()] = true;
-};
 
 const highlightTextMatch = (text: string, query: string): string => {
   if (!query) return escapeHtml(text);
@@ -580,33 +563,6 @@ function copyStackTrace(stacktrace: string) {
 
 <style lang="scss" scoped>
 // Exception Details Styling
-.exception-details-container {
-  padding: 0.75rem !important;
-  font-size: 12px;
-  font-family:
-    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  background-color: var(--o2-code-bg);
-}
-
-.exception-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.exception-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.exception-label {
-  font-weight: 700;
-  color: var(--o2-text-primary);
-  font-size: 0.75rem;
-  margin-bottom: 0;
-  padding: 0.25rem 0;
-}
 
 .exception-type {
   color: #d32f2f;
@@ -619,7 +575,7 @@ function copyStackTrace(stacktrace: string) {
 
 .exception-message {
   color: var(--o2-text-secondary);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--o2-code-bg);
   padding: 0.5rem;
   border-radius: 4px;
   border-left: 3px solid #ff9800;
@@ -629,32 +585,12 @@ function copyStackTrace(stacktrace: string) {
   line-height: 1.5;
 }
 
-.exception-value {
-  color: var(--o2-text-secondary);
-}
 
-.stacktrace-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-
-  .copy-btn {
-    margin-left: auto;
-    color: var(--o2-text-secondary);
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
 
 .stacktrace-container {
-  background: #f8f9fa;
+  background: var(--o2-code-bg);
   border-radius: 4px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--o2-border);
   overflow: auto;
   max-height: 600px;
   padding: 0.75rem;
@@ -757,8 +693,8 @@ function copyStackTrace(stacktrace: string) {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: #f8f9fa;
-  border: 1px dashed #dee2e6;
+  background: var(--o2-code-bg);
+  border: 1px dashed var(--o2-border);
   border-radius: 4px;
   color: #6c757d;
   font-size: 12px;

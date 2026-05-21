@@ -29,9 +29,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <div v-else class="tw:pb-8">
     <!-- Search bar -->
-    <div class="config-search-wrapper tw:sticky">
+    <div
+      class="config-search-wrapper tw:sticky"
+      data-test="dashboard-config-search-wrapper"
+    >
       <div class="tw:flex tw:flex-nowrap tw:items-center" style="gap: 4px">
-        <OButton variant="ghost" size="icon" @click="toggleAllSections">
+        <OButton
+          variant="ghost"
+          size="icon"
+          @click="toggleAllSections"
+          data-test="dashboard-config-toggle-all-sections-btn"
+        >
           <template #icon-left
             ><OIcon
               :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
@@ -46,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="searchQuery && !anySectionVisible"
       class="config-no-results column tw:items-center tw:py-4"
+      data-test="dashboard-config-no-results"
     >
       <OIcon name="search-off" size="md" class="tw:mb-1 tw:text-gray-400" />
       <div class="tw:text-gray-400 tw:text-xs">

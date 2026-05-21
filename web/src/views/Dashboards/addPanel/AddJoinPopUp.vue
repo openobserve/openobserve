@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div data-test="dashboard-join-pop-up" class="join-popup-container">
-    <div class="join-header">
+    <div class="join-header" data-test="dashboard-join-pop-up-header">
       <div class="join-section">
         <div class="join-section-header">
           <LeftJoinSvg class="tw:h-[21px]" />

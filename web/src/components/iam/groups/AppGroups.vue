@@ -356,9 +356,6 @@ const bulkDeleteUserGroups = async () => {
     background: transparent !important;
   }
 
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: transparent !important;
-  }
 }
+
 </style>

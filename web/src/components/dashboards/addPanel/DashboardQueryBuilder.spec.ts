@@ -284,17 +284,17 @@ describe("DashboardQueryBuilder", () => {
         stubs: {
           DashboardGeoMapsQueryBuilder: {
             name: "DashboardGeoMapsQueryBuilder",
-            template: "<div class='geo-maps-builder'></div>",
+            template: "<div data-test='dashboard-geo-maps-builder' class='geo-maps-builder'></div>",
             props: ["dashboardData"],
           },
           DashboardMapsQueryBuilder: {
             name: "DashboardMapsQueryBuilder",
-            template: "<div class='maps-builder'></div>",
+            template: "<div data-test='dashboard-maps-builder' class='maps-builder'></div>",
             props: ["dashboardData"],
           },
           DashboardSankeyChartBuilder: {
             name: "DashboardSankeyChartBuilder",
-            template: "<div class='sankey-builder'></div>",
+            template: "<div data-test='dashboard-sankey-builder' class='sankey-builder'></div>",
             props: ["dashboardData"],
           },
           SortByBtnGrp: true,
@@ -303,17 +303,17 @@ describe("DashboardQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: {
             name: "DashboardFiltersOption",
-            template: "<div class='filters-option'></div>",
+            template: "<div data-test='dashboard-filters-option' class='filters-option'></div>",
             props: ["dashboardData"],
           },
           DashboardJoinsOption: {
             name: "DashboardJoinsOption",
-            template: "<div class='joins-option'></div>",
+            template: "<div data-test='dashboard-joins-option' class='joins-option'></div>",
             props: ["dashboardData"],
           },
           DynamicFunctionPopUp: {
             name: "DynamicFunctionPopUp",
-            template: "<div class='dynamic-function-popup'></div>",
+            template: "<div data-test='dashboard-dynamic-function-popup' class='dynamic-function-popup'></div>",
           },
           QIcon: true,
           QTooltip: true,
@@ -849,7 +849,7 @@ describe("DashboardQueryBuilder", () => {
         "meta.dragAndDrop.targetDragIndex": 0,
       });
 
-      expect(wrapper.find(".dragItem").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-query-builder-drag-item"]').exists()).toBe(true);
     });
 
     it("should apply drop target styling during drag", () => {
@@ -1293,10 +1293,10 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should render all required child components", () => {
-      expect(wrapper.find(".geo-maps-builder").exists()).toBe(true);
-      expect(wrapper.find(".maps-builder").exists()).toBe(true);
-      expect(wrapper.find(".sankey-builder").exists()).toBe(true);
-      expect(wrapper.find(".filters-option").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-geo-maps-builder"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-maps-builder"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sankey-builder"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-filters-option"]').exists()).toBe(true);
     });
 
     it("should pass dashboard data to child components", () => {

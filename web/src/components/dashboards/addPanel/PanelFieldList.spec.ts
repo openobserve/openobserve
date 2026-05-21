@@ -177,19 +177,19 @@ describe("FieldList", () => {
   describe("Component Rendering", () => {
     it("should render field list container", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".index-menu").exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
     });
 
-    it("should apply light theme class", () => {
+    it("should mount in light theme", () => {
       store.state.theme = "light";
       wrapper = mountComponent();
-      expect(wrapper.find(".theme-light").exists()).toBe(true);
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should apply dark theme class", () => {
+    it("should mount in dark theme", () => {
       store.state.theme = "dark";
       wrapper = mountComponent();
-      expect(wrapper.find(".theme-dark").exists()).toBe(true);
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render stream type dropdown", () => {

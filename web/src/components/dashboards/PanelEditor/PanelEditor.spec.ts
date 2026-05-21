@@ -280,6 +280,13 @@ const mountGlobal = {
     QIcon: true,
     QBtn: true,
     QTooltip: true,
+    // OSplitter slots must render so nested ODialogs (e.g. the custom-chart
+    // selector inside the splitter's #before slot) appear in the DOM.
+    OSplitter: {
+      name: "OSplitter",
+      template:
+        '<div class="o-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+    },
     ODialog: ODialogStub,
     // Explicit stub so shallowMount tracks `open` as a declared prop.
     ShowLegendsPopup: {
@@ -287,6 +294,13 @@ const mountGlobal = {
       props: ["open", "panelData"],
       emits: ["update:open"],
       template: '<div data-test="show-legends-popup-stub" :data-open="String(open)"></div>',
+    },
+    // Explicit stub so shallowMount preserves the `searchType` prop and
+    // makes findComponent({ name: 'PanelSchemaRenderer' }) work.
+    PanelSchemaRenderer: {
+      name: "PanelSchemaRenderer",
+      props: ["searchType", "panelSchema", "selectedTimeObj", "width", "height"],
+      template: '<div class="panel-renderer-mock">PanelSchemaRenderer</div>',
     },
   },
 };
@@ -318,7 +332,9 @@ describe("PanelEditor.vue", () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".panel-editor").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="panel-editor-container"]').exists(),
+      ).toBe(true);
     });
 
     it("should mount successfully with metrics pageType", () => {
@@ -537,7 +553,9 @@ describe("PanelEditor.vue", () => {
       });
 
       expect(
-        wrapper.find(".field-list-sidebar-header-collapsed").exists(),
+        wrapper
+          .find('[data-test="panel-editor-field-list-sidebar-collapsed"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -550,7 +568,9 @@ describe("PanelEditor.vue", () => {
       });
 
       expect(
-        wrapper.find(".field-list-sidebar-header-collapsed").exists(),
+        wrapper
+          .find('[data-test="panel-editor-field-list-sidebar-collapsed"]')
+          .exists(),
       ).toBe(false);
     });
 

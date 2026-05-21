@@ -356,7 +356,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const searchInput = wrapper.find('[data-test="q-input"]');
+      const searchInput = wrapper.find('[data-test="query-inspector-search"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -1178,7 +1178,9 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const searchInput = wrapper.find('[data-test="q-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="query-inspector-search"] input',
+      );
       expect(searchInput.exists()).toBe(true);
 
       // Simulate user typing into the search input

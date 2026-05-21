@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-graph-refresh-btn"
             variant="outline"
             size="icon-toolbar"
-            class="tw:mr-[0.375rem]"
+            class="tw:min-w-[1.875rem]!"
             @click="$emit('service-graph-refresh')"
           >
             <OIcon name="refresh" size="sm" />

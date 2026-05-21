@@ -10,10 +10,15 @@
 
     <div v-if="backgroundType === 'single'">
       <div
+        data-test="dashboard-config-color-input-wrapper"
         class="color-input-wrapper"
         style="margin-top: 36px; margin-left: 5px"
       >
-        <input type="color" v-model="backgroundColor" />
+        <input
+          data-test="dashboard-config-color-input"
+          type="color"
+          v-model="backgroundColor"
+        />
       </div>
     </div>
   </div>

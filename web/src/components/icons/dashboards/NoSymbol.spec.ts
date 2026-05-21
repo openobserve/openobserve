@@ -25,34 +25,34 @@ describe('NoSymbol.vue', () => {
 
     it('renders an SVG element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-svg"]').exists()).toBe(true);
     });
 
     it('has correct SVG dimensions', () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
+      const svg = wrapper.find('[data-test="dashboard-icon-no-symbol-svg"]');
       expect(svg.attributes('width')).toBe('86');
       expect(svg.attributes('height')).toBe('90');
     });
 
     it('has correct viewBox', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 86 90');
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-svg"]').attributes('viewBox')).toBe('0 0 86 90');
     });
 
     it('contains a path element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-path"]').exists()).toBe(true);
     });
 
     it('path uses currentColor stroke', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('stroke')).toBe('currentColor');
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-path"]').attributes('stroke')).toBe('currentColor');
     });
 
     it('path has stroke-width of 4', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('stroke-width')).toBe('4');
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-path"]').attributes('stroke-width')).toBe('4');
     });
   });
 
@@ -92,7 +92,7 @@ describe('NoSymbol.vue', () => {
 
     it('has xmlns attribute', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('xmlns')).toBe('http://www.w3.org/2000/svg');
+      expect(wrapper.find('[data-test="dashboard-icon-no-symbol-svg"]').attributes('xmlns')).toBe('http://www.w3.org/2000/svg');
     });
   });
 });

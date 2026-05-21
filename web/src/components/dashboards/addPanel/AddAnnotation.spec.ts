@@ -129,7 +129,7 @@ describe("AddAnnotation", () => {
 
   it("renders the ODialog wrapper", () => {
     expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "QInput" }).exists()).toBeTruthy();
+    expect(wrapper.findComponent({ name: "OInput" }).exists()).toBeTruthy();
   });
 
   it("uses the Add Annotation title when no annotation prop is provided", () => {
@@ -175,7 +175,7 @@ describe("AddAnnotation", () => {
   it("calls create_timed_annotations when saving a new annotation", async () => {
     (annotationService.create_timed_annotations as any).mockResolvedValueOnce({});
 
-    const inputs = wrapper.findAllComponents({ name: "QInput" });
+    const inputs = wrapper.findAllComponents({ name: "OInput" });
     expect(inputs.length).toBeGreaterThan(0);
     await inputs[0].vm.$emit("update:modelValue", "New Annotation");
     await flushPromises();
@@ -342,9 +342,7 @@ describe("AddAnnotation", () => {
     wrapper = buildWrapper({ annotation: mockAnnotation });
     await flushPromises();
 
-    const timestampElement = wrapper.find(".text-caption");
-    expect(timestampElement.exists()).toBe(true);
-    expect(timestampElement.text()).toContain("Timestamp:");
+    expect(wrapper.text()).toContain("Timestamp:");
   });
 
   it("disables the primary save button when the title is empty", () => {
@@ -355,7 +353,7 @@ describe("AddAnnotation", () => {
   });
 
   it("enables the primary save button once the title is filled in", async () => {
-    const inputs = wrapper.findAllComponents({ name: "QInput" });
+    const inputs = wrapper.findAllComponents({ name: "OInput" });
     await inputs[0].vm.$emit("update:modelValue", "Has a title now");
     await flushPromises();
 
@@ -391,7 +389,7 @@ describe("AddAnnotation", () => {
       new Error("boom"),
     );
 
-    const inputs = wrapper.findAllComponents({ name: "QInput" });
+    const inputs = wrapper.findAllComponents({ name: "OInput" });
     await inputs[0].vm.$emit("update:modelValue", "Title");
     await flushPromises();
 

@@ -25,44 +25,44 @@ describe('StepMiddle.vue', () => {
 
     it('renders an SVG element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-svg"]').exists()).toBe(true);
     });
 
     it('has correct SVG dimensions', () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
+      const svg = wrapper.find('[data-test="dashboard-icon-step-middle-svg"]');
       expect(svg.attributes('width')).toBe('82');
       expect(svg.attributes('height')).toBe('83');
     });
 
     it('has correct viewBox', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 82 83');
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-svg"]').attributes('viewBox')).toBe('0 0 82 83');
     });
 
     it('contains a path element for the step line', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-path"]').exists()).toBe(true);
     });
 
     it('path uses currentColor stroke', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('stroke')).toBe('currentColor');
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-path"]').attributes('stroke')).toBe('currentColor');
     });
 
     it('path has vertical (V) steps', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('d')).toContain('V');
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-path"]').attributes('d')).toContain('V');
     });
 
     it('has 2 circle elements for data points', () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('circle').length).toBe(2);
+      expect(wrapper.findAll('[data-test="dashboard-icon-step-middle-circle"]').length).toBe(2);
     });
 
     it('circles use currentColor fill', () => {
       wrapper = createWrapper();
-      wrapper.findAll('circle').forEach((c) => {
+      wrapper.findAll('[data-test="dashboard-icon-step-middle-circle"]').forEach((c) => {
         expect(c.attributes('fill')).toBe('currentColor');
       });
     });
@@ -104,12 +104,12 @@ describe('StepMiddle.vue', () => {
 
     it('has fewer data points than StepAfter/StepBefore (2 vs 3)', () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('circle').length).toBe(2);
+      expect(wrapper.findAll('[data-test="dashboard-icon-step-middle-circle"]').length).toBe(2);
     });
 
     it('path ends at the left boundary (H0)', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('d')).toContain('H0');
+      expect(wrapper.find('[data-test="dashboard-icon-step-middle-path"]').attributes('d')).toContain('H0');
     });
   });
 });

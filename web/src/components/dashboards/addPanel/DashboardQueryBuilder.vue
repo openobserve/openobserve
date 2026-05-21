@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
                 class="dragItem"
+                data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
@@ -256,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'breakdown'
                 "
                 class="dragItem"
+                data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
@@ -403,6 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
             class="dragItem"
+            data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
           </div>
@@ -556,6 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
               class="dragItem"
+              data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
             </div>

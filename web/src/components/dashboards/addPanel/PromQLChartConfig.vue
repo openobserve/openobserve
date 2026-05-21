@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="promql-chart-config">
+  <div class="promql-chart-config" data-test="dashboard-promql-chart-config">
     <!-- Aggregation Function Selector -->
     <OSelect
       v-if="showAggregationConfig"

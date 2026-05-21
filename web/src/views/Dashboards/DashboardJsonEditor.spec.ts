@@ -180,7 +180,7 @@ describe("DashboardJsonEditor", () => {
     // ODrawer wrapper exists
     expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(true);
     // Body contains the json editor container
-    expect(wrapper.find(".dashboard-json-editor").exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-json-editor-container"]').exists()).toBe(true);
     // Footer renders both buttons supplied via ODrawer props
     expect(wrapper.find('[data-test="o-drawer-primary"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="o-drawer-secondary"]').exists()).toBe(true);
@@ -493,7 +493,7 @@ describe("DashboardJsonEditor", () => {
     wrapper.vm.validationErrors = ["Error 1", "Error 2"];
     await wrapper.vm.$nextTick();
 
-    const errorSection = wrapper.find('.validation-errors');
+    const errorSection = wrapper.find('[data-test="dashboard-json-editor-validation-errors"]');
     expect(errorSection.exists()).toBe(true);
     expect(wrapper.text()).toContain("Error 1");
     expect(wrapper.text()).toContain("Error 2");
@@ -504,7 +504,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     wrapper.vm.validationErrors = [];
 
-    const errorSection = wrapper.find('.validation-errors');
+    const errorSection = wrapper.find('[data-test="dashboard-json-editor-validation-errors"]');
     expect(errorSection.exists()).toBe(false);
   });
 

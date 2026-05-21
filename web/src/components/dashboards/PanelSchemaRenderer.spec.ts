@@ -17,20 +17,8 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 
-// Mock Quasar plugins
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    Quasar: actual.Quasar,
-    Dialog: {
-      create: vi.fn(),
-    }: {
-      create: vi.fn(),
-    },
-    exportFile: vi.fn().mockReturnValue(true),
-  };
-});
+// Quasar was removed entirely — no Quasar plugin mock required.
+// (Dialog.create / exportFile no longer used in the component.)
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -403,8 +391,16 @@ describe("PanelSchemaRenderer", () => {
     it("should hide error message when no error", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find(".errorMessage").exists()).toBe(false);
-      expect(wrapper.find(".customErrorMessage").exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="panel-schema-renderer-error-message"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="panel-schema-renderer-custom-error-message"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should emit error event when errorDetail changes", () => {
@@ -825,7 +821,11 @@ describe("PanelSchemaRenderer", () => {
     it("should not show annotation button when annotations not allowed", () => {
       wrapper = createWrapper({ allowAnnotationsAdd: false });
 
-      expect(wrapper.find('q-btn[color="primary"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="panel-schema-renderer-annotation-button"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should show annotation button when annotations allowed and panel supports it", () => {

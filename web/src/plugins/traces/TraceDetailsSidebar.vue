@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
       >
-        <OIcon name="cancel" size="xs" />
+        <OIcon name="close" size="xs" />
       </OButton>
     </div>
     <div
@@ -358,7 +358,7 @@ class="tw:h-full tw:overflow-y-auto">
                   class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Input</div>
-                  <div class="tw:flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -369,11 +369,11 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="sm"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy input"
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
@@ -425,7 +425,7 @@ class="tw:h-full tw:overflow-y-auto">
                   class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Output</div>
-                  <div class="tw:flex tw:items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -436,11 +436,11 @@ class="tw:h-full tw:overflow-y-auto">
                     >
                       <OIcon
                         :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="sm"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy output"
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
@@ -870,7 +870,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
-import { toggleFullscreen } from "@/utils/dom";
+import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1881,7 +1881,7 @@ export default defineComponent({
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
-        toggleFullscreen(ioContainerRef.value)
+        domToggleFullScreen(ioContainerRef.value)
           .then(() => {
             // Check if this specific element is now fullscreen
             nextTick(() => {
@@ -2088,7 +2088,6 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
-    table-layout: fixed;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
     border-radius: 0.5rem;
@@ -2101,12 +2100,27 @@ export default defineComponent({
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 4px !important;
+    padding: 8px !important;
     font-size: 13px;
     word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    min-height: 24px;
+    height: auto;
     max-width: 600px;
+  }
+
+  /* Add proper column sizing */
+  th:first-child,
+  td:first-child {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: auto;
+    min-width: 100px;
   }
   td span {
     display: inline-block;
@@ -2142,6 +2156,7 @@ export default defineComponent({
     border-bottom-right-radius: 0.5rem;
   }
 }
+
 
 .trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);
