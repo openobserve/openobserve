@@ -667,8 +667,7 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
 
-    #[allow(unused_mut)]
-    let mut is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
+    let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
         &req.sql,
         ts_column.as_deref(),
         is_http_distinct,
@@ -884,9 +883,8 @@ pub async fn search_partition(
     );
 
     #[cfg(feature = "enterprise")]
-    let (streaming_id, streaming_aggs, stremaing_aggs_cache_strategy) =
-        prepare_streaming_aggregate(trace_id, req, &sql, &mut is_streaming_aggregate, use_cache)
-            .await?;
+    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
+        prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
     #[cfg(feature = "enterprise")]
     {
         resp.streaming_output = streaming_aggs;

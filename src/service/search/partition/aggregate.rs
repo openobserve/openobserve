@@ -15,19 +15,18 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::sql::Sql, config::utils::sql::is_simple_aggregate_query,
-    o2_enterprise::enterprise::search::cache_aggs_util,
-};
-#[cfg(feature = "enterprise")]
-use {
+    crate::service::search::sql::Sql,
+    config::meta::search::SearchPartitionRequest,
+    config::utils::sql::is_simple_aggregate_query,
     config::{
         ider,
         meta::{
-            search::{self, CardinalityLevel, generate_aggregation_search_interval},
+            search::{CardinalityLevel, generate_aggregation_search_interval},
             sql::resolve_stream_names,
         },
     },
     infra::errors::Error,
+    o2_enterprise::enterprise::search::cache_aggs_util,
     o2_enterprise::enterprise::search::{
         cache::streaming_agg::{
             self, StreamingAggsPartitionStrategy, create_aggregation_cache_file_path,
@@ -69,19 +68,19 @@ pub(crate) fn is_streaming_aggregate(
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
 /// and initialize cache for the streaming aggregation pipeline.
 ///
-/// Returns `(streaming_id, streaming_aggs, partition_strategy)`.
+/// Returns `(streaming_aggs, streaming_id, partition_strategy)`.
 #[cfg(feature = "enterprise")]
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn prepare_streaming_aggregate(
     trace_id: &str,
-    req: &search::SearchPartitionRequest,
+    req: &SearchPartitionRequest,
     sql: &Sql,
-    is_streaming_aggregate: &mut bool,
+    is_streaming_aggregate: bool,
     use_cache: bool,
-) -> Result<(Option<String>, bool, Option<StreamingAggsPartitionStrategy>), Error> {
+) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error> {
     let org_id = &sql.org_id;
     let stream_type = sql.stream_type;
-    let streaming_id = if req.streaming_output && *is_streaming_aggregate {
+    let streaming_id = if req.streaming_output && is_streaming_aggregate {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
             Ok(v) => (v[0].clone(), v.join(",")),
@@ -113,9 +112,7 @@ pub(crate) async fn prepare_streaming_aggregate(
 
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache,
-            // so we set is_streaming_aggregate to false and return None
-            *is_streaming_aggregate = false;
+            // this query can't use streaming_agg cache, return None
             None
         } else {
             let streaming_id = ider::uuid();
@@ -192,12 +189,8 @@ pub(crate) async fn prepare_streaming_aggregate(
         None
     };
 
-    let streaming_aggs = *is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
-
     // Get cache strategy for streaming aggregates
-    let streaming_aggs_cache_strategy = if streaming_aggs
-        && let Some(streaming_id_ref) = streaming_id.as_deref()
-    {
+    let streaming_aggs_cache_strategy = if let Some(streaming_id_ref) = streaming_id.as_deref() {
         match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
             Some(strategy) => {
                 log::info!(
@@ -216,5 +209,9 @@ pub(crate) async fn prepare_streaming_aggregate(
         None
     };
 
-    Ok((streaming_id, streaming_aggs, streaming_aggs_cache_strategy))
+    Ok((
+        streaming_id.is_some(),
+        streaming_id,
+        streaming_aggs_cache_strategy,
+    ))
 }
