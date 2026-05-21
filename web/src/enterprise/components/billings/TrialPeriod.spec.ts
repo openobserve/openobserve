@@ -562,8 +562,8 @@ describe("TrialPeriod.vue", () => {
       wrapper = createWrapper({}, mockStore);
       const container = wrapper.find('.trial-period-container');
       expect(container.classes()).toContain('gradient-banner');
-      expect(container.classes()).toContain('q-pa-md');
-      expect(container.classes()).toContain('full-width');
+      expect(container.classes()).toContain('tw:p-3');
+      expect(container.classes()).toContain('tw:w-full');
     });
 
     it("should display correct subtitle text", () => {

@@ -141,7 +141,7 @@ describe('Databricks.vue', () => {
   // Test 5: Template renders main container
   it('should render main container with correct class', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-pa-sm');
+    const container = wrapper.find('.tw\\:p-2');
     expect(container.exists()).toBe(true);
   });
 
@@ -250,7 +250,7 @@ describe('Databricks.vue', () => {
   // Test 19: Component structure matches expected layout
   it('should have correct component structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-pa-sm');
+    const container = wrapper.find('.tw\\:p-2');
     const textDiv = container.find('div[class*="tw:text-"]');
     const boldDiv = wrapper.find('div[class*="tw:font-bold"]');
     
