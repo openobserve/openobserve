@@ -54,7 +54,7 @@ pub fn hash_value(value: &[u8]) -> u64 {
 /// just powers of two, and is far cheaper than a modulo.
 #[inline]
 pub fn block_index(hash: u64, num_blocks: u32) -> u32 {
-    let high = (hash >> 32) as u64;
+    let high = hash >> 32;
     ((high * num_blocks as u64) >> 32) as u32
 }
 
@@ -75,9 +75,9 @@ fn mask_from_hash(hash: u64) -> [u32; 8] {
 #[inline]
 fn block_from_bytes(bytes: &[u8; BLOCK_BYTES]) -> [u32; 8] {
     let mut out = [0u32; 8];
-    for i in 0..8 {
+    for (i, word) in out.iter_mut().enumerate() {
         let off = i * 4;
-        out[i] = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());
+        *word = u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());
     }
     out
 }
@@ -183,7 +183,7 @@ impl Sbbf {
     /// Parse from bytes produced by `to_bytes`. Used by tests; production
     /// readers go through [`check_block`] without materializing this struct.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
-        if bytes.len() % BLOCK_BYTES != 0 || bytes.is_empty() {
+        if bytes.is_empty() || !bytes.len().is_multiple_of(BLOCK_BYTES) {
             return Err("SBBF bytes must be a non-zero multiple of 32");
         }
         let n = bytes.len() / BLOCK_BYTES;

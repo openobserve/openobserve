@@ -18,31 +18,29 @@
 //! Given a candidate `Vec<FileKey>` and the bloom-prunable predicates
 //! extracted by [`super::bloom_predicate`], this module:
 //!
-//! 1. Splits files into "has bloom" (`bloom_ver != 0`) and "no bloom" (`bloom_ver == 0`). The latter
-//!    pass through untouched.
+//! 1. Splits files into "has bloom" (`bloom_ver != 0`) and "no bloom" (`bloom_ver == 0`). The
+//!    latter pass through untouched.
 //! 2. Groups "has bloom" files by `(date, bloom_ver)` so all files sharing a `.bf` are tested with
 //!    one footer fetch.
 //! 3. For each group, fetches **only the bytes the query needs**:
 //!    - footer cache hit → 0 GETs
 //!    - footer cache miss → 1 suffix GET (16 KB)
-//!    - then one **32-byte range GET per `(file, value)` to test** (coalesced when adjacent)
-//! 4. For each `(file_id, predicate value)`, runs the SBBF point check on the fetched 32-byte block.
-//!    A file is kept iff every predicate's bloom returns *maybe* for at least one of its values (OR
-//!    within a predicate, AND across predicates).
+//!    - then **one batched `get_ranges` call** that pulls every required 32-byte SBBF block for all
+//!      `(file, value)` targets in the bucket. `cache_storage::get_ranges` internally coalesces
+//!      adjacent ranges via `object_store::coalesce_ranges`.
+//! 4. For each `(file_id, predicate value)`, runs the SBBF point check on the fetched 32-byte
+//!    block. A file is kept iff every predicate's bloom returns *maybe* for at least one of its
+//!    values (OR within a predicate, AND across predicates).
 //!
 //! Any failure (fetch, parse, schema mismatch) **falls back to "keep
 //! all"** for the affected group — bloom is performance, not correctness.
 
-use std::{collections::HashMap, ops::Range};
+use std::collections::HashMap;
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
 use infra::{
-    bloom::{
-        BLOOM_FOOTER_CACHE, BloomReader,
-        path::bloom_path,
-        sbbf::BLOCK_BYTES,
-    },
+    bloom::{BLOOM_FOOTER_CACHE, BloomReader, path::bloom_path, sbbf::BLOCK_BYTES},
     cache::storage as cache_storage,
 };
 use object_store::{GetOptions, GetRange};
@@ -55,13 +53,6 @@ use super::bloom_predicate::BloomPredicate;
 /// header ≈ 7.5 KB at the high end). When the actual footer overflows
 /// this probe, the group falls back to "keep all".
 const BLOOM_SUFFIX_PROBE_BYTES: u64 = 16 * 1024;
-
-/// When fetching block bytes from one `.bf`, merge two ranges that are
-/// within this many bytes of each other into one GET. Most predicate
-/// queries are point trace_id lookups so coalescing rarely matters in
-/// practice, but for `trace_id IN (a, b, c)` against a small SBBF the
-/// per-value blocks may end up close together.
-const BLOOM_RANGE_COALESCE_GAP: u64 = 16 * 1024;
 
 /// Outer concurrency cap on `.bf` buckets processed in parallel.
 ///
@@ -124,8 +115,8 @@ pub async fn prune(
         groups.entry((date, f.meta.bloom_ver)).or_default().push(i);
     }
 
-    // 3. Plan per-group work: target (file_idx, pred_idx, value_idx) tuples and the bytes each
-    //    one needs. file_idx is into with_bloom for later result-folding.
+    // 3. Plan per-group work: target (file_idx, pred_idx, value_idx) tuples and the bytes each one
+    //    needs. file_idx is into with_bloom for later result-folding.
     struct GroupSpec {
         group: Group,
         account: String,
@@ -159,8 +150,8 @@ pub async fn prune(
         })
         .collect();
 
-    // 4. Run each group: fetch footer → compute 32-byte ranges → batched range
-    //    GETs → run check_block per target. Outer concurrency is config-driven.
+    // 4. Run each group: fetch footer → compute 32-byte ranges → batched range GETs → run
+    //    check_block per target. Outer concurrency is config-driven.
     let with_bloom_ref = &with_bloom;
     let concurrency = bloom_prefetch_concurrency();
     let results: Vec<(Group, GroupResult)> = stream::iter(specs)
@@ -180,8 +171,8 @@ pub async fn prune(
         .collect()
         .await;
 
-    // 5. Fold per-group outcomes into a per-file "did every predicate match?"
-    //    table. Default = keep (no info = conservative).
+    // 5. Fold per-group outcomes into a per-file "did every predicate match?" table. Default = keep
+    //    (no info = conservative).
     let mut per_file_match: HashMap<usize, Vec<Vec<bool>>> = HashMap::new();
     for (_, result) in &results {
         match result {
@@ -209,7 +200,7 @@ pub async fn prune(
     let mut has_info: HashMap<usize, Vec<bool>> = HashMap::new();
     for (_, result) in &results {
         if let GroupResult::Ok(outcomes) = result {
-            for (file_idx, pred_idx, _, _) in outcomes {
+            for (file_idx, pred_idx, ..) in outcomes {
                 let entry = has_info
                     .entry(*file_idx)
                     .or_insert_with(|| vec![false; predicates.len()]);
@@ -309,7 +300,7 @@ async fn run_group(
         file_idx: usize,
         pred_idx: usize,
         value_idx: usize,
-        range: Range<u64>,
+        range: std::ops::Range<u64>,
         hash: u64,
     }
     let mut planned: Vec<Planned> = Vec::with_capacity(targets.len());
@@ -331,62 +322,41 @@ async fn run_group(
         return GroupResult::Ok(Vec::new());
     }
 
-    // Step 3: coalesce adjacent block ranges into combined fetches. Each
-    // block is 32 B, so coalescing rarely helps single trace_id queries,
-    // but multi-value IN list against a small SBBF can collapse to one
-    // GET. Build an index from planned[i].range → merged range slot.
-    let mut order: Vec<usize> = (0..planned.len()).collect();
-    order.sort_by_key(|&i| planned[i].range.start);
-
-    let mut merged: Vec<Range<u64>> = Vec::with_capacity(order.len());
-    let mut merged_for_planned: Vec<usize> = vec![0; planned.len()];
-    for &i in &order {
-        let r = planned[i].range.clone();
-        match merged.last_mut() {
-            Some(last) if r.start <= last.end.saturating_add(BLOOM_RANGE_COALESCE_GAP) => {
-                last.end = last.end.max(r.end);
-                merged_for_planned[i] = merged.len() - 1;
-            }
-            _ => {
-                merged.push(r);
-                merged_for_planned[i] = merged.len() - 1;
-            }
-        }
+    // Step 3: fetch all 32-byte blocks in one call. `get_ranges` internally
+    // coalesces adjacent ranges via `object_store::coalesce_ranges` and
+    // returns one `Bytes` per input range, in input order. For trace_id
+    // queries each range is a separate 32 B block at random offsets inside
+    // the SBBF — coalescing rarely merges, but the single API call still
+    // saves N round trips of per-range overhead.
+    let ranges: Vec<std::ops::Range<u64>> = planned.iter().map(|p| p.range.clone()).collect();
+    let fetched = match cache_storage::get_ranges(account, &path.into(), &ranges).await {
+        Ok(v) => v,
+        Err(e) => return GroupResult::Err(path.to_string(), FetchError::Store(e)),
+    };
+    if fetched.len() != planned.len() {
+        return GroupResult::Err(
+            path.to_string(),
+            FetchError::ShortBlock {
+                expected: planned.len(),
+                got: fetched.len(),
+            },
+        );
     }
 
-    // Step 4: fetch all merged ranges. Sequential inside the bucket — each
-    // range is tiny (32 B–~1 KB after coalesce) and we already parallelize
-    // ACROSS buckets at the outer layer. Hits local file cache when warm.
-    let mut fetched_bytes: Vec<bytes::Bytes> = Vec::with_capacity(merged.len());
-    for r in &merged {
-        match cache_storage::get_range(account, &path.into(), r.clone()).await {
-            Ok(b) => fetched_bytes.push(b),
-            Err(e) => {
-                return GroupResult::Err(path.to_string(), FetchError::Store(e));
-            }
-        }
-    }
-
-    // Step 5: run check_block for each planned target against its slice
-    // out of the appropriate merged buffer.
+    // Step 4: run check_block for each planned target against its 32-byte
+    // block. Order matches `planned`.
     let mut outcomes: Vec<(usize, usize, usize, bool)> = Vec::with_capacity(planned.len());
-    for (i, p) in planned.iter().enumerate() {
-        let slot = merged_for_planned[i];
-        let m = &merged[slot];
-        let buf = &fetched_bytes[slot];
-        let offset_within = (p.range.start - m.start) as usize;
-        if offset_within + BLOCK_BYTES > buf.len() {
+    for (p, buf) in planned.iter().zip(fetched.iter()) {
+        if buf.len() < BLOCK_BYTES {
             return GroupResult::Err(
                 path.to_string(),
                 FetchError::ShortBlock {
-                    expected: offset_within + BLOCK_BYTES,
+                    expected: BLOCK_BYTES,
                     got: buf.len(),
                 },
             );
         }
-        let block: &[u8; BLOCK_BYTES] = buf[offset_within..offset_within + BLOCK_BYTES]
-            .try_into()
-            .unwrap();
+        let block: &[u8; BLOCK_BYTES] = buf[..BLOCK_BYTES].try_into().unwrap();
         let hit = BloomReader::check_block_with_hash(block, p.hash);
         outcomes.push((p.file_idx, p.pred_idx, p.value_idx, hit));
     }
@@ -452,16 +422,30 @@ mod tests {
             values: vec!["present-A".into()],
         };
         // file A: any value matches → kept
-        assert!(pred.values.iter().any(|v| check(&pred.field, id_a, v.as_bytes())));
+        assert!(
+            pred.values
+                .iter()
+                .any(|v| check(&pred.field, id_a, v.as_bytes()))
+        );
         // file B: no value matches → would be dropped
-        assert!(!pred.values.iter().any(|v| check(&pred.field, id_b, v.as_bytes())));
+        assert!(
+            !pred
+                .values
+                .iter()
+                .any(|v| check(&pred.field, id_b, v.as_bytes()))
+        );
 
         // IN list with one present + one absent → still kept (OR within)
         let pred_in = BloomPredicate {
             field: "trace_id".into(),
             values: vec!["present-A".into(), "absent-X".into()],
         };
-        assert!(pred_in.values.iter().any(|v| check(&pred_in.field, id_a, v.as_bytes())));
+        assert!(
+            pred_in
+                .values
+                .iter()
+                .any(|v| check(&pred_in.field, id_a, v.as_bytes()))
+        );
 
         // AND across predicates: any all-miss drops
         let pred_other = BloomPredicate {
@@ -469,9 +453,9 @@ mod tests {
             values: vec!["absent-Z".into()],
         };
         let preds = [pred.clone(), pred_other];
-        let kept = preds.iter().all(|p| {
-            p.values.iter().any(|v| check(&p.field, id_a, v.as_bytes()))
-        });
+        let kept = preds
+            .iter()
+            .all(|p| p.values.iter().any(|v| check(&p.field, id_a, v.as_bytes())));
         assert!(!kept);
     }
 

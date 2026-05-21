@@ -205,33 +205,42 @@ mod tests {
         }
 
         // Round-trip via the .bf format and verify positives match.
-        use infra::bloom::{BloomReader, BloomWriter};
+        // Uses the same single-block API the pruner uses in production:
+        // `block_range_for` → fetch 32 B → `check_block_with_hash`.
+        use infra::bloom::{BloomReader, BloomWriter, sbbf::BLOCK_BYTES};
         let blob = BloomWriter::serialize(blooms).unwrap();
-        let reader = BloomReader::parse(blob).unwrap();
+        let reader = BloomReader::parse(&blob).unwrap();
+
+        let check = |field: &str, file_id: u64, v: &[u8]| -> Option<bool> {
+            let (range, h) = reader.block_range_for(field, file_id, v)?;
+            let s = range.start as usize;
+            let e = range.end as usize;
+            let block: &[u8; BLOCK_BYTES] = blob[s..e].try_into().unwrap();
+            Some(BloomReader::check_block_with_hash(block, h))
+        };
 
         for tid in &trace_ids {
-            assert!(
-                reader.check("trace_id", 42, tid.as_bytes()).unwrap(),
+            assert_eq!(
+                check("trace_id", 42, tid.as_bytes()),
+                Some(true),
                 "trace_id {tid} should be present"
             );
         }
         for uid in &user_ids {
-            assert!(
-                reader.check("user_id", 42, uid.as_bytes()).unwrap(),
+            assert_eq!(
+                check("user_id", 42, uid.as_bytes()),
+                Some(true),
                 "user_id {uid} should be present"
             );
         }
         for lv in ["info", "error"] {
-            assert!(reader.check("level", 42, lv.as_bytes()).unwrap());
+            assert_eq!(check("level", 42, lv.as_bytes()), Some(true));
         }
 
         // Overwhelmingly negative for absent values.
         let mut fp = 0;
         for i in 200..1200u32 {
-            if reader
-                .check("trace_id", 42, format!("trace-{i:03}").as_bytes())
-                .unwrap()
-            {
+            if check("trace_id", 42, format!("trace-{i:03}").as_bytes()).unwrap_or(true) {
                 fp += 1;
             }
         }

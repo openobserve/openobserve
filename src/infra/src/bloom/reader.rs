@@ -153,8 +153,12 @@ impl BloomReader {
                 let body_size = read_u32(suffix, &mut p)?;
                 let _n_items = read_u32(suffix, &mut p)?;
                 // Body must be a non-zero multiple of 32 (one SBBF block).
-                if body_size == 0 || body_size as usize % BLOCK_BYTES != 0 {
-                    return Err(ReadError::InvalidBloomSize(name.clone(), file_id, body_size));
+                if body_size == 0 || !(body_size as usize).is_multiple_of(BLOCK_BYTES) {
+                    return Err(ReadError::InvalidBloomSize(
+                        name.clone(),
+                        file_id,
+                        body_size,
+                    ));
                 }
                 // Body must fit before the footer (in the full file).
                 if body_offset
@@ -193,8 +197,8 @@ impl BloomReader {
     ///
     /// Returns `Some((range, hash))` where:
     /// - `range` is the absolute byte range inside the `.bf` to fetch (always exactly 32 bytes)
-    /// - `hash` is the xxhash64 of the value; pass it to [`check_block_with_hash`] together with the
-    ///   fetched bytes
+    /// - `hash` is the xxhash64 of the value; pass it to [`check_block_with_hash`] together with
+    ///   the fetched bytes
     ///
     /// Returns `None` when this `.bf` has no info for `(field, file_id)` —
     /// the caller should interpret that as "no information available" and
@@ -286,7 +290,13 @@ mod tests {
     /// Fetch the 32-byte block that `block_range_for` points at, then
     /// run the same single-block check the pruner does. Returns `None`
     /// when the reader has no info for `(field, file_id)`.
-    fn check_via_block(reader: &BloomReader, blob: &[u8], field: &str, file_id: u64, v: &[u8]) -> Option<bool> {
+    fn check_via_block(
+        reader: &BloomReader,
+        blob: &[u8],
+        field: &str,
+        file_id: u64,
+        v: &[u8],
+    ) -> Option<bool> {
         let (range, h) = reader.block_range_for(field, file_id, v)?;
         let s = range.start as usize;
         let e = range.end as usize;
@@ -301,13 +311,31 @@ mod tests {
         assert_eq!(r.field_count(), 2);
 
         // present items — single-block check must hit
-        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"abc"), Some(true));
-        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"def"), Some(true));
-        assert_eq!(check_via_block(&r, &blob, "trace_id", 102, b"ghi"), Some(true));
-        assert_eq!(check_via_block(&r, &blob, "user_id", 101, b"u-1"), Some(true));
+        assert_eq!(
+            check_via_block(&r, &blob, "trace_id", 101, b"abc"),
+            Some(true)
+        );
+        assert_eq!(
+            check_via_block(&r, &blob, "trace_id", 101, b"def"),
+            Some(true)
+        );
+        assert_eq!(
+            check_via_block(&r, &blob, "trace_id", 102, b"ghi"),
+            Some(true)
+        );
+        assert_eq!(
+            check_via_block(&r, &blob, "user_id", 101, b"u-1"),
+            Some(true)
+        );
         // absent items — overwhelmingly false
-        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"NOT_PRESENT_xx"), Some(false));
-        assert_eq!(check_via_block(&r, &blob, "user_id", 101, b"NOT_PRESENT_xx"), Some(false));
+        assert_eq!(
+            check_via_block(&r, &blob, "trace_id", 101, b"NOT_PRESENT_xx"),
+            Some(false)
+        );
+        assert_eq!(
+            check_via_block(&r, &blob, "user_id", 101, b"NOT_PRESENT_xx"),
+            Some(false)
+        );
     }
 
     #[test]

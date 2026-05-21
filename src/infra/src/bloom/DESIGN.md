@@ -119,10 +119,11 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
 ```
 0  ─────────────────────────────────────────
    MAGIC      4B   "O2BF"
-   VERSION    1B   0x01
+   VERSION    1B   0x02
 ─────────────────────────────────────────────
-   BODY            (concat of `Sbbf::write` outputs, each is
-                    parquet's thrift `BloomFilterHeader` + bitset)
+   BODY            (concat of raw SBBF bitsets — each is exactly
+                    `num_blocks × 32` little-endian bytes, no
+                    thrift header, no framing)
 ─────────────────────────────────────────────
    FOOTER          (hand-rolled, no thrift)
      field_count   u32 LE
@@ -134,7 +135,7 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
        per file:
          file_id     u64 LE  (file_list.id cast to u64)
          body_offset u64 LE
-         body_size   u32 LE
+         body_size   u32 LE   (always a non-zero multiple of 32)
          n_items     u32 LE
 ─────────────────────────────────────────────
    FOOTER_LEN  4B  (LE)
@@ -142,13 +143,13 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
 EOF─────────────────────────────────────────
 ```
 
-Bloom algorithm: `parquet::bloom_filter::Sbbf` (Parquet spec, SBBF + XxHash64 seed=0). Each per-(file, field) bloom in the body is a stand-alone Parquet column-bloom — feedable to any parquet-aware tool.
+Bloom algorithm: SBBF + xxhash64 (seed=0), Parquet spec. Implementation lives in `infra::bloom::sbbf` — ~120 LOC of `Sbbf` struct + the standalone `check_block(block_bytes, hash)` and `block_index(hash, num_blocks)` primitives. The split-block design is the key property that makes single-block point reads possible.
 
 Width-overflow checks at write time return `WriteError::{FieldNameTooLong, TooManyFields, TooManyFiles, BloomBodyTooLarge}` instead of silent `as` casts.
 
-Tail magic + footer-length pointer enables Parquet-style tail reads for future streaming readers; current reader is whole-blob.
+Tail magic + footer-length pointer is used by the reader's `parse_suffix(suffix, total_size)` path: the search side fetches just the footer (typically 16 KB suffix probe) and never materializes the body. The body bytes stay in object store / disk cache; only the **single 32-byte block** each point check needs is read on demand via `cache_storage::get_ranges`.
 
-The reader uses `OnceLock<Result<Sbbf, ReadError>>` per file entry, so `BloomReader::check` takes `&self` and the same reader can be shared across queries via `Arc` without per-call locking.
+**Format version**: `VERSION = 0x02` (was `0x01` in the prototype, which wrapped each body in a thrift `BloomFilterHeader` produced by `parquet::bloom_filter::Sbbf::write`). V2 strips that header so `body_offset..body_offset+body_size` is exactly a sequence of 32-byte blocks. V1 files are rejected by the V2 reader (`BadVersion(0x01)`); migration is wipe + rebuild via setting `bloom_ver = 0` on affected `file_list` rows.
 
 ### 4.4 `file_id` choice
 
@@ -233,17 +234,23 @@ Skipped (search-side prune treats those files as "keep"):
 `service::search::bloom_pruner::prune(files, predicates, trace_id, org, stream_type, stream)`:
 
 1. **Split**: files with `bloom_ver = 0` pass through untouched.
-2. **Group** remaining files by `(date, bloom_ver)` so each `.bf` is fetched only once. For each group, compute the `(field, file_id)` targets the predicates will check.
-3. **Fetch per group**, bounded by `stream::buffer_unordered(BLOOM_PREFETCH_CONCURRENCY = 32)`. Four-stage ladder:
-   - **Stage A — full-blob cache hit**: `file_data::get_opts(remote=false)` returns the whole `.bf` from memory or disk → `BloomReader::parse` directly.
-   - **Stage B — footer cache hit**: `BLOOM_FOOTER_CACHE.get(path)` returns the cached suffix bytes (footer + tail of body) plus the `.bf` total size. No object-store IO.
-   - **Stage C — full miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` to the object store. `GetResult.meta.size` is the total file length (no separate `head`); the suffix bytes go into `BLOOM_FOOTER_CACHE` for the next query.
-   - **Body fetch** (B and C only): build a partial blob (header + zeros + suffix), parse the footer via `BloomReader::parse`, call `body_ranges_for(targets)` to learn which body bytes the query needs, drop ranges already inside the suffix, `coalesce_ranges` adjacent ranges, fetch each remaining range via `cache_storage::get_range`, and splice with `BloomReader::splice_body_bytes`. If the probe covered the whole file (small `.bf`), skip straight to a full `parse`.
-   - **Cache fill** of the full blob is delegated to `file_downloader::queue_download` so the synchronous prune path never blocks on a full-file GET. Subsequent queries that touch the same `.bf` take Stage A.
-4. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates).
-5. Files with unknown field/file_id (schema drift) → conservatively keep.
+2. **Group** remaining files by `(date, bloom_ver)` so each `.bf` footer is fetched only once. For each group, enumerate the `(file_idx, pred_idx, value_idx)` tuples that need a point check.
+3. **Fetch per group**, bounded by `buffer_unordered(bloom_prefetch_concurrency())` where the concurrency is config-driven (see §9). Per group:
+   - **Footer cache hit**: `BLOOM_FOOTER_CACHE.get(path)` returns the cached suffix bytes (footer + tail of body) plus the `.bf` total size. **0 GETs**.
+   - **Footer cache miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` to the object store. `GetResult.meta.size` is the total file length (no separate `head`); the suffix bytes go into `BLOOM_FOOTER_CACHE` for the next query.
+   - **Footer parse**: `BloomReader::parse_suffix(&suffix, total_size)` produces a footer-only reader. The body is never materialized.
+   - **Block planning**: for each `(file_id, value)` target, `reader.block_range_for(field, file_id, value)` returns the absolute byte range of the single 32-byte SBBF block to fetch and the `hash` to feed `check_block`. Targets with no info (unknown field or file_id) are dropped; the per-file fold treats those predicates as "unknown → keep".
+   - **Batched block fetch**: a single `cache_storage::get_ranges(account, path, &ranges)` call pulls every needed 32-byte block. Internally `object_store::coalesce_ranges` merges adjacent ranges into one underlying GET; returns one `Bytes` per input range, in input order.
+   - **Check**: `BloomReader::check_block_with_hash(&block, hash)` on each fetched 32-byte block.
+4. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates). A predicate with no info on this file (every value's `block_range_for` returned `None`) is treated as "unknown → keep".
+5. Files with no successfully-evaluated targets (bucket fetch failed wholesale) → conservatively keep.
 
-Why the writer layout matters here: `BloomWriter::serialize` groups blooms by field, files-within-field contiguous (`writer.rs`). A single-field query (the canonical `trace_id = X`) therefore turns `body_ranges_for` into a contiguous run of ranges, which `coalesce_ranges` collapses into **one** GET regardless of how many files are in the bucket. The per-bucket worst case becomes 2 GETs (suffix + body), not `O(files)`.
+**Per-bucket steady-state IO**:
+
+- Footer cache warm: **0 GETs for the footer + 1 `get_ranges` call** that batches all N point checks (where N = file_ids in bucket × predicates × values per predicate). Each block is 32 bytes — for a trace_id IN list of 1 value across 20 file_ids, that's 20 × 32 B = 640 B in one batched call.
+- Footer cache cold: same as above + 1 suffix GET (16 KB).
+
+The single-block design means **read amplification = O(32 B per point check)**, independent of the underlying SBBF size. A 2 MB SBBF (1.7M unique trace_ids at FPR 0.01) is touched for 32 B per query — the same as a 200 MB SBBF (170M unique).
 
 ### 6.3 Hook
 
@@ -264,7 +271,8 @@ The layer is **performance, not correctness**. Every failure mode degrades to "k
 | `BloomWriter::serialize` overflow | Log `..{stage="serialize"}`, no upload, no DB change |
 | `.bf` fetch fails | Log warn, keep all files in that group |
 | `.bf` parse fails (bad magic, truncated) | Log warn, keep all files in that group |
-| `Sbbf::from_bytes` fails on a single (field, file_id) | Log warn, bump `BLOOM_CHECK_ERRORS_TOTAL`, conservatively keep that file |
+| Footer entry's `body_size` is not a non-zero multiple of 32 | `BloomReader::parse_suffix` rejects with `InvalidBloomSize`, the bucket falls back to "keep all" |
+| Fetched block size mismatch (`get_ranges` returned fewer/shorter ranges than asked) | Log warn, conservatively keep affected files |
 | Field unknown to the `.bf` (schema drift) | Conservatively keep that file |
 | `file_id` unknown to the `.bf` (race window) | Conservatively keep that file |
 | Old dump parquet missing `bloom_ver` column | Defaulted to 0 on read; degrades to tantivy for those rows |
@@ -279,7 +287,7 @@ All under the standard Prometheus registry, namespace `o2`:
 |---|---|---|---|
 | `bloom_prune_keep_ratio` | Histogram | `organization, stream_type` | Per `prune` call (when bloom prune actually runs); ratio of files surviving |
 | `bloom_prune_duration_seconds` | Histogram | `organization, stream_type` | Wall time of a `prune` call |
-| `bloom_check_errors_total` | IntCounter | `organization, stream_type` | Per `Sbbf::from_bytes` failure on a single (field, file_id) |
+| `bloom_check_errors_total` | IntCounter | `organization, stream_type` | Per block-fetch / size-mismatch failure inside one group (very rare; usually indicates a corrupt `.bf`) |
 | `bloom_file_built_total` | IntCounter | `organization, stream_type` | Per successful `.bf` upload |
 | `bloom_file_build_failed_total` | IntCounter | `organization, stream_type, stage` | Per build failure; `stage ∈ {serialize, upload, update_file_list}` |
 
@@ -313,12 +321,23 @@ Per-stream opt-in is via the existing `StreamSettings`:
 
 Only the **intersection** is bloom-targeted. A field listed only in one isn't built.
 
+Search-side concurrency is config-driven, mirroring the tantivy search path (`grpc/storage.rs`):
+
+```rust
+fn bloom_prefetch_concurrency() -> usize {
+    let cfg = config::get_config();
+    let cache_enabled = cfg.disk_cache.enabled || cfg.memory_cache.enabled;
+    if cache_enabled { cfg.limit.query_index_thread_num }
+    else             { cfg.limit.query_thread_num }
+}
+```
+
+Both knobs default to `cpu_num * 4` (cluster) / `cpu_num` (local). No hardcoded constant — large multi-day trace_id lookups need to fan out far beyond 32 buckets, and tantivy's path already tunes against the same env vars.
+
 Internal tuning constants (not currently exposed as env vars):
 
 - Default FPP = `0.01` (≈ 1% false-positive rate; ~10 bits/element with SBBF)
-- `BLOOM_PREFETCH_CONCURRENCY = 32` (search-side parallel `.bf` fetches)
-- `BLOOM_SUFFIX_PROBE_BYTES = 16 KB` (size of the suffix range probe on cache miss; should cover the footer for buckets up to ~150 indexed files at the typical 3-field config)
-- `BLOOM_RANGE_COALESCE_GAP = 16 KB` (merge two body ranges into one GET if they're within this many bytes of each other)
+- `BLOOM_SUFFIX_PROBE_BYTES = 16 KB` (size of the suffix range probe on footer-cache miss; should cover the footer for buckets up to ~150 indexed files at the typical 3-field config — footer is ~24 B per (file, field) entry + ~7.5 KB per-field header)
 
 ---
 
@@ -345,7 +364,7 @@ Mitigation: only the fields the user opts into via `bloom_filter_fields` get blo
 
 Because bloom build is append-only, a hour that received writes across N compaction rounds has up to N `.bf` files. Search handles this natively (group by `(date, bloom_ver)`, fetch each). N is typically 1–3 per hour in practice (initial ingest + 1–2 compaction rounds).
 
-A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` fetches, bounded by `buffer_unordered(32)` and absorbed by the file_data cache after the first query.
+A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` footers, bounded by `buffer_unordered(bloom_prefetch_concurrency())` and absorbed by `BLOOM_FOOTER_CACHE` after the first query. The 32-byte block reads themselves are batched per bucket via `get_ranges` and hit the local file cache once warm.
 
 ---
 
@@ -405,39 +424,36 @@ skip hours that have been partially dumped, or run before dump.
 
 ### 12.2 Performance gaps
 
-#### No cross-query `BloomReader` cache
+#### No cross-query `Arc<BloomReader>` cache
 
-`BloomReader::check` is `&self` (interior `OnceLock<Sbbf>`), so we
-*can* share via `Arc` across queries — but we don't yet. Every prune
-call re-parses each `.bf` footer it touches.
+`BLOOM_FOOTER_CACHE` caches suffix bytes; every prune call still
+calls `BloomReader::parse_suffix` to walk the footer into the
+`HashMap<field, HashMap<file_id, ...>>` structure.
 
-**Impact:** the parse is cheap (dozens of microseconds for a typical
-footer) but it's pure waste on a hot bucket queried thousands of
-times per second.
+**Impact:** the parse is cheap (microseconds for a typical footer of
+~24 B per file × few fields) but it's pure waste on a hot bucket
+queried thousands of times per second.
 
-**Fix later:** add an LRU `HashMap<(org, stream, date, bloom_ver),
-Arc<BloomReader>>` next to the file_data cache. The cache key is
-unique per `.bf` and the reader is immutable, so eviction is a pure
-LRU concern.
+**Fix later:** swap the suffix-bytes cache for an `Arc<BloomReader>`
+cache keyed by path. The reader is footer-only (no body), so memory
+per entry is small — a few hundred bytes for typical .bf footers.
 
-#### Hardcoded concurrency / FPP / probe sizing
+#### Hardcoded FPP / probe sizing
 
-Four constants that should probably be env-configurable:
+Two build/probe constants that aren't env-configurable yet:
 
-- `BLOOM_PREFETCH_CONCURRENCY = 32` (search prune)
 - `DEFAULT_FPP = 0.01` (build)
 - `BLOOM_SUFFIX_PROBE_BYTES = 16 KB` (search-side cache-miss footer probe)
-- `BLOOM_RANGE_COALESCE_GAP = 16 KB` (range merging threshold)
 
-**Impact:** users can't tune without recompiling. The two probe-related
-constants matter on the cache-miss path: if a `.bf` has a footer larger
-than 16 KB (≳ 150 indexed files × 3 fields in a single hour), the
-suffix probe fails to cover the footer and the bucket degrades to
-"keep all".
+**Impact:** users can't tune without recompiling. The probe constant
+matters on the cache-miss path: if a `.bf` has a footer larger than
+16 KB (≳ 150 indexed files × 3 fields in a single hour), the suffix
+probe fails to cover the footer and the bucket degrades to "keep all".
 
-**Fix later:** add `ZO_BLOOM_PREFETCH_CONCURRENCY`,
-`ZO_BLOOM_DEFAULT_FPP`, `ZO_BLOOM_SUFFIX_PROBE_BYTES`,
-`ZO_BLOOM_RANGE_COALESCE_GAP` env vars.
+**Fix later:** add `ZO_BLOOM_DEFAULT_FPP` and
+`ZO_BLOOM_SUFFIX_PROBE_BYTES` env vars. The search-side concurrency
+is already config-driven (mirrors tantivy's `query_index_thread_num`
+/ `query_thread_num`, see §9).
 
 ### 12.3 Semantic / coverage gaps
 
@@ -539,8 +555,9 @@ Capabilities we **don't have yet** but might want, separate from the
 |---|---|
 | `src/infra/src/bloom/mod.rs` | Module root, magic + version constants |
 | `src/infra/src/bloom/path.rs` | `bloom_path` / `bloom_dir` helpers |
+| `src/infra/src/bloom/sbbf.rs` | Own SBBF impl (Parquet spec, ~120 LOC); `Sbbf`, `block_index`, `check_block`, `hash_value`, `num_blocks_for`, `BLOCK_BYTES` |
 | `src/infra/src/bloom/writer.rs` | `BloomBuilder`, `FieldBloom`, `BloomWriter::serialize`, `WriteError` |
-| `src/infra/src/bloom/reader.rs` | `BloomReader::parse / check / body_ranges_for / splice_body_bytes`, `ReadError` |
+| `src/infra/src/bloom/reader.rs` | `BloomReader::parse / parse_suffix / block_range_for / check_block_with_hash`, `ReadError` |
 | `src/infra/src/bloom/footer_cache.rs` | `BLOOM_FOOTER_CACHE` (path → suffix bytes) |
 | `src/infra/src/bloom/DESIGN.md` | This document |
 | `src/infra/src/file_list/mod.rs` | `FileList::update_bloom_ver` trait |
