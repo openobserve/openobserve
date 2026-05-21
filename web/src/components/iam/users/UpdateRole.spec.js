@@ -37,6 +37,12 @@ vi.mock("vue-i18n", async (importOriginal) => {
   };
 });
 
+const dismissToastMock = vi.fn();
+const toastMock = vi.fn(() => dismissToastMock);
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: toastMock,
+}));
+
 
 // ODrawer stub: exposes the migrated props (open/title/size/persistent) and
 // emits the standard update:open / click:* events. Slot content (q-form,
@@ -135,15 +141,10 @@ describe("UpdateRole Component", () => {
     };
 
     dismissMock = vi.fn();
-    notifyMock = vi.fn().mockReturnValue(dismissMock);
+    notifyMock = toastMock;
+    vi.mocked(toastMock).mockReturnValue(dismissMock);
 
     wrapper = mountUpdateRole();
-
-    // Attach notify mock to wrapper's $q (matches old spec's pattern).
-    wrapper.vm.$q = {
-      ...wrapper.vm.$q,
-      notify: notifyMock,
-    };
   });
 
   afterEach(() => {
@@ -204,7 +205,7 @@ describe("UpdateRole Component", () => {
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Organization member updated successfully.",
         }),
       );
@@ -236,7 +237,7 @@ describe("UpdateRole Component", () => {
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Error while updating organization member",
         }),
       );
@@ -257,7 +258,7 @@ describe("UpdateRole Component", () => {
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          spinner: true,
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000,
         }),
@@ -296,7 +297,7 @@ describe("UpdateRole Component", () => {
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Error while updating organization member",
           timeout: 15000,
         }),
@@ -319,7 +320,7 @@ describe("UpdateRole Component", () => {
       // No error_members → success notification.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Organization member updated successfully.",
           timeout: 3000,
         }),
@@ -341,7 +342,7 @@ describe("UpdateRole Component", () => {
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Organization member updated successfully.",
           timeout: 3000,
         }),
@@ -466,23 +467,22 @@ describe("UpdateRole Component", () => {
   });
 
   describe("UI Elements", () => {
-    it("renders the form element inside the drawer body", () => {
-      const form = wrapper.find("form");
-      expect(form.exists()).toBe(true);
+    it("renders the drawer body content", () => {
+      const drawer = findDrawer(wrapper);
+      expect(drawer.exists()).toBe(true);
     });
 
     it("shows role selector component", () => {
-      const roleSelect = wrapper.findComponent({ name: "QSelect" });
+      const roleSelect = wrapper.findComponent({ name: "OSelect" });
       expect(roleSelect.exists()).toBe(true);
     });
 
-    it("has a save submit button", () => {
-      const saveButton = wrapper.find('button[type="submit"]');
-      expect(saveButton.exists()).toBe(true);
+    it("has a save button", () => {
+      const saveButton = wrapper.findAll("button").find((b) => b.text() === "user.save");
+      expect(saveButton).toBeDefined();
     });
 
     it("renders the cancel OButton in the drawer body", () => {
-      // OButton renders as a real <button>; first non-submit button is cancel.
       const buttons = wrapper.findAll("button");
       expect(buttons.length).toBeGreaterThanOrEqual(2);
     });
@@ -495,16 +495,14 @@ describe("UpdateRole Component", () => {
         resetValidation: vi.fn(),
       };
 
-      const form = wrapper.find("form");
-      await form.trigger("submit.prevent");
+      await wrapper.vm.onSubmit();
 
       expect(organizationsService.update_member_role).not.toHaveBeenCalled();
     });
 
     it("emits update:open(false) when the cancel OButton is clicked", async () => {
-      // The first button in the drawer body is the cancel OButton.
       const buttons = wrapper.findAll("button");
-      const cancelButton = buttons.find((b) => b.attributes("type") !== "submit");
+      const cancelButton = buttons.find((b) => b.text() === "user.cancel");
       expect(cancelButton).toBeDefined();
       await cancelButton.trigger("click");
 

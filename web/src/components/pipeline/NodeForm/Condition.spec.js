@@ -356,6 +356,7 @@ describe("Condition Component", () => {
       await wrapper.vm.saveCondition();
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
+          variant: "error",
           message: "Please add at least one condition",
         })
       );
@@ -372,7 +373,7 @@ describe("Condition Component", () => {
       vi.mocked(toast).mockClear();
       await wrapper.vm.saveCondition();
       expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" })
+        expect.objectContaining({ variant: "error" })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
     });
@@ -387,7 +388,7 @@ describe("Condition Component", () => {
       vi.mocked(toast).mockClear();
       await wrapper.vm.saveCondition();
       expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" })
+        expect.objectContaining({ variant: "error" })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
     });

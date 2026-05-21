@@ -1073,9 +1073,9 @@ describe("ImportPipeline.vue", () => {
       expect(wrapper.vm.router).toBeDefined();
     });
 
-    it("exposes q (Quasar) on vm", () => {
+    it("exposes i18n t function on vm", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.q).toBeDefined();
+      expect(typeof wrapper.vm.$t).toBe("function");
     });
   });
 });

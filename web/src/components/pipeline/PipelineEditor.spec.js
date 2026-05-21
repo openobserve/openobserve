@@ -513,6 +513,7 @@ describe("PipelineEditor", () => {
   describe("savePipeline Validations", () => {
     beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
+      wrapper.vm.pipelineNameInputRef = { focus: vi.fn() };
       const { toast } = await import("@/lib/feedback/Toast/useToast");
       vi.mocked(toast).mockClear();
     });

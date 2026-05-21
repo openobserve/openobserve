@@ -478,12 +478,15 @@ describe("ScheduledPipeline Component", () => {
 
       // Mock the previewPromqlQueryRef
       const mockRefreshData = vi.fn();
+
+      // Simulate run query button click
+      wrapper.vm.expandState.output = true;
+      await nextTick();
+      // Set the template ref after expandState re-render
       wrapper.vm.previewPromqlQueryRef = {
         refreshData: mockRefreshData
       };
 
-      // Simulate run query button click
-      wrapper.vm.expandState.output = true;
       await wrapper.vm.runQuery();
 
       // Wait for nextTick to complete

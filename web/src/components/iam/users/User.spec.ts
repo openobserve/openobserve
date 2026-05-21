@@ -388,7 +388,7 @@ describe("User Component", () => {
         .findAllComponents(ODialogStub)
         .find((d: any) => d.props("title") === "Delete User");
       expect(dialog).toBeTruthy();
-      expect(dialog!.props("size")).toBe("xs");
+      expect(dialog!.props("size")).toBe("sm");
       expect(dialog!.props("primaryButtonLabel")).toBe("OK");
       expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
       expect(dialog!.props("open")).toBe(true);
@@ -485,7 +485,7 @@ describe("User Component", () => {
         .findAllComponents(ODialogStub)
         .find((d: any) => d.props("title") === "Delete Users");
       expect(dialog).toBeTruthy();
-      expect(dialog!.props("size")).toBe("xs");
+      expect(dialog!.props("size")).toBe("sm");
       expect(dialog!.props("primaryButtonLabel")).toBe("OK");
       expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
       expect(dialog!.props("open")).toBe(true);

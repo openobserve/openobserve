@@ -111,6 +111,11 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: trackMock }),
 }));
 
+const dismissToastMock = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => dismissToastMock),
+}));
+
 import AddUser from "@/components/iam/users/AddUser.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -263,7 +268,6 @@ describe("AddUser Component", () => {
           $q: {
             platform,
             notify: mockNotify,
-            dialog: Dialog,
           },
         },
       },
@@ -973,9 +977,6 @@ describe("AddUser Component", () => {
         other_organization: "custom-org",
       };
       wrapper.vm.existingUser = false;
-
-      const dismissMock = vi.fn();
-      wrapper.vm.$q.notify = vi.fn().mockReturnValue(dismissMock);
 
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "User created successfully" },

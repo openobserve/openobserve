@@ -590,11 +590,12 @@ describe("IngestLogs Index Component", () => {
     });
 
     it("should redirect to curl when route name becomes ingestLogs on updated", async () => {
+      const DummyComponent = { template: "<div />" };
       const mockIngestLogsRouter = createRouter({
         history: createMemoryHistory(),
         routes: [
-          { path: "/", name: "curl" },
-          { path: "/ingest", name: "ingestLogs" },
+          { path: "/", name: "curl", component: DummyComponent },
+          { path: "/ingest", name: "ingestLogs", component: DummyComponent },
         ],
       });
       // Push to set initial route synchronously before mounting
@@ -608,13 +609,16 @@ describe("IngestLogs Index Component", () => {
             OSplitter: true,
             OTabs: true,
             ORouteTab: true,
-            // Don't stub RouterView so it reacts to route changes
           },
         },
       });
 
-      // Navigate to ingestLogs route to trigger onUpdated redirect
+      // Navigate to ingestLogs route
       await mockIngestLogsRouter.push({ name: "ingestLogs" });
+      await flushPromises();
+
+      // Trigger a component update via prop change so onUpdated fires
+      await testWrapper.setProps({ currOrgIdentifier: "triggered-org" });
       await flushPromises();
 
       // The onUpdated hook should have redirected to "curl"
