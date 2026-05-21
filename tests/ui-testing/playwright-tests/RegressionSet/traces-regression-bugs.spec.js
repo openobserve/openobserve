@@ -234,15 +234,17 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
 
     const orgName = 'default';
     const tracesUrl = `/web/traces?org_identifier=${orgName}`;
-    await page.goto(tracesUrl);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
+    // Attach listener BEFORE navigation to capture all API calls including page load
     const apiCalls = [];
     page.on('request', (req) => {
       if (req.url().includes('/api/') && req.url().includes('traces')) {
         apiCalls.push({ url: req.url(), timestamp: Date.now() });
       }
     });
+
+    await page.goto(tracesUrl);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     testLogger.info('Navigated to traces, tracking API calls');
 
@@ -432,13 +434,38 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await pm.homePage.openOrgSelector();
       await page.waitForTimeout(500);
 
-      try {
-        await pm.homePage.selectOrganization(orgName);
-        await page.waitForTimeout(2000);
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      // Find an org different from the current one to actually test switching
+      const orgItems = page.locator('[data-test="organization-menu-item-label-item-label"]');
+      const orgCount = await orgItems.count().catch(() => 0);
+      let switchedOrg = false;
+
+      for (let i = 0; i < orgCount; i++) {
+        const itemText = await orgItems.nth(i).textContent().catch(() => '');
+        if (itemText && itemText.trim() !== orgName) {
+          testLogger.info(`Switching to org: "${itemText.trim()}"`);
+          await orgItems.nth(i).click();
+          await page.waitForTimeout(2000);
+          await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+          switchedOrg = true;
+
+          // Switch back to original org
+          await pm.homePage.openOrgSelector();
+          await page.waitForTimeout(500);
+          try {
+            await pm.homePage.selectOrganization(orgName);
+            await page.waitForTimeout(2000);
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+          } catch (err) {
+            testLogger.warn(`Could not switch back to ${orgName}: ${err.message}`);
+          }
+          break;
+        }
+      }
+
+      if (switchedOrg) {
         testLogger.info('Organization switched - trace explorer should be in clean state');
-      } catch (err) {
-        testLogger.warn(`Org switch skipped (selector not available in this environment): ${err.message}`);
+      } else {
+        testLogger.info('Single-org environment - org switching not applicable');
       }
     } else {
       testLogger.info('Single-org environment - org switching not applicable');
@@ -532,6 +559,11 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.goto(tracesUrl);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
+    // Verify dark mode persisted across page navigation
+    const isDarkAfterNav = await pm.homePage.isDarkMode();
+    testLogger.info(`Dark mode after navigation: ${isDarkAfterNav}`);
+    expect(isDarkAfterNav, 'Bug #4151: Dark mode must persist after page navigation').toBe(true);
+
     await pm.tracesPage.selectTraceStream('default');
     await pm.tracesPage.runTraceSearch();
     await page.waitForTimeout(3000);
@@ -584,8 +616,8 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     if (durationVisible) {
       testLogger.info('Duration column header found');
 
-      // Force click to bypass chart overlay interception
-      await durationHeader.click({ force: true });
+      await durationHeader.scrollIntoViewIfNeeded();
+      await durationHeader.click();
       await page.waitForTimeout(2000);
 
       const sortIndicator = pm.tracesPage.getSortIndicator();
@@ -596,7 +628,8 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       const searchBarAfterSort = pm.tracesPage.getSearchBarElement();
       await expect(searchBarAfterSort, 'Bug #2887: Search bar must remain visible after duration sort').toBeVisible({ timeout: 5000 });
 
-      await durationHeader.click({ force: true });
+      await durationHeader.scrollIntoViewIfNeeded();
+      await durationHeader.click();
       await page.waitForTimeout(2000);
       testLogger.info('Duration sort direction toggled');
 
