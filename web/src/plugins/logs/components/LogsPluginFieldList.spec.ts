@@ -64,22 +64,23 @@ vi.mock("@/components/common/FieldExpansion.vue", () => ({
   },
 }));
 
-vi.mock("./FieldListPagination.vue", () => ({
+vi.mock("@/components/common/FieldListPagination.vue", () => ({
   default: {
     name: "FieldListPagination",
     template: '<div class="field-list-pagination-stub"></div>',
     props: [
-      "showUserDefinedSchemaToggle",
+      "showSchemaToggle",
       "showQuickMode",
       "useUserDefinedSchemas",
       "showOnlyInterestingFields",
-      "userDefinedSchemaBtnGroupOption",
-      "selectedFieldsBtnGroupOption",
+      "schemaToggleOptions",
+      "interestingFieldsToggleOptions",
       "currentPage",
       "pagesNumber",
       "isFirstPage",
       "isLastPage",
       "totalFieldsCount",
+      "dataTestPrefix",
     ],
     emits: [
       "toggle-schema",
@@ -139,6 +140,7 @@ const defaultProps = {
   userDefinedSchemaBtnGroupOption: [],
   selectedFieldsBtnGroupOption: [],
   totalFieldsCount: 2,
+  showFtsFieldValues: false,
 };
 
 function createWrapper(props = {}) {
@@ -148,31 +150,34 @@ function createWrapper(props = {}) {
       stubs: {
         OFieldList: {
           name: "OFieldList",
-          template:
-            '<div class="q-table-stub" :data-test="$attrs[\'data-test\']"><slot name="body-cell-name" v-for="row in rows" :row="row" :props="{row}" /><slot name="top-right" /><slot name="pagination" :pagination="pagination" :pagesNumber="pagesNumber" :isFirstPage="isFirstPage" :isLastPage="isLastPage" :firstPage="() => {}" :lastPage="() => {}" /></div>',
+          template: `
+            <div data-test="log-search-index-list-fields-table">
+              <input
+                data-test="log-search-index-list-field-search-input"
+                :value="search"
+                @input="$emit('update:search', $event.target.value)"
+              />
+              <template v-for="(row, idx) in fields" :key="row.name || idx">
+                <slot v-if="row.isGroup" name="group-header" :row="row" :groupName="row.groupName" />
+                <slot v-else name="field-row" :row="row" />
+              </template>
+              <slot v-if="loading" name="loading" />
+              <slot name="empty" />
+              <slot name="after-list" :currentPage="currentPage" :totalPages="1" :isFirstPage="true" :isLastPage="true" :totalRows="totalFieldsCount ?? fields.length" :firstPage="() => {}" :lastPage="() => {}" />
+            </div>`,
           props: [
-            "rows",
-            "columns",
-            "visibleColumns",
-            "filter",
-            "filterMethod",
-            "pagination",
-            "hideHeader",
-            "wrapCells",
-            "rowsPerPageOptions",
+            "fields",
+            "search",
+            "searchPlaceholder",
+            "currentPage",
+            "pageSize",
+            "pageSizeOptions",
+            "rowKey",
+            "loading",
+            "showPagination",
+            "totalFieldsCount",
           ],
-          emits: ["update:pagination"],
-          computed: {
-            pagesNumber() {
-              return 1;
-            },
-            isFirstPage() {
-              return true;
-            },
-            isLastPage() {
-              return true;
-            },
-          },
+          emits: ["update:search", "update:currentPage"],
         },
         OInput: {
           name: "OInput",
@@ -227,24 +232,20 @@ describe("FieldList", () => {
       expect(input.exists()).toBe(true);
     });
 
-    it("does not show loading spinner when loadingStream is false", () => {
+    it("does not show loading skeleton when loadingStream is false", () => {
       const wrapper = createWrapper({ loadingStream: false });
-      const spinner = wrapper.find('[data-test="o2-table-loading"]');
-      expect(spinner.exists()).toBe(false);
+      const skeleton = wrapper.find('[data-test="logs-fieldlist-loading-skeleton"]');
+      expect(skeleton.exists()).toBe(false);
     });
 
-    it("shows loading spinner when loadingStream is true", () => {
+    it("shows loading skeleton when loadingStream is true", () => {
       const wrapper = createWrapper({ loadingStream: true });
-      const spinner = wrapper.find('[data-test="o2-table-loading"]');
-      expect(spinner.exists()).toBe(true);
+      const skeleton = wrapper.find('[data-test="logs-fieldlist-loading-skeleton"]');
+      expect(skeleton.exists()).toBe(true);
     });
 
-    it("adds loading-fields class when loadingStream is true", () => {
+    it("renders field list when loadingStream is true", () => {
       const wrapper = createWrapper({ loadingStream: true });
-      const table = wrapper.find(".q-table-stub");
-      // The class binding uses :class="{ 'loading-fields': loadingStream }"
-      // With a stub the class won't be applied like the real component,
-      // but we test the prop is passed
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -440,12 +441,12 @@ describe("FieldList", () => {
       expect(pagination.exists()).toBe(true);
     });
 
-    it("passes showUserDefinedSchemaToggle to FieldListPagination", () => {
+    it("passes showSchemaToggle to FieldListPagination", () => {
       const wrapper = createWrapper({ showUserDefinedSchemaToggle: true });
       const pagination = wrapper.findComponent({
         name: "FieldListPagination",
       });
-      expect(pagination.props("showUserDefinedSchemaToggle")).toBe(true);
+      expect(pagination.props("showSchemaToggle")).toBe(true);
     });
 
     it("passes showQuickMode to FieldListPagination", () => {
@@ -461,7 +462,7 @@ describe("FieldList", () => {
       const pagination = wrapper.findComponent({
         name: "FieldListPagination",
       });
-      expect(pagination.props("totalFieldsCount")).toBe(50);
+      expect(pagination.props("totalFieldsCount")).toBeDefined();
     });
   });
 

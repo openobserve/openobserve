@@ -95,6 +95,12 @@ const mockDashboardPanelData = {
     stream: {
       customQueryFields: [{ name: "custom_field" }],
       vrlFunctionFieldList: [],
+      streamType: "logs",
+      selectedStream: "default",
+      streamResults: [],
+    },
+    streamFields: {
+      groupedFields: [],
     },
   },
 };

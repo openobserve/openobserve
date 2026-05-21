@@ -33,6 +33,14 @@ vi.mock("quasar", async () => {
   };
 });
 
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
 // Mock services
 vi.mock("@/services/stream", () => ({
   default: {
@@ -1167,9 +1175,9 @@ describe("MetricList — getMetricsFieldValues null / edge values", () => {
     wrapper.vm.getMetricsFieldValues("flaky_field");
     await flushPromises();
 
-    // The catch block calls quasar notify and the field may not be set at all
-    // What we verify is that the component does not throw and notify is called
-    expect(mockNotify).toHaveBeenCalled();
+    // The catch block calls toast and the field may not be set at all
+    // What we verify is that the component does not throw and toast is called
+    expect(mockToast).toHaveBeenCalled();
   });
 
   it("passes the selected metric value as stream_name", async () => {
