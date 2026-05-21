@@ -23,10 +23,8 @@ import {
   vi,
 } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
-installQuasar();
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 

@@ -15,11 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 describe("CustomMarkdownEditor", () => {
   let wrapper: any;

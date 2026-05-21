@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import HomeView from "../../views/HomeView.vue";
 import store from "./helpers/store";
 import i18n from "@/locales";
@@ -39,7 +38,6 @@ const mockRoute = {
   path: "/home",
 };
 
-installQuasar({ plugins: [] });
 
 describe("HomeView.vue", () => {
   let wrapper: any;

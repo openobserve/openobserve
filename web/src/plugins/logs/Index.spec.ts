@@ -45,7 +45,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
 
 // Mock the sqlUtils module
 vi.mock("@/utils/query/sqlUtils", () => ({

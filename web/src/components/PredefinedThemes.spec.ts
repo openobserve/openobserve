@@ -15,7 +15,6 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";

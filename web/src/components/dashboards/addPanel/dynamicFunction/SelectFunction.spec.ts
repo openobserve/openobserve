@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SelectFunction from "@/components/dashboards/addPanel/dynamicFunction/SelectFunction.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,

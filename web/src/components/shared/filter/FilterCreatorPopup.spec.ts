@@ -15,11 +15,9 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 import FilterCreatorPopup from "./FilterCreatorPopup.vue";
 
-installQuasar();
 
 const mockI18n = createI18n({
   locale: "en",

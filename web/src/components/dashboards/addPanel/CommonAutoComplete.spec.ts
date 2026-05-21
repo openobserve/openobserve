@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 // Mock store
 const mockStore = {
@@ -55,7 +54,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar();
 
 describe("CommonAutoComplete", () => {
   let wrapper: any;

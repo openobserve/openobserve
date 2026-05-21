@@ -1,6 +1,5 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MoveDashboardToAnotherFolder from "./MoveDashboardToAnotherFolder.vue";
 import { createI18n } from "vue-i18n";
 
@@ -140,7 +139,6 @@ const getMockUtils = async () => {
   };
 };
 
-installQuasar();
 
 describe("MoveDashboardToAnotherFolder", () => {
   let wrapper: any;

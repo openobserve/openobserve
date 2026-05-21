@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OverrideConfigPopup from "@/components/dashboards/OverrideConfigPopup.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // ── ODialog / OButton stubs ──────────────────────────────────────────────────
 // Stubs preserve the slot content (so child rendering can be asserted) and

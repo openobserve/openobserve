@@ -15,12 +15,10 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelineFlow from "./PipelineFlow.vue";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 
-installQuasar({});
 
 // Create i18n instance
 const i18n = createI18n({

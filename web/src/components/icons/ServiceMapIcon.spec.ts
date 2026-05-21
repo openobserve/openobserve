@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ServiceMapIcon from '@/components/icons/ServiceMapIcon.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('ServiceMapIcon.vue', () => {
   let wrapper: VueWrapper;

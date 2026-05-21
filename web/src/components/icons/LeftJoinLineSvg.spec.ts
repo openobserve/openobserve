@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import LeftJoinLineSvg from '@/components/icons/LeftJoinLineSvg.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('LeftJoinLineSvg.vue', () => {
   let wrapper: VueWrapper;

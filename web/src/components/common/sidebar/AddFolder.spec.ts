@@ -20,7 +20,6 @@ import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // ODrawer stub — mirrors the migrated component's overlay surface.

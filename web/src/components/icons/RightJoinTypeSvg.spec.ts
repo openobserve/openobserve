@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import RightJoinTypeSvg from '@/components/icons/RightJoinTypeSvg.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('RightJoinTypeSvg.vue', () => {
   let wrapper: VueWrapper;

@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FeatureComparisonTable from "./FeatureComparisonTable.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Mock feature constants
 vi.mock("@/constants/features", () => ({

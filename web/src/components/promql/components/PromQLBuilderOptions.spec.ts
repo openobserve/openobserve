@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PromQLBuilderOptions from "./PromQLBuilderOptions.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("PromQLBuilderOptions", () => {
   let wrapper: any;

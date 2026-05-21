@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -46,7 +45,6 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place

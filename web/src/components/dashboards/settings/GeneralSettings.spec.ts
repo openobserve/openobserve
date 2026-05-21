@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 // Mock utilities
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
@@ -36,7 +35,6 @@ import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 const mockDashboardData = {
   dashboardId: "dashboard-1",

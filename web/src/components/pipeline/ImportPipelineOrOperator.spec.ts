@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import ImportPipeline from '@/components/pipeline/ImportPipeline.vue';
 import store from '@/test/unit/helpers/store';
 
@@ -78,7 +77,6 @@ const i18n = createI18n({
   }
 });
 
-installQuasar();
 
 describe('ImportPipeline.vue - OR Operator Tests', () => {
   let wrapper: VueWrapper<any>;

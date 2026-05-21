@@ -178,6 +178,31 @@ describe("AddStream", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
     });
+
+    it("should render inline form without ODrawer when isInPipeline is true", async () => {
+      const wrapper = mountComp(undefined, { isInPipeline: true });
+      await flushPromises();
+
+      // Pipeline mode should not have ODrawer
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(false);
+
+      // Pipeline mode should have inputs
+      expect(wrapper.find('[data-test="add-stream-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-type-input"]').exists()).toBe(true);
+
+      // Pipeline mode should have buttons
+      expect(wrapper.find('[data-test="add-stream-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-save-btn"]').exists()).toBe(true);
+    });
+
+    it("should render data retention input in pipeline mode when enabled", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore, { isInPipeline: true });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
+    });
   });
 
   describe("Button event handling", () => {
@@ -206,6 +231,16 @@ describe("AddStream", () => {
       // Save button should be a submit button (type="submit")
       const saveBtn = wrapper.find('[data-test="add-stream-save-btn"]');
       expect(saveBtn.attributes("type")).toBe("submit");
+    });
+
+    it("should emit close when Cancel is clicked in pipeline mode", async () => {
+      const wrapper = mountComp(undefined, { isInPipeline: true });
+      await flushPromises();
+
+      const cancelBtn = wrapper.find('[data-test="add-stream-cancel-btn"]');
+      await cancelBtn.trigger("click");
+
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
   });
 
@@ -498,6 +533,123 @@ describe("AddStream", () => {
           timeout: 4000,
         }),
       );
+    });
+
+    it("should validate and save stream when submitForm is called with valid data", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.stream_type = "logs";
+
+      await vm.submitForm();
+      await flushPromises();
+
+      expect(mockCreateStream).toHaveBeenCalled();
+    });
+
+    it("should fail validation and set nameError when stream name is empty", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.stream_type = "logs";
+      // name is empty (default) — validation should fail on name
+
+      await vm.saveStream();
+      await flushPromises();
+
+      expect(mockCreateStream).not.toHaveBeenCalled();
+      expect(vm.nameError).toBe("Field is required!");
+    });
+
+    it("should return early from submitForm when validation fails", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      // name and stream_type are empty (defaults) — validation should fail
+      await vm.submitForm();
+      await flushPromises();
+
+      // submitForm returns early, saveStream is never entered
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(mockCreateStream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Input event handling", () => {
+    it("should trigger v-model setter and clear nameError when OInput emits in drawer mode", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.nameError = "Field is required!";
+      await flushPromises();
+
+      // Simulate OInput emitting update:modelValue (as it does on user input)
+      const oInputs = wrapper.findAllComponents({ name: "OInput" });
+      expect(oInputs.length).toBeGreaterThanOrEqual(1);
+      await oInputs[0].vm.$emit("update:modelValue", "updated-name");
+      await flushPromises();
+
+      // v-model setter should update streamInputs.name
+      expect(vm.streamInputs.name).toBe("updated-name");
+      // @update:model-value handler should clear the error
+      expect(vm.nameError).toBe("");
+    });
+
+    it("should trigger v-model setter when OInput emits in pipeline mode", async () => {
+      const wrapper = mountComp(undefined, { isInPipeline: true });
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.nameError = "Field is required!";
+      await flushPromises();
+
+      const oInputs = wrapper.findAllComponents({ name: "OInput" });
+      expect(oInputs.length).toBeGreaterThanOrEqual(1);
+      await oInputs[0].vm.$emit("update:modelValue", "pipeline-name");
+      await flushPromises();
+
+      expect(vm.streamInputs.name).toBe("pipeline-name");
+      expect(vm.nameError).toBe("");
+    });
+
+    it("should trigger v-model setter for stream_type when OSelect emits in drawer mode", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamTypeError = "Field is required!";
+      await flushPromises();
+
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      await oSelect.vm.$emit("update:modelValue", "metrics");
+      await flushPromises();
+
+      expect(vm.streamInputs.stream_type).toBe("metrics");
+      expect(vm.streamTypeError).toBe("");
+    });
+
+    it("should trigger v-model setter for dataRetentionDays when OInput emits with showDataRetention enabled", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.stream_type = "logs";
+      vm.dataRetentionError = "Field is required!";
+      await flushPromises();
+
+      const dataRetentionDiv = wrapper.find('[data-test="add-stream-data-retention-input"]');
+      const oInput = dataRetentionDiv.findComponent({ name: "OInput" });
+      await oInput.vm.$emit("update:modelValue", 30);
+      await flushPromises();
+
+      expect(vm.streamInputs.dataRetentionDays).toBe(30);
+      expect(vm.dataRetentionError).toBe("");
     });
   });
 

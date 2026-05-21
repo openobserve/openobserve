@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FileItem from "@/components/actionScripts/FileItem.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
 
 describe("FileItem.vue", () => {
   let wrapper: VueWrapper;

@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import { reactive, nextTick } from "vue";
 
@@ -93,7 +92,6 @@ vi.mock("vue-i18n", () => ({
   }),
 }));
 
-installQuasar();
 
 describe("ColorPaletteDropDown", () => {
   let wrapper: VueWrapper;

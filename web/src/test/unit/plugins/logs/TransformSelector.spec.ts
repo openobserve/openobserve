@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import TransformSelector from "@/plugins/logs/TransformSelector.vue";
 import i18n from "@/locales";
 import { ref } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Create mock objects that can be modified per test
 const mockSearchObj = {
@@ -59,7 +58,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
 
-installQuasar();
 
 describe("TransformSelector.vue", () => {
   let store: any;

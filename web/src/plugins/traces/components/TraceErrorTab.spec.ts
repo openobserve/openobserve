@@ -15,11 +15,9 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // ─── Quasar mock — override useQuasar with a notify spy ────────────────────
 const { mockNotify } = vi.hoisted(() => ({

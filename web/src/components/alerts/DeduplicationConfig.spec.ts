@@ -15,11 +15,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 import DeduplicationConfig from "@/components/alerts/DeduplicationConfig.vue";
 

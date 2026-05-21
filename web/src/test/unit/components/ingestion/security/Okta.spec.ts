@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Okta from "@/components/ingestion/security/Okta.vue";
 
 // Mock useIngestion composable
@@ -36,7 +35,6 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("Okta.vue", () => {
   let store: any;

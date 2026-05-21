@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
-installQuasar();
 
 vi.mock('@/aws-exports', () => ({
   default: { isCloud: 'false', isEnterprise: 'true' },

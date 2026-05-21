@@ -17,10 +17,8 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import CustomConfirmDialog from "./CustomConfirmDialog.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props forwarded by CustomConfirmDialog and synthesise the

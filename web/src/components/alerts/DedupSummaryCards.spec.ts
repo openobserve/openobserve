@@ -15,12 +15,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DedupSummaryCards from "./DedupSummaryCards.vue";
 import { createStore } from "vuex";
 import alertsService from "@/services/alerts";
 
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 

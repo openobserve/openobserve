@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import FilterCondition from './FilterCondition.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -26,7 +25,6 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe('FilterCondition.vue Branch Coverage', () => {
   const defaultProps = {

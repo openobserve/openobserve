@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
 // Mock Quasar plugins
@@ -172,7 +171,6 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;

@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
 
@@ -53,7 +52,6 @@ const getAfterSanitizeAttributesHook = () => {
   return hookCall ? hookCall[1] : undefined;
 };
 
-installQuasar();
 
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;

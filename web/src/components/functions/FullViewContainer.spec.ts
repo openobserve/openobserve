@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import FullViewContainer from '@/components/functions/FullViewContainer.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('FullViewContainer.vue', () => {
   let wrapper: VueWrapper;

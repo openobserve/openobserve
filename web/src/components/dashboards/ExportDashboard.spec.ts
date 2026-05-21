@@ -16,12 +16,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ExportDashboard from "./ExportDashboard.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Mock getDashboard utility
 vi.mock("@/utils/commons", () => ({

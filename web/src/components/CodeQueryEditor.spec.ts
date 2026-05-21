@@ -15,11 +15,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Stable mock editor instance so tests can reference it directly
 const mockEditorObj = {
