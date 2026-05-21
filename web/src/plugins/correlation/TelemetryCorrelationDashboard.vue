@@ -250,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 )
                               "
                               size="xs"
+                              @update:model-value="toggleMetricStream(stream)"
                             />
                           </div>
                           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -712,6 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                             size="xs"
+                            @update:model-value="toggleMetricStream(stream)"
                           />
                         </div>
                         <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">

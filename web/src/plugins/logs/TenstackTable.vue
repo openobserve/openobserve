@@ -315,7 +315,7 @@ class="tw:mr-1" />
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
+                class="tw:py-none tw:px-2 tw:flex tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
                 :style="{
                   width:
