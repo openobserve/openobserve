@@ -1155,7 +1155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading state -->
-    <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center">
+    <div v-if="loading" class="tw:flex tw:items-center tw:justify-center" style="height: calc(100vh - 130px);">
       <OSpinner size="md" />
     </div>
   </div>

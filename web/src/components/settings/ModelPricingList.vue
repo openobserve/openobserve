@@ -327,10 +327,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div
             v-if="loading"
-            class="tw:w-full tw:flex tw:flex-col flex-center tw:mt-1"
-            style="font-size: 1.5rem"
+            class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:mt-1"
+            style="font-size: 1.5rem; height: calc(100vh - 220px);"
           >
-            <OSpinner size="lg" class="tw:mt-[20vh]" />
+            <OSpinner size="lg" />
           </div>
           <div
             v-else
