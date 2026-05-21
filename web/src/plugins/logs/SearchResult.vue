@@ -1395,6 +1395,11 @@ export default defineComponent({
         field_value,
         action,
       );
+      // Clicks on log-row include/exclude should always append (AND) to the
+      // existing query, never replace an existing condition for the same field
+      // — unlike the field-sidebar checkboxes which represent the full set of
+      // selected values for that field.
+      searchObj.data.stream.addToFilterMode = "append";
       searchObj.data.stream.addToFilter = searchExpression;
     };
 
