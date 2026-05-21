@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor" data-test="panel-editor-container">
+  <div class="panel-editor tw:px-[0.625rem]!" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
-      <div class="tw:pl-[0.625rem]">
+      <div>
         <div
           class="tw:flex tw:flex-col scroll card-container tw:mr-[0.625rem]"
           style="
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="mainContentAreaClass" :style="afterSlotStyle">
               <div :class="afterSlotInnerClass" :style="afterSlotInnerStyle">
                 <div
-                  class="layout-panel-container tw:flex tw:flex-col"
+                  class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="tw:flex tw:flex-col tw:relative tw:overflow-hidden"
+                    class="tw:flex tw:flex-col tw:relative tw:overflow-hidden tw:h-full"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Chart Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'custom_chart'"
-        class="tw:flex tw:flex-col tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col"
         style="
           overflow-y: auto;
           display: flex;
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Field List for custom chart -->
           <template #before>
-            <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
               <div
                 class="tw:flex tw:flex-col scroll card-container"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
@@ -479,7 +479,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="sidebar-button"
               size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
+              :style="{ zIndex: 100 }"
+              class="tw:top-[0.875rem]! tw:left-[0rem]! tw:absolute!"
               @click="collapseFieldList"
             >
               <template #icon-left>
@@ -502,8 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="{ height: contentHeight, overflowY: 'auto' }"
             >
               <div
-                class="tw:flex tw:flex-col scroll"
-                style="height: 100%; display: flex; flex-direction: column"
+                class="tw:flex tw:flex-col scroll tw:w-full tw:h-full"
               >
                 <!-- Editor/Preview splitter -->
                 <div style="height: 500px; flex-shrink: 0; overflow: hidden">
@@ -909,16 +909,16 @@ const rowStyle = computed(() => {
 // Main content container class - logs/build uses vertical flex, others use horizontal
 const mainContentContainerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:flex tw:flex-col flex column";
+    return "tw:flex tw:flex-row tw:flex-1";
   }
-  return "tw:flex tw:flex-col tw:mr-[0.625rem]";
+  return "tw:flex tw:flex-row tw:flex-1";
 });
 
 // Main content container style
 const mainContentContainerStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
+  // if (props.pageType === "logs" || props.pageType === "build") {
+  //   return { width: "100%", height: "100%" };
+  // }
   // flex:1 and minWidth:0 are required so this column fills the remaining row width
   // (alongside the fixed-width ChartSelection sidebar) and lets the inner OSplitter
   // resolve its `width: 100%` against a real parent width instead of intrinsic content.
@@ -957,9 +957,7 @@ const afterSlotStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {
       height: "100%",
-      width: dashboardPanelData.layout.showFieldList
-        ? "100%"
-        : "calc(100% - 58px)",
+      width: "100%"
     };
   }
   return {};
@@ -968,9 +966,9 @@ const afterSlotStyle = computed(() => {
 // After slot inner div class - logs/build uses "tw:flex tw:flex-col", others use "tw:flex tw:flex-col scroll"
 const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:flex tw:flex-col";
+    return "tw:flex tw:flex-col tw:w-full";
   }
-  return "tw:flex tw:flex-col scroll";
+  return "tw:flex tw:flex-col scroll tw:w-full";
 });
 
 // After slot inner div style
