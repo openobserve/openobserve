@@ -1,5 +1,5 @@
 ﻿<template>
-  <ODropdown v-model:open="picker.showMenu" side="bottom" align="start">
+  <ODropdown v-model:open="picker.showMenu" side="bottom" :align="props.align">
     <template #trigger>
       <OButton
         :style="{
@@ -52,7 +52,7 @@
               <div class="relative-row tw:px-3 tw:py-2">
                 <div class="relative-period-name">Custom</div>
                 <div class="tw:flex tw:gap-2">
-                  <div class="tw:flex tw:flex-col">
+                  <div class="tw:flex tw:flex-col tw:w-20">
                     <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
@@ -100,6 +100,12 @@ const props = defineProps({
     default: false,
     required: false,
     type: Boolean,
+  },
+  align: {
+    default: "end",
+    required: false,
+    type: String,
+    validator: (v) => ["start", "center", "end"].includes(v),
   },
 });
 
