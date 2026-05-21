@@ -45,9 +45,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgDetails, OrgRenameBody,
-                OrgUser, Organization, OrganizationCreationResponse, OrganizationResponse,
-                PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgCreateRequest, OrgDetails,
+                OrgRenameBody, OrgUser, Organization, OrganizationCreationResponse,
+                OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -511,11 +511,17 @@ pub async fn create_user_rumtoken(
 )]
 pub async fn create_org(
     Headers(user_email): Headers<UserEmail>,
-    Json(org): Json<Organization>,
+    Json(req): Json<OrgCreateRequest>,
 ) -> Response {
-    let mut org = org;
+    let mut org = Organization {
+        identifier: req.identifier,
+        name: req.name,
+        org_type: req.org_type,
+        service_account: req.service_account,
+    };
 
-    let result = organization::create_org(&mut org, &user_email.user_id).await;
+    let result =
+        organization::create_org(&mut org, &user_email.user_id, req.make_billed_member_of).await;
     match result {
         Ok((created_org, service_account_info)) => {
             use crate::common::meta::organization::OrganizationCreationResponse;
