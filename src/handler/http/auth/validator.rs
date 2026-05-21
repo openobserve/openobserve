@@ -143,14 +143,11 @@ pub async fn validator(
     path_prefix: &str,
 ) -> Result<AuthValidationResult, AuthError> {
     let cfg = get_config();
-    let path = match req_data
-        .uri
-        .path()
+    let uri_path = req_data.uri.path();
+    let path = uri_path
         .strip_prefix(format!("{}{}", cfg.common.base_uri, path_prefix).as_str())
-    {
-        Some(path) => path,
-        None => req_data.uri.path(),
-    };
+        .or_else(|| uri_path.strip_prefix("/api/"))
+        .unwrap_or(uri_path);
     let path = path.strip_prefix("/").unwrap_or(path);
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
