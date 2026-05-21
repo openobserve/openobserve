@@ -852,6 +852,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
             :metric-streams="correlationProps.metricStreams"
             :log-streams="correlationProps.logStreams"
             :trace-streams="correlationProps.traceStreams"
@@ -1767,6 +1768,7 @@ export default defineComponent({
             serviceName: correlationData.service_name,
             matchedDimensions: actualMatchedDimensions,
             additionalDimensions: {},
+            matchedSetId: correlationData.matched_set_id,
             metricStreams: correlationData.related_streams.metrics,
             logStreams: correlationData.related_streams.logs,
             traceStreams: correlationData.related_streams.traces,

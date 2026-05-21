@@ -549,6 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :additional-dimensions="
                   metricsCorrelationData.additionalDimensions
                 "
+                :matched-set-id="metricsCorrelationData.matchedSetId"
                 :metric-streams="metricsCorrelationData.metricStreams"
                 :log-streams="metricsCorrelationData.logStreams"
                 :trace-streams="metricsCorrelationData.traceStreams"
@@ -585,6 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :service-name="correlationData.serviceName"
     :matched-dimensions="correlationData.matchedDimensions"
     :additional-dimensions="correlationData.additionalDimensions"
+    :matched-set-id="correlationData.matchedSetId"
     :log-streams="correlationData.logStreams"
     :metric-streams="correlationData.metricStreams"
     :trace-streams="correlationData.traceStreams"
@@ -980,6 +982,7 @@ export default defineComponent({
       serviceName: string;
       matchedDimensions: Record<string, string>;
       additionalDimensions: Record<string, string>;
+      matchedSetId?: string;
       logStreams: any[];
       metricStreams: any[];
       traceStreams: any[];
@@ -997,6 +1000,7 @@ export default defineComponent({
       serviceName: string;
       matchedDimensions: Record<string, string>;
       additionalDimensions: Record<string, string>;
+      matchedSetId?: string;
       logStreams: any[];
       metricStreams: any[];
       traceStreams: any[];
@@ -1035,6 +1039,7 @@ export default defineComponent({
           serviceName: data.service_name,
           matchedDimensions: data.matched_dimensions || {},
           additionalDimensions: data.additional_dimensions || {},
+          matchedSetId: data.matched_set_id,
           logStreams: data.related_streams?.logs || [],
           metricStreams: data.related_streams?.metrics || [],
           traceStreams: data.related_streams?.traces || [],
@@ -1162,6 +1167,7 @@ export default defineComponent({
           serviceName: data.service_name,
           matchedDimensions: data.matched_dimensions || {},
           additionalDimensions: data.additional_dimensions || {},
+          matchedSetId: data.matched_set_id,
           logStreams: data.related_streams?.logs || [],
           metricStreams: data.related_streams?.metrics || [],
           traceStreams: data.related_streams?.traces || [],

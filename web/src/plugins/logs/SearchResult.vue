@@ -535,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :service-name="correlationDashboardProps.serviceName"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
       :additional-dimensions="correlationDashboardProps.additionalDimensions"
+      :matched-set-id="correlationDashboardProps.matchedSetId"
       :metric-streams="correlationDashboardProps.metricStreams"
       :log-streams="correlationDashboardProps.logStreams"
       :trace-streams="correlationDashboardProps.traceStreams"
@@ -1313,6 +1314,7 @@ export default defineComponent({
           serviceName: result.correlationData.service_name,
           matchedDimensions: actualMatchedDimensions,
           additionalDimensions: {},
+          matchedSetId: result.correlationData.matched_set_id,
           metricStreams: result.correlationData.related_streams.metrics || [],
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],

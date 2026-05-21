@@ -258,6 +258,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div class="metric-group-actions">
                             <OButton
+                              v-for="button in subjectButtons"
+                              :key="button.id"
+                              variant="ghost"
+                              size="icon-xs"
+                              :disabled="getSubjectButtonState(button, group.id).relevantCount === 0"
+                              :class="{
+                                'subject-button-active':
+                                  getSubjectButtonState(button, group.id).state === 'all' &&
+                                  getSubjectButtonState(button, group.id).relevantCount > 0,
+                                'subject-button-partial':
+                                  getSubjectButtonState(button, group.id).state === 'partial',
+                              }"
+                              @click.stop="toggleSubjectInGroup(button, group.id)"
+                            >
+                              {{ button.label }}
+                            </OButton>
+                            <OButton
                               variant="ghost"
                               size="icon-xs"
                               @click.stop="selectAllInGroup(group.id)"
@@ -753,6 +770,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="metric-group-actions">
                           <OButton
+                            v-for="button in subjectButtons"
+                            :key="button.id"
+                            variant="ghost"
+                            size="icon-xs"
+                            :disabled="getSubjectButtonState(button, group.id).relevantCount === 0"
+                            :class="{
+                              'subject-button-active':
+                                getSubjectButtonState(button, group.id).state === 'all' &&
+                                getSubjectButtonState(button, group.id).relevantCount > 0,
+                              'subject-button-partial':
+                                getSubjectButtonState(button, group.id).state === 'partial',
+                            }"
+                            @click.stop="toggleSubjectInGroup(button, group.id)"
+                          >
+                            {{ button.label }}
+                          </OButton>
+                          <OButton
                             variant="ghost"
                             size="icon-xs"
                             @click.stop="selectAllInGroup(group.id)"
@@ -1241,6 +1275,13 @@ import {
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  getSubjectSelectionState,
+  SUBJECT_BUTTONS_BY_SET,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
 import type { StreamInfo } from "@/services/service_streams";
 import {
   enrichStreamsWithOverlap,
@@ -1271,6 +1312,7 @@ export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
+  matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -1611,12 +1653,20 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams — prefer curated defaults from group definitions,
-// fall back to first 6 unique streams for non-OTel deployments.
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
+// Selected metric streams — initial selection strategy:
+// 1. If the matched_set_id has subject buttons registered, start empty and let
+//    the subject-button watch apply any defaultActive buttons (e.g. Pod for k8s).
+// 2. Otherwise prefer curated defaults from group definitions, falling back to
+//    the first 6 unique streams for non-OTel deployments.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
+      if (
+        props.matchedSetId &&
+        SUBJECT_BUTTONS_BY_SET[props.matchedSetId]?.length
+      ) {
+        return [];
+      }
       const unique = getUniqueStreams(sortedMetricStreams.value);
       const defs =
         props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
@@ -1752,6 +1802,95 @@ const getGroupSelectionState = (
   if (selectedCount === groupStreams.length) return "all";
   return "partial";
 };
+
+// Subject buttons (Pod/Node/Container for k8s, etc.) — derived from the
+// matched IdentitySet's semantic groups. Rendered alongside All/None in each
+// metric group's header. Empty when matched_set_id is missing/unrecognized.
+const subjectButtons = computed<SubjectButton[]>(() =>
+  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
+);
+
+const getSubjectButtonState = (button: SubjectButton, groupId: string) => {
+  const groupStreams =
+    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
+  return getSubjectSelectionState(
+    button,
+    groupStreams,
+    selectedMetricStreams.value,
+  );
+};
+
+const selectSubjectInGroup = (button: SubjectButton, groupId: string) => {
+  const groupStreams =
+    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
+  const matches = groupStreams.filter((s) =>
+    streamMatchesPatterns(s.stream_name, button.patterns),
+  );
+  if (matches.length === 0) return;
+  const alreadySelected = new Set(
+    selectedMetricStreams.value.map((s) => s.stream_name),
+  );
+  const toAdd = matches.filter((s) => !alreadySelected.has(s.stream_name));
+  if (toAdd.length === 0) return;
+  selectedMetricStreams.value = [
+    ...selectedMetricStreams.value,
+    ...applyUnstableDimensionDefaults(toAdd),
+  ];
+};
+
+const deselectSubjectInGroup = (button: SubjectButton, groupId: string) => {
+  const groupStreams =
+    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
+  const matchNames = new Set(
+    groupStreams
+      .filter((s) => streamMatchesPatterns(s.stream_name, button.patterns))
+      .map((s) => s.stream_name),
+  );
+  if (matchNames.size === 0) return;
+  selectedMetricStreams.value = selectedMetricStreams.value.filter(
+    (s) => !matchNames.has(s.stream_name),
+  );
+};
+
+const toggleSubjectInGroup = (button: SubjectButton, groupId: string) => {
+  const { state } = getSubjectButtonState(button, groupId);
+  if (state === "all") {
+    deselectSubjectInGroup(button, groupId);
+  } else {
+    selectSubjectInGroup(button, groupId);
+  }
+};
+
+// Apply defaultActive buttons across every metric group on first availability
+// of subjectButtons. Runs once per matched_set_id transition so user edits are
+// preserved on subsequent reactive updates.
+let lastAppliedDefaultsKey: string | null = null;
+watch(
+  [subjectButtons, groupedUniqueMetricStreams],
+  ([buttons, grouped]) => {
+    if (!buttons.length) return;
+    const defaultButtons = buttons.filter((b) => b.defaultActive);
+    if (!defaultButtons.length) return;
+
+    // Key on matched_set_id + the set of group ids that currently have streams.
+    // This way defaults re-apply if the user navigates between contexts but
+    // not on every selection change.
+    const key = `${props.matchedSetId ?? ""}|${Object.keys(grouped.byGroup)
+      .filter((g) => grouped.byGroup[g].length > 0)
+      .sort()
+      .join(",")}`;
+    if (lastAppliedDefaultsKey === key) return;
+
+    for (const button of defaultButtons) {
+      for (const g of grouped.groups) {
+        if (g.streams.length === 0) continue;
+        selectSubjectInGroup(button, g.id);
+      }
+    }
+    lastAppliedDefaultsKey = key;
+  },
+  { immediate: true },
+);
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -3105,6 +3244,16 @@ body.body--dark .metric-splitter-separator {
   .metric-group-actions {
     display: flex;
     gap: 0.25rem;
+
+    .subject-button-active {
+      color: var(--q-primary);
+      font-weight: 600;
+    }
+
+    .subject-button-partial {
+      color: var(--q-primary);
+      opacity: 0.6;
+    }
   }
 }
 
