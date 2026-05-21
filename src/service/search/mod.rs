@@ -722,10 +722,9 @@ pub async fn search_partition(
     .unwrap_or((false, false));
 
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {file_list_took} ms",
         (req.start_time, req.end_time),
         files.len(),
-        file_list_took,
     );
 
     if use_single_partition {
@@ -786,19 +785,8 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        // non enterprise - diabled
-        #[cfg(not(feature = "enterprise"))]
         streaming_output: false,
-        #[cfg(not(feature = "enterprise"))]
         streaming_aggs: false,
-        #[cfg(not(feature = "enterprise"))]
-        streaming_id: None,
-        // enterprise
-        #[cfg(feature = "enterprise")]
-        streaming_output: false,
-        #[cfg(feature = "enterprise")]
-        streaming_aggs: false,
-        #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
         non_ts_order_by_cols: vec![],
