@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="titleError = ''"
             />
           </div>
-          <div class="tw:w-full tw:pb-3">
+          <div class="tw:w-full tw:py-3 ">
             <div
               class="tw:pb-2 tw:font-bold"
               data-test="add-template-body-input-title"
