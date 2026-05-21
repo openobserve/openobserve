@@ -10,13 +10,15 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
-import { ref, watch } from "vue";
+import { computed, provide, ref, watch } from "vue";
+import { O_DROPDOWN_NESTED_KEY } from "./ODropdown.context";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
   side: "bottom",
   align: "start",
   sideOffset: 4,
+  persistent: false,
 });
 
 const emit = defineEmits<DropdownEmits>();
@@ -26,7 +28,6 @@ defineSlots<DropdownSlots>();
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
-// Initialise from props.open so `open=true` works on first render.
 const internalOpen = ref(props.open ?? false);
 
 watch(
@@ -41,36 +42,79 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
-/**
- * Prevent Reka UI from closing the dropdown when a pointer-down occurs inside
- * another portaled overlay nested in this dropdown's content (e.g. an OSelect
- * listbox or another ODropdown). Reka's DismissableLayer considers those
- * clicks "outside" because portaled content is rendered directly to <body>,
- * not inside DropdownMenuContent.
- */
-function isInsideNestedPortal(target: Element | null): boolean {
-  return !!target?.closest("[data-reka-popper-content-wrapper]");
+// ═══════════════════════════════════════════════════════════════════════════
+// Nested-overlay coordination
+// ═══════════════════════════════════════════════════════════════════════════
+// Descendant overlays (OSelect / OCombobox / nested ODropdown / etc.) call
+// `open()` from the injected registry when they open and the returned
+// `close` when they close. While at least one descendant is open — or one
+// just closed within the same pointer-event tick — outside-clicks on us
+// originate from the descendant's portal, not from a real "outside" click,
+// so we silently swallow them.
+const nestedOverlayCount = ref(0);
+const lastNestedCloseAt = ref(0);
+const NESTED_CLOSE_GRACE_MS = 50;
+
+provide(O_DROPDOWN_NESTED_KEY, {
+  open: () => {
+    nestedOverlayCount.value++;
+    return () => {
+      nestedOverlayCount.value = Math.max(0, nestedOverlayCount.value - 1);
+      lastNestedCloseAt.value = Date.now();
+    };
+  },
+});
+
+function withinNestedCloseGrace(): boolean {
+  return Date.now() - lastNestedCloseAt.value < NESTED_CLOSE_GRACE_MS;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `persistent` prop — controls how many real outside-clicks must happen
+// before the dropdown actually dismisses. See ODropdown.types.ts for spec.
+// ═══════════════════════════════════════════════════════════════════════════
+const persistenceBudget = computed<number>(() => {
+  if (props.persistent === false) return 0;
+  if (props.persistent === true) return Number.POSITIVE_INFINITY;
+  // Numeric value: clamp at >= 1 so any positive number means "needs at
+  // least one swallow".
+  const n = Number(props.persistent);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+});
+
+// Counts how many outside-clicks the dropdown has already swallowed in
+// the current open-session. Reset each time we open.
+const swallowedOutsideClicks = ref(0);
+
+watch(internalOpen, (open) => {
+  if (open) swallowedOutsideClicks.value = 0;
+});
+
+function shouldSwallowRealOutsideClick(): boolean {
+  if (persistenceBudget.value === 0) return false;
+  if (persistenceBudget.value === Number.POSITIVE_INFINITY) return true;
+  if (swallowedOutsideClicks.value < persistenceBudget.value) {
+    swallowedOutsideClicks.value++;
+    return true;
+  }
+  return false;
 }
 
 function handlePointerDownOutside(event: Event) {
-  const target = (event as CustomEvent<{ originalEvent: PointerEvent }>).detail
-    ?.originalEvent?.target as Element | null;
-  if (isInsideNestedPortal(target)) {
+  // Click came from a still-open descendant overlay, OR a descendant just
+  // closed in the same pointer-event tick → never our problem.
+  if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
+    event.preventDefault();
+    return;
+  }
+  // Real outside click. Honour `persistent` (false / true / number).
+  if (shouldSwallowRealOutsideClick()) {
     event.preventDefault();
   }
 }
 
-/**
- * When a nested popup opens (e.g. OSelect listbox), focus moves into a node
- * that lives outside DropdownMenuContent in the DOM. Reka UI fires
- * focus-outside and tries to return focus to the trigger, which causes the
- * browser to land on whatever is behind the dropdown. Prevent default so
- * focus stays inside the nested popup as intended.
- */
 function handleFocusOutside(event: Event) {
-  const target = (event as CustomEvent<{ originalEvent: FocusEvent }>).detail
-    ?.originalEvent?.target as Element | null;
-  if (isInsideNestedPortal(target)) {
+  if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
 }
