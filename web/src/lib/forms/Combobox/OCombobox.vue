@@ -123,7 +123,10 @@ const hasLabel = computed(
     <label
       v-if="hasLabel || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      :class="[
+        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        disabled && 'o-input-label--disabled',
+      ]"
     >
       <slot name="label">{{ label }}</slot>
       <OIcon
@@ -131,7 +134,7 @@ const hasLabel = computed(
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-input-label"
+        class="tw:cursor-help"
       ><slot name="tooltip" /></OIcon>
     </label>
 

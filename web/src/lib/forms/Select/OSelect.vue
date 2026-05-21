@@ -688,7 +688,10 @@ const fieldWidthClass = computed(() => {
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      :class="[
+        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        disabled && 'o-input-label--disabled',
+      ]"
     >
       {{ label }}
       <OIcon
@@ -696,7 +699,7 @@ const fieldWidthClass = computed(() => {
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-input-label"
+        class="tw:cursor-help"
       ><slot name="tooltip" /></OIcon>
     </label>
 
@@ -721,11 +724,10 @@ const fieldWidthClass = computed(() => {
               hasError
                 ? 'tw:border-select-border-error'
                 : 'tw:border-select-border tw:hover:border-select-border-hover',
+              /* Single-border focus — no outer ring. See OInput.vue. */
               'tw:focus:outline-none tw:focus:border-select-border-focus',
-              'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
-              'tw:ring-offset-1 tw:ring-offset-surface-base',
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-              'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed',
+              'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               triggerEndPadding,
               labelPosition === 'inside' && label
                 ? 'tw:items-end tw:h-10'
@@ -1111,11 +1113,10 @@ const fieldWidthClass = computed(() => {
             hasError
               ? 'tw:border-select-border-error'
               : 'tw:border-select-border tw:hover:border-select-border-hover',
+            /* Single-border focus — no outer ring. See OInput.vue. */
             'tw:focus:outline-none tw:focus:border-select-border-focus',
-            'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
-            'tw:ring-offset-1 tw:ring-offset-surface-base',
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed',
+            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             triggerEndPadding,
             labelPosition === 'inside' && label
               ? 'tw:items-end tw:h-10 tw:pb-1.5'
