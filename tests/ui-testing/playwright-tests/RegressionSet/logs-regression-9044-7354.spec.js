@@ -5,7 +5,7 @@ const logData = require('../../fixtures/log.json');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
-  test.describe.configure({ mode: 'parallel' });
+  test.describe.configure({ mode: 'serial' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -20,7 +20,7 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
     await pm.logsPage.selectIndexStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate" WHERE match_all(\'zin*\')');
+    await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
     await page.waitForTimeout(500);
     await pm.logsPage.selectRunQuery();
     await pm.logsPage.waitForResultsLoaded();
@@ -88,7 +88,7 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
 });
 
 test.describe('Regression: Undefined Length error on Logs -> Scheduled Search -> Streams -> Logs (#7354)', () => {
-  test.describe.configure({ mode: 'parallel' });
+  test.describe.configure({ mode: 'serial' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
