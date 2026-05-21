@@ -129,9 +129,8 @@ describe("GroupRoles Component", () => {
     });
 
     it("filters roles correctly", async () => {
-      // Switch to "all" to see all roles including developer
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Switch to "all" via direct API call to avoid reka-ui toggle quirks in jsdom
+      await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
       // Verify all 3 roles are visible before filtering
@@ -151,9 +150,8 @@ describe("GroupRoles Component", () => {
     });
 
     it("filters roles case-insensitively", async () => {
-      // Switch to "all" to see all roles
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Switch to "all" via direct API call to avoid reka-ui toggle quirks in jsdom
+      await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
       // Act: type search term in uppercase
@@ -167,9 +165,8 @@ describe("GroupRoles Component", () => {
     });
 
     it("returns all roles when search term is empty", async () => {
-      // Switch to "all" to see all roles
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Switch to "all" via direct API call to avoid reka-ui toggle quirks in jsdom
+      await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
       // Act: clear search
@@ -188,7 +185,7 @@ describe("GroupRoles Component", () => {
     it("fetches roles on component mount", async () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user", "developer"];
-      vi.mocked(getRoles).mockResolvedValue({ data: mockRolesData });
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
 
       await wrapper.vm.getchOrgUsers();
 
@@ -198,7 +195,7 @@ describe("GroupRoles Component", () => {
     it("transforms roles data correctly", async () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user"];
-      vi.mocked(getRoles).mockResolvedValue({ data: mockRolesData });
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
 
       await wrapper.vm.getchOrgUsers();
 
@@ -218,7 +215,7 @@ describe("GroupRoles Component", () => {
     it("marks roles as selected based on groupRoles prop", async () => {
       const { getRoles } = await import("@/services/iam");
       const mockRolesData = ["admin", "user", "developer"];
-      vi.mocked(getRoles).mockResolvedValue({ data: mockRolesData });
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: mockRolesData });
 
       // groupRoles prop contains ["admin", "user"]
       await wrapper.vm.getchOrgUsers();
@@ -249,7 +246,7 @@ describe("GroupRoles Component", () => {
 
     it("renders table with roles data", async () => {
       const { getRoles } = await import("@/services/iam");
-      vi.mocked(getRoles).mockResolvedValue({
+      vi.mocked(getRoles).mockResolvedValueOnce({
         data: ["admin", "user"],
       });
 
@@ -262,7 +259,7 @@ describe("GroupRoles Component", () => {
 
     it("shows no users message when no roles", async () => {
       const { getRoles } = await import("@/services/iam");
-      vi.mocked(getRoles).mockResolvedValue({ data: [] });
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
 
       const emptyWrapper = mount(GroupRoles, {
         global: {
@@ -287,9 +284,13 @@ describe("GroupRoles Component", () => {
   });
 
   describe("Role Selection", () => {
-    it("renders checkboxes for role selection", () => {
-      // After mount, roles "admin" and "user" are selected (in groupRoles)
-      // "developer" is not selected and hidden (usersDisplay is "selected")
+    it("renders checkboxes for role selection", async () => {
+      // After mount, roles "admin" and "user" are selected (in groupRoles).
+      // usersDisplay starts as "selected" so only selected roles are shown.
+      // Call updateUserTable directly to switch to "all" (avoids reka-ui toggle quirks in jsdom).
+      await wrapper.vm.updateUserTable("all");
+      await flushPromises();
+
       const adminCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]');
       const userCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]');
 
@@ -298,9 +299,8 @@ describe("GroupRoles Component", () => {
     });
 
     it("toggles selection when checkbox is clicked", async () => {
-      // Switch to "all" to see developer role
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Switch to "all" via direct API call to avoid reka-ui toggle quirks in jsdom
+      await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
       const developerCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]');
@@ -310,74 +310,72 @@ describe("GroupRoles Component", () => {
       await developerCheckbox.trigger("click");
       await flushPromises();
 
-      // The toggleUserSelection function mutates props.addedRoles directly
-      // "developer" was not in groupUsersMap, so it should be added to addedRoles
+      // The toggleUserSelection function mutates props.addedRoles directly.
+      // "developer" was not in groupUsersMap, so it should be added to addedRoles.
       expect(wrapper.props("addedRoles").has("developer")).toBe(true);
     });
 
     it("adds role to addedRoles when selecting unassigned role", () => {
-      const addedRoles = new Set();
-      const removedRoles = new Set();
+      // Arrange: use the actual props.addedRoles Set passed to the component
+      const addedRoles = wrapper.props("addedRoles") as Set<string>;
+      const testRole = { role_name: "newrole", isInGroup: false };
 
-      // Apply props via setProps to update groupUsersMap
-      // groupRoles: [] means nothing is originally in group
-      // isInGroup: false means the checkbox is currently unchecked
-      // After toggle: isInGroup becomes true → role was not in groupUsersMap → added to addedRoles
-      const testRole = { role_name: "admin", isInGroup: false };
-
-      // Set groupUsersMap to empty (no roles originally in group)
+      // Set groupUsersMap to empty — "newrole" was not originally in the group
       wrapper.vm.groupUsersMap = new Set([]);
 
+      // Act
       wrapper.vm.toggleUserSelection(testRole);
 
-      expect(addedRoles.has("admin")).toBe(true);
+      // Assert: newrole is staged for addition
+      expect(addedRoles.has("newrole")).toBe(true);
     });
 
     it("adds role to removedRoles when deselecting assigned role", () => {
-      const addedRoles = new Set();
-      const removedRoles = new Set();
-
-      // Role was originally in group (groupUsersMap has "admin")
-      // isInGroup: true means the checkbox is currently checked
-      // After toggle: isInGroup becomes false → role was in groupUsersMap → added to removedRoles
+      // Arrange: use the actual props.removedRoles Set passed to the component
+      const removedRoles = wrapper.props("removedRoles") as Set<string>;
+      // "admin" was originally in the group
       const testRole = { role_name: "admin", isInGroup: true };
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
 
+      // Act
       wrapper.vm.toggleUserSelection(testRole);
 
+      // Assert: admin is staged for removal
       expect(removedRoles.has("admin")).toBe(true);
     });
 
     it("removes role from addedRoles when deselecting newly added role", () => {
-      const addedRoles = new Set(["user"]);
-      const removedRoles = new Set();
+      // Arrange: stage "user" for addition first using the prop's Set
+      const addedRoles = wrapper.props("addedRoles") as Set<string>;
+      addedRoles.add("user");
 
-      // Role was NOT originally in group (groupUsersMap is empty)
-      // isInGroup: true means the checkbox is currently checked (previously selected)
-      // After toggle: isInGroup becomes false → role was not in groupUsersMap → removed from addedRoles
       const testRole = { role_name: "user", isInGroup: true };
 
+      // "user" was NOT originally in the group
       wrapper.vm.groupUsersMap = new Set([]);
 
+      // Act: deselect the role
       wrapper.vm.toggleUserSelection(testRole);
 
+      // Assert: "user" is removed from addedRoles (undoes the pending addition)
       expect(addedRoles.has("user")).toBe(false);
     });
 
     it("removes role from removedRoles when reselecting removed role", () => {
-      const addedRoles = new Set();
-      const removedRoles = new Set(["admin"]);
+      // Arrange: stage "admin" for removal first using the prop's Set
+      const removedRoles = wrapper.props("removedRoles") as Set<string>;
+      removedRoles.add("admin");
 
-      // Role WAS originally in group (groupUsersMap has "admin")
-      // isInGroup: false means the checkbox is currently unchecked (previously deselected)
-      // After toggle: isInGroup becomes true → role was in groupUsersMap → removed from removedRoles
+      // "admin" WAS originally in the group
       const testRole = { role_name: "admin", isInGroup: false };
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
 
+      // Act: reselect the role
       wrapper.vm.toggleUserSelection(testRole);
 
+      // Assert: "admin" is removed from removedRoles (undoes the pending removal)
       expect(removedRoles.has("admin")).toBe(false);
     });
   });
@@ -385,7 +383,7 @@ describe("GroupRoles Component", () => {
   describe("Display Filtering", () => {
     beforeEach(async () => {
       const { getRoles } = await import("@/services/iam");
-      vi.mocked(getRoles).mockResolvedValue({
+      vi.mocked(getRoles).mockResolvedValueOnce({
         data: ["admin", "user", "developer"],
       });
     });
@@ -475,7 +473,7 @@ describe("GroupRoles Component", () => {
 
     it("handles empty roles data from API", async () => {
       const { getRoles } = await import("@/services/iam");
-      vi.mocked(getRoles).mockResolvedValue({ data: [] });
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
 
       await wrapper.vm.getchOrgUsers();
 
@@ -483,9 +481,8 @@ describe("GroupRoles Component", () => {
     });
 
     it("handles clearing search input", async () => {
-      // Switch to "all" to see all roles
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Switch to "all" via direct API call to avoid reka-ui toggle quirks in jsdom
+      await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
       // Type something first
