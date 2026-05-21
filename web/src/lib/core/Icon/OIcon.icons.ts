@@ -46,7 +46,7 @@ import Cloud from "~icons/material-symbols/cloud-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
-import Delete from "~icons/material-symbols/delete-outline";
+import Delete from "~icons/si/bin-line";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
 import Error from "~icons/material-symbols/error-outline";
@@ -202,6 +202,7 @@ import FastRewindIcon from "~icons/material-symbols/fast-rewind-outline";
 import FiberManualRecordIcon from "~icons/material-symbols/fiber-manual-record-outline";
 import FileDownloadIcon from "~icons/material-symbols/download";
 import FilterAltIcon from "~icons/material-symbols/filter-alt-outline";
+import DataPlusLineIcon from "~icons/majesticons/data-plus-line";
 import FilterListIcon from "~icons/material-symbols/filter-list";
 import FlagIcon from "~icons/material-symbols/flag-outline";
 import FormatListNumberedIcon from "~icons/material-symbols/format-list-numbered";
@@ -210,7 +211,9 @@ import FunctionsIcon from "~icons/material-symbols/functions";
 import GridOnIcon from "~icons/material-symbols/grid-on-outline";
 import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
-import HomeIcon from "~icons/material-symbols/home-outline";
+import HomeIcon from "~icons/mdi/home-outline";
+import OrganizationIcon from "~icons/octicon/organization-16";
+import Graph2Icon from "~icons/material-symbols/graph-2";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
 import InsightsIcon from "~icons/material-symbols/insights";
@@ -232,6 +235,7 @@ import PsychologyIcon from "~icons/material-symbols/psychology-outline";
 import RadarIcon from "~icons/material-symbols/radar";
 import RemoveIcon from "~icons/material-symbols/remove";
 import ReportProblemIcon from "~icons/material-symbols/report-outline";
+import ShieldAlertOutlineIcon from "~icons/mdi/shield-alert-outline";
 import RestartAltIcon from "~icons/material-symbols/restart-alt";
 import RocketLaunchIcon from "~icons/material-symbols/rocket-launch-outline";
 import RuleIcon from "~icons/material-symbols/rule";
@@ -380,6 +384,7 @@ export const iconRegistry = {
   "more-vert": MoreVert,
   "menu": MenuIcon,
   "open-in-new": OpenInNew,
+  "organization": OrganizationIcon,
   "pause": Pause,
   "pause-circle-filled": PauseCircleFilled,
   "person": Person,
@@ -428,6 +433,7 @@ export const iconRegistry = {
   "dns": Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
+  "graph-2": Graph2Icon,
   "flame": Whatshot,
   "whatshot": Whatshot,
   "brain-circuit": PsychologyIcon,
@@ -530,6 +536,7 @@ export const iconRegistry = {
   "file-download": FileDownloadIcon,
   "file-upload": UploadFile,
   "filter-alt": FilterAltIcon,
+  "data-plus-line": DataPlusLineIcon,
   "filter-list": FilterListIcon,
   "flag": FlagIcon,
   "format-list-numbered": FormatListNumberedIcon,
@@ -561,6 +568,7 @@ export const iconRegistry = {
   "radar": RadarIcon,
   "remove": RemoveIcon,
   "report-problem": ReportProblemIcon,
+  "shield-alert-outline": ShieldAlertOutlineIcon,
   "restart-alt": RestartAltIcon,
   "rocket-launch": RocketLaunchIcon,
   "rule": RuleIcon,

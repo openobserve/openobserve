@@ -83,7 +83,11 @@
   "devDependencies": {
     "@cypress/vue": "^6.0.2",
     "@cypress/webpack-dev-server": "^5.4.1",
+    "@iconify-json/majesticons": "^1.2.4",
     "@iconify-json/material-symbols": "^1.2.72",
+    "@iconify-json/mdi": "^1.2.3",
+    "@iconify-json/octicon": "^1.2.25",
+    "@iconify-json/si": "^1.2.17",
     "@rushstack/eslint-patch": "^1.15.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",

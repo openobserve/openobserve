@@ -365,7 +365,10 @@
   --color-input-focus-ring: var(--color-primary-400);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
-  --color-input-label: var(--color-text-secondary);
+  /* Labels were resolving to text-secondary which is the same muted grey
+     used for disabled / hint text — making every form label look disabled.
+     Bumped to text-primary so labels read as active form metadata. */
+  --color-input-label: var(--color-text-primary);
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
@@ -384,7 +387,8 @@
   --color-select-focus-ring: var(--color-primary-400);
   --color-select-text: var(--color-text-primary);
   --color-select-placeholder: var(--color-text-disabled);
-  --color-select-label: var(--color-text-secondary);
+  /* Select labels were grey (text-secondary) — same fix as input-label. */
+  --color-select-label: var(--color-text-primary);
   --color-select-icon: var(--color-text-secondary);
   --color-select-error-text: var(--color-error-600);
   --color-select-content-bg: var(--color-surface-overlay);

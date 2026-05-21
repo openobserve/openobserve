@@ -28,7 +28,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <OIcon :name="icon" size="md" />
+        <OIcon
+          :name="icon"
+          size="md"
+          :style="
+            isActive
+              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
+              : undefined
+          "
+        />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -42,7 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <component :is="iconComponent" class="o-icon tw:size-6" />
+        <component
+          :is="iconComponent"
+          class="o-icon tw:size-6"
+          :style="
+            isActive
+              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
+              : undefined
+          "
+        />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -79,7 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <OIcon :name="icon" size="md" />
+        <OIcon
+          :name="icon"
+          size="md"
+          :style="
+            isActive
+              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
+              : undefined
+          "
+        />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -93,7 +117,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar">
       <div class="icon-wrapper">
-        <component :is="iconComponent" class="o-icon tw:size-6" />
+        <component
+          :is="iconComponent"
+          class="o-icon tw:size-6"
+          :style="
+            isActive
+              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
+              : undefined
+          "
+        />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -241,7 +273,9 @@ export default defineComponent({
     // background-color: rgba(30, 41, 59, 0.6);
 .nav-menu-item-label {
       color: var(--o2-menu-color);
-      transform: translateY(-2px);
+      // Removed `transform: translateY(-2px)` — combined with the elastic
+      // bounce transition on .nav-menu-item-label, the label appeared to
+      // shrink/jitter on hover. Color change alone is enough hover feedback.
     }
   }
 
@@ -329,10 +363,12 @@ export default defineComponent({
   perspective: 1000px; // Enable 3D space
 }
 
-// Add spring bounce-back transition to label
+// Label transition — `color` only (not `all`) with a plain ease curve.
+// The previous elastic `cubic-bezier(0.68, -0.55, 0.265, 1.55)` combined with
+// a translateY on hover made the label appear to shrink/spring at the start
+// of the animation.
 .nav-menu-item-label {
-  transition: all 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  transform-style: preserve-3d;
+  transition: color 200ms ease;
 }
 
 // Phase 4: Badge support
@@ -403,6 +439,22 @@ export default defineComponent({
       width: 1.5rem !important;
     }
 
+    /* Sidebar nav icons should look like main layout sections: darker
+       and sharper than the default muted text color. Stroke + crisp-edges
+       shape rendering gives the icons a more defined, pronounced look. */
+    :deep(.nav-menu-item-avatar svg),
+    :deep(.icon-wrapper svg) {
+      color: var(--o2-text-primary);
+      stroke: currentColor;
+      stroke-width: 0.5;
+      shape-rendering: geometricPrecision;
+    }
+
+    body.body--dark &:not(.nav-menu-item--active) :deep(.nav-menu-item-avatar svg),
+    body.body--dark &:not(.nav-menu-item--active) :deep(.icon-wrapper svg) {
+      color: #e5e5e5;
+    }
+
     .nav-menu-item-label {
       padding-bottom: 0.25rem;
       font-size: 0.75rem;
@@ -411,8 +463,11 @@ export default defineComponent({
     }
 
     &.nav-menu-item--active {
-      color: var(--o2-menu-color);
-
+      /* Do NOT set `color: var(--o2-menu-color)` on the outer container —
+         it cascades into the OIcon SVG (paths use currentColor) and tints
+         the selected-page icon with the theme/menu color. The active
+         affordance lives in the gradient background + side indicator + the
+         label override below. Icons inherit normal text-primary instead. */
       .OIcon img {
         filter: brightness(100);
       }
@@ -422,14 +477,12 @@ export default defineComponent({
       }
 
       body.body--light & {
-        color: var(--o2-menu-color) !important;
 .nav-menu-item-label {
           color: #19191e !important;
         }
       }
 
       body.body--dark & {
-        color: var(--o2-menu-color) !important;
 .nav-menu-item-label {
           color: #ffffff !important;
         }

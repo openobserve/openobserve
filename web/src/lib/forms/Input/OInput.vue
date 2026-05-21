@@ -224,10 +224,14 @@ const wrapperClasses = computed(() => [
 <template>
   <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
+    <!-- text-sm + font-semibold + text-text-primary so labels read as active
+         form metadata, not disabled hints. The previous combination
+         (text-xs + font-medium + text-input-label) consistently read as
+         disabled-grey across the app regardless of token value. -->
     <label
       v-if="label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      class="tw:text-sm tw:font-semibold tw:text-text-primary tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
       <OIcon
