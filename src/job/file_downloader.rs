@@ -256,7 +256,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                 // update metrics
                 metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                    .with_label_values::<&str>(&[])
+                    .with_label_values(&[])
                     .dec();
             }
         });
