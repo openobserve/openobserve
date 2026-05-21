@@ -1041,11 +1041,6 @@ export default defineComponent({
   justify-content: center;
   padding: 1.25rem 1.375rem 1.625rem;
   display: flex;
-
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
 }
 
 .non-selectable {

@@ -1665,31 +1665,6 @@ export default defineComponent({
   height: 100% !important;
 }
 
-.file-upload-input > .q-field__inner {
-  height: 100% !important;
-}
-
-.file-upload-input > .q-field__inner > .q-field__control {
-  height: 100% !important;
-}
-
-.file-upload-input
-  > .q-field__inner
-  > .q-field__control
-  .q-field__control-container {
-  height: 100% !important;
-}
-.file-upload-input
-  > .q-field__inner
-  > .q-field__control
-  .q-field__control-container
-  .q-field__label {
-  height: 100% !important;
-  width: 100% !important;
-  display: flex;
-  align-items: start;
-  justify-content: start;
-}
 .focused-input {
   border: 1px solid #007bff; /* Customize the border color */
   box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
@@ -1719,13 +1694,6 @@ export default defineComponent({
 }
 
 .app-table-container {
-  .q-table{
-    thead{
-          tr {
-      background: var(--o2-table-header-bg) !important;
-    }
-    }
-  }
   .thead-sticky,
   .tfoot-sticky {
     position: sticky;
@@ -1734,32 +1702,10 @@ export default defineComponent({
     z-index: 1;
     background: #f5f5f5;
   }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: #565656 !important;
-  }
-
-  .q-table__bottom {
-    .q-table__control {
-      padding-top: 0;
-      padding-bottom: 0;
-    }
-  }
 }
 
 .editable-input {
   height: 10px !important;
 }
 
-.category-select {
-  .q-placeholder {
-    font-size: 14px !important;
-  }
-}
-.org-select {
-  .q-placeholder {
-    font-size: 14px !important;
-  }
-}
 </style>
