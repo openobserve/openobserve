@@ -3772,8 +3772,10 @@
     "noHistory": "Sin historial de chat",
     "delete": "Borrar",
     "clearAll": "Borrar todo",
+    "export": "Exportar",
     "clearAllTitle": "Borrar todos los chats",
-    "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+    "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer.",
+    "exportAll": "Exportar todo"
   },
   "storage_settings": {
     "tabLabel": "Almacenamiento organizacional",

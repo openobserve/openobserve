@@ -3774,8 +3774,10 @@
     "noHistory": "Sem histórico de bate-papo",
     "delete": "Excluir",
     "clearAll": "Limpar tudo",
+    "export": "Exportar",
     "clearAllTitle": "Limpar todos os bate-papos",
-    "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
+    "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita.",
+    "exportAll": "Exportar tudo"
   },
   "storage_settings": {
     "tabLabel": "Armazenamento organizacional",

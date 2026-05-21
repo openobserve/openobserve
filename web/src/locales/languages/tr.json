@@ -3785,8 +3785,10 @@
     "noHistory": "Sohbet geçmişi yok",
     "delete": "Sil",
     "clearAll": "Tümünü temizle",
+    "export": "Dışa aktar",
     "clearAllTitle": "Tüm sohbetleri temizle",
-    "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
+    "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz.",
+    "exportAll": "Tümünü dışa aktar"
   },
   "storage_settings": {
     "tabLabel": "Kuruluş Depolama",

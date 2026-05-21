@@ -3785,8 +3785,10 @@
     "noHistory": "Geen chatgeschiedenis",
     "delete": "Verwijderen",
     "clearAll": "Alles wissen",
+    "export": "Exporteren",
     "clearAllTitle": "Alle chats wissen",
-    "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
+    "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+    "exportAll": "Alles exporteren"
   },
   "storage_settings": {
     "tabLabel": "Opslag van de organisatie",

@@ -409,6 +409,90 @@ export function useChatHistory(
     }
   };
 
+  /**
+   * Export all chat history entries for the current user+org as a JSON file download.
+   * The exported format includes metadata suitable for research purposes.
+   *
+   * @returns true if export was triggered successfully
+   */
+  const exportAllChats = async (): Promise<boolean> => {
+    try {
+      const history = await loadHistory();
+      if (history.length === 0) return false;
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        count: history.length,
+        chats: history.map((chat) => ({
+          id: chat.id,
+          title: chat.title,
+          timestamp: chat.timestamp,
+          sessionId: chat.sessionId,
+          messages: chat.messages,
+        })),
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `o2-chats-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      return true;
+    } catch (error) {
+      console.error("Error exporting chat history:", error);
+      return false;
+    }
+  };
+
+  /**
+   * Export a single chat entry by its ID as a JSON file download.
+   *
+   * @param chatId - The ID of the chat to export
+   * @returns true if export was triggered successfully
+   */
+  const exportChatById = async (chatId: number): Promise<boolean> => {
+    try {
+      const chat = await loadChat(chatId);
+      if (!chat) return false;
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        chat: {
+          id: chat.id,
+          title: chat.title,
+          timestamp: chat.timestamp,
+          sessionId: chat.sessionId,
+          messages: chat.messages,
+        },
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeTitle = chat.title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
+      link.download = `o2-chat-${safeTitle}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      return true;
+    } catch (error) {
+      console.error("Error exporting chat:", error);
+      return false;
+    }
+  };
+
   return {
     saveToHistory,
     loadHistory,
@@ -416,5 +500,7 @@ export function useChatHistory(
     deleteChatById,
     clearAllHistory,
     updateChatTitle,
+    exportAllChats,
+    exportChatById,
   };
 }

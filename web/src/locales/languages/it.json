@@ -3783,8 +3783,10 @@
     "noHistory": "Nessuna cronologia chat",
     "delete": "Elimina",
     "clearAll": "Cancella tutto",
+    "export": "Esporta",
     "clearAllTitle": "Cancella tutte le chat",
-    "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
+    "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata.",
+    "exportAll": "Esporta tutto"
   },
   "storage_settings": {
     "tabLabel": "Storage dell'organizzazione",

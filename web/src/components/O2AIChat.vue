@@ -92,6 +92,14 @@
                           </div>
                           <span class="delete-history-wrap">
                           <OButton
+                            variant="ghost-subtle"
+                            size="icon"
+                            @click.stop="dbExportChatById(chat.id)"
+                          >
+                            <q-icon name="download" size="0.9rem" />
+                            <q-tooltip :delay="500">Export chat</q-tooltip>
+                          </OButton>
+                          <OButton
                             variant="ghost-destructive"
                             size="icon"
                             @click.stop="deleteChat(chat.id)"
@@ -111,12 +119,23 @@
                   </q-list>
                 </div>
 
-                <!-- Clear all conversations button -->
+                <!-- Export & clear all actions -->
                 <div
                   v-if="filteredChatHistory.length > 0"
                   class="clear-all-container"
                 >
                   <q-separator />
+                  <OButton
+                    variant="ghost-subtle"
+                    :block="true"
+                    @click.stop="
+                      exportAllConversations;
+                      titleMenuOpen = false;
+                    "
+                  >
+                    <q-icon name="download" size="1rem" />
+                    Export all
+                  </OButton>
                   <OButton
                     variant="ghost-destructive"
                     :block="true"
@@ -207,6 +226,16 @@
                   <q-item-label caption>
                     Model: {{ chat.model }}
                   </q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <OButton
+                    variant="ghost-subtle"
+                    size="icon"
+                    @click.stop="dbExportChatById(chat.id)"
+                  >
+                    <q-icon name="download" size="0.9rem" />
+                    <q-tooltip :delay="500">Export</q-tooltip>
+                  </OButton>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -1608,6 +1637,8 @@ export default defineComponent({
       deleteChatById: dbDeleteChatById,
       clearAllHistory: dbClearAllHistory,
       updateChatTitle: dbUpdateChatTitle,
+      exportAllChats: dbExportAllChats,
+      exportChatById: dbExportChatById,
     } = useChatHistory(
       () => store.state.userInfo.email ?? "",
       () => store.state.selectedOrganization.identifier ?? "",
@@ -4057,6 +4088,10 @@ export default defineComponent({
       }
     };
 
+    const exportAllConversations = async () => {
+      await dbExportAllChats();
+    };
+
     const loadChat = async (chatId: number) => {
       try {
         if (chatId == null) {
@@ -5659,6 +5694,7 @@ export default defineComponent({
       showDeleteChatConfirmDialog,
       chatToDelete,
       clearAllConversations,
+      exportAllConversations,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
       // Tool confirmation

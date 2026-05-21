@@ -3774,8 +3774,10 @@
     "noHistory": "Pas d'historique des discussions",
     "delete": "Supprimer",
     "clearAll": "Tout effacer",
+    "export": "Exporter",
     "clearAllTitle": "Effacer tous les chats",
-    "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée."
+    "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée.",
+    "exportAll": "Tout exporter"
   },
   "storage_settings": {
     "tabLabel": "Stockage de l'organisation",

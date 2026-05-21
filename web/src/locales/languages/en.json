@@ -2002,8 +2002,10 @@
     "noHistory": "No chat history",
     "delete": "Delete",
     "clearAll": "Clear all",
+    "export": "Export",
     "clearAllTitle": "Clear all chats",
-    "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone."
+    "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone.",
+    "exportAll": "Export all"
   },
   "billing": {
     "header": "Usage & Billing",

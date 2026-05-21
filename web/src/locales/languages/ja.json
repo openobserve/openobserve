@@ -3774,8 +3774,10 @@
     "noHistory": "チャット履歴なし",
     "delete": "[削除]",
     "clearAll": "すべてクリア",
+    "export": "エクスポート",
     "clearAllTitle": "すべてのチャットをクリア",
-    "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
+    "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。",
+    "exportAll": "すべてエクスポート"
   },
   "storage_settings": {
     "tabLabel": "組織ストレージ",

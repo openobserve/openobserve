@@ -3785,8 +3785,10 @@
     "noHistory": "채팅 기록 없음",
     "delete": "삭제",
     "clearAll": "모두 지우기",
+    "export": "내보내기",
     "clearAllTitle": "모든 채팅 지우기",
-    "clearAllMessage": "이렇게 하면 모든 채팅 기록이 영구적으로 삭제됩니다.이 작업은 취소할 수 없습니다."
+    "clearAllMessage": "이렇게 하면 모든 채팅 기록이 영구적으로 삭제됩니다.이 작업은 취소할 수 없습니다.",
+    "exportAll": "전체 내보내기"
   },
   "storage_settings": {
     "tabLabel": "조직 스토리지",

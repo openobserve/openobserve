@@ -3774,8 +3774,10 @@
     "noHistory": "Kein Chatverlauf",
     "delete": "Löschen",
     "clearAll": "Alles löschen",
+    "export": "Exportieren",
     "clearAllTitle": "Alle Chats löschen",
-    "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "exportAll": "Alle exportieren"
   },
   "storage_settings": {
     "tabLabel": "Org-Speicher",

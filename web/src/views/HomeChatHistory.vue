@@ -16,7 +16,7 @@ const store = useStore();
 const { t } = useI18n();
 const $q = useQuasar();
 
-const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
+const { loadHistory, deleteChatById, clearAllHistory, exportAllChats, exportChatById } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
 );
@@ -74,6 +74,10 @@ function clearAll() {
     newChat();
     await refresh();
   });
+}
+
+async function exportAll() {
+  await exportAllChats();
 }
 
 function formatTime(ts: string): string {
@@ -178,7 +182,28 @@ function formatTime(ts: string): string {
           <div class="hch-item-title">{{ chat.title }}</div>
           <div class="hch-item-time">{{ formatTime(chat.timestamp) }}</div>
         </div>
-        <span class="hch-delete-wrap">
+        <div class="hch-actions-wrap">
+          <OButton
+            variant="ghost-subtle"
+            size="icon"
+            :title="t('chatHistory.export')"
+            @click.stop="exportChatById(chat.id)"
+          >
+            <svg
+              width="0.875em"
+              height="0.875em"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </OButton>
           <OButton
             variant="ghost-destructive"
             size="icon"
@@ -202,7 +227,7 @@ function formatTime(ts: string): string {
               <path d="M9 6V4h6v2" />
             </svg>
           </OButton>
-        </span>
+        </div>
       </div>
 
       <div v-if="filtered.length === 0" class="hch-empty">
@@ -212,8 +237,25 @@ function formatTime(ts: string): string {
       </div>
     </div>
 
-    <!-- Clear all -->
+    <!-- Clear all / Export -->
     <div v-if="history.length > 0" class="hch-footer">
+      <OButton variant="ghost-subtle" :block="true" @click="exportAll">
+        <svg
+          width="0.875em"
+          height="0.875em"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {{ t("chatHistory.exportAll") }}
+      </OButton>
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"
@@ -314,7 +356,7 @@ function formatTime(ts: string): string {
   &:hover {
     background: var(--o2-hover-color, rgba(128, 128, 128, 0.1));
 
-    .hch-delete-wrap {
+    .hch-actions-wrap {
       opacity: 1;
     }
   }
@@ -334,11 +376,12 @@ function formatTime(ts: string): string {
   min-width: 0;
 }
 
-.hch-delete-wrap {
+.hch-actions-wrap {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  opacity: 0;
+  gap: 0.125em;
+  opacity: 0.6;
   transition: opacity 0.12s;
 }
 
