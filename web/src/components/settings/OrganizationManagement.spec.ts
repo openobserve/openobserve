@@ -49,9 +49,10 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 // ── Mock org_storage service ──
+const mockOrgStorageEnable = vi.fn().mockResolvedValue({ data: true });
 vi.mock("@/services/org_storage", () => ({
   default: {
-    enable: vi.fn().mockResolvedValue({ data: true }),
+    enable: (...args: any[]) => mockOrgStorageEnable(...args),
   },
 }));
 
@@ -1328,6 +1329,193 @@ describe("OrganizationManagement.vue", () => {
           variant: "error",
           message: "extend failed",
           timeout: 5000,
+        }),
+      );
+    });
+  });
+
+  describe("confirmRevokeContract Function", () => {
+    beforeEach(() => {
+      // Prevent onMounted from calling getData so toast call counts are predictable
+      store.state.zoConfig.meta_org = "different_org";
+    });
+
+    it("should call confirm with the correct dialog options", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.confirmRevokeContract({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockConfirmFn).toHaveBeenCalledWith({
+        title: "Revoke External Contract",
+        message:
+          'Are you sure you want to revoke the external contract for "TestOrg"? The organization will revert to the Free tier.',
+      });
+    });
+
+    it("should not call revoke_external_contract when confirm is rejected", async () => {
+      mockConfirmFn.mockResolvedValueOnce(false);
+
+      wrapper = createWrapper();
+      await wrapper.vm.confirmRevokeContract({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockRevokeExternalContract).not.toHaveBeenCalled();
+    });
+
+    it("should call revoke_external_contract and show success toast on success", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockRevokeExternalContract.mockResolvedValue({ data: true });
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
+
+      wrapper = createWrapper();
+      await wrapper.vm.confirmRevokeContract({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockRevokeExternalContract).toHaveBeenCalledWith(
+        "default",
+        "test-org",
+      );
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "External contract revoked successfully.",
+        }),
+      );
+    });
+
+    it("should show error toast when revoke_external_contract fails", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockRevokeExternalContract.mockRejectedValue({
+        response: { data: { message: "Revoke failed" } },
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.confirmRevokeContract({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Revoke failed",
+          timeout: 5000,
+        }),
+      );
+    });
+
+    it("should show default error message when revoke_external_contract fails without response", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockRevokeExternalContract.mockRejectedValue({});
+
+      wrapper = createWrapper();
+      await wrapper.vm.confirmRevokeContract({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Failed to revoke external contract.",
+        }),
+      );
+    });
+  });
+
+  describe("toggleOrgStorage Function", () => {
+    beforeEach(() => {
+      // Prevent onMounted from calling getData so toast call counts are predictable
+      store.state.zoConfig.meta_org = "different_org";
+    });
+
+    it("should call confirm with the correct dialog options", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.toggleOrgStorage({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockConfirmFn).toHaveBeenCalledWith({
+        title: "Enable Storage Settings",
+        message:
+          'Are you sure you want to enable storage settings for "TestOrg"?',
+      });
+    });
+
+    it("should not call org storage enable when confirm is rejected", async () => {
+      mockConfirmFn.mockResolvedValueOnce(false);
+
+      wrapper = createWrapper();
+      await wrapper.vm.toggleOrgStorage({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockOrgStorageEnable).not.toHaveBeenCalled();
+    });
+
+    it("should call org storage enable and show success toast on success", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockOrgStorageEnable.mockResolvedValue({ data: true });
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
+
+      wrapper = createWrapper();
+      await wrapper.vm.toggleOrgStorage({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockOrgStorageEnable).toHaveBeenCalledWith("test-org");
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Storage settings enabled successfully.",
+        }),
+      );
+    });
+
+    it("should show error toast when org storage enable fails", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockOrgStorageEnable.mockRejectedValue({
+        response: { data: { message: "Enable failed" } },
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.toggleOrgStorage({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Enable failed",
+          timeout: 5000,
+        }),
+      );
+    });
+
+    it("should show default error message when org storage enable fails without response", async () => {
+      mockConfirmFn.mockResolvedValueOnce(true);
+      mockOrgStorageEnable.mockRejectedValue({});
+
+      wrapper = createWrapper();
+      await wrapper.vm.toggleOrgStorage({
+        name: "TestOrg",
+        identifier: "test-org",
+      });
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Failed to enable storage settings.",
         }),
       );
     });

@@ -107,17 +107,11 @@ vi.mock("@/services/billings", () => ({
   }
 }));
 
-// Mock Quasar notify
+// Mock Toast (replaces quasar notify)
 const mockNotify = vi.fn(() => vi.fn()); // Return a function for dismiss
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 // ODialog stub — preserves v-model:open behavior and emits primary/secondary/neutral
 // so we can drive dialog buttons via emits in tests.
