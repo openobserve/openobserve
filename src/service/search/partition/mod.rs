@@ -66,13 +66,11 @@ impl PartitionGenerator {
         order_by: OrderBy,
         is_aggregate: bool,
         add_mini_partition: bool,
-        #[cfg(feature = "enterprise")] streaming_aggs_cache_strategy: Option<
-            StreamingAggsPartitionStrategy,
-        >,
+        #[cfg(feature = "enterprise")] cache_strategy: Option<StreamingAggsPartitionStrategy>,
     ) -> Vec<[i64; 2]> {
         // If cache-aware strategy is provided, use it
         #[cfg(feature = "enterprise")]
-        if let Some(strategy) = streaming_aggs_cache_strategy {
+        if let Some(strategy) = cache_strategy {
             return strategy.to_time_partitions(order_by);
         }
 

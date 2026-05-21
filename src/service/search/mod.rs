@@ -727,6 +727,29 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
+    let is_non_ts_order_by = detect_non_ts_order_by(
+        &sql.order_by,
+        ts_column.as_deref(),
+        is_aggregate,
+        sql.histogram_interval.is_some() || enable_align_histogram,
+    );
+
+    if is_non_ts_order_by {
+        resp.non_ts_order_by_cols = sql
+            .order_by
+            .iter()
+            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
+            .collect();
+    }
+
+    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        return Ok(resp);
+    }
+
     let partition_settings = calculate_partition_settings(
         trace_id,
         total_secs,
@@ -748,6 +771,16 @@ pub async fn search_partition(
         cfg.limit.query_partition_by_secs,
     );
 
+    #[cfg(feature = "enterprise")]
+    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
+        prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
+    #[cfg(feature = "enterprise")]
+    {
+        resp.streaming_output = streaming_aggs;
+        resp.streaming_aggs = streaming_aggs;
+        resp.streaming_id = streaming_id.clone();
+    }
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -759,39 +792,6 @@ pub async fn search_partition(
             }
         })
         .unwrap_or(OrderBy::Desc);
-
-    let is_non_ts_order_by = detect_non_ts_order_by(
-        &sql.order_by,
-        ts_column.as_deref(),
-        is_aggregate,
-        is_histogram,
-    );
-
-    if is_non_ts_order_by {
-        resp.non_ts_order_by_cols = sql
-            .order_by
-            .iter()
-            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
-            .collect();
-    }
-
-    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
-        );
-        resp.partitions = vec![[req.start_time, req.end_time]];
-        return Ok(resp);
-    }
-
-    #[cfg(feature = "enterprise")]
-    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
-        prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
-    #[cfg(feature = "enterprise")]
-    {
-        resp.streaming_output = streaming_aggs;
-        resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id.clone();
-    }
 
     let generator = partition::PartitionGenerator::new(
         min_step,
