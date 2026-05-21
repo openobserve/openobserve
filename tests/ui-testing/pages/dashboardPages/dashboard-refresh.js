@@ -45,15 +45,11 @@ export default class DashboardTimeRefresh {
     }
 
     await this.relativeTime.click();
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .waitFor({
-        state: "visible",
-      });
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .click();
-    await this.applyBtn.click();
+    const relBtn = this.page.locator(`[data-test="date-time-relative-${date}-${time}-btn"]`);
+    await relBtn.waitFor({ state: "attached" });
+    // Use JS click — the dropdown can extend outside the viewport in the new layout
+    await relBtn.evaluate((el) => el.click());
+    await this.applyBtn.evaluate((el) => el.click());
   }
 
   // Set absolute time selection with dynamic start and end days

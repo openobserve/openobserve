@@ -110,14 +110,34 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      await operatorLocator.click();
-      await this.page
-        .locator('[data-test="dashboard-add-condition-operator-option"]', { hasText: operator })
-        .first()
-        .click();
+      // OSelect in listbox mode: outer div gets data-test; PopoverTrigger is the inner button.
+      // Use JS click to avoid viewport/portal click interception issues.
+      await operatorLocator.waitFor({ state: "visible", timeout: 10000 });
+      await operatorLocator.locator('button').first().evaluate((el) => el.click());
+      // Options render in portal with data-test="${parent}-popover"
+      const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
+      await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
+      // Wait for virtualizer to render items inside the popover
+      await this.page.waitForTimeout(600);
+      // The virtualizer renders items asynchronously; search then select
+      // Type into the search filter to narrow results, then click
+      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"], input').first();
+      const hasSearch = await searchInput.count() > 0;
+      if (hasSearch) {
+        await searchInput.fill(operator);
+        await this.page.waitForTimeout(300);
+      }
+      // Click option by text — items are ListboxItem elements within the popover
+      const optionInPopover = this.page.locator('[data-test="dashboard-add-condition-operator-option"]').first();
+      const optionVisible = await optionInPopover.isVisible().catch(() => false);
+      if (optionVisible) {
+        await optionInPopover.click();
+      } else {
+        // Fallback: getByText anywhere on page (portal renders at body)
+        await this.page.getByText(operator, { exact: true }).last().click();
+      }
       // Wait for the operator dropdown portal to fully close before step 5.
-      await this.page
-        .locator('[data-test="dashboard-add-condition-operator-popover"]')
+      await operatorPopover
         .waitFor({ state: "hidden", timeout: 5000 })
         .catch(() => {});
     }
