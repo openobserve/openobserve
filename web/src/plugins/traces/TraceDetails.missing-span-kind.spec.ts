@@ -19,7 +19,6 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { http, HttpResponse } from "msw";
 
 const node = document.createElement("div");
@@ -34,7 +33,6 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-installQuasar();
 
 
 /**

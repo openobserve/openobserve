@@ -54,9 +54,6 @@ vi.mock("quasar", async () => {
   };
 });
 
-installQuasar({
-  plugins: []
-});
 
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;

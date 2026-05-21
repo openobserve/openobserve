@@ -58,9 +58,6 @@ const enhancedStore = {
   }
 };
 
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: vi.fn(() => ({

@@ -904,12 +904,142 @@ describe("OrganizationManagement.vue", () => {
       expect(result).toEqual([]);
     });
 
+    it("should filter visibleRows when filterQuery has a value", () => {
+      wrapper = createWrapper();
+      wrapper.vm.tabledata = mockRows;
+      wrapper.vm.filterQuery = "test";
+
+      const result = wrapper.vm.visibleRows;
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Test Organization");
+    });
+
+    it("should return all rows from visibleRows when filterQuery is empty", () => {
+      wrapper = createWrapper();
+      wrapper.vm.tabledata = mockRows;
+      wrapper.vm.filterQuery = "";
+
+      const result = wrapper.vm.visibleRows;
+      expect(result).toHaveLength(3);
+    });
+
     it("should be case insensitive", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "TEST");
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("Test Organization");
+    });
+  });
+
+  describe("OTable Cell Actions Rendering", () => {
+    it("should render action buttons for a row without billing provider or storage", async () => {
+      store.state.zoConfig.meta_org = "default";
+      const mockResponse = {
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "0",
+              created_at: 123456789,
+              trial_expires_at: 987654321,
+              billing_provider: undefined,
+              org_storage_enabled: false,
+            },
+          ],
+        },
+      };
+      mockGetAdminOrg.mockResolvedValue(mockResponse);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Extend trial button should always be present
+      expect(
+        wrapper.find('[data-test="otg-management-extend-trial-btn"]').exists(),
+      ).toBe(true);
+      // Add contract button should show when billing_provider is "-"
+      expect(
+        wrapper.find('[data-test="org-management-add-contract-btn"]').exists(),
+      ).toBe(true);
+      // Storage enable button should show when org_storage_enabled is false
+      expect(
+        wrapper.find(
+          '[data-test="org-management-storage-enable-btn"]',
+        ).exists(),
+      ).toBe(true);
+    });
+
+    it("should render revoke and extend contract buttons for no_op billing provider", async () => {
+      store.state.zoConfig.meta_org = "default";
+      const mockResponse = {
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "3",
+              created_at: 123456789,
+              trial_expires_at: 987654321,
+              billing_provider: "no_op",
+              org_storage_enabled: false,
+              contract_end_date: 1234567890000000,
+            },
+          ],
+        },
+      };
+      mockGetAdminOrg.mockResolvedValue(mockResponse);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="org-management-extend-contract-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="org-management-revoke-contract-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render storage enabled button for orgs with storage enabled", async () => {
+      store.state.zoConfig.meta_org = "default";
+      const mockResponse = {
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "0",
+              created_at: 123456789,
+              trial_expires_at: 987654321,
+              billing_provider: "-",
+              org_storage_enabled: true,
+            },
+          ],
+        },
+      };
+      mockGetAdminOrg.mockResolvedValue(mockResponse);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+
+      // Storage enabled button should show when org_storage_enabled is true
+      const storageEnabledBtn = wrapper.find(
+        '[data-test="org-management-storage-enabled-btn"]',
+      );
+      expect(storageEnabledBtn.exists()).toBe(true);
+      // Storage enable button should NOT show
+      const storageEnableBtn = wrapper.find(
+        '[data-test="org-management-storage-enable-btn"]',
+      );
+      expect(storageEnableBtn.exists()).toBe(false);
     });
   });
 
@@ -1400,6 +1530,7 @@ describe("OrganizationManagement.vue", () => {
         name: "TestOrg",
         identifier: "test-org",
       });
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1419,6 +1550,7 @@ describe("OrganizationManagement.vue", () => {
         name: "TestOrg",
         identifier: "test-org",
       });
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1492,6 +1624,7 @@ describe("OrganizationManagement.vue", () => {
         name: "TestOrg",
         identifier: "test-org",
       });
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1511,6 +1644,7 @@ describe("OrganizationManagement.vue", () => {
         name: "TestOrg",
         identifier: "test-org",
       });
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1533,6 +1667,59 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.formatMicrosToDate(1234567890000000)).toBe(
         "2023-12-01",
       );
+    });
+  });
+
+  describe("Extend Trial Dialog Week Selectors", () => {
+    it("should select week 2 when the second span is clicked", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.extendTrialPrompt = true;
+      wrapper.vm.extendTrialDataRow = { name: "Test Org" };
+      await nextTick();
+
+      // Click the second week span (page = 2)
+      const weekSpans = wrapper.findAll('[data-test="o-dialog-stub"] span');
+      // Find the span containing "2"
+      const week2Span = weekSpans.find((s: any) => s.text().trim() === "2");
+      expect(week2Span?.exists()).toBe(true);
+      await week2Span!.trigger("click");
+
+      expect(wrapper.vm.extendedTrial).toBe(2);
+    });
+
+    it("should toggle extendTrialPrompt when the dialog opens and closes", async () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.extendTrialPrompt).toBe(false);
+
+      wrapper.vm.extendTrialPrompt = true;
+      wrapper.vm.extendTrialDataRow = { name: "Test Org" };
+      await nextTick();
+
+      expect(wrapper.vm.extendTrialPrompt).toBe(true);
+
+      wrapper.vm.extendTrialPrompt = false;
+      await nextTick();
+
+      expect(wrapper.vm.extendTrialPrompt).toBe(false);
+    });
+  });
+
+  describe("Contract Dialog Rendering", () => {
+    it("should render the contract dialog with date input and current end date for extend mode", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog(
+        { name: "Acme", identifier: "acme", contract_end_date: 1234567890000000 },
+        "extend",
+      );
+      await nextTick();
+
+      const dateInput = wrapper.find('[data-test="contract-end-date-input"]');
+      expect(dateInput.exists()).toBe(true);
+
+      // The "Current end date" text should appear in extend mode with a valid contract_end_date
+      const currentEndDateText = wrapper.text();
+      expect(currentEndDateText).toContain("Current end date");
+      expect(currentEndDateText).toContain("2023-12-01");
     });
   });
 

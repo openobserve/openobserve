@@ -24,10 +24,6 @@ import {
   cloneMockData
 } from "@/test/unit/fixtures/cipherKeyTestFixtures";
 
-installQuasar({
-  plugins: [],
-  components: [QInput, QSelect, QBtn, QFieldset],
-});
 
 describe("AddAkeylessType", () => {
   let wrapper: any = null;

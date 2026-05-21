@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 
 // Mock userService
@@ -127,10 +126,6 @@ const platform = {
   has: { touch: false },
 };
 
-installQuasar({
-  plugins: [],
-  config: { platform },
-});
 
 // ODrawer stub: exposes the migrated props (open/size/title/...) and
 // the standard click:* emits. The default slot still hosts the original

@@ -32,9 +32,6 @@ vi.mock("@/utils/cookies", () => ({
   removeToken: vi.fn(),
 }));
 
-installQuasar({
-  plugins: [],
-});
 
 describe("Header Component", () => {
   let wrapper: any;

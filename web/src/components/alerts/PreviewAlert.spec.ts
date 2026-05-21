@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
 import { nextTick } from "vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import i18n from "@/locales";

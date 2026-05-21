@@ -115,9 +115,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [],
-});
 
 const mockStore = createStore({
   state: {

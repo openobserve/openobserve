@@ -1,14 +1,12 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import Query from "./Query.vue";
 import searchService from "@/services/search";
 
-installQuasar();
 
 // Mock the services and composables
 vi.mock("@/services/search", () => ({

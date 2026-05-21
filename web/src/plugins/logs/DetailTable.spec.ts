@@ -195,7 +195,9 @@ describe("DetailTable Component", () => {
           },
           'OSpinner': true,
           'OSeparator': true,
-          'OCardSection': true,
+          'OCardSection': {
+            template: '<div><slot /></div>',
+          },
           'OLogsHighLighting': true,
           'OChunkedContent': true,
           'OTelemetryCorrelationDashboard': true,
@@ -236,7 +238,7 @@ describe("DetailTable Component", () => {
 
   it("should initialize reactive data correctly", () => {
     expect(wrapper.vm.tab).toBe("json");
-    expect(wrapper.vm.selectedRelativeValue).toBe("10");
+    expect(wrapper.vm.selectedRelativeValue).toBe(10);
     expect(wrapper.vm.shouldWrapValues).toBe(true);
     expect(wrapper.vm.recordSizeOptions).toEqual([10, 20, 50, 100, 200, 500, 1000]);
   });
@@ -284,7 +286,7 @@ describe("DetailTable Component", () => {
   });
 
   it("should render O2AIContextAddBtn component", () => {
-    const aiButton = wrapper.find('[data-test="o2ai-context-btn"]');
+    const aiButton = wrapper.find('[data-test="logs-detail-ai-context-btn"]');
     expect(aiButton.exists()).toBe(true);
   });
 
@@ -598,7 +600,10 @@ describe("DetailTable Component", () => {
     
     await wrapper.vm.copyContentToClipboard(testData);
     
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(JSON.stringify(testData));
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      JSON.stringify(testData),
+      { successMessage: "Content Copied Successfully!", timeout: 1000 },
+    );
   });
 
   it("should emit add:table when addFieldToTable called", () => {

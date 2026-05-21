@@ -59,7 +59,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Removed installQuasar() since we're using Quasar directly in global plugins
 
 describe("BackGroundColorConfig", () => {
   let wrapper: any;

@@ -16,13 +16,11 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Shared mocks

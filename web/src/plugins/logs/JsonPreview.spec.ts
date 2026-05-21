@@ -137,7 +137,9 @@ vi.mock("vue-router", () => ({
 }));
 
 // Mock Toast
-const mockToast = vi.fn();
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));

@@ -65,9 +65,6 @@ vi.mock("@/services/service_accounts", () => ({
   },
 }));
 
-installQuasar({
-  plugins: [],
-});
 
 describe("EditScript", () => {
   let wrapper: any;

@@ -20,9 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/services/iam", () => ({
   getGroup: vi.fn(() => Promise.resolve({ data: {} })),

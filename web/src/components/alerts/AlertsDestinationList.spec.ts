@@ -33,9 +33,6 @@ vi.mock("quasar", async (importOriginal) => {
   };
 });
 
-installQuasar({
-  plugins: [QTable],
-});
 
 // Mock services
 vi.mock("@/services/alert_destination", () => ({
