@@ -19,11 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     :width="30"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
-    persistent
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4 tw:w-full">
-        <OForm ref="updateUserForm" @submit.prevent="onSubmit">
+        <OForm ref="updateUserForm" @submit="onSubmit">
           <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -47,6 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             maxlength="100"
             data-test="user-email-field"
+            :error="!!emailError"
+            :error-message="emailError"
+            @update:model-value="emailError = ''"
           />
 
           <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
@@ -304,6 +306,7 @@ export default defineComponent({
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref(props.customRoles);
+    const emailError = ref('');
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -401,6 +404,7 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
+      emailError,
       invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
@@ -436,7 +440,7 @@ export default defineComponent({
 
       if (this.existingUser && !this.beingUpdated) {
         if (!this.formData.email || !emailRegex.test(this.formData.email)) {
-          toast({ message: 'Please enter a valid email address.', timeout: 3000 });
+          this.emailError = 'Please enter a valid email address.';
           return;
         }
       }

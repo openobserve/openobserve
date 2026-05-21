@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog data-test="user-delete-dialog"
       v-model:open="confirmDelete"
-      size="xs"
+      size="sm"
       :title="t('user.confirmDeleteHead')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
-      size="xs"
+      size="sm"
       title="Delete Users"
       secondary-button-label="Cancel"
       primary-button-label="OK"
