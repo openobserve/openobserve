@@ -53,12 +53,8 @@ vi.mock("vuex", async (importOriginal) => {
   };
 });
 
-const { mockCopyToClipboard } = vi.hoisted(() => ({
-  mockCopyToClipboard: vi.fn().mockResolvedValue(true),
-}));
-
 vi.mock("@/utils/clipboard", () => ({
-  copyToClipboard: mockCopyToClipboard,
+  copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
 // useLocalTraceFilterField behaves like a ref: called with no args it returns the
@@ -93,6 +89,7 @@ vi.mock("@/utils/traces/traceColors", () => ({
 }));
 
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import { copyToClipboard } from "@/utils/clipboard";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 
 // ---------------------------------------------------------------------------
@@ -535,6 +532,7 @@ describe("useTraces", () => {
     it("calls copyToClipboard with a URL string", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -544,7 +542,7 @@ describe("useTraces", () => {
 
       copyTracesUrl();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.stringContaining("http"),
         expect.objectContaining({ successMessage: expect.any(String) }),
       );
@@ -553,6 +551,7 @@ describe("useTraces", () => {
     it("passes successMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -562,7 +561,7 @@ describe("useTraces", () => {
 
       copyTracesUrl();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           successMessage: "Link Copied Successfully!",
@@ -574,6 +573,7 @@ describe("useTraces", () => {
     it("passes errorMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -583,7 +583,7 @@ describe("useTraces", () => {
 
       copyTracesUrl();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           errorMessage: "Error while copy link.",
@@ -594,6 +594,7 @@ describe("useTraces", () => {
     it("overrides from/to with customTimeRange when provided", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -603,7 +604,7 @@ describe("useTraces", () => {
 
       copyTracesUrl({ from: "1000", to: "9999" });
 
-      const clipboardArg = mockCopyToClipboard.mock.calls[0][0];
+      const clipboardArg = vi.mocked(copyToClipboard).mock.calls[0][0];
       expect(clipboardArg).toContain("from=1000");
       expect(clipboardArg).toContain("to=9999");
     });

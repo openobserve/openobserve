@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PrometheusConfig from "./PrometheusConfig.vue";
 
 // Mock dependencies
@@ -37,7 +36,6 @@ vi.mock("@/components/CopyContent.vue", () => ({
   }
 }));
 
-installQuasar();
 
 describe("PrometheusConfig.vue", () => {
   let store: any;

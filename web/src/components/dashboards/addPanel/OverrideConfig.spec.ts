@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OverrideConfig from "@/components/dashboards/addPanel/OverrideConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -63,7 +62,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("OverrideConfig", () => {
   let wrapper: any;

@@ -15,13 +15,11 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Mock external dependencies
 vi.mock("@/aws-exports", () => ({

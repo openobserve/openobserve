@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
 import CrossLinkManager from "./CrossLinkManager.vue";
@@ -17,7 +16,6 @@ vi.mock("./CrossLinkDialog.vue", () => ({
   },
 }));
 
-installQuasar();
 
 describe("CrossLinkManager Component", () => {
   let wrapper: any;

@@ -22,13 +22,11 @@ import {
   vi,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SpanRenderer from "@/plugins/traces/SpanRenderer.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 const mockStore = createStore({
   state: {

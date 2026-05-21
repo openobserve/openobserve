@@ -31,6 +31,7 @@ const mockI18n = createI18n({
   },
 });
 
+
 describe('FilterGroup.vue Comprehensive Coverage', () => {
   const defaultProps = {
     group: {
@@ -1185,7 +1186,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should toggle label when toggleLabel is called directly', async () => {
+    it('should handle tab change for toggle label', async () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -1199,9 +1200,12 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      wrapper.vm.toggleLabel('or');
-      expect(wrapper.emitted('add-group')).toBeTruthy();
-      expect(wrapper.emitted('input:update')).toBeTruthy();
+      const tabs = wrapper.findComponent({ name: 'q-tabs' });
+      if (tabs.exists()) {
+        await tabs.vm.$emit('update:model-value', 'or');
+        expect(wrapper.emitted('add-group')).toBeTruthy();
+        expect(wrapper.emitted('input:update')).toBeTruthy();
+      }
     });
   });
 

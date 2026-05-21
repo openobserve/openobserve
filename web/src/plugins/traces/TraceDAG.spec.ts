@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TraceDAG from "@/plugins/traces/TraceDAG.vue";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
 
-installQuasar();
 
 // Mock VueFlow components
 vi.mock("@vue-flow/core", () => ({

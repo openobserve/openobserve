@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ShowLegendsPopup from "./ShowLegendsPopup.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,7 +25,6 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
   ]),
 }));
 
-installQuasar();
 
 // Stub ODialog so its slot content renders inline (not teleported to document.body).
 const ODialogStub = {

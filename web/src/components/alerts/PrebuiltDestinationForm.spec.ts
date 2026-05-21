@@ -15,11 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 import PrebuiltDestinationForm from "@/components/alerts/PrebuiltDestinationForm.vue";
 

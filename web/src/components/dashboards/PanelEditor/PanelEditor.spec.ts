@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelEditor from "./PanelEditor.vue";
 
 // Mock vuex store
@@ -292,7 +291,6 @@ const mountGlobal = {
   },
 };
 
-installQuasar();
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;

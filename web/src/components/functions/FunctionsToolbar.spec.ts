@@ -16,12 +16,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionsToolbar from "./FunctionsToolbar.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 describe("FunctionsToolbar", () => {
   let store: any;

@@ -15,7 +15,6 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -177,7 +176,6 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
-installQuasar();
 
 const makeHit = (id: string, errors = 0) => ({
   trace_id: id,

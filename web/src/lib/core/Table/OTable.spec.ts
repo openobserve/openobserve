@@ -3,9 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest";
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
 
 // Set up i18n so OTable sub-components (loading, error, etc.) can use useI18n()
 const i18n = createI18n({

@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IdentityAccessManagement from "@/views/IdentityAccessManagement.vue";
 import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
@@ -24,7 +23,6 @@ import router from "@/test/unit/helpers/router";
 import { nextTick, ref, computed } from "vue";
 import config from "@/aws-exports";
 
-installQuasar();
 
 // Mock the useIsMetaOrg composable
 vi.mock("@/composables/useIsMetaOrg", () => ({

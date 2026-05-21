@@ -15,11 +15,9 @@
 
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 describe("HistogramIntervalDropDown", () => {
   let wrapper: any;

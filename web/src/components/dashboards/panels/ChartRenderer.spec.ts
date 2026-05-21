@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -100,7 +99,6 @@ vi.mock("lodash-es", () => ({
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
 
-installQuasar();
 
 describe("ChartRenderer", () => {
   let wrapper: any;

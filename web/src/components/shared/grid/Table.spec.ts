@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 import Table from "./Table.vue";
 
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,

@@ -7,7 +7,6 @@ import { nextTick } from 'vue'
 import store from '@/test/unit/helpers/store'
 import i18n from '@/locales'
 
-installQuasar();// AddFolder stub — after the q-dialog -> ODrawer migration, AddFolder owns
 // the overlay surface itself via v-model:open. This stub mirrors the public
 // prop/emit shape FolderList relies on so the parent dialog open/close logic
 // can be tested without rendering the real drawer internals.

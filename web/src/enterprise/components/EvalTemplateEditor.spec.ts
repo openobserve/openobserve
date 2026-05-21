@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+
 const mockPush = vi.fn();
 let mockRouteParams: Record<string, string> = {};
 

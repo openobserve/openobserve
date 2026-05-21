@@ -1,11 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import i18n from "@/locales";
 import { getDueDays } from "@/utils/zincutils";
 
-installQuasar();
 
 // Mock getDueDays function
 vi.mock("@/utils/zincutils", () => ({

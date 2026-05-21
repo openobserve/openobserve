@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { copyToClipboard } from 'quasar';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import CopyContent from './CopyContent.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -43,7 +42,6 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe('CopyContent.vue Branch Coverage', () => {
   let mockCopyToClipboard: any;

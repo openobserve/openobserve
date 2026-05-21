@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Mock Stream Service
 vi.mock("@/services/stream", () => ({
@@ -27,13 +28,10 @@ vi.mock("@/services/stream", () => ({
 }));
 
 // Mock Toast
-const { mockToast, mockToastDismiss } = vi.hoisted(() => ({
-  mockToast: vi.fn(),
-  mockToastDismiss: vi.fn(),
-}));
+const mockToastDismiss = vi.fn();
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: mockToast,
+  toast: vi.fn(),
 }));
 
 // Mock utilities
@@ -83,7 +81,7 @@ describe("useStreams Composable", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockToast.mockReturnValue(mockToastDismiss);
+    vi.mocked(toast).mockReturnValue(mockToastDismiss);
     mockStore = createMockStore();
 
     // Set up default mocks
@@ -731,7 +729,7 @@ describe("useStreams Composable", () => {
 
       await streamsInstance.getStreams("logs", false, true);
 
-      expect(mockToast).toHaveBeenCalledWith({
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading streams...",
         timeout: 5000,
@@ -750,7 +748,7 @@ describe("useStreams Composable", () => {
 
       await streamsInstance.getStreams("logs", false, false);
 
-      expect(mockToast).not.toHaveBeenCalled();
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
     });
 
     it("should handle Promise.allSettled with mixed results in getStreams", async () => {

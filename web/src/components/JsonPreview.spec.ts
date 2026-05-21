@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 // All vi.mock() calls must come before any component imports — they are hoisted by Vitest.
@@ -56,7 +55,6 @@ vi.mock("quasar", async (importOriginal) => {
 
 import JsonPreview from "./JsonPreview.vue";
 
-installQuasar();
 
 // ── Mount factory ─────────────────────────────────────────────────────────────
 

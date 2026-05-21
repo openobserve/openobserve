@@ -15,11 +15,9 @@
 
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 
-installQuasar();
 
 describe("TraceTimestampCell", () => {
   let wrapper: VueWrapper;

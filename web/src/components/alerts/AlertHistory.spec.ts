@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertHistory from "@/components/alerts/AlertHistory.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -31,7 +30,6 @@ vi.mock("@/services/alerts", () => ({
 
 import alertsService from "@/services/alerts";
 
-installQuasar({ plugins: [] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

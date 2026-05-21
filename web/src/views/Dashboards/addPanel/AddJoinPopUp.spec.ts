@@ -2,7 +2,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AddJoinPopUp from "@/views/Dashboards/addPanel/AddJoinPopUp.vue";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 
 // Mock composables
@@ -50,7 +49,6 @@ const i18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe("AddJoinPopUp", () => {
   let wrapper: any;

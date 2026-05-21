@@ -24,7 +24,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 
 // Hoisted mock references — available inside vi.mock factories so individual

@@ -88,11 +88,9 @@ vi.mock("quasar", async (importOriginal) => {
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import SessionDetails from "./SessionDetails.vue";
 
-installQuasar({ plugins: [quasar.Notify] });
 
 // ---------------------------------------------------------------------------
 // Helpers

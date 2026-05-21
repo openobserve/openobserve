@@ -24,7 +24,6 @@ import {
   afterAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
@@ -34,7 +33,6 @@ import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
 
-installQuasar();
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({

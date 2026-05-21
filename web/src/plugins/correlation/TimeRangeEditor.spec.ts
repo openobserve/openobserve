@@ -21,7 +21,6 @@ import {
   QRadio,
   QIcon,
 } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TimeRangeEditor from "./TimeRangeEditor.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -125,7 +124,6 @@ const SOURCE_TIMESTAMP_US = 1704110400000000;
 // 5 minutes in microseconds
 const FIVE_MIN_US = 5 * 60 * 1000 * 1000;
 
-installQuasar({ components: { QInput, QRadio, QIcon } });
 
 describe("TimeRangeEditor.vue", () => {
   let wrapper: any;

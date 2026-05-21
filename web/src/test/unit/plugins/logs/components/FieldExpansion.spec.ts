@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import i18n from "@/locales";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock formatLargeNumber utility
 vi.mock("@/utils/zincutils", () => ({
@@ -28,7 +27,6 @@ vi.mock("@/utils/zincutils", () => ({
   }),
 }));
 
-installQuasar();
 
 describe("FieldExpansion.vue", () => {
 

@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
 // Mock colorizeQuery utility
@@ -37,7 +36,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
-installQuasar();
 
 // ── ODialog / OButton stubs ──────────────────────────────────────────────────
 // Stub preserves the slot content (so child rendering can be asserted) and

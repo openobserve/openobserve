@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -37,7 +36,6 @@ const mockStore = createStore({
 const mockI18n = createI18n({ locale: 'en', messages: { en: {} } });
 const mockRouter = createRouter({ history: createWebHistory(), routes: [{ path: '/', component: { template: '<div>Home</div>' } }] });
 
-installQuasar();
 
 describe('WindowsConfig.vue', () => {
   let wrapper: VueWrapper;

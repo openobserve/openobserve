@@ -19,12 +19,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockToast } = vi.hoisted(() => ({
-  mockToast: vi.fn(),
-}));
-
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: mockToast,
+  toast: vi.fn(),
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -87,6 +83,7 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
   };
 });
 
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePrebuiltDestinations } from "./usePrebuiltDestinations";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +99,7 @@ function makeSlackCredentials() {
 describe("usePrebuiltDestinations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockToast.mockReturnValue(vi.fn());
+    vi.mocked(toast).mockReturnValue(vi.fn());
     // Default template fetch: empty list (no cache)
     mockGetSystemTemplates.mockResolvedValue({ data: [] });
   });
@@ -340,7 +337,7 @@ describe("usePrebuiltDestinations", () => {
         createDestination("slack", "my-slack", { webhookUrl: "" }),
       ).rejects.toThrow();
 
-      expect(mockToast).toHaveBeenCalledWith(
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "error" }),
       );
     });
@@ -361,7 +358,7 @@ describe("usePrebuiltDestinations", () => {
       const { createDestination } = usePrebuiltDestinations();
       await createDestination("slack", "my-slack", makeSlackCredentials());
 
-      expect(mockToast).toHaveBeenCalledWith(
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success" }),
       );
     });
@@ -478,7 +475,7 @@ describe("usePrebuiltDestinations", () => {
         makeSlackCredentials(),
       );
 
-      expect(mockToast).toHaveBeenCalledWith(
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success" }),
       );
     });
@@ -566,7 +563,7 @@ describe("usePrebuiltDestinations", () => {
       const { convertToPrebuilt } = usePrebuiltDestinations();
       await expect(convertToPrebuilt("missing", "slack")).rejects.toThrow();
 
-      expect(mockToast).toHaveBeenCalledWith(
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "error" }),
       );
     });

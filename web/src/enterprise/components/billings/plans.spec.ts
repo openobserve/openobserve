@@ -21,10 +21,8 @@ import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
 import config from "@/aws-exports";
 import * as zincutils from "@/utils/zincutils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
-installQuasar();
 
 // Mock BillingService
 vi.mock("@/services/billings", () => ({

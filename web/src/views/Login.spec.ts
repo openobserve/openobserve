@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LoginPage from "./Login.vue";
 
 // Mock dependencies first with factory functions to avoid hoisting issues
@@ -106,7 +105,6 @@ Object.defineProperty(window, "location", {
   writable: true,
 });
 
-installQuasar();
 
 describe("Login.vue", () => {
   let wrapper: VueWrapper<any>;

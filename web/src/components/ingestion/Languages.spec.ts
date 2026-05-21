@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Languages from "@/components/ingestion/Languages.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { useQuasar } from "quasar";
 
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({

@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ServiceIdentityConfig from "./ServiceIdentityConfig.vue";
 
-installQuasar({ plugins: {  } });
 
 vi.mock("@/services/alerts", () => ({
   default: {

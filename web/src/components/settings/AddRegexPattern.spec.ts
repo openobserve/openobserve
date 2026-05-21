@@ -15,13 +15,11 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // MSW is set up globally in setupTests.ts - no need to mock services
 // Import the actual service to test real HTTP calls

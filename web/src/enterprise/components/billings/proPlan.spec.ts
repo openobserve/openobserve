@@ -15,12 +15,10 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import proPlan from "@/enterprise/components/billings/proPlan.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 const mockProFeatures = [
   { name: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking", price: "", is_parent: true },

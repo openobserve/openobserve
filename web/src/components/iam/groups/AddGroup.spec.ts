@@ -16,7 +16,6 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddGroup from "@/components/iam/groups/AddGroup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 

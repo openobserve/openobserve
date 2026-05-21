@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SinglePanelMove from "./SinglePanelMove.vue";
 
 // Mock external dependencies
@@ -111,7 +110,6 @@ const ODialogStub = {
   `,
 };
 
-installQuasar();
 
 describe("SinglePanelMove", () => {
   let wrapper: VueWrapper<any>;
