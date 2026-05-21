@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="sm"
-                class="tw:mt-3"
+                class="tw:mt-3 tw:w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
                 icon-left="add"
