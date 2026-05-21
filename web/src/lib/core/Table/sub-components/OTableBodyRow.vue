@@ -126,7 +126,7 @@ function onDblclick(event: MouseEvent) {
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
     :class="[
-      'tw:transition-colors tw:duration-150',
+      'tw:transition-colors tw:duration-150 tw:cursor-pointer',
       'tw:hover:bg-[var(--color-table-row-hover-bg)]',
       isRowSelected
         ? 'tw:bg-[var(--color-table-row-selected-bg)]'

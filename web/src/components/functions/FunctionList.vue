@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:items-center actions-container">
                   <OButton
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
                     @click="showAddUpdateFn({ row })"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="ghost-destructive"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
                     @click="showDeleteDialogFn({ row })"
@@ -92,12 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="icon-sm"
+                    icon-left="account-tree"
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines({ row })"
-                  >
-                    <OIcon name="account-tree" size="xs" />
-                  </OButton>
+                  />
                 </div>
               </template>
 
