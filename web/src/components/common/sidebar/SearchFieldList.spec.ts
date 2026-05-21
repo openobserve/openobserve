@@ -672,28 +672,21 @@ describe("FieldList.vue Comprehensive Coverage", () => {
   });
 
   describe("Filter Field Value Tests", () => {
-    it("should update filterFieldValue on input", async () => {
+    it("should have a search input for filtering fields", () => {
       wrapper = createWrapper();
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
-      );
+      // Search is handled by OFieldList internally; verify the search input exists
+      const searchInput = wrapper.find('[placeholder="Search field"]');
+      expect(searchInput.exists()).toBe(true);
+    });
+
+    it("should accept input in the search field", async () => {
+      wrapper = createWrapper();
+      const searchInput = wrapper.find('[placeholder="Search field"]');
 
       await searchInput.setValue("test-filter");
 
-      expect(wrapper.vm.filterFieldValue).toBe("test-filter");
-    });
-
-    it("should clear filterFieldValue", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.filterFieldValue = "test-value";
-      await nextTick();
-
-      vm.filterFieldValue = "";
-      await nextTick();
-
-      expect(vm.filterFieldValue).toBe("");
+      // The input should reflect the typed value
+      expect((searchInput.element as HTMLInputElement).value).toBe("test-filter");
     });
   });
 
