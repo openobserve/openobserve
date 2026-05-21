@@ -199,6 +199,7 @@ export default {
     OSelect,
     OInput,
     OCheckbox,
+    OSeparator,
   },
   props: {
     modelValue: {
@@ -274,7 +275,7 @@ export default {
       }
 
       if (!fields.value.havingConditions.length) {
-        fields.value.havingConditions.push({ operator: null, value: null });
+        fields.value.havingConditions.push({ operator: "=", value: null });
       }
 
       await nextTick();
