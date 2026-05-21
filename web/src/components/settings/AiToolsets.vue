@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`ai-toolset-${row.name}-edit`"
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             :title="t('common.edit')"
             @click="editToolset(row)"
             icon-left="edit"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`ai-toolset-${row.name}-delete`"
             variant="ghost-destructive"
-            size="icon-xs-sq"
+            size="icon-sm"
             :title="t('common.delete')"
             @click="confirmDeleteToolset(row)"
             icon-left="delete"

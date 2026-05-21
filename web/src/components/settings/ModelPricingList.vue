@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("modelPricing.header") }}
           <OButton
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             data-test="model-pricing-info-btn"
           >
             <OIcon name="info-outline" size="xs" />
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="
                   row.enabled ? 'ghost-destructive' : 'ghost'
                 "
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="
                   row.enabled
                     ? t('modelPricing.actionDisable')
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="t('modelPricing.actionEdit')"
                 @click.stop="openEditor(row)"
                 data-test="model-pricing-edit-btn"
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost-destructive"
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="t('modelPricing.actionDelete')"
                 @click.stop="confirmDelete(row)"
                 data-test="model-pricing-delete-btn"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="t('modelPricing.actionDuplicate')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-duplicate-btn"
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <OButton
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon-sm"
                 :title="t('modelPricing.actionClone')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-clone-btn"
@@ -617,7 +617,8 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colActions"),
     isAction: true,
     pinned: "right",
-    size: 120,
+    size: 200,
+    minSize: 180,
     meta: { align: "center" },
   },
 ];

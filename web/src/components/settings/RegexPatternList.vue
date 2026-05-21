@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             title="Export Regex Pattern"
             @click.stop="exportRegexPattern(row)"
             icon-left="download"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon-sm"
             :title="t('regex_patterns.edit')"
             @click.stop="editRegexPattern(row)"
             icon-left="edit"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
             variant="ghost-destructive"
-            size="icon-xs-sq"
+            size="icon-sm"
             :title="t('regex_patterns.delete')"
             @click.stop="confirmDeleteRegexPattern(row)"
             icon-left="delete"
