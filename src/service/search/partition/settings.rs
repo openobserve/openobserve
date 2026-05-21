@@ -38,7 +38,7 @@ pub fn calculate_partition_settings(
     trace_id: &str,
     total_secs: usize,
     sql: &Sql,
-    is_aggregate: bool,
+    is_complex_query: bool,
     has_ts_column: bool,
     enable_align_histogram: bool,
     skip_max_query_range: bool,
@@ -66,7 +66,7 @@ pub fn calculate_partition_settings(
         .unwrap()
         .num_microseconds()
         .unwrap();
-    if (is_aggregate && has_ts_column) || enable_align_histogram {
+    if (is_complex_query && has_ts_column) || enable_align_histogram {
         let hist_int = if let Some(hist_int) = histogram_interval {
             hist_int
         } else {

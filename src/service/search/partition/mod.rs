@@ -51,7 +51,7 @@ impl PartitionGenerator {
     /// * `end_time` - End time in microseconds
     /// * `step` - Regular partition step size in microseconds
     /// * `order_by` - Sort order for partitions
-    /// * `is_aggregate` - Whether this is an aggregate query
+    /// * `is_complex_query` - Whether this query requires complex search handling
     /// * `add_mini_partition` - Whether to add a mini partition for faster initial results
     /// * `cache_strategy` - Optional cache-aware partition strategy
     ///
@@ -64,7 +64,7 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
-        is_aggregate: bool,
+        is_complex_query: bool,
         add_mini_partition: bool,
         #[cfg(feature = "enterprise")] cache_strategy: Option<StreamingAggsPartitionStrategy>,
     ) -> Vec<[i64; 2]> {
@@ -83,7 +83,7 @@ impl PartitionGenerator {
                 order_by,
                 add_mini_partition,
             )
-        } else if is_aggregate {
+        } else if is_complex_query {
             vec![[start_time, end_time]]
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)

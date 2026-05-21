@@ -34,8 +34,7 @@ use config::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{
-            is_aggregate_query, is_eligible_for_histogram, is_explain_query,
-            is_simple_distinct_query,
+            is_complex_query, is_eligible_for_histogram, is_explain_query, is_simple_distinct_query,
         },
         time::now_micros,
     },
@@ -603,15 +602,15 @@ pub async fn search_multi(
 /// must be used instead.
 ///
 /// Only the first ORDER BY column is evaluated; secondary columns are not compared.
-/// Aggregate and histogram queries always return false — their partitioning is not
+/// Complex and histogram queries always return false — their partitioning is not
 /// affected by non-ts ORDER BY.
 fn detect_non_ts_order_by(
     order_by: &[(String, config::meta::sql::OrderBy)],
     ts_column: Option<&str>,
-    is_aggregate: bool,
+    is_complex_query: bool,
     is_histogram: bool,
 ) -> bool {
-    if is_aggregate || is_histogram {
+    if is_complex_query || is_histogram {
         return false;
     }
     order_by
@@ -660,9 +659,9 @@ pub async fn search_partition(
 
     // if there is no _timestamp field or EXPLAIN in the query, return single partitions
     let is_explain_query = is_explain_query(&req.sql);
-    let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
+    let is_complex_query = is_complex_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
-    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
+    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).map(|(v, _)| v);
     let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
         &req.sql,
         ts_column.as_deref(),
@@ -727,34 +726,31 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    let is_non_ts_order_by = detect_non_ts_order_by(
+    if detect_non_ts_order_by(
         &sql.order_by,
         ts_column.as_deref(),
-        is_aggregate,
+        is_complex_query,
         sql.histogram_interval.is_some() || enable_align_histogram,
-    );
-
-    if is_non_ts_order_by {
+    ) {
         resp.non_ts_order_by_cols = sql
             .order_by
             .iter()
             .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
             .collect();
-    }
-
-    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
-        );
-        resp.partitions = vec![[req.start_time, req.end_time]];
-        return Ok(resp);
+        if cfg.limit.disable_partitions_for_non_ts_order_by {
+            log::info!(
+                "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
+            );
+            resp.partitions = vec![[req.start_time, req.end_time]];
+            return Ok(resp);
+        }
     }
 
     let partition_settings = calculate_partition_settings(
         trace_id,
         total_secs,
         &sql,
-        is_aggregate,
+        is_complex_query,
         ts_column.is_some(),
         enable_align_histogram,
         skip_max_query_range,
@@ -803,7 +799,7 @@ pub async fn search_partition(
         req.end_time,
         step,
         sql_order_by,
-        is_aggregate,
+        is_complex_query,
         add_mini_partition,
         #[cfg(feature = "enterprise")]
         stremaing_aggs_cache_strategy,
@@ -1442,7 +1438,7 @@ mod tests {
         assert!(detect_non_ts_order_by(&order_by, None, false, false));
     }
 
-    // ── SQL-parsing integration tests (via ColumnVisitor + is_aggregate_query) ──
+    // ── SQL-parsing integration tests (via ColumnVisitor + is_complex_query) ──
 
     #[test]
     fn test_detect_sql_multi_col_non_ts_primary() {
@@ -1476,35 +1472,53 @@ mod tests {
 
     #[test]
     fn test_detect_sql_aggregate_with_count_order() {
-        // is_aggregate_query returns true for GROUP BY → detect always false
+        // is_complex_query returns true for GROUP BY → detect always false
         let sql = "SELECT count(*), status FROM logs GROUP BY status ORDER BY count(*) DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "GROUP BY query must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(
+            is_complex_query,
+            "GROUP BY query must be detected as complex"
+        );
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
-    fn test_detect_sql_join_is_aggregate_short_circuits() {
-        // is_aggregate_query returns true for JOINs → detect always false regardless of ORDER BY
+    fn test_detect_sql_join_is_complex_short_circuits() {
+        // is_complex_query returns true for JOINs → detect always false regardless of ORDER BY
         let sql = "SELECT a.duration, b.name FROM logs a \
                    JOIN users b ON a.user_id = b.id \
                    ORDER BY duration DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "JOIN query must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(is_complex_query, "JOIN query must be detected as complex");
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
-    fn test_detect_sql_subquery_is_aggregate_short_circuits() {
-        // is_aggregate_query returns true for subqueries → detect always false
+    fn test_detect_sql_subquery_is_complex_short_circuits() {
+        // is_complex_query returns true for subqueries → detect always false
         let sql = "SELECT * FROM (SELECT * FROM logs WHERE status = 200) sub \
                    ORDER BY duration DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "subquery must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(is_complex_query, "subquery must be detected as complex");
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
@@ -1520,8 +1534,8 @@ mod tests {
     #[test]
     fn test_detect_sql_cte_outer_non_ts_order_by() {
         // CTE: outer ORDER BY duration first → true
-        // Note: is_aggregate_query may return true for CTEs with subquery body;
-        // in that case the aggregate guard fires before this helper.
+        // Note: is_complex_query may return true for CTEs with subquery body;
+        // in that case the complex-query guard fires before this helper.
         let sql = "WITH t AS (SELECT * FROM logs ORDER BY _timestamp DESC) \
                    SELECT * FROM t ORDER BY duration DESC";
         let order_by = parse_order_by(sql);
