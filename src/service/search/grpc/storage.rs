@@ -239,11 +239,14 @@ pub async fn search(
             .observe(cached_ratio);
     }
 
-    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
-    let target_partitions = cfg.limit.cpu_num
-        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
+    // linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu
+    let target_partitions = (cfg.limit.cpu_num as i64
+        + ((cfg.limit.query_thread_num as i64 - cfg.limit.cpu_num as i64) as f64
+            * (1.0 - cached_ratio)) as i64) as usize;
 
-    log::debug!("search->storage: session target_partitions: {target_partitions}");
+    log::info!(
+        "[trace_id {trace_id}] search->storage: session target_partitions: {target_partitions}"
+    );
 
     let session = config::meta::search::Session {
         id: format!("{trace_id}-storage"),
@@ -509,9 +512,15 @@ pub async fn tantivy_search(
             .observe(cached_ratio);
     }
 
-    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
-    let target_partitions = cfg.limit.cpu_num
-        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
+    // linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu
+    let target_partitions = (cfg.limit.cpu_num as i64
+        + ((cfg.limit.query_thread_num as i64 - cfg.limit.cpu_num as i64) as f64
+            * (1.0 - cached_ratio)) as i64) as usize;
+
+    log::info!(
+        "[trace_id {}] search->tantivy: session target_partitions: {target_partitions}",
+        query.trace_id,
+    );
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();

@@ -198,10 +198,15 @@ pub(crate) async fn create_context(
             .observe(cached_ratio);
     }
 
-    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
+    // linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu
     let cfg = get_config();
-    let target_partitions = cfg.limit.cpu_num
-        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
+    let target_partitions = (cfg.limit.cpu_num as i64
+        + ((cfg.limit.query_thread_num as i64 - cfg.limit.cpu_num as i64) as f64
+            * (1.0 - cached_ratio)) as i64) as usize;
+
+    log::info!(
+        "[trace_id {trace_id}] promql->search->storage: session target_partitions: {target_partitions}"
+    );
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
