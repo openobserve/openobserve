@@ -426,6 +426,7 @@ pub async fn tantivy_search(
 ) -> Result<(usize, bool, TantivyMultiResult), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+    let trace_id = &query.trace_id;
 
     // Cache the corresponding Index files
     let mut scan_stats = ScanStats::new();
@@ -478,8 +479,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
@@ -518,8 +518,7 @@ pub async fn tantivy_search(
             * (1.0 - cached_ratio)) as i64) as usize;
 
     log::info!(
-        "[trace_id {}] search->tantivy: session target_partitions: {target_partitions}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->tantivy: session target_partitions: {target_partitions}",
     );
 
     let search_start = std::time::Instant::now();
@@ -535,8 +534,7 @@ pub async fn tantivy_search(
     let max_group_len = index_parquet_files.len();
 
     log::info!(
-        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
     );
 
     for file_group in index_parquet_files {
@@ -590,8 +588,7 @@ pub async fn tantivy_search(
             Err(e) => {
                 let took = start.elapsed().as_millis() as usize;
                 log::error!(
-                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
-                    query.trace_id,
+                    "[trace_id {trace_id}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
                 );
                 // search error, need add filter back
                 return Ok((took, true, TantivyMultiResult::RowNums(0)));
@@ -613,8 +610,7 @@ pub async fn tantivy_search(
                         total_row_ids_percent += result.percent();
                         if threshold_num == 0 {
                             log::warn!(
-                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
-                                query.trace_id,
+                                "[trace_id {trace_id}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
                                 total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
                             );
                             file_list.extend(file_list_map.into_values());
@@ -662,8 +658,7 @@ pub async fn tantivy_search(
                 }
                 Err(e) => {
                     log::error!(
-                        "[trace_id {}] search->tantivy: error filtering via index. Keep file to search, error: {e}",
-                        query.trace_id,
+                        "[trace_id {trace_id}] search->tantivy: error filtering via index. Keep file to search, error: {e}"
                     );
                     is_add_filter_back = true;
                     continue;
@@ -683,8 +678,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
                 file_list_map.len(),
                 search_start.elapsed().as_millis()
             ),
