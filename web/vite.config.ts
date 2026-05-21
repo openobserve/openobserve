@@ -131,7 +131,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@import '@/styles/quasar-variables';\n`,
+        additionalData: `@use '@/styles/legacy-variables' as *;\n`,
       },
     },
   },

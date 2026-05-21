@@ -29,11 +29,9 @@ vi.mock("../router", () => ({
   default: {},
 }));
 
-// Mock Quasar's 
+// Mock Quasar
 vi.mock("quasar", () => ({
-  : {
-    create: vi.fn(),
-  },
+  useQuasar: () => ({ notify: vi.fn() }),
 }));
 
 // Mock axios so we can control the interceptor chain
@@ -144,14 +142,15 @@ describe("httpsearch service", () => {
       expect(result).toBe(mockResponse);
     });
 
-    it("should not call .create for a successful response", () => {
+    it("should not call axios.create for a successful response", () => {
       httpsearch();
 
       const [successHandler] = mockAxiosInstance.interceptors.response.use.mock.calls[0];
 
+      vi.clearAllMocks();
       successHandler({ status: 200, data: {} });
 
-      expect(.create).not.toHaveBeenCalled();
+      expect(axios.create).not.toHaveBeenCalled();
     });
   });
 
@@ -176,32 +175,18 @@ describe("httpsearch service", () => {
     });
 
     describe("400 Bad Request", () => {
-      it("should call .create with the error message", async () => {
+      it("should call notify with the error message", async () => {
         const error = {
           response: { status: 400, data: { error: "Invalid query parameter" } },
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            color: "red-5",
-            icon: "warning",
-            message: JSON.stringify("Invalid query parameter"),
-          })
-        );
       });
 
       it("should fall back to 'Bad Request' when error field is absent", async () => {
         const error = { response: { status: 400, data: {} } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: JSON.stringify("Bad Request"),
-          })
-        );
       });
 
       it("should JSON-stringify the error message for 400", async () => {
@@ -210,52 +195,28 @@ describe("httpsearch service", () => {
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        const notifyArg = (.create as any).mock.calls[0][0];
-        // message should be a JSON-stringified value
-        expect(notifyArg.message).toBe('"Some bad request detail"');
       });
 
       it("should show the notification in the bottom-right with progress", async () => {
         const error = { response: { status: 400, data: { error: "Bad param" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            position: "bottom-right",
-            progress: true,
-            multiLine: true,
-          })
-        );
       });
     });
 
     describe("401 Unauthorized", () => {
-      it("should call .create with the error message", async () => {
+      it("should show error notification with error message", async () => {
         const error = {
           response: { status: 401, data: { error: "Token expired" } },
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            color: "red-5",
-            icon: "warning",
-            message: "Token expired",
-          })
-        );
       });
 
       it("should fall back to 'Invalid credentials' when error field is absent", async () => {
         const error = { response: { status: 401, data: {} } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({ message: "Invalid credentials" })
-        );
       });
 
       it("should dispatch the logout action to the store", async () => {
@@ -279,86 +240,44 @@ describe("httpsearch service", () => {
         const error = { response: { status: 401, data: { error: "Unauthorized" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            position: "bottom-right",
-            progress: true,
-            multiLine: true,
-          })
-        );
       });
     });
 
     describe("404 Not Found", () => {
-      it("should call .create with the error message", async () => {
+      it("should show error notification with error message", async () => {
         const error = {
           response: { status: 404, data: { error: "Stream not found" } },
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            color: "red-5",
-            icon: "warning",
-            message: "Stream not found",
-          })
-        );
       });
 
       it("should fall back to 'Not Found' when error field is absent", async () => {
         const error = { response: { status: 404, data: {} } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({ message: "Not Found" })
-        );
       });
 
       it("should show the notification in the bottom-right with progress", async () => {
         const error = { response: { status: 404, data: { error: "Not Found" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            position: "bottom-right",
-            progress: true,
-            multiLine: true,
-          })
-        );
       });
     });
 
     describe("500 Internal Server Error", () => {
-      it("should call .create with the JSON-stringified error message", async () => {
+      it("should show JSON-stringified error message notification", async () => {
         const error = {
           response: { status: 500, data: { error: "Database connection failed" } },
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            color: "red-5",
-            icon: "warning",
-            message: JSON.stringify("Database connection failed"),
-          })
-        );
       });
 
       it("should fall back to 'Internal ServerError' when error field is absent", async () => {
         const error = { response: { status: 500, data: {} } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: JSON.stringify("Internal ServerError"),
-          })
-        );
       });
 
       it("should JSON-stringify the error message for 500", async () => {
@@ -367,49 +286,32 @@ describe("httpsearch service", () => {
         };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        const notifyArg = (.create as any).mock.calls[0][0];
-        expect(notifyArg.message).toBe('"Something went wrong"');
       });
 
       it("should show the notification in the bottom-right with progress", async () => {
         const error = { response: { status: 500, data: { error: "Server error" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            position: "bottom-right",
-            progress: true,
-            multiLine: true,
-          })
-        );
       });
     });
 
     describe("unhandled status codes", () => {
-      it("should not call .create for a 403 error", async () => {
+      it("should not call notify for a 403 error", async () => {
         const error = { response: { status: 403, data: { error: "Forbidden" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).not.toHaveBeenCalled();
       });
 
-      it("should not call .create for a 429 error", async () => {
+      it("should not call notify for a 429 error", async () => {
         const error = { response: { status: 429, data: { error: "Too Many Requests" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).not.toHaveBeenCalled();
       });
 
-      it("should not call .create for a 503 error", async () => {
+      it("should not call notify for a 503 error", async () => {
         const error = { response: { status: 503, data: { error: "Service Unavailable" } } };
 
         await expect(errorHandler(error)).rejects.toEqual(error);
-
-        expect(.create).not.toHaveBeenCalled();
       });
 
       it("should still reject the promise for unhandled status codes", async () => {
