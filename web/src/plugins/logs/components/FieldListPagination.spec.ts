@@ -51,10 +51,11 @@ const quasarStubs = {
     props: ["name"],
     emits: ["click"],
   },
-  QTooltip: {
-    name: "QTooltip",
-    template: '<div class="q-tooltip-stub"><slot /></div>',
-    props: ["anchor", "self", "maxWidth"],
+  OTooltip: {
+    name: "OTooltip",
+    template:
+      '<div class="o-tooltip-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
+    props: ["anchor", "self", "maxWidth", "content", "side", "align"],
   },
   QSeparator: {
     name: "QSeparator",
