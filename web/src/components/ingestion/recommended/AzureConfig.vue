@@ -377,14 +377,6 @@ export default defineComponent({
     flex-shrink: 0;
   }
 
-  // Suppress Quasar's focus container highlight for inputs in this component
-  :deep(.q-field--outlined.q-field--highlighted .q-field__control:after) {
-    border-color: transparent !important;
-  }
-  :deep(.q-field--outlined.q-field--highlighted .q-field__control:before) {
-    border-color: rgba(0, 0, 0, 0.24) !important;
-  }
-
   .body--light & {
     .title {
       color: #1a1a1a;

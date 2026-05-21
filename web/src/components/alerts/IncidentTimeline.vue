@@ -655,10 +655,6 @@ defineExpose({
 }
 
 .comment-input {
-  :deep(.q-field__control) {
-    border-radius: 6px;
-  }
-
   :deep(textarea) {
     font-size: 14px;
     line-height: 1.5;
