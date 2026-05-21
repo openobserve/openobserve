@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="events-container relative-position">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b" />
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b tw:px-2 tw:py-2" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
         class="tw:flex tw:p-2 event-metadata tw:px-[0.375rem]"
       >
-        <div class="tw:w-full tw:flex">
+        <div class="tw:w-full tw:flex tw:flex-col">
           <div class="tw:w-full tw:pb-2 tw:text-xs">
             <OIcon name="mail" size="sm" class="tw:pr-1" />
             {{ sessionDetails.user_email || "Unknown User" }}
@@ -149,7 +149,7 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    icon: "navigation",
+    icon: "send",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -159,7 +159,7 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
-    icon: "label",
+    icon: "tag",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];
