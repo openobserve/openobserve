@@ -45,6 +45,7 @@ const filtered = computed(() => {
 });
 
 const activeChatId = computed(() => store.state.currentChatTimestamp);
+const chatExportEnabled = computed(() => store.state.zoConfig.ai_chat_export_enabled === true);
 
 function selectChat(id: number) {
   store.dispatch("setCurrentChatTimestamp", id);
@@ -184,6 +185,7 @@ function formatTime(ts: string): string {
         </div>
         <div class="hch-actions-wrap">
           <OButton
+            v-if="chatExportEnabled"
             variant="ghost-subtle"
             size="icon"
             :title="t('chatHistory.export')"
@@ -239,7 +241,7 @@ function formatTime(ts: string): string {
 
     <!-- Clear all / Export -->
     <div v-if="history.length > 0" class="hch-footer">
-      <OButton variant="ghost-subtle" :block="true" @click="exportAll">
+      <OButton v-if="chatExportEnabled" variant="ghost-subtle" :block="true" @click="exportAll">
         <svg
           width="0.875em"
           height="0.875em"

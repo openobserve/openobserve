@@ -92,6 +92,7 @@
                           </div>
                           <span class="delete-history-wrap">
                           <OButton
+                            v-if="chatExportEnabled"
                             variant="ghost-subtle"
                             size="icon"
                             @click.stop="dbExportChatById(chat.id)"
@@ -126,6 +127,7 @@
                 >
                   <q-separator />
                   <OButton
+                    v-if="chatExportEnabled"
                     variant="ghost-subtle"
                     :block="true"
                     @click.stop="
@@ -227,7 +229,7 @@
                     Model: {{ chat.model }}
                   </q-item-label>
                 </q-item-section>
-                <q-item-section side>
+                <q-item-section v-if="chatExportEnabled" side>
                   <OButton
                     variant="ghost-subtle"
                     size="icon"
@@ -5664,6 +5666,8 @@ export default defineComponent({
       );
     });
 
+    const chatExportEnabled = computed(() => store.state.zoConfig.ai_chat_export_enabled === true);
+
     return {
       inputMessage,
       chatMessages,
@@ -5695,6 +5699,8 @@ export default defineComponent({
       chatToDelete,
       clearAllConversations,
       exportAllConversations,
+      dbExportChatById,
+      chatExportEnabled,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
       // Tool confirmation

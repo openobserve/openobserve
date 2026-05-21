@@ -186,6 +186,7 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    ai_chat_export_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     dashboard_show_field_as_json_enabled: bool,
@@ -354,6 +355,7 @@ pub async fn zo_config() -> impl IntoResponse {
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    let ai_chat_export_enabled = enterprise_value!(false, o2cfg.ai.chat_export_enabled);
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is always on when the enterprise feature is compiled in — no runtime flag.
@@ -443,6 +445,7 @@ pub async fn zo_config() -> impl IntoResponse {
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        ai_chat_export_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
