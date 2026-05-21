@@ -42,7 +42,8 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
     const currentPage = await pm.logsPage.getCurrentPageNumber();
     expect(currentPage).toBe('2');
 
-    await pm.logsPage.assertScrollAtTop();
+    const scrollTop = await pm.logsPage.getScrollContainerPosition();
+    expect(scrollTop).toBeLessThanOrEqual(1);
     testLogger.info('Scroll correctly reset to top on page 2');
   });
 
@@ -64,7 +65,8 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
     const currentPage = await pm.logsPage.getCurrentPageNumber();
     expect(currentPage).toBe('1');
 
-    await pm.logsPage.assertScrollAtTop();
+    const scrollTop = await pm.logsPage.getScrollContainerPosition();
+    expect(scrollTop).toBeLessThanOrEqual(1);
     testLogger.info('Scroll correctly reset to top on page 1');
   });
 
@@ -82,7 +84,8 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
     const currentPage = await pm.logsPage.getCurrentPageNumber();
     expect(currentPage).toBe('2');
 
-    await pm.logsPage.assertScrollAtTop();
+    const scrollTop = await pm.logsPage.getScrollContainerPosition();
+    expect(scrollTop).toBeLessThanOrEqual(1);
     testLogger.info('Scroll correctly reset to top after Next Page button');
   });
 });
@@ -174,11 +177,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
     await page.waitForLoadState('domcontentloaded');
 
     if (traceId) {
-      const searchBtn = page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`).locator('button').first();
-      if (await searchBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await searchBtn.click();
-        await page.waitForTimeout(3000);
-      }
+      await pm.logsPage.clickScheduledSearchRow(traceId);
     }
 
     await pm.logsPage.navigateToStreams();
@@ -217,11 +216,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
     await page.waitForLoadState('domcontentloaded');
 
     if (traceId) {
-      const searchBtn = page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`).locator('button').first();
-      if (await searchBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await searchBtn.click();
-        await page.waitForTimeout(3000);
-      }
+      await pm.logsPage.clickScheduledSearchRow(traceId);
     }
 
     await pm.logsPage.navigateToStreams();

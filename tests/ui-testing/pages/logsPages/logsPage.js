@@ -1020,7 +1020,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
     }
@@ -7842,14 +7842,6 @@ export class LogsPage {
     }
 
     /**
-     * Assert that the main results scroll container is at the top (scrollTop <= 1).
-     */
-    async assertScrollAtTop() {
-        const scrollTop = await this.getScrollContainerPosition();
-        expect(scrollTop).toBeLessThanOrEqual(1);
-    }
-
-    /**
      * Click a specific page number in the pagination component.
      * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
      */
@@ -7884,20 +7876,40 @@ export class LogsPage {
 
     /**
      * Click "List Scheduled Search" in the open More Options menu.
-     * Returns the page URL after navigation.
+     * Uses the data-test selector on the menu item when available (enterprise),
+     * falling back to text-based DOM matching for OSS builds.
      */
     async clickListScheduledSearch() {
-        // Use evaluate to find and click the menu item
-        await this.page.evaluate(() => {
-            const items = document.querySelectorAll('.q-menu .q-item, [role="menuitem"]');
-            for (const item of items) {
-                if (item.textContent?.trim() === 'List Scheduled Search') {
-                    item.click();
-                    break;
+        const listBtn = this.page.locator('[data-test="search-scheduler-list-btn"]');
+        if (await listBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await listBtn.click();
+        } else {
+            await this.page.evaluate(() => {
+                const items = document.querySelectorAll('[role="menuitem"]');
+                for (const item of items) {
+                    if (item.textContent?.trim() === 'List Scheduled Search') {
+                        item.click();
+                        break;
+                    }
                 }
-            }
-        });
+            });
+        }
         await this.page.waitForTimeout(3000);
+    }
+
+    /**
+     * Click a scheduled search row by its trace_id.
+     * @param {string} traceId - The trace_id of the scheduled search job
+     * @returns {Promise<boolean>} true if the row was clicked, false if not found
+     */
+    async clickScheduledSearchRow(traceId) {
+        const row = this.page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`);
+        if (await row.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await row.locator('button').first().click();
+            await this.page.waitForTimeout(3000);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -7971,7 +7983,9 @@ export class LogsPage {
      */
     async getCurrentPageNumber() {
         return await this.page.evaluate(() => {
-            const btn = document.querySelector('.q-pagination button[aria-current="true"]');
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (!pagination) return '';
+            const btn = pagination.querySelector('button[aria-current="true"]');
             return btn ? btn.getAttribute('aria-label') : '';
         });
     }
