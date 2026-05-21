@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 pub mod assume_service_account;
+#[cfg(feature = "cloud")]
+pub mod billing_group;
 pub mod es;
 pub mod org;
 pub mod settings;
