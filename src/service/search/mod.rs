@@ -63,7 +63,6 @@ use {
             search::{CardinalityLevel, generate_aggregation_search_interval},
             self_reporting::usage::USAGE_STREAM,
         },
-        utils::sql::is_simple_aggregate_query,
     },
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
@@ -74,7 +73,6 @@ use {
                 create_aggregation_cache_file_path, discover_cache_for_query,
                 generate_optimal_partitions, get_aggregation_cache_key_from_request,
             },
-            cache_aggs_util,
             datafusion::distributed_plan::streaming_aggs_exec,
         },
     },
@@ -684,39 +682,25 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
 
-    #[cfg(feature = "enterprise")]
-    let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
-
-    #[cfg(feature = "enterprise")]
-    {
-        let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
-            cache_aggs_util::analyze_count_aggregation_pattern(&req.sql);
-        if let Ok(result) = res {
-            is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
-        }
-    }
-
-    let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let mut use_single_partition = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
 
-    #[cfg(feature = "enterprise")]
-    let mut is_streaming_aggregate = ts_column.is_none()
-        && is_cachable_aggs
-        && cfg.common.feature_query_streaming_aggs
-        && !is_http_distinct;
-
-    #[cfg(not(feature = "enterprise"))]
-    let is_streaming_aggregate = false;
+    #[allow(unused_mut)]
+    let mut is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
+        &req.sql,
+        ts_column.as_deref(),
+        is_http_distinct,
+    );
 
     // if need streaming output and is simple query, we shouldn't skip file list
-    if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
-        skip_get_file_list = false;
+    if use_single_partition && req.streaming_output && is_streaming_aggregate {
+        use_single_partition = false;
     }
 
     // if http distinct, we should skip file list
     if is_http_distinct || is_explain_query {
-        skip_get_file_list = true;
+        use_single_partition = true;
     }
 
     let query_duration_secs = (req.end_time - req.start_time) / 1000 / 1000;
@@ -728,7 +712,7 @@ pub async fn search_partition(
         &sql.schemas,
         sql.time_range,
         query_duration_secs,
-        skip_get_file_list,
+        use_single_partition,
     )
     .await?;
     let files = stream_files.files;
@@ -754,7 +738,7 @@ pub async fn search_partition(
         file_list_took,
     );
 
-    if skip_get_file_list {
+    if use_single_partition {
         let mut response = search::SearchPartitionResponse::default();
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
@@ -889,10 +873,7 @@ pub async fn search_partition(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search_partition: \
-        original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, \
-        partition_secs: {}, part_num: {part_num}, \
-        is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
+        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, part_num: {part_num}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
         resp.original_size,
         cfg.limit.query_group_base_speed,
         cfg.limit.query_partition_by_secs,
@@ -982,7 +963,7 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
-    let streaming_id = if req.streaming_output && is_streaming_aggregate && !skip_get_file_list {
+    let streaming_id = if req.streaming_output && is_streaming_aggregate && !use_single_partition {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
             Ok(v) => (v[0].clone(), v.join(",")),
@@ -1019,7 +1000,6 @@ pub async fn search_partition(
             // this query can't use streaming_agg cache,
             // so we set is_streaming_aggregate to false and return None
             is_streaming_aggregate = false;
-            // skip_get_file_list = true;
             None
         } else {
             let streaming_id = ider::uuid();

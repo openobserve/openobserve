@@ -42,7 +42,7 @@ pub struct StreamFiles {
 }
 
 /// For each stream in the query, either queries the actual file list or
-/// estimates file metadata from stream statistics (when skipping file list
+/// estimates file metadata from stream statistics (when using single partition
 /// or using approximate partitioning).
 #[allow(clippy::too_many_arguments)]
 pub async fn collect_stream_files(
@@ -53,7 +53,7 @@ pub async fn collect_stream_files(
     schemas: &HashMap<TableReference, Arc<SchemaCache>>,
     time_range: Option<(i64, i64)>,
     query_duration_secs: i64,
-    skip_get_file_list: bool,
+    use_single_partition: bool,
 ) -> Result<StreamFiles, Error> {
     let cfg = get_config();
     let mut files = Vec::with_capacity(schemas.len() * 10);
@@ -72,7 +72,7 @@ pub async fn collect_stream_files(
             stream_settings.approx_partition
         };
 
-        if !skip_get_file_list && !use_stream_stats_for_partition {
+        if !use_single_partition && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
                 trace_id,
                 org_id,
