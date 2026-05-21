@@ -161,7 +161,6 @@ describe("AWSConfig", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    mockConsoleError.mockRestore();
   });
 
   // Test 1: Component mounting

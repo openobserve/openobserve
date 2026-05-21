@@ -24,16 +24,13 @@ vi.mock("@/services/iam", () => ({
   createGroup: vi.fn(),
 }));
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<any>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Lightweight stubs for the in-house O* components. ODrawer renders its
 // default slot so children remain queryable, and OButton forwards click
@@ -138,7 +135,15 @@ describe("AddGroup Component", () => {
       expect(nameInput.exists()).toBe(true);
     });
 
-    it("displays validation hint text", () => {
+    it("displays validation hint text", async () => {
+      // nameErrorMessage returns the format hint only when name is non-empty;
+      // when name is empty it returns the required-field message instead.
+      // showNameError has no public API — set vm directly so OInput renders
+      // the :error-message via its role="alert" span.
+      wrapper.vm.name = "test-name";
+      wrapper.vm.showNameError = true;
+      await flushPromises();
+
       expect(wrapper.text()).toContain(
         "Use alphanumeric and '_' characters only, without spaces.",
       );
@@ -291,10 +296,9 @@ describe("AddGroup Component", () => {
       await wrapper.vm.saveGroup();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'User Group "test_group" Created Successfully!',
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -309,10 +313,9 @@ describe("AddGroup Component", () => {
       await wrapper.vm.saveGroup();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -327,7 +330,7 @@ describe("AddGroup Component", () => {
       await wrapper.vm.saveGroup();
       await flushPromises();
 
-      expect(mockNotify).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
     });
 
     it("does not emit added:group when creation fails", async () => {

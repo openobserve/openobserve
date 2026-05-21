@@ -70,6 +70,7 @@ describe("Languages Component", () => {
         },
         stubs: {
           'OSplitter': {
+            name: 'OSplitter',
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
           'OInput': true,
