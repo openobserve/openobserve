@@ -13,23 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `.bf` file reader.
+//! `.bf` file reader — footer only.
 //!
-//! Whole-blob reader: parses the footer, exposes `(file_id, field) ->
-//! contains(value)` lookups. Built for the search hot path — once the
-//! footer is parsed, every check is one xxhash + one cache-line load
-//! through `parquet::bloom_filter::Sbbf::check`.
+//! The reader never holds the body of a `.bf` in memory. It parses the
+//! footer (which is tiny: ~24 B per file × fields) and exposes two things:
 //!
-//! Failure mode is "treat-as-missing": malformed bytes return
-//! `Err(ReadError::*)`. Callers (the search prune layer) downgrade any
-//! error to "no pruning" to keep query correctness.
+//! 1. [`BloomReader::block_range_for`] — given a `(field, file_id, value)` lookup, returns the
+//!    absolute byte range of the single 32-byte SBBF block to fetch, plus the hash to feed into
+//!    [`super::sbbf::check_block`]. Returns `None` when the file or field is absent (caller
+//!    interprets that as "no info — keep the file").
+//! 2. The 8-bit point check itself lives in [`super::sbbf::check_block`].
+//!
+//! This is the whole reason we keep the body out of memory: a point check
+//! on a 2 MB SBBF only needs 32 bytes, and at search time we routinely
+//! fan that out across hundreds of `.bf` buckets per query.
 
-use std::sync::OnceLock;
+use std::ops::Range;
 
 use hashbrown::HashMap;
-use parquet::bloom_filter::Sbbf;
 
-use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION};
+use super::{
+    ALGO_SBBF_XXHASH64, MAGIC, VERSION,
+    sbbf::{BLOCK_BYTES, block_index, check_block, hash_value},
+};
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ReadError {
@@ -45,22 +51,15 @@ pub enum ReadError {
     BadFooter(u32, usize),
     #[error("truncated field section")]
     Truncated,
-    #[error("invalid sbbf bytes for field '{0}', file_id={1}: {2}")]
-    InvalidBloom(String, u64, String),
+    #[error("invalid sbbf body size for field '{0}', file_id={1}: {2} bytes")]
+    InvalidBloomSize(String, u64, u32),
 }
 
-/// One indexed bloom for a particular file_id, lazily materialized.
-///
-/// `bloom` is wrapped in `OnceLock` rather than `Option<Sbbf>` so that
-/// `check` only needs `&self` (interior init) — this is the contract
-/// that lets a single `Arc<BloomReader>` be shared across queries
-/// without a `Mutex` on the hot path. The OnceLock stores
-/// `Result<Sbbf, ReadError>` to memoize parse failures too.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct FileEntry {
     body_offset: u64,
+    /// Always a non-zero multiple of `BLOCK_BYTES` — validated at parse time.
     body_size: u32,
-    bloom: OnceLock<Result<Sbbf, ReadError>>,
 }
 
 #[derive(Debug)]
@@ -70,73 +69,97 @@ struct FieldSection {
     entries: Vec<FileEntry>,
 }
 
-/// Parsed `.bf` blob ready for membership lookups. Lookups take `&self`
-/// (no `&mut`) so the reader can be shared via `Arc` across queries.
+/// Parsed `.bf` footer. Body bytes stay on disk / in object store; the
+/// reader exposes [`Self::block_range_for`] so the caller can fetch just
+/// the 32 bytes a single point check needs.
 pub struct BloomReader {
-    blob: Vec<u8>,
-    /// `field_name` → section
     by_field: HashMap<String, FieldSection>,
 }
 
 impl std::fmt::Debug for BloomReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BloomReader")
-            .field("blob_len", &self.blob.len())
             .field("field_count", &self.by_field.len())
             .finish()
     }
 }
 
 impl BloomReader {
-    pub fn parse(blob: Vec<u8>) -> Result<Self, ReadError> {
-        if blob.len() < 4 + 1 + 4 + 4 + 4 {
-            return Err(ReadError::TooShort(blob.len()));
+    /// Parse the footer out of a full `.bf` blob. Used by tests and by any
+    /// caller that already has the entire file in memory.
+    pub fn parse(blob: &[u8]) -> Result<Self, ReadError> {
+        Self::parse_suffix(blob, blob.len() as u64)
+    }
+
+    /// Parse from a trailing suffix of the file. `total_size` is the full
+    /// `.bf` length on disk; `suffix` is the last `suffix.len()` bytes of
+    /// it. The reader needs the tail magic + footer_len + footer payload —
+    /// the suffix must therefore cover all of those (callers size it
+    /// generously, e.g. 16 KB).
+    ///
+    /// `body_offset`s recorded in the footer are absolute against the
+    /// full file, which is exactly what [`Self::block_range_for`] returns.
+    pub fn parse_suffix(suffix: &[u8], total_size: u64) -> Result<Self, ReadError> {
+        if suffix.len() < 4 + 1 + 4 + 4 + 4 {
+            return Err(ReadError::TooShort(suffix.len()));
         }
-        if &blob[..4] != MAGIC {
-            return Err(ReadError::BadMagic);
+        let total = total_size as usize;
+        // We need to validate the *file* header (MAGIC + VERSION) too. If
+        // the suffix covers the whole file, both fit. Otherwise we only
+        // validate the tail and trust the upstream fetch.
+        let suffix_covers_head = suffix.len() >= total;
+        if suffix_covers_head {
+            if &suffix[..4] != MAGIC {
+                return Err(ReadError::BadMagic);
+            }
+            if suffix[4] != VERSION {
+                return Err(ReadError::BadVersion(suffix[4]));
+            }
         }
-        if blob[4] != VERSION {
-            return Err(ReadError::BadVersion(blob[4]));
-        }
-        let n = blob.len();
-        if &blob[n - 4..] != MAGIC {
+        let n = suffix.len();
+        if &suffix[n - 4..] != MAGIC {
             return Err(ReadError::BadMagic);
         }
 
-        let footer_len = u32::from_le_bytes(blob[n - 8..n - 4].try_into().unwrap()) as usize;
+        let footer_len = u32::from_le_bytes(suffix[n - 8..n - 4].try_into().unwrap()) as usize;
         if footer_len + 8 > n {
             return Err(ReadError::BadFooter(footer_len as u32, n));
         }
         let footer_start = n - 8 - footer_len;
 
         let mut p = footer_start;
-        let field_count = read_u32(&blob, &mut p)? as usize;
+        let field_count = read_u32(suffix, &mut p)? as usize;
 
         let mut by_field: HashMap<String, FieldSection> = HashMap::with_capacity(field_count);
         for _ in 0..field_count {
-            let name_len = read_u16(&blob, &mut p)? as usize;
+            let name_len = read_u16(suffix, &mut p)? as usize;
             if p + name_len > n {
                 return Err(ReadError::Truncated);
             }
-            let name = std::str::from_utf8(&blob[p..p + name_len])
+            let name = std::str::from_utf8(&suffix[p..p + name_len])
                 .map_err(|_| ReadError::Truncated)?
                 .to_string();
             p += name_len;
-            let algo = read_u8(&blob, &mut p)?;
+            let algo = read_u8(suffix, &mut p)?;
             if algo != ALGO_SBBF_XXHASH64 {
                 return Err(ReadError::BadAlgo(algo));
             }
-            let file_count = read_u32(&blob, &mut p)? as usize;
+            let file_count = read_u32(suffix, &mut p)? as usize;
             let mut by_file: HashMap<u64, usize> = HashMap::with_capacity(file_count);
             let mut entries: Vec<FileEntry> = Vec::with_capacity(file_count);
             for _ in 0..file_count {
-                let file_id = read_u64(&blob, &mut p)?;
-                let body_offset = read_u64(&blob, &mut p)?;
-                let body_size = read_u32(&blob, &mut p)?;
-                let _n_items = read_u32(&blob, &mut p)?;
-                if (body_offset as usize)
-                    .checked_add(body_size as usize)
-                    .map(|end| end > footer_start)
+                let file_id = read_u64(suffix, &mut p)?;
+                let body_offset = read_u64(suffix, &mut p)?;
+                let body_size = read_u32(suffix, &mut p)?;
+                let _n_items = read_u32(suffix, &mut p)?;
+                // Body must be a non-zero multiple of 32 (one SBBF block).
+                if body_size == 0 || body_size as usize % BLOCK_BYTES != 0 {
+                    return Err(ReadError::InvalidBloomSize(name.clone(), file_id, body_size));
+                }
+                // Body must fit before the footer (in the full file).
+                if body_offset
+                    .checked_add(body_size as u64)
+                    .map(|end| end as usize > total - footer_len - 8)
                     .unwrap_or(true)
                 {
                     return Err(ReadError::Truncated);
@@ -145,7 +168,6 @@ impl BloomReader {
                 entries.push(FileEntry {
                     body_offset,
                     body_size,
-                    bloom: OnceLock::new(),
                 });
                 by_file.insert(file_id, idx);
             }
@@ -155,7 +177,7 @@ impl BloomReader {
             return Err(ReadError::Truncated);
         }
 
-        Ok(Self { blob, by_field })
+        Ok(Self { by_field })
     }
 
     /// Number of distinct indexed fields in this blob.
@@ -167,97 +189,38 @@ impl BloomReader {
         self.by_field.keys().map(String::as_str)
     }
 
-    /// Underlying blob size (used by the partial-read path to know
-    /// where the body region ends and the footer begins).
-    pub fn blob_len(&self) -> u64 {
-        self.blob.len() as u64
+    /// Compute the single 32-byte block range to fetch for a point check.
+    ///
+    /// Returns `Some((range, hash))` where:
+    /// - `range` is the absolute byte range inside the `.bf` to fetch (always exactly 32 bytes)
+    /// - `hash` is the xxhash64 of the value; pass it to [`check_block_with_hash`] together with the
+    ///   fetched bytes
+    ///
+    /// Returns `None` when this `.bf` has no info for `(field, file_id)` —
+    /// the caller should interpret that as "no information available" and
+    /// keep the file in the candidate set.
+    pub fn block_range_for(
+        &self,
+        field: &str,
+        file_id: u64,
+        value: &[u8],
+    ) -> Option<(Range<u64>, u64)> {
+        let section = self.by_field.get(field)?;
+        let idx = *section.by_file.get(&file_id)?;
+        let entry = section.entries[idx];
+        // body_size validated at parse to be a multiple of 32 and non-zero.
+        let num_blocks = entry.body_size / BLOCK_BYTES as u32;
+        let h = hash_value(value);
+        let bi = block_index(h, num_blocks) as u64;
+        let start = entry.body_offset + bi * BLOCK_BYTES as u64;
+        Some((start..start + BLOCK_BYTES as u64, h))
     }
 
-    /// Absolute byte ranges (in the original blob) for the SBBF body
-    /// of each `(field, file_id)` target. Unknown pairs are skipped —
-    /// they don't need body bytes because `check` will short-circuit
-    /// with `Ok(true)` (conservative keep).
-    ///
-    /// Returned ranges are not deduplicated or merged; the caller is
-    /// expected to feed them through a range-coalescing fetcher (e.g.
-    /// `infra::cache::storage::get_ranges`).
-    pub fn body_ranges_for<'a, I>(&self, targets: I) -> Vec<std::ops::Range<u64>>
-    where
-        I: IntoIterator<Item = (&'a str, u64)>,
-    {
-        targets
-            .into_iter()
-            .filter_map(|(field, file_id)| {
-                let section = self.by_field.get(field)?;
-                let idx = *section.by_file.get(&file_id)?;
-                let entry = &section.entries[idx];
-                let start = entry.body_offset;
-                let end = start.checked_add(entry.body_size as u64)?;
-                Some(start..end)
-            })
-            .collect()
-    }
-
-    /// Splice fetched body bytes into the underlying blob at `offset`.
-    ///
-    /// Intended for the partial-read fetch path: the pruner parses a
-    /// blob built from a suffix probe (footer + zero-filled body) to
-    /// obtain ranges via `body_ranges_for`, fetches those ranges, then
-    /// splices them back in before calling `check`.
-    ///
-    /// **Caller obligations:**
-    /// - The blob slice at `offset..offset + bytes.len()` is zeroed (i.e. has not been read yet).
-    ///   Splicing over an already- materialized region is a no-op only if the bytes match; if they
-    ///   don't, downstream `check` on that range will return stale results.
-    /// - No prior `check` call has triggered SBBF decoding for a `(field, file_id)` whose body
-    ///   overlaps this range. The lazy `OnceLock<Sbbf>` would memoize a decode of the zeroed bytes
-    ///   and refuse to re-read after the splice.
-    ///
-    /// Panics if `offset + bytes.len()` exceeds the blob length —
-    /// indicates a range/byte-stream mismatch upstream.
-    pub fn splice_body_bytes(&mut self, offset: u64, bytes: &[u8]) {
-        let start = offset as usize;
-        let end = start + bytes.len();
-        assert!(
-            end <= self.blob.len(),
-            "splice_body_bytes out of range: offset={} len={} blob_len={}",
-            offset,
-            bytes.len(),
-            self.blob.len()
-        );
-        self.blob[start..end].copy_from_slice(bytes);
-    }
-
-    /// True iff the bloom for `(field, file_id)` *might* contain `value`.
-    /// Returns `Ok(true)` when the file or field is unknown to this `.bf`
-    /// — callers decide what to do with that (typically: keep the file
-    /// because we lack info to rule it out).
-    ///
-    /// Takes `&self` (interior init via `OnceLock`) so the same
-    /// `BloomReader` can be shared via `Arc` across queries without
-    /// per-check locking.
-    pub fn check(&self, field: &str, file_id: u64, value: &[u8]) -> Result<bool, ReadError> {
-        let section = match self.by_field.get(field) {
-            Some(s) => s,
-            None => return Ok(true),
-        };
-        let idx = match section.by_file.get(&file_id) {
-            Some(i) => *i,
-            None => return Ok(true),
-        };
-        let entry = &section.entries[idx];
-        let bloom_result = entry.bloom.get_or_init(|| {
-            let start = entry.body_offset as usize;
-            let end = start + entry.body_size as usize;
-            Sbbf::from_bytes(&self.blob[start..end]).map_err(|e| {
-                log::warn!("bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}: {e}");
-                ReadError::InvalidBloom(field.to_string(), file_id, e.to_string())
-            })
-        });
-        match bloom_result {
-            Ok(bloom) => Ok(bloom.check(value)),
-            Err(e) => Err(e.clone()),
-        }
+    /// Run the 8-bit SBBF check on a fetched 32-byte block. Convenience
+    /// wrapper around [`super::sbbf::check_block`].
+    #[inline]
+    pub fn check_block_with_hash(block: &[u8; BLOCK_BYTES], hash: u64) -> bool {
+        check_block(block, hash)
     }
 }
 
@@ -320,36 +283,47 @@ mod tests {
         BloomWriter::serialize(b.finish()).expect("write succeeds")
     }
 
-    #[test]
-    fn test_round_trip_membership_yes_and_no() {
-        let blob = build_two_field_blob();
-        let r = BloomReader::parse(blob).unwrap();
-        assert_eq!(r.field_count(), 2);
-
-        // present items
-        assert!(r.check("trace_id", 101, b"abc").unwrap());
-        assert!(r.check("trace_id", 101, b"def").unwrap());
-        assert!(r.check("trace_id", 102, b"ghi").unwrap());
-        assert!(r.check("user_id", 101, b"u-1").unwrap());
-        // absent items — overwhelmingly false (FPR ~1%)
-        assert!(!r.check("trace_id", 101, b"NOT_PRESENT_xx").unwrap());
-        assert!(!r.check("user_id", 101, b"NOT_PRESENT_xx").unwrap());
+    /// Fetch the 32-byte block that `block_range_for` points at, then
+    /// run the same single-block check the pruner does. Returns `None`
+    /// when the reader has no info for `(field, file_id)`.
+    fn check_via_block(reader: &BloomReader, blob: &[u8], field: &str, file_id: u64, v: &[u8]) -> Option<bool> {
+        let (range, h) = reader.block_range_for(field, file_id, v)?;
+        let s = range.start as usize;
+        let e = range.end as usize;
+        let block: &[u8; BLOCK_BYTES] = blob[s..e].try_into().unwrap();
+        Some(BloomReader::check_block_with_hash(block, h))
     }
 
     #[test]
-    fn test_unknown_field_or_file_returns_true() {
-        // "no information" is conservative — keep the file in the candidate set.
+    fn test_round_trip_membership_yes_and_no() {
         let blob = build_two_field_blob();
-        let r = BloomReader::parse(blob).unwrap();
-        assert!(r.check("nonexistent_field", 101, b"x").unwrap());
-        assert!(r.check("trace_id", 999_999, b"x").unwrap());
+        let r = BloomReader::parse(&blob).unwrap();
+        assert_eq!(r.field_count(), 2);
+
+        // present items — single-block check must hit
+        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"abc"), Some(true));
+        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"def"), Some(true));
+        assert_eq!(check_via_block(&r, &blob, "trace_id", 102, b"ghi"), Some(true));
+        assert_eq!(check_via_block(&r, &blob, "user_id", 101, b"u-1"), Some(true));
+        // absent items — overwhelmingly false
+        assert_eq!(check_via_block(&r, &blob, "trace_id", 101, b"NOT_PRESENT_xx"), Some(false));
+        assert_eq!(check_via_block(&r, &blob, "user_id", 101, b"NOT_PRESENT_xx"), Some(false));
+    }
+
+    #[test]
+    fn test_unknown_field_or_file_returns_none() {
+        // "no information" — caller decides what to do (typically: keep the file).
+        let blob = build_two_field_blob();
+        let r = BloomReader::parse(&blob).unwrap();
+        assert!(r.block_range_for("nonexistent_field", 101, b"x").is_none());
+        assert!(r.block_range_for("trace_id", 999_999, b"x").is_none());
     }
 
     #[test]
     fn test_bad_magic_rejected() {
         let mut blob = build_two_field_blob();
         blob[0] = b'X';
-        let err = BloomReader::parse(blob).unwrap_err();
+        let err = BloomReader::parse(&blob).unwrap_err();
         assert!(matches!(err, ReadError::BadMagic));
     }
 
@@ -358,7 +332,7 @@ mod tests {
         let mut blob = build_two_field_blob();
         let n = blob.len();
         blob[n - 1] = b'X';
-        let err = BloomReader::parse(blob).unwrap_err();
+        let err = BloomReader::parse(&blob).unwrap_err();
         assert!(matches!(err, ReadError::BadMagic));
     }
 
@@ -366,17 +340,15 @@ mod tests {
     fn test_bad_version_rejected() {
         let mut blob = build_two_field_blob();
         blob[4] = 0xFF;
-        let err = BloomReader::parse(blob).unwrap_err();
+        let err = BloomReader::parse(&blob).unwrap_err();
         assert!(matches!(err, ReadError::BadVersion(0xFF)));
     }
 
     #[test]
     fn test_truncated_blob_rejected() {
         let blob = build_two_field_blob();
-        let truncated = blob[..blob.len() - 5].to_vec();
+        let truncated = &blob[..blob.len() - 5];
         let err = BloomReader::parse(truncated).unwrap_err();
-        // Without the tail magic it'll trip BadMagic; without footer length it'll
-        // trip BadFooter or Truncated. Any failure is acceptable.
         assert!(matches!(
             err,
             ReadError::BadMagic | ReadError::BadFooter(_, _) | ReadError::Truncated
@@ -385,33 +357,52 @@ mod tests {
 
     #[test]
     fn test_too_short_blob_rejected() {
-        let err = BloomReader::parse(vec![0u8; 5]).unwrap_err();
+        let err = BloomReader::parse(&[0u8; 5]).unwrap_err();
         assert!(matches!(err, ReadError::TooShort(_)));
     }
 
     #[test]
     fn test_empty_blob_writer_round_trips() {
         let blob = BloomWriter::serialize(vec![]).unwrap();
-        let r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(&blob).unwrap();
         assert_eq!(r.field_count(), 0);
+    }
+
+    /// The pruner only ever has the trailing N bytes of the file plus
+    /// `total_size`. Confirm `parse_suffix` recovers the same footer.
+    #[test]
+    fn test_parse_suffix_round_trip() {
+        let blob = build_two_field_blob();
+        let total = blob.len();
+        let probe = 1024.min(total);
+        let suffix = &blob[total - probe..];
+        let r = BloomReader::parse_suffix(suffix, total as u64).unwrap();
+        assert_eq!(r.field_count(), 2);
+
+        // The reader gives us absolute offsets against the full file —
+        // the pruner uses these as direct `get_range` arguments.
+        let (range, h) = r.block_range_for("trace_id", 101, b"abc").unwrap();
+        assert_eq!(range.end - range.start, BLOCK_BYTES as u64);
+        let s = range.start as usize;
+        let e = range.end as usize;
+        let block: &[u8; BLOCK_BYTES] = blob[s..e].try_into().unwrap();
+        assert!(BloomReader::check_block_with_hash(block, h));
     }
 
     #[test]
     fn test_observed_fpr_within_bounds() {
-        // Sanity check: default fpp 0.01 should give FPR ≈ 1%. Build a bloom
-        // with 1k unique strings, query 10k absent strings, expect << 5%
-        // false positives.
+        // Sanity: 1k inserts at FPR 0.01 → < 5% false positives on 10k absent queries.
         let mut b = BloomBuilder::new();
         let idx = b.begin(7, "trace_id", 1000);
         for i in 0..1000u32 {
             b.insert(idx, format!("present-{i}").as_bytes());
         }
         let blob = BloomWriter::serialize(b.finish()).unwrap();
-        let r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(&blob).unwrap();
         let mut fp = 0;
         for i in 0..10_000u32 {
-            if r.check("trace_id", 7, format!("absent-{i}").as_bytes())
-                .unwrap()
+            if check_via_block(&r, &blob, "trace_id", 7, format!("absent-{i}").as_bytes())
+                .unwrap_or(true)
             {
                 fp += 1;
             }
@@ -420,111 +411,5 @@ mod tests {
             fp < 500,
             "false positive count {fp} > 500 for 10k absent queries (FPR > 5%)"
         );
-    }
-
-    /// Simulates the partial-read fetch path used by `bloom_pruner`:
-    ///   1. Allocate a blob the size of the full `.bf`, with only the header (5 bytes) and the
-    ///      trailing footer region filled in; the body region is left zeroed.
-    ///   2. `BloomReader::parse` succeeds (it only validates header magic, tail magic, and footer
-    ///      payload).
-    ///   3. `body_ranges_for` returns the absolute byte ranges that `check` will demand for the
-    ///      targets we care about.
-    ///   4. Splice those ranges in.
-    ///   5. `check` returns the correct membership.
-    #[test]
-    fn test_partial_read_path_round_trip() {
-        use super::super::{MAGIC, VERSION};
-        let full = build_two_field_blob();
-        let total = full.len();
-
-        // Probe just the trailing 1 KB (typical pruner SUFFIX_PROBE).
-        // Footer for this tiny test blob is well under 1 KB.
-        let probe = 1024.min(total);
-        let suffix_start = total - probe;
-        let suffix = &full[suffix_start..];
-
-        // Build a partial blob: header + zeros + suffix.
-        let mut blob = vec![0u8; total];
-        blob[..4].copy_from_slice(MAGIC);
-        blob[4] = VERSION;
-        blob[suffix_start..].copy_from_slice(suffix);
-
-        let mut r = BloomReader::parse(blob).unwrap();
-        assert_eq!(r.field_count(), 2);
-        assert_eq!(r.blob_len(), total as u64);
-
-        // Compute body ranges for the targets the pruner will check.
-        // Some lie inside the suffix already (no fetch needed); others
-        // are still zero in the blob.
-        let targets = [
-            ("trace_id", 101u64),
-            ("trace_id", 102u64),
-            ("user_id", 101u64),
-        ];
-        let ranges = r.body_ranges_for(targets);
-        assert_eq!(ranges.len(), 3);
-
-        // Splice ranges that aren't already covered by the suffix.
-        for range in ranges {
-            if range.start < suffix_start as u64 {
-                let s = range.start as usize;
-                let e = range.end as usize;
-                r.splice_body_bytes(range.start, &full[s..e]);
-            }
-        }
-
-        // All present values pass.
-        assert!(r.check("trace_id", 101, b"abc").unwrap());
-        assert!(r.check("trace_id", 101, b"def").unwrap());
-        assert!(r.check("trace_id", 102, b"ghi").unwrap());
-        assert!(r.check("user_id", 101, b"u-1").unwrap());
-    }
-
-    #[test]
-    fn test_body_ranges_skips_unknown() {
-        let blob = build_two_field_blob();
-        let r = BloomReader::parse(blob).unwrap();
-
-        // Mix of known and unknown — unknown fall away silently.
-        let targets = [
-            ("trace_id", 101u64),      // known
-            ("trace_id", 999u64),      // unknown file_id
-            ("missing_field", 101u64), // unknown field
-        ];
-        let ranges = r.body_ranges_for(targets);
-        assert_eq!(ranges.len(), 1);
-    }
-
-    #[test]
-    #[should_panic(expected = "splice_body_bytes out of range")]
-    fn test_splice_panics_on_overrun() {
-        let blob = build_two_field_blob();
-        let n = blob.len();
-        let mut r = BloomReader::parse(blob).unwrap();
-        r.splice_body_bytes(n as u64 - 1, &[0u8; 4]);
-    }
-
-    /// The bytes inside a `.bf` body for one (file, field) entry must be a
-    /// valid stand-alone Parquet column-chunk bloom filter (thrift header +
-    /// bitset). Confirm by feeding the slice back through `Sbbf::from_bytes`
-    /// and checking membership.
-    #[test]
-    fn test_per_entry_bytes_are_parquet_compatible() {
-        let blob = build_two_field_blob();
-        let r = BloomReader::parse(blob.clone()).unwrap();
-        // Pull body slice for (trace_id, file 101) by re-walking the footer.
-        // Simpler: use the parsed reader via a fresh check call.
-        let section = r.by_field.get("trace_id").unwrap();
-        let idx = *section.by_file.get(&101).unwrap();
-        let entry = &section.entries[idx];
-        let start = entry.body_offset as usize;
-        let end = start + entry.body_size as usize;
-        let standalone = parquet::bloom_filter::Sbbf::from_bytes(&blob[start..end])
-            .expect("valid standalone Sbbf");
-        // Sbbf::check wants `T: AsBytes`; that's impl'd for `[u8]` (not for
-        // fixed-size array literals), so deref `b"..."` to a slice.
-        assert!(standalone.check(&b"abc"[..]));
-        assert!(standalone.check(&b"def"[..]));
-        assert!(!standalone.check(&b"NOT_PRESENT_xx"[..]));
     }
 }

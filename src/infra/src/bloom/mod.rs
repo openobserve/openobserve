@@ -26,11 +26,11 @@
 //! ```text
 //! 0     ────────────────────────────────────
 //!       MAGIC      4B   "O2BF"
-//!       VERSION    1B   0x01
+//!       VERSION    1B   0x02
 //! ────────────────────────────────────────────
-//!       BODY            (concat of `parquet::bloom_filter::Sbbf::write`
-//!                        outputs — each is a thrift-encoded
-//!                        BloomFilterHeader followed by the bitset)
+//!       BODY            (concat of raw SBBF bitsets — each is exactly
+//!                        `num_blocks × 32` little-endian bytes, no
+//!                        header, no framing)
 //! ────────────────────────────────────────────
 //!       FOOTER          (thrift-free, hand-rolled)
 //!         field_count   u32 LE
@@ -50,26 +50,39 @@
 //! EOF   ────────────────────────────────────
 //! ```
 //!
-//! Each per-(file, field) bloom is a `parquet::bloom_filter::Sbbf` written
-//! via `Sbbf::write` and read back via `Sbbf::from_bytes`. We rely on the
-//! Parquet bloom filter spec for the on-disk format — no custom block
-//! layout, no custom hash. `Sbbf::insert` / `check` apply XxHash64
-//! internally per spec.
+//! Each per-(file, field) bloom is our own [`sbbf::Sbbf`] (Parquet's SBBF
+//! algorithm, our own bytes). The body is **just the raw bitset**: a
+//! contiguous run of 32-byte blocks. Combined with the footer's
+//! `body_offset` + `body_size`, this lets the search side fetch any
+//! single 32-byte block by absolute offset and run
+//! [`sbbf::check_block`] against it without ever loading the surrounding
+//! bytes — which is the whole point of switching off
+//! `parquet::bloom_filter::Sbbf`'s eagerly-decoded API.
+//!
+//! ## Format version
+//!
+//! `VERSION` was 0x01 in the prototype, which wrapped each body in a
+//! Parquet thrift `BloomFilterHeader`. V2 strips that header and writes
+//! bytes that round-trip through [`sbbf::Sbbf::to_bytes`] /
+//! [`sbbf::Sbbf::from_bytes`]. V1 files are not readable by V2 code —
+//! the reader logs once and treats the bucket as "keep all".
 
 pub mod footer_cache;
 pub mod path;
 pub mod reader;
+pub mod sbbf;
 pub mod writer;
 
 pub use footer_cache::{BLOOM_FOOTER_CACHE, BloomFooterCache};
 pub use reader::{BloomReader, ReadError};
+pub use sbbf::{BLOCK_BYTES, Sbbf, block_index, check_block, hash_value, num_blocks_for};
 pub use writer::{BloomBuilder, BloomWriter, FieldBloom};
 
 /// Magic prefix and suffix for `.bf` files.
 pub const MAGIC: &[u8; 4] = b"O2BF";
 
 /// Current `.bf` format version.
-pub const VERSION: u8 = 0x01;
+pub const VERSION: u8 = 0x02;
 
 /// Algorithm tag for SBBF + XxHash64 (matches Parquet spec).
 pub const ALGO_SBBF_XXHASH64: u8 = 0x01;

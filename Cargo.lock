@@ -5275,6 +5275,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "xxhash-rust",
  "zstd",
 ]
 

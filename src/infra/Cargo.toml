@@ -37,6 +37,7 @@ svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+xxhash-rust.workspace = true
 zstd.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
