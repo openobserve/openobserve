@@ -182,7 +182,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.roleName"),
     accessorKey: "role_name",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
 ];
 

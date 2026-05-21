@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-select="{ row }">
           <OCheckbox
             :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
-            size="sm"
             :model-value="row.isInGroup"
             class="filter-check-box tw:cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
