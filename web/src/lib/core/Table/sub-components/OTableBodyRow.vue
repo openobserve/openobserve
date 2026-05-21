@@ -151,7 +151,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-8 tw:min-w-8 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
+      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
