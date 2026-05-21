@@ -7804,7 +7804,7 @@ export class LogsPage {
      */
     async waitForResultsLoaded() {
         await this.page.locator('[data-test="logs-search-result-pagination"]')
-            .waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+            .waitFor({ state: 'visible', timeout: 30000 });
         await this.page.waitForTimeout(500);
     }
 
@@ -7836,7 +7836,9 @@ export class LogsPage {
             const searchList = pagination.closest('.search-list');
             if (!searchList) return;
             const container = searchList.querySelector('[class*="overflow-y-auto"]');
-            if (container) container.scrollTop = container.scrollHeight;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
         });
         await this.page.waitForTimeout(500);
     }
@@ -7904,12 +7906,9 @@ export class LogsPage {
      */
     async clickScheduledSearchRow(traceId) {
         const row = this.page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`);
-        if (await row.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await row.locator('button').first().click();
-            await this.page.waitForTimeout(3000);
-            return true;
-        }
-        return false;
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await row.locator('[data-test="search-scheduler-expand-btn"]').click();
+        await this.page.waitForTimeout(3000);
     }
 
     /**

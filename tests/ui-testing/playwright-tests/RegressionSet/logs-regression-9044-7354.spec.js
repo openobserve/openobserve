@@ -126,27 +126,27 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
       { data: searchJobBody, headers }
     );
 
-    let traceId = null;
-    if (jobResponse.status() === 200) {
-      const body = await jobResponse.json();
-      const match = body.message?.match(/\[Job_Id: (.+?)\]/);
-      const jobId = match ? match[1] : null;
-      testLogger.info(`Created search job: ${jobId}`);
+    expect(jobResponse.ok()).toBe(true);
 
-      const listResponse = await page.request.get(
-        `${process.env['ZO_BASE_URL']}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-        { headers }
-      );
-      const jobs = await listResponse.json();
-      const job = jobs.find(j => j.id === jobId);
-      traceId = job?.trace_id || null;
-      testLogger.info(`Job trace_id: ${traceId}`);
-    }
+    const body = await jobResponse.json();
+    const match = body.message?.match(/\[Job_Id: (.+?)\]/);
+    const jobId = match ? match[1] : null;
+    expect(jobId).toBeTruthy();
+    testLogger.info(`Created search job: ${jobId}`);
+
+    const listResponse = await page.request.get(
+      `${process.env['ZO_BASE_URL']}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
+      { headers }
+    );
+    const jobs = await listResponse.json();
+    const job = jobs.find(j => j.id === jobId);
+    const traceId = job?.trace_id || null;
+    expect(traceId).toBeTruthy();
+    testLogger.info(`Job trace_id: ${traceId}`);
 
     page._jobTraceId = traceId;
 
     const cleanupJob = async () => {
-      if (!traceId) return;
       try {
         await page.request.delete(
           `${process.env['ZO_BASE_URL']}/api/${orgId}/search_jobs/${traceId}?type=logs&search_type=UI&use_cache=true`,
@@ -176,9 +176,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
     await pm.logsPage.clickListScheduledSearch();
     await page.waitForLoadState('domcontentloaded');
 
-    if (traceId) {
-      await pm.logsPage.clickScheduledSearchRow(traceId);
-    }
+    await pm.logsPage.clickScheduledSearchRow(traceId);
 
     await pm.logsPage.navigateToStreams();
     await page.waitForLoadState('domcontentloaded');
@@ -215,9 +213,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
     await pm.logsPage.clickListScheduledSearch();
     await page.waitForLoadState('domcontentloaded');
 
-    if (traceId) {
-      await pm.logsPage.clickScheduledSearchRow(traceId);
-    }
+    await pm.logsPage.clickScheduledSearchRow(traceId);
 
     await pm.logsPage.navigateToStreams();
     await pm.logsPage.navigateToLogsFromSidebar();
