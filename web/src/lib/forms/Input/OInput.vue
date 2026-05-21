@@ -212,16 +212,10 @@ const wrapperClasses = computed(() => [
   hasError.value
     ? "tw:border-input-border-error"
     : "tw:border-input-border tw:hover:border-input-border-hover",
-  /* Single-border focus: just change the border color, no outer ring.
-     Previously both `focus-within:border-input-border-focus` AND
-     `focus-within:ring-2 ring-input-focus-ring` were applied — that produced
-     the "two borders" look. The colored border alone is enough affordance. */
   "tw:focus-within:border-input-border-focus",
-  /* Disabled inputs were almost indistinguishable from enabled ones — same
-     near-white bg, same border. Added opacity-60 + dashed border so they
-     read as obviously inactive at a glance. */
+  "tw:focus-within:ring-2 tw:focus-within:ring-input-focus-ring",
   props.disabled
-    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed tw:border-dashed"
+    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed"
     : "",
   props.readonly ? "tw:border-input-border tw:bg-input-bg" : "",
 ]);
@@ -230,18 +224,10 @@ const wrapperClasses = computed(() => [
 <template>
   <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
-    <!-- Hardcoded hex via inline style for both themes — the previous
-         token-based color (`tw:text-text-primary` -> `--color-text-primary`)
-         was consistently rendering as the disabled-grey across the app in
-         spite of being set to `--color-grey-900` (#171717) in the theme.
-         Inline `style` beats any cascade so labels read as active metadata. -->
     <label
       v-if="label || $slots.tooltip"
       :for="inputId"
-      :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
-        props.disabled && 'o-input-label--disabled',
-      ]"
+      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
       <OIcon
@@ -249,7 +235,7 @@ const wrapperClasses = computed(() => [
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="tw:cursor-help tw:text-input-label"
       ><slot name="tooltip" /></OIcon>
     </label>
 

@@ -217,13 +217,14 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
     </button>
 
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         so labels across all form components read consistently. -->
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none',
-        isDisabled && 'o-input-label--disabled',
+        labelSizeClasses[size ?? 'md'],
+        'tw:select-none tw:leading-none',
+        isDisabled
+          ? 'tw:text-checkbox-label-disabled'
+          : 'tw:text-checkbox-label',
       ]"
     >
       <slot name="label">{{ label }}</slot>

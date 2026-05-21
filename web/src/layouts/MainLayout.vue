@@ -374,13 +374,13 @@ export default defineComponent({
       },
       {
         title: t("menu.alerts"),
-        icon: "shield-alert-outline",
+        icon: "report-problem",
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: "data-plus-line",
+        icon: "filter-alt",
         link: "/ingestion",
         name: "ingestion",
       },

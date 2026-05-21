@@ -120,17 +120,13 @@ const hasLabel = computed(
       :disabled="disabled"
       :class="[
         'tw:relative tw:inline-flex tw:shrink-0 tw:rounded-full',
-        'tw:p-0.5 tw:items-center tw:border-2',
+        'tw:p-0.5 tw:items-center tw:bg-transparent tw:border-2',
         currentSizes.track,
-        /* Three visually distinct states:
-           ON       → primary FILLED track + white thumb (high contrast)
-           OFF      → transparent track + primary outline + primary thumb
-           DISABLED → transparent + grey dashed outline + grey thumb */
         props.disabled
-          ? 'tw:bg-transparent tw:border-switch-disabled-border tw:border-dashed'
+          ? 'tw:border-switch-disabled-border'
           : isChecked
-            ? 'tw:bg-[var(--color-primary-500)] tw:border-switch-border'
-            : 'tw:bg-transparent tw:border-switch-border-off',
+            ? 'tw:border-switch-border'
+            : 'tw:border-switch-border-off',
         props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
         'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
@@ -145,21 +141,20 @@ const hasLabel = computed(
           props.disabled
             ? 'tw:bg-switch-disabled-thumb'
             : isChecked
-              ? 'tw:bg-white'
+              ? 'tw:bg-switch-thumb-on'
               : 'tw:bg-switch-thumb-off',
           isChecked ? currentSizes.thumbTranslate : 'tw:translate-x-0',
         ]"
       />
     </button>
 
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         so labels across all form components read consistently. -->
     <span
       v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none tw:flex tw:items-center tw:gap-1',
-        disabled && 'o-input-label--disabled',
+        labelSize[size ?? 'md'],
+        'tw:select-none tw:leading-none tw:flex tw:items-center tw:gap-1',
+        disabled ? 'tw:text-switch-label-disabled' : 'tw:text-switch-label',
       ]"
     >
       <slot name="label">{{ label }}</slot>

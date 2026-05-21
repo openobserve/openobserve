@@ -58,7 +58,7 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
   <label
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
-      props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+      props.disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
     :for="props.id"
   >
@@ -67,18 +67,12 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       We style it as the visual circle and use RadioGroupIndicator
       to render the inner dot when checked.
     -->
-    <!--
-      Three visually distinct states:
-        OFF      → primary outline + white bg + no dot
-        ON       → primary outline + white bg + primary dot
-        DISABLED → grey outline + grey bg + 50% opacity + dashed border
-    -->
     <RadioGroupItem
       :id="props.id"
       :value="String(resolvedValue ?? '')"
       :disabled="props.disabled"
       :class="[
-        'tw:shrink-0 tw:rounded-full tw:border-2 tw:flex tw:items-center tw:justify-center',
+        'tw:shrink-0 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center',
         'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
         'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-radio-focus-ring',
@@ -88,8 +82,6 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
         'tw:data-[state=checked]:border-radio-checked-border',
         'tw:data-disabled:bg-radio-disabled-bg',
         'tw:data-disabled:border-radio-disabled-border',
-        'tw:data-disabled:border-dashed',
-        'tw:data-disabled:cursor-not-allowed',
       ]"
     >
       <RadioGroupIndicator
@@ -100,14 +92,13 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       />
     </RadioGroupItem>
 
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         (font-bold, dark text, muted when disabled) so labels across all
-         form components read consistently. -->
+    <!-- Label -->
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none',
-        props.disabled && 'o-input-label--disabled',
+        labelSize[resolvedSize],
+        'tw:select-none tw:leading-none',
+        props.disabled ? 'tw:text-radio-label-disabled' : 'tw:text-radio-label',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

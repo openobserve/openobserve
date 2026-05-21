@@ -358,21 +358,14 @@
   --color-input-bg: var(--color-surface-base);
   --color-input-border: var(--color-border-strong);
   --color-input-border-hover: var(--color-primary-400);
-  --color-input-border-focus: var(--color-primary-500);
   --color-input-border-error: var(--color-error-500);
-  /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
-     was almost identical to the enabled white bg in light mode, making
-     disabled fields visually indistinguishable from enabled ones. */
-  --color-input-disabled-bg: var(--color-grey-200);
+  --color-input-disabled-bg: var(--color-surface-subtle);
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-primary-400);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
-  /* Labels were resolving to text-secondary which is the same muted grey
-     used for disabled / hint text — making every form label look disabled.
-     Bumped to text-primary so labels read as active form metadata. */
-  --color-input-label: var(--color-text-primary);
+  --color-input-label: var(--color-text-secondary);
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
@@ -386,14 +379,12 @@
   --color-select-border-hover: var(--color-primary-400);
   --color-select-border-focus: var(--color-primary-500);
   --color-select-border-error: var(--color-error-500);
-  /* Same rationale as input-disabled-bg. */
-  --color-select-disabled-bg: var(--color-grey-200);
+  --color-select-disabled-bg: var(--color-surface-subtle);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-focus-ring: var(--color-primary-400);
   --color-select-text: var(--color-text-primary);
   --color-select-placeholder: var(--color-text-disabled);
-  /* Select labels were grey (text-secondary) — same fix as input-label. */
-  --color-select-label: var(--color-text-primary);
+  --color-select-label: var(--color-text-secondary);
   --color-select-icon: var(--color-text-secondary);
   --color-select-error-text: var(--color-error-600);
   --color-select-content-bg: var(--color-surface-overlay);
@@ -408,17 +399,12 @@
   --color-switch-focus-ring: var(--color-primary-400);
   --color-switch-label: var(--color-text-primary);
   --color-switch-label-disabled: var(--color-text-secondary);
-  /* Switch palette — single solid color (primary-500) for both border AND
-     fill on ON state so the track reads as one color, not two-tone.
-       ON       → primary-500 fill + primary-500 border + white thumb
-       OFF      → primary-500 outline + primary-500 thumb on left
-       DISABLED → grey-300 dashed outline */
-  --color-switch-border: var(--color-primary-500);
-  --color-switch-border-off: var(--color-primary-500);
-  --color-switch-thumb-off: var(--color-primary-500);
-  --color-switch-thumb-on: var(--color-primary-500);
-  --color-switch-disabled-border: var(--color-grey-300);
-  --color-switch-disabled-thumb: var(--color-grey-300);
+  --color-switch-border: var(--color-primary-600);
+  --color-switch-border-off: var(--color-grey-400);
+  --color-switch-thumb-off: var(--color-grey-400);
+  --color-switch-thumb-on: var(--color-primary-600);
+  --color-switch-disabled-border: var(--color-grey-400);
+  --color-switch-disabled-thumb: var(--color-grey-400);
 
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-surface-base);
@@ -433,15 +419,14 @@
   --color-checkbox-label: var(--color-text-primary);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
-  /* Radio (ORadio) — primary outline by default (interactive signal),
-     grey only when disabled. */
+  /* Radio (ORadio) */
   --color-radio-bg: var(--color-surface-base);
-  --color-radio-border: var(--color-primary-600);
-  --color-radio-hover-border: var(--color-primary-700);
+  --color-radio-border: var(--color-border-strong);
+  --color-radio-hover-border: var(--color-primary-400);
   --color-radio-checked-border: var(--color-primary-600);
   --color-radio-checked-dot: var(--color-primary-600);
   --color-radio-disabled-bg: var(--color-surface-subtle);
-  --color-radio-disabled-border: var(--color-grey-300);
+  --color-radio-disabled-border: var(--color-border-default);
   --color-radio-focus-ring: var(--color-primary-400);
   --color-radio-label: var(--color-text-primary);
   --color-radio-label-disabled: var(--color-text-disabled);
@@ -761,7 +746,6 @@
   --color-input-bg: var(--color-input-bg);
   --color-input-border: var(--color-input-border);
   --color-input-border-hover: var(--color-input-border-hover);
-  --color-input-border-focus: var(--color-input-border-focus);
   --color-input-border-error: var(--color-input-border-error);
   --color-input-disabled-bg: var(--color-input-disabled-bg);
   --color-input-disabled-border: var(--color-input-disabled-border);
