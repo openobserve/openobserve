@@ -127,9 +127,9 @@ const globalConfig = {
     AddFolder: AddFolderStub,
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
-    "q-select": {
+    "OSelect": {
       template: `
-        <div class="q-select-stub" :data-test="$attrs['data-test']">
+        <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disable)">
           <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
             <option v-for="opt in options" :key="opt.value" :value="JSON.stringify(opt)">{{ opt.label }}</option>
           </select>
@@ -193,10 +193,11 @@ describe("SelectFolderDropDown.vue", () => {
       expect(wrapper.props("disableDropdown")).toBe(false);
     });
 
-    it("passes disableDropdown to q-select stub as disable prop", () => {
+    it("passes disableDropdown to OSelect stub as disable prop", () => {
       wrapper = createWrapper({ disableDropdown: true });
-      const select = wrapper.find(".q-select-stub");
+      const select = wrapper.find(".o-select-stub");
       expect(select.exists()).toBe(true);
+      expect(select.attributes("data-disable")).toBe("true");
     });
 
     it("accepts activeFolderId prop", () => {
@@ -217,20 +218,21 @@ describe("SelectFolderDropDown.vue", () => {
     it("defaults to 'default' folder when activeFolderId is not provided", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("default");
+      // selectedFolder is a ref<string>, auto-unwrapped to the string value
+      expect(vm.selectedFolder).toBe("default");
     });
 
     it("selects the folder matching activeFolderId when provided", () => {
       wrapper = createWrapper({ activeFolderId: "folder-1" });
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("folder-1");
-      expect(vm.selectedFolder.label).toBe("My Alerts");
+      // selectedFolder is a ref<string> — the folder ID string
+      expect(vm.selectedFolder).toBe("folder-1");
     });
 
     it("falls back to 'default' when activeFolderId does not match any folder", () => {
       wrapper = createWrapper({ activeFolderId: "nonexistent-id" });
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("default");
+      expect(vm.selectedFolder).toBe("default");
     });
   });
 
@@ -243,8 +245,8 @@ describe("SelectFolderDropDown.vue", () => {
       const newFolder = { data: { name: "New Folder", folderId: "new-id" } };
       await vm.updateFolderList(newFolder);
       await nextTick();
-      expect(vm.selectedFolder.label).toBe("New Folder");
-      expect(vm.selectedFolder.value).toBe("new-id");
+      // selectedFolder is ref<string> — holds just the folder ID
+      expect(vm.selectedFolder).toBe("new-id");
     });
 
     it("closes the add folder dialog after update", async () => {
@@ -312,7 +314,9 @@ describe("SelectFolderDropDown.vue", () => {
     it("emits 'folder-selected' with selectedFolder when it changes", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.selectedFolder = { label: "My Alerts", value: "folder-1" };
+      // selectedFolder is ref<string>; setting it triggers the watcher
+      // which looks up the folder name from the store and emits { label, value }
+      vm.selectedFolder = "folder-1";
       await nextTick();
       const emitted = wrapper.emitted("folder-selected");
       expect(emitted).toBeTruthy();
@@ -354,7 +358,7 @@ describe("SelectFolderDropDown.vue", () => {
       store.commit("setFoldersByType", store.state.organizationData.foldersByType);
       await nextTick();
       // selectedFolder should still resolve to folder-1
-      expect((wrapper.vm as any).selectedFolder.value).toBe("folder-1");
+      expect((wrapper.vm as any).selectedFolder).toBe("folder-1");
     });
   });
 
@@ -369,9 +373,9 @@ describe("SelectFolderDropDown.vue", () => {
       expect(vm.store.state.organizationData.foldersByType["alerts"]).toEqual(MOCK_FOLDERS);
     });
 
-    it("renders the select element", () => {
+    it("renders the OSelect element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".q-select-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-select-stub").exists()).toBe(true);
     });
   });
 
@@ -382,8 +386,8 @@ describe("SelectFolderDropDown.vue", () => {
       setStoreFolders("alerts", []);
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      // When no folders, defaults to {label: 'default', value: 'default'}
-      expect(vm.selectedFolder.value).toBe("default");
+      // When no folders, defaults to 'default'
+      expect(vm.selectedFolder).toBe("default");
     });
 
     it("handles undefined foldersByType for type gracefully", () => {

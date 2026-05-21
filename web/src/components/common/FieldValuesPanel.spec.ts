@@ -207,12 +207,12 @@ describe("FieldValuesPanel.vue", () => {
   describe("Multi-select controls", () => {
     it("renders checkboxes when showMultiSelect is true", () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(2) });
-      expect(wrapper.findAllComponents({ name: "QCheckbox" }).length).toBeGreaterThan(0);
+      expect(wrapper.findAllComponents({ name: "OCheckbox" }).length).toBeGreaterThan(0);
     });
 
     it("does not render checkboxes when showMultiSelect is false", () => {
       wrapper = createWrapper({ showMultiSelect: false, fieldValues: buildFieldValues(2) });
-      expect(wrapper.findAllComponents({ name: "QCheckbox" }).length).toBe(0);
+      expect(wrapper.findAllComponents({ name: "OCheckbox" }).length).toBe(0);
     });
 
     it("does not render include/exclude buttons when showMultiSelect is false", () => {
