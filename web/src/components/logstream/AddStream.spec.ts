@@ -27,6 +27,8 @@ const { mockGetStream, mockAddStream, mockCreateStream, mockSchemaStream } = vi.
   mockSchemaStream: vi.fn(),
 }));
 
+const mockToast = vi.hoisted(() => vi.fn());
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: mockGetStream,
@@ -49,6 +51,10 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 
 vi.mock("@/services/segment_analytics", () => ({
   default: { track: vi.fn() },
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 const ODrawerStub = {
@@ -438,6 +444,61 @@ describe("AddStream", () => {
       await expect(vm.saveStream()).resolves.not.toThrow();
       await flushPromises();
     });
+
+    it("should fail validation and not call createStream when stream_type is empty", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.name = "test-stream";
+      // stream_type is empty (default) — validation should fail
+
+      await vm.saveStream();
+      await flushPromises();
+
+      expect(mockCreateStream).not.toHaveBeenCalled();
+      expect(vm.streamTypeError).toBe("Field is required!");
+    });
+
+    it("should fail validation and not call createStream when data retention days < 1", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.stream_type = "logs";
+      vm.streamInputs.dataRetentionDays = 0;
+
+      await vm.saveStream();
+      await flushPromises();
+
+      expect(mockCreateStream).not.toHaveBeenCalled();
+      expect(vm.dataRetentionError).toBe("Field is required!");
+    });
+
+    it("should call toast with error message when createStream fails with non-403 error", async () => {
+      mockCreateStream.mockRejectedValue({
+        response: { status: 500, data: { message: "Internal Server Error" } },
+      });
+
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.stream_type = "logs";
+
+      await vm.saveStream();
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Internal Server Error",
+          timeout: 4000,
+        }),
+      );
+    });
   });
 
   describe("getStreamPayload", () => {
@@ -509,6 +570,98 @@ describe("AddStream", () => {
 
       const payload = vm.getStreamPayload();
       expect(payload.settings.defined_schema_fields).toContain("my_field");
+    });
+
+    it("should set data_retention in payload when showDataRetention is enabled", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.stream_type = "logs";
+      vm.streamInputs.dataRetentionDays = 7;
+      await flushPromises();
+
+      const payload = vm.getStreamPayload();
+      expect(payload).toBeDefined();
+      expect(payload.settings.data_retention).toBe(7);
+    });
+
+    it("should show toast error and return undefined when data retention days < 1", async () => {
+      const customStore = makeStore({ data_retention_days: 30 });
+      const wrapper = mountComp(customStore);
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.streamInputs.stream_type = "logs";
+      vm.streamInputs.dataRetentionDays = 0;
+      await flushPromises();
+
+      const payload = vm.getStreamPayload();
+
+      expect(payload).toBeUndefined();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("Invalid Data Retention"),
+          timeout: 4000,
+        }),
+      );
+    });
+
+    it("should add partition key with 'value' type for keyPartition index", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.fields.push({ name: "city", type: "", index_type: ["keyPartition"] });
+
+      const payload = vm.getStreamPayload();
+      expect(payload.settings.partition_keys).toContainEqual({
+        field: "city",
+        types: "value",
+      });
+    });
+
+    it("should add partition key with 'prefix' type for prefixPartition index", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.fields.push({ name: "user_agent", type: "", index_type: ["prefixPartition"] });
+
+      const payload = vm.getStreamPayload();
+      expect(payload.settings.partition_keys).toContainEqual({
+        field: "user_agent",
+        types: "prefix",
+      });
+    });
+
+    it("should add partition key with hash buckets for hashPartition index", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.fields.push({ name: "trace_id", type: "", index_type: ["hashPartition_8"] });
+
+      const payload = vm.getStreamPayload();
+      expect(payload.settings.partition_keys).toContainEqual({
+        field: "trace_id",
+        types: { hash: 8 },
+      });
+    });
+
+    it("should parse different hash bucket sizes correctly", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.fields.push({ name: "big_key", type: "", index_type: ["hashPartition_64"] });
+
+      const payload = vm.getStreamPayload();
+      expect(payload.settings.partition_keys).toContainEqual({
+        field: "big_key",
+        types: { hash: 64 },
+      });
     });
   });
 });
