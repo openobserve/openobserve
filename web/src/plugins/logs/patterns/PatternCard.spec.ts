@@ -15,14 +15,12 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import * as quasar from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PatternCard from "./PatternCard.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [quasar.],
-});
+installQuasar();
 
 describe("PatternCard", () => {
   let wrapper: any;

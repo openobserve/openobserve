@@ -87,8 +87,12 @@ vi.mock('@/enterprise/components/billings/LicensePeriod.vue', () => ({
   },
 }));
 
+const mockToast = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
+
 // Mock useQuasar
-const mockNotify = vi.fn();
 const mockDialog = vi.fn().mockReturnValue({
   onOk: vi.fn().mockReturnThis(),
   onCancel: vi.fn().mockReturnThis(),
@@ -99,7 +103,6 @@ vi.mock('quasar', async () => {
   return {
     ...actual,
     useQuasar: () => ({
-      notify: mockNotify,
       dialog: mockDialog,
       platform: {
         has: {
@@ -186,7 +189,7 @@ describe('License.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
+    mockToast.mockClear();
     mockDialog.mockClear();
     // Mock window.location
     delete (window as any).location;
@@ -460,10 +463,10 @@ describe('License.vue', () => {
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: 'success',
         message: 'License updated successfully',
-      });
+      }));
     });
 
     it('should show error notification on failed update', async () => {
@@ -473,10 +476,10 @@ describe('License.vue', () => {
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Failed to update license : unexpected error',
-      });
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: 'error',
+        message: expect.stringContaining('Failed to update license'),
+      }));
     });
 
     it('should clear license key after successful update', async () => {
@@ -533,12 +536,9 @@ describe('License.vue', () => {
     });
 
     it('should show visibility button for license key', () => {
-      const buttons = wrapper.findAll('button');
-      const visibilityBtn = buttons.find((btn: any) => {
-        const html = btn.html();
-        return html.includes('visibility');
-      });
-      expect(visibilityBtn).toBeTruthy();
+      const oIcons = wrapper.findAllComponents({ name: 'OIcon' });
+      const visibilityIcon = oIcons.find((icon: any) => icon.props('name') === 'visibility');
+      expect(visibilityIcon).toBeTruthy();
     });
 
     it('should open modal when visibility button is clicked', async () => {
@@ -654,10 +654,10 @@ describe('License.vue', () => {
 
       await wrapper.vm.copyLicenseKey();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
-        message: 'License key copied to clipboard',
-      });
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: 'success',
+        message: expect.stringContaining('copied'),
+      }));
     });
 
     it('should close modal after copying', async () => {
@@ -819,10 +819,10 @@ describe('License.vue', () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Failed to load license information',
-      });
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: 'error',
+        message: expect.stringContaining('Failed to load'),
+      }));
 
       consoleErrorSpy.mockRestore();
     });
@@ -842,10 +842,10 @@ describe('License.vue', () => {
 
       await wrapper.vm.copyLicenseKey();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Failed to copy license key',
-      });
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        variant: 'error',
+        message: expect.stringContaining('Failed to copy'),
+      }));
 
       consoleErrorSpy.mockRestore();
     });

@@ -15,13 +15,11 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import * as quasar from "quasar";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PatternStatistics from "./PatternStatistics.vue";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [quasar.],
-});
+installQuasar();
 
 describe("PatternStatistics", () => {
   let wrapper: any;
