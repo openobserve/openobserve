@@ -21,16 +21,10 @@ import { nextTick } from "vue";
 // Mock all external modules before the component is imported
 // ---------------------------------------------------------------------------
 
-const mockNotify = vi.fn(() => vi.fn());
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const mockToast = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => mockStore,
@@ -465,19 +459,19 @@ describe("AddToDashboard — onSubmit validation", () => {
     vi.clearAllMocks();
   });
 
-  it("shows a negative notification when selectedDashboard is null", async () => {
+  it("shows an error notification when selectedDashboard is null", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     // selectedDashboard is null, activeTabId is null
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
   });
 
-  it("shows a negative notification when selectedDashboard is set but activeTabId is null", async () => {
+  it("shows an error notification when selectedDashboard is set but activeTabId is null", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     wrapper.vm.selectedDashboard = "dash-1";
@@ -486,8 +480,8 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
   });
 
@@ -540,7 +534,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     expect(wrapper.emitted("save")).toBeTruthy();
   });
 
-  it("shows positive notification after successful panel addition", async () => {
+  it("shows success notification after successful panel addition", async () => {
     const wrapper = createWrapper();
     await flushPromises();
 
@@ -551,8 +545,8 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "positive" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success" }),
     );
   });
 
@@ -635,7 +629,7 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
   it("calls dismiss function in finally block", async () => {
     const dismissFn = vi.fn();
-    mockNotify.mockReturnValue(dismissFn);
+    mockToast.mockReturnValue(dismissFn);
     mockAddPanel.mockRejectedValue(new Error("error"));
 
     const wrapper = createWrapper();

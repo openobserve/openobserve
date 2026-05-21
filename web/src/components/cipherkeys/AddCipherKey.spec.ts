@@ -3,7 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import AddCipherKey from '@/components/cipherkeys/AddCipherKey.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
 // Mock dependencies
 vi.mock('@/services/cipher_keys');
@@ -28,7 +27,6 @@ vi.mock('quasar', async () => {
   };
 });
 
-installQuasar();
 
 describe('AddCipherKey.vue', () => {
   let wrapper: VueWrapper;

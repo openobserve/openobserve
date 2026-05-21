@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock vue-router
 const mockRouter = { push: vi.fn() };

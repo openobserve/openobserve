@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import RealUserMonitoring from "@/views/RUM/RealUserMonitoring.vue";
 import i18n from "@/locales";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock composables
 vi.mock("@/composables/useSessionReplay", () => ({
@@ -76,7 +75,6 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("RealUserMonitoring.vue", () => {
   let store: any;

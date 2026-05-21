@@ -3,7 +3,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Jumpcloud from "@/components/ingestion/security/Jumpcloud.vue";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -14,7 +13,6 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("Jumpcloud.vue", () => {
   let store: any;

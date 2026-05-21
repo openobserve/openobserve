@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock PanelSchemaRenderer component
 vi.mock("../dashboards/PanelSchemaRenderer.vue", () => ({

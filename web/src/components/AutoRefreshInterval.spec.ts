@@ -1,11 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn((value) => `${value} seconds`)

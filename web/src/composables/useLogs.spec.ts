@@ -24,7 +24,6 @@ import useLogs from "../composables/useLogs";
 import searchService from "../services/search";
 import savedviewsService from "../services/saved_views";
 import * as zincutils from "../utils/zincutils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Import functions from their respective composables
 import { useHistogram } from "../composables/useLogs/useHistogram";
@@ -37,7 +36,6 @@ import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 
-installQuasar();
 
 // Create i18n instance
 const i18n = createI18n({

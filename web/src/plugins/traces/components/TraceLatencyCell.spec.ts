@@ -15,7 +15,6 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 const mockSearchObj = {
   meta: {
@@ -32,7 +31,6 @@ vi.mock("@/composables/useTraces", () => ({
 
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 
-installQuasar();
 
 describe("TraceLatencyCell", () => {
   let wrapper: VueWrapper;

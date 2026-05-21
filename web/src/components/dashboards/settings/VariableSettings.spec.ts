@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariableSettings from "./VariableSettings.vue";
 
@@ -135,7 +134,6 @@ vi.mock("vue-draggable-next", () => ({
   }
 }));
 
-installQuasar();
 
 describe("VariableSettings", () => {
   let wrapper: VueWrapper;

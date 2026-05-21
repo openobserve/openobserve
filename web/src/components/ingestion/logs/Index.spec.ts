@@ -1,11 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({

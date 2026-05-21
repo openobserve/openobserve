@@ -3,7 +3,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import OSQuery from "@/components/ingestion/security/OSQuery.vue";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -14,7 +13,6 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("OSQuery.vue", () => {
   let store: any;

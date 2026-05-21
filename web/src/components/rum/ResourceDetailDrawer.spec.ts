@@ -160,11 +160,11 @@ describe("ResourceDetailDrawer", () => {
       expect(wrapper.text()).toContain("200");
     });
 
-    it("renders a check_circle icon for a 200 success status code", () => {
+    it("renders a check-circle icon for a 200 success status code", () => {
       // Arrange & Assert
       const icons = wrapper.findAllComponents({ name: "OIcon" });
       const successIcon = icons.find((icon: any) =>
-        icon.props("name")?.includes("check_circle"),
+        icon.props("name")?.includes("check-circle"),
       );
       expect(successIcon).toBeTruthy();
     });

@@ -17,7 +17,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock the InvoiceTable component before import
 vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
@@ -29,7 +28,6 @@ vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
 
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 
-installQuasar();
 
 describe("InvoiceHistory", () => {
   let wrapper: any;

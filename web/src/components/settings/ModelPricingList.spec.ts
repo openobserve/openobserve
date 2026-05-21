@@ -16,12 +16,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ModelPricingList from "./ModelPricingList.vue";
 
-installQuasar();
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 

@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock child components with proper props exposure
 vi.mock("./PreviewAlert.vue", () => ({

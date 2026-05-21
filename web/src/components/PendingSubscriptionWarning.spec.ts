@@ -3,9 +3,7 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import PendingSubscriptionWarning from '@/components/PendingSubscriptionWarning.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('PendingSubscriptionWarning.vue', () => {
   let wrapper: VueWrapper;

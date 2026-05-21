@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Pagination from "@/components/shared/grid/Pagination.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `/mocked/${path}`)

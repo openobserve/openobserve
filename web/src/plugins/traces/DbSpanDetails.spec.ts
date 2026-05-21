@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
@@ -22,7 +21,6 @@ import DbSpanDetails from "./DbSpanDetails.vue";
  
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
-installQuasar();
 
 function mountDbSpanDetails(span: Record<string, unknown> = {}) {
   return mount(DbSpanDetails, { props: { span } });

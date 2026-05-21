@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -41,7 +40,6 @@ vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
 
 import alertsService from "@/services/alerts";
 
-installQuasar({ plugins: [] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

@@ -26,13 +26,11 @@ vi.mock("@/services/incidents", () => ({
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
 
-installQuasar();
 
 const makeEvent = (overrides: Record<string, any> = {}) => ({
   type: "Alert",

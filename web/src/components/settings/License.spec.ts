@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import License from './License.vue';
 import licenseServer from '@/services/license_server';
 import { createStore } from 'vuex';
@@ -115,7 +114,6 @@ vi.mock('quasar', async () => {
   };
 });
 
-installQuasar({ plugins: {} });
 
 describe('License.vue', () => {
   let store: any;

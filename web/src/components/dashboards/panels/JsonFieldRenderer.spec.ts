@@ -1,10 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("JsonFieldRenderer Component", () => {
   let wrapper: any;

@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import BuildQueryPage from "./BuildQueryPage.vue";
 
 // Mock vuex store
@@ -271,7 +270,6 @@ function createWrapper(props = {}) {
   });
 }
 
-installQuasar({ plugins: {} });
 
 describe("BuildQueryPage Component", () => {
   let wrapper: any;

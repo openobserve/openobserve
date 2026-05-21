@@ -19,7 +19,6 @@ import { installQuasar } from "@/test/unit/helpers";
 import Advanced, { type Variable } from "./Advanced.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock getUUID
 vi.mock("@/utils/zincutils", () => ({

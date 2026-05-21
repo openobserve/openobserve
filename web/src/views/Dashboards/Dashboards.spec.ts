@@ -309,8 +309,13 @@ describe("Dashboards.vue", () => {
 
   afterEach(() => {
     if (wrapper) {
-      wrapper.unmount();
+      try {
+        wrapper.unmount();
+      } catch {
+        // ignore unmount errors when component failed to initialize
+      }
     }
+    wrapper = undefined;
     vi.clearAllMocks();
   });
 
@@ -384,11 +389,11 @@ describe("Dashboards.vue", () => {
       expect(Array.isArray(columns)).toBe(true);
       expect(columns.length).toBeGreaterThan(0);
 
-      // Check specific required columns
-      const columnNames = columns.map((col: any) => col.name);
-      expect(columnNames).toContain("#");
-      expect(columnNames).toContain("name");
-      expect(columnNames).toContain("actions");
+      // Check specific required columns (columns use id/header, not name)
+      const columnIds = columns.map((col: any) => col.id);
+      expect(columnIds).toContain("#");
+      expect(columnIds).toContain("name");
+      expect(columnIds).toContain("actions");
     });
 
     it("should test dashboards computed property", async () => {
@@ -396,8 +401,8 @@ describe("Dashboards.vue", () => {
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
         default: [
-          { dashboardId: "dash1", title: "Dashboard 1" },
-          { dashboardId: "dash2", title: "Dashboard 2" }
+          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" }
         ]
       };
 
@@ -417,9 +422,9 @@ describe("Dashboards.vue", () => {
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
         default: [
-          { dashboardId: "dash1", title: "Dashboard 1" },
-          { dashboardId: "dash2", title: "Dashboard 2" },
-          { dashboardId: "dash3", title: "Dashboard 3" }
+          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          { dashboardId: "dash3", title: "Dashboard 3", description: "", owner: "", created: "2023-01-01T00:00:00Z" }
         ]
       };
 

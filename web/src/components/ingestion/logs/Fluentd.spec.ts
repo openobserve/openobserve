@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import { createI18n } from 'vue-i18n';
@@ -50,7 +49,6 @@ vi.mock('@/components/CopyContent.vue', () => ({
   }
 }));
 
-installQuasar();
 
 // Create mock store
 const mockStore = createStore({

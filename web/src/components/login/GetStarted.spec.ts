@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import GetStarted from './GetStarted.vue';
@@ -42,7 +41,6 @@ const mockI18n = createI18n({
   messages: { en: {} },
 });
 
-installQuasar();
 
 describe('GetStarted.vue', () => {
   let wrapper: VueWrapper;

@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import DetailTable from './DetailTable.vue';
 
-installQuasar({});
 
 describe('DetailTable.vue', () => {
   const mockRowData = {

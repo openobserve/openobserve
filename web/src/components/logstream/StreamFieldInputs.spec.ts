@@ -405,6 +405,86 @@ describe('StreamFieldInputs', () => {
       const result = wrapper.vm.disableOptions(schemaWithHash, prefixOption);
       expect(result).toBe(true);
     });
+
+    it('should not disable fullTextSearchKey when hashPartition is selected', () => {
+      const schemaWithHash = { index_type: ['hashPartition_8'] };
+      const ftsOption = { value: 'fullTextSearchKey' };
+      const result = wrapper.vm.disableOptions(schemaWithHash, ftsOption);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable secondaryIndexKey when hashPartition is selected', () => {
+      const schemaWithHash = { index_type: ['hashPartition_8'] };
+      const secondaryOption = { value: 'secondaryIndexKey' };
+      const result = wrapper.vm.disableOptions(schemaWithHash, secondaryOption);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable bloomFilterKey when hashPartition is selected', () => {
+      const schemaWithHash = { index_type: ['hashPartition_8'] };
+      const bloomOption = { value: 'bloomFilterKey' };
+      const result = wrapper.vm.disableOptions(schemaWithHash, bloomOption);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable fullTextSearchKey when prefixPartition is selected', () => {
+      const schemaWithPrefix = { index_type: ['prefixPartition'] };
+      const ftsOption = { value: 'fullTextSearchKey' };
+      const result = wrapper.vm.disableOptions(schemaWithPrefix, ftsOption);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable fullTextSearchKey when keyPartition is selected', () => {
+      const schemaWithKey = { index_type: ['keyPartition'] };
+      const ftsOption = { value: 'fullTextSearchKey' };
+      const result = wrapper.vm.disableOptions(schemaWithKey, ftsOption);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable secondaryIndexKey when prefixPartition is selected', () => {
+      const schemaWithPrefix = { index_type: ['prefixPartition'] };
+      const option = { value: 'secondaryIndexKey' };
+      const result = wrapper.vm.disableOptions(schemaWithPrefix, option);
+      expect(result).toBe(false);
+    });
+
+    it('should not disable bloomFilterKey when keyPartition is selected', () => {
+      const schemaWithKey = { index_type: ['keyPartition'] };
+      const option = { value: 'bloomFilterKey' };
+      const result = wrapper.vm.disableOptions(schemaWithKey, option);
+      expect(result).toBe(false);
+    });
+
+    it('should disable other hash variants and partition types when hashPartition is selected with multiple index types', () => {
+      const complexSchema = { index_type: ['hashPartition_8', 'fullTextSearchKey', 'bloomFilterKey'] };
+
+      // Different hash variant should be disabled
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_16' })).toBe(true);
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_64' })).toBe(true);
+      // Same hash should be allowed
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_8' })).toBe(false);
+      // keyPartition and prefixPartition should be disabled
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'keyPartition' })).toBe(true);
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'prefixPartition' })).toBe(true);
+      // Non-partition types should be allowed
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'fullTextSearchKey' })).toBe(false);
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'bloomFilterKey' })).toBe(false);
+      expect(wrapper.vm.disableOptions(complexSchema, { value: 'secondaryIndexKey' })).toBe(false);
+    });
+
+    it('should disable hashPartition options when prefixPartition or keyPartition is selected', () => {
+      // When prefix is selected alongside other non-hash types
+      const schemaWithPrefix = { index_type: ['prefixPartition', 'fullTextSearchKey'] };
+      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'hashPartition_8' })).toBe(true);
+      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'hashPartition_32' })).toBe(true);
+      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'keyPartition' })).toBe(true);
+
+      // When key is selected alongside other non-hash types
+      const schemaWithKey = { index_type: ['keyPartition', 'bloomFilterKey'] };
+      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'hashPartition_8' })).toBe(true);
+      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'hashPartition_64' })).toBe(true);
+      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'prefixPartition' })).toBe(true);
+    });
   });
 
   describe('Form Validation', () => {
@@ -420,6 +500,64 @@ describe('StreamFieldInputs', () => {
       await wrapper.setProps({ fields: mockFields });
       const dataTypeSelects = wrapper.findAll('[data-test="add-stream-field-data-type-select"]');
       expect(dataTypeSelects.length).toBeGreaterThan(0);
+    });
+
+    it('should show data type error when field has name but no type', async () => {
+      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
+      await wrapper.setProps({ fields: fieldWithoutType });
+
+      wrapper.vm.validate();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.html()).toContain('Data Type is required');
+    });
+
+    it('should not require data type when visibleInputs.data_type is false', async () => {
+      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
+      await wrapper.setProps({
+        fields: fieldWithoutType,
+        visibleInputs: { name: true, data_type: false, index_type: false },
+      });
+
+      const result = wrapper.vm.validate();
+
+      expect(result).toBe(true);
+      expect(wrapper.html()).not.toContain('Data Type is required');
+    });
+
+    it('should return true when all fields have name and type', async () => {
+      await wrapper.setProps({ fields: mockFields });
+
+      const result = wrapper.vm.validate();
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when field has empty name and empty type', async () => {
+      const emptyField = [{ uuid: '1', name: '', type: '', index_type: [] }];
+      await wrapper.setProps({ fields: emptyField });
+
+      const result = wrapper.vm.validate();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.html()).toContain('Field is required');
+      expect(wrapper.html()).toContain('Data Type is required');
+      expect(result).toBe(false);
+    });
+
+    it('should clear data type error on update:model-value', async () => {
+      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
+      await wrapper.setProps({ fields: fieldWithoutType });
+
+      wrapper.vm.validate();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.html()).toContain('Data Type is required');
+
+      // Changing the type via the OSelect should clear the error
+      // The OSelect component emits update:model-value which triggers
+      // fieldDataTypeErrors[index] = ''
+      const dataTypeSelect = wrapper.find('[data-test="add-stream-field-data-type-select"]');
+      expect(dataTypeSelect.exists()).toBe(true);
     });
   });
 

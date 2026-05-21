@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFolder from "./AddFolder.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({

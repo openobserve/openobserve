@@ -15,10 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PanelSidebar from "./PanelSidebar.vue";
 
-installQuasar();
 
 describe("PanelSidebar", () => {
   let wrapper: VueWrapper<any>;

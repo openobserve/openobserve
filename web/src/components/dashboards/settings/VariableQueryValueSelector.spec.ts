@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
 
@@ -39,7 +38,6 @@ vi.mock("@/utils/dashboard/constants", () => ({
   CUSTOM_VALUE: "::_o2_custom"
 }));
 
-installQuasar();
 
 describe("VariableQueryValueSelector", () => {
   let wrapper: VueWrapper<any>;

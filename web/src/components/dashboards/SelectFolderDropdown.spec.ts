@@ -16,12 +16,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Stub ODrawer so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events

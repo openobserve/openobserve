@@ -15,13 +15,11 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricList from "./MetricList.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn());

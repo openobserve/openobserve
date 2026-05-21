@@ -42,7 +42,6 @@ vi.mock("@/services/service_streams", () => ({
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import serviceStreamsApi from "@/services/service_streams";
@@ -52,7 +51,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Install Quasar globally
-installQuasar();
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({

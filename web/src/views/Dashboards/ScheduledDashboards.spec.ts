@@ -146,7 +146,7 @@ describe('ScheduledDashboards', () => {
           'OTable': {
             name: 'OTable',
             template: `<div class="o-table-mock">
-              <div class="o-table-body"><slot name="cell-name" /><slot name="cell-tab" /><slot name="cell-time_range" /><slot name="cell-frequency" /><slot name="cell-last_triggered_at" /><slot name="cell-created_at" /><slot name="empty" /></div>
+              <div class="o-table-body"><slot name="cell-name" :row="{ name: 'test' }" /><slot name="cell-tab" :row="{ tab: 'test' }" /><slot name="cell-time_range" :row="{ time_range: 'test' }" /><slot name="cell-frequency" :row="{ frequency: 'test' }" /><slot name="cell-last_triggered_at" :row="{ last_triggered_at: 'test' }" /><slot name="cell-created_at" :row="{ created_at: 'test' }" /><slot name="empty" /></div>
             </div>`,
             props: {
               data: { type: Array, default: () => [] },
@@ -173,6 +173,12 @@ describe('ScheduledDashboards', () => {
             name: 'q-input',
             template: '<input class="q-input-mock" />',
             props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
+            emits: ['update:modelValue']
+          },
+          'OInput': {
+            name: 'OInput',
+            template: '<input class="q-input-mock" :data-test="$attrs[\'data-test\']" />',
+            props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue']
           },
           'q-btn': {
@@ -240,10 +246,10 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.find('.scheduled-dashboards').classes()).toContain('dark-mode');
     });
 
-    it('should apply bg-white class when theme is light', () => {
+    it('should apply light-mode class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('bg-white');
+      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('tw:bg-white');
     });
   });
 
@@ -508,7 +514,9 @@ describe('ScheduledDashboards', () => {
   describe('Loading States', () => {
     it('should show loading spinner when loading is true', () => {
       const wrapper = createWrapper({ loading: true });
-      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(true);
+      const table = wrapper.findComponent({ name: 'OTable' });
+      expect(table.exists()).toBe(true);
+      expect(table.props('loading')).toBe(true);
     });
 
     it('should show no data message when not loading and no reports', () => {

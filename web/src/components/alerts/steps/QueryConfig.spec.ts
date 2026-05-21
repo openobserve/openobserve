@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import QueryConfig from "./QueryConfig.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock store
 const createMockStore = (overrides = {}) => ({

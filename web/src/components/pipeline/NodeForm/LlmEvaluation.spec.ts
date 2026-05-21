@@ -19,6 +19,7 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+
 vi.mock("vue-router", async () => {
   const actual = await vi.importActual("vue-router");
   return {
@@ -402,12 +403,12 @@ describe("LlmEvaluation - fetchSourceStreamFields", () => {
 });
 
 describe("LlmEvaluation - dark mode class", () => {
-  it("renders with dark theme when store theme is dark", async () => {
+  it("applies bg-dark class when store theme is dark", async () => {
     // The test store has theme: 'dark'
     const wrapper = createWrapper();
     await flushPromises();
     const section = wrapper.find('[data-test="llm-evaluation-node-section"]');
-    expect(section.exists()).toBe(true);
+    expect(section.classes()).toContain("bg-dark");
     wrapper.unmount();
   });
 });

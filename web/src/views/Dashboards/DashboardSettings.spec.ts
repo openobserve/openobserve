@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardSettings from "./DashboardSettings.vue";
 
 // Mock child components
@@ -85,7 +84,6 @@ vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
-installQuasar();
 
 describe("DashboardSettings.vue", () => {
   let wrapper: VueWrapper;

@@ -15,10 +15,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import DestinationPreview from "./DestinationPreview.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive the dialog's emitted events directly.

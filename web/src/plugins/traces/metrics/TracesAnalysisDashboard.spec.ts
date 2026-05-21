@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
@@ -136,7 +135,6 @@ vi.mock("@/utils/zincutils", () => ({
 // ---------------------------------------------------------------------------
 import TracesAnalysisDashboard from "./TracesAnalysisDashboard.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Vuex store

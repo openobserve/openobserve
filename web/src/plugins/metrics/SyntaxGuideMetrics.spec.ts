@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
@@ -33,7 +32,6 @@ const i18n = createI18n({
   }
 });
 
-installQuasar({ plugins: [] });
 
 describe("SyntaxGuideMetrics.vue", () => {
   let wrapper: any;

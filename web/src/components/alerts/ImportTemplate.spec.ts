@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { shallowMount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import ImportTemplate from './ImportTemplate.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -84,7 +83,6 @@ const mockRouter = createRouter({
   routes: [],
 });
 
-installQuasar();
 
 describe('ImportTemplate Component - Comprehensive Function Tests', () => {
   let wrapper: any;

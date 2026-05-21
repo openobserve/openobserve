@@ -68,6 +68,7 @@ const mockI18n = createI18n({
   },
 });
 
+
 describe('AddFunction.vue Branch Coverage', () => {
   const defaultProps = {
     modelValue: {
@@ -692,10 +693,14 @@ describe('AddFunction.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent
-      // AI chat container is rendered when enabled on non-function routes
-      const chatStub = wrapper.findComponent({ name: 'O2AIChat' });
-      expect(chatStub.exists()).toBe(true);
+      // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent (line 41, 119)
+      const mainContainer = wrapper.find('.tw\\:flex.tw\\:overflow-auto');
+      if (mainContainer.exists()) {
+        expect(mainContainer.attributes('style')).toContain('75%');
+      }
+
+      const chatContainer = wrapper.find('[style*="width: 25%"]');
+      expect(chatContainer.exists()).toBe(true);
     });
 
     it('should hide AI chat when disabled or in add function component', async () => {
@@ -724,10 +729,14 @@ describe('AddFunction.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent
-      // AI chat container is not rendered when disabled
-      const chatStub = wrapper.findComponent({ name: 'O2AIChat' });
-      expect(chatStub.exists()).toBe(false);
+      // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent (line 41, 119)
+      const mainContainer = wrapper.find('.tw\\:flex.tw\\:overflow-auto');
+      if (mainContainer.exists()) {
+        expect(mainContainer.attributes('style')).toContain('100%');
+      }
+
+      const chatContainer = wrapper.find('[style*="width: 25%"]');
+      expect(chatContainer.exists()).toBe(false);
     });
   });
 

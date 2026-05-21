@@ -19,9 +19,7 @@ import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 import CorrelationDemo from "./CorrelationDemo.vue";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar({ plugins: {  } });
 
 // ---------------------------------------------------------------------------
 // Stub heavy child component

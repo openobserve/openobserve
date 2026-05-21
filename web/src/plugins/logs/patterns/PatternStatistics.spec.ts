@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import PatternStatistics from "./PatternStatistics.vue";
 import store from "@/test/unit/helpers/store";

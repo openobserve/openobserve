@@ -16,7 +16,7 @@
 // TODO: REMOVE THIS FILE when unit tests are rewritten.
 // Quasar has been removed as a dependency. This helper no longer installs
 // Quasar — it only provides layout injections. All references to
-// tempQuasarPlugin() in spec files should be replaced with direct
+// installQuasar() in spec files should be replaced with direct
 // qLayoutInjections() calls during the test rewrite.
 
 import { config } from "@vue/test-utils";
@@ -24,7 +24,7 @@ import { cloneDeep } from "lodash-es";
 import { qLayoutInjections } from "./layout-injections";
 import { beforeAll, afterAll } from "vitest";
 
-export function tempQuasarPlugin() {
+function tempQuasarPlugin() {
   const globalConfigBackup = cloneDeep(config.global);
 
   beforeAll(() => {
@@ -38,3 +38,8 @@ export function tempQuasarPlugin() {
     config.global = globalConfigBackup;
   });
 }
+
+// Legacy alias — 500+ spec files still import { installQuasar }.
+// Remove this export once all specs have been rewritten to use
+// qLayoutInjections() directly.
+export { tempQuasarPlugin as installQuasar };

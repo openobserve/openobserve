@@ -16,7 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 <template>
   <div class="llm-eval-settings">
     <!-- Loading skeleton -->
-    <div v-if="loading" class="llm-eval-settings__loading">
+    <div
+      v-if="loading"
+      data-test="stream-llm-eval-loading"
+      class="llm-eval-settings__loading"
+    >
       <OSpinner size="md" />
     </div>
 
@@ -249,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <!-- Info banner when disabled -->
         <div
           v-else
+          data-test="stream-llm-eval-info-banner"
           class="llm-eval-settings__info-banner"
           :class="
             store.state.theme === 'dark'

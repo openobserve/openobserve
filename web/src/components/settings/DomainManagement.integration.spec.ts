@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
@@ -27,7 +26,6 @@ import {
   apiErrorScenarios,
 } from "./DomainManagement.test-helpers";
 
-installQuasar();
 
 // Create a unique DOM node for this test file to avoid conflicts
 const uniqueNodeId = "domain-management-test-app";

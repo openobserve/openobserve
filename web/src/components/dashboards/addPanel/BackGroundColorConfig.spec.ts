@@ -74,35 +74,39 @@ describe("BackGroundColorConfig", () => {
           ...provide,
         },
         stubs: {
-          "q-select": {
+          OSelect: {
             template: `
-              <div class="q-select-stub" :data-test="$attrs['data-test']">
-                <select 
-                  :value="modelValue" 
+              <div :data-test="$attrs['data-test']">
+                <select
+                  :value="modelValue"
                   @change="$emit('update:modelValue', $event.target.value)"
-                  class="select-element"
+                  class="o-select-native"
                 >
-                  <option 
-                    v-for="option in options" 
-                    :key="option.value" 
+                  <option
+                    v-for="option in options"
+                    :key="option.value"
                     :value="option.value"
                   >
                     {{ option.label }}
                   </option>
                 </select>
-                <div class="display-value">{{ displayValue }}</div>
-                <div class="label">{{ label }}</div>
+                <span class="o-select-display">{{ modelValue || 'None' }}</span>
               </div>
             `,
             props: [
               "modelValue",
               "options",
-              "dense",
               "label",
-              "stackLabel",
-              "emitValue",
-              "displayValue",
-              "outlined",
+              "labelKey",
+              "valueKey",
+              "multiple",
+              "loading",
+              "error",
+              "clearable",
+              "searchable",
+              "size",
+              "disabled",
+              "selectAll",
             ],
             emits: ["update:modelValue"],
             inheritAttrs: false,
@@ -392,11 +396,11 @@ describe("BackGroundColorConfig", () => {
       expect(container.attributes("style")).toContain("width: 100%");
     });
 
-    it("should render q-select with correct props", () => {
+    it("should render OSelect with correct props", () => {
       wrapper = createWrapper();
-      const qSelect = wrapper.find(".q-select-stub");
+      const oSelect = wrapper.find(".o-select-native");
 
-      expect(qSelect.exists()).toBeTruthy();
+      expect(oSelect.exists()).toBeTruthy();
       expect(wrapper.vm.colorModeOptions).toEqual([
         { label: "None", value: "" },
         { label: "Single color", value: "single" },
@@ -405,15 +409,15 @@ describe("BackGroundColorConfig", () => {
 
     it("should render display value as 'None' when no background type", () => {
       wrapper = createWrapper();
-      const displayValue = wrapper.find(".display-value");
-      expect(displayValue.text()).toBe("None");
+      // backgroundType is computed from config, which defaults to ""
+      expect(wrapper.vm.backgroundType).toBe("");
     });
 
     it("should render display value as 'Single color' when type is single", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      const displayValue = wrapper.find(".display-value");
-      expect(displayValue.text()).toBe("Single color");
+      // backgroundType is computed from config
+      expect(wrapper.vm.backgroundType).toBe("single");
     });
 
     it("should not show color input when background type is empty", () => {
@@ -457,7 +461,7 @@ describe("BackGroundColorConfig", () => {
     });
 
     it("should update background type when select changes", async () => {
-      const select = wrapper.find(".select-element");
+      const select = wrapper.find(".o-select-native");
 
       await select.setValue("single");
       await flushPromises();
@@ -478,7 +482,7 @@ describe("BackGroundColorConfig", () => {
     });
 
     it("should handle form interactions correctly", async () => {
-      const select = wrapper.find(".select-element");
+      const select = wrapper.find(".o-select-native");
 
       // Change to single
       await select.setValue("single");

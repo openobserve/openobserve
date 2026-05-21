@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -73,7 +72,6 @@ vi.mock("@/utils/queryPlanParser", () => ({
 // Component import must come after all vi.mock() declarations.
 import QueryPlanDialog from "./QueryPlanDialog.vue";
 
-installQuasar();
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 

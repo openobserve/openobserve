@@ -1,11 +1,9 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 describe("CrossLinkUserGuide Component", () => {
   let wrapper: any;

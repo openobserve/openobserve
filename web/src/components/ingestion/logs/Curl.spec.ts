@@ -15,11 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 
-installQuasar();
 
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({

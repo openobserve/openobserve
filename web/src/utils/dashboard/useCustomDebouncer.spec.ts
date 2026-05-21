@@ -12,6 +12,7 @@ vi.mock("vue", () => {
   const actualRef = (value: any) => ({ value });
   return {
     ref: actualRef,
+    getCurrentInstance: vi.fn().mockReturnValue({}), // return truthy to trigger lifecycle registration
     onUnmounted: vi.fn().mockImplementation((callback) => { onUnmountedCallback = callback; }),
     onDeactivated: vi.fn().mockImplementation((callback) => { onDeactivatedCallback = callback; }),
     onActivated: vi.fn().mockImplementation((callback) => { onActivatedCallback = callback; }),

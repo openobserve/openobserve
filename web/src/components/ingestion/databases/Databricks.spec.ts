@@ -16,7 +16,6 @@
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import Databricks from './Databricks.vue';
 import useIngestion from '@/composables/useIngestion';
@@ -87,7 +86,6 @@ const mockIngestionData = {
   }
 };
 
-installQuasar({});
 
 describe('Databricks.vue', () => {
   let wrapper: any;
