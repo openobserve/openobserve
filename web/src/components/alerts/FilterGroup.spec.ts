@@ -1147,7 +1147,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.emitted('add-condition')).toBeTruthy();
     });
 
-    it('should handle add group button click when depth < 2', async () => {
+    it('should handle add group button click when depth < 2', () => {
       const wrapper = mount(FilterGroup, {
         props: { ...defaultProps, depth: 1 },
         global: {
@@ -1157,6 +1157,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           },
           stubs: {
             'FilterCondition': true,
+            'OTooltip': true,
           },
         },
       });
