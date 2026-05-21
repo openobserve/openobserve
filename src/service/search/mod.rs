@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::max,
-    sync::{Arc, LazyLock as Lazy},
-};
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -69,9 +66,9 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        partition::{cpu_cores::get_cpu_cores, stream_files::collect_stream_files},
-        sql::visitor::histogram_interval::{
-            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        partition::{
+            cpu_cores::get_cpu_cores, settings::calculate_partition_settings,
+            stream_files::collect_stream_files,
         },
     },
 };
@@ -730,84 +727,25 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    let mut part_num = max(1, total_secs / cfg.limit.query_partition_by_secs);
-    if part_num * cfg.limit.query_partition_by_secs < total_secs {
-        part_num += 1;
-    }
-    // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
-    let max_partition_num = cfg.limit.query_partition_max_num.max(1);
-    if part_num > max_partition_num {
-        part_num = max_partition_num;
-    }
+    let partition_settings = calculate_partition_settings(
+        trace_id,
+        total_secs,
+        &sql,
+        is_aggregate,
+        ts_column.is_some(),
+        enable_align_histogram,
+        skip_max_query_range,
+        max_query_range,
+    );
+    let part_num = partition_settings.part_num;
+    let min_step = partition_settings.min_step;
+    let step = partition_settings.step;
+    let is_histogram = partition_settings.is_histogram;
+    let add_mini_partition = partition_settings.add_mini_partition;
     log::info!(
-        "[trace_id {trace_id}] search_partition: original_size: {original_size}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, part_num: {part_num}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
+        "[trace_id {trace_id}] search_partition: original_size: {original_size}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, total_secs: {total_secs}, part_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {is_histogram}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
         cfg.limit.query_group_base_speed,
         cfg.limit.query_partition_by_secs,
-    );
-
-    // Calculate step with all constraints
-    let mut min_step = Duration::try_seconds(1)
-        .unwrap()
-        .num_microseconds()
-        .unwrap();
-    if (is_aggregate && ts_column.is_some()) || enable_align_histogram {
-        let hist_int = if let Some(hist_int) = sql.histogram_interval {
-            hist_int
-        } else {
-            let interval = generate_histogram_interval((req.start_time, req.end_time));
-            match convert_histogram_interval_to_seconds(interval) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
-                    );
-                    10
-                }
-            }
-        };
-        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
-        if hist_int > 0 {
-            min_step *= hist_int;
-        }
-    }
-    let mut step = (req.end_time - req.start_time) / part_num as i64;
-    // step must be times of min_step
-    if step < min_step {
-        step = min_step;
-    }
-    // Align step with min_step to ensure partition boundaries match histogram intervals
-    if min_step > 0 && step % min_step > 0 {
-        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
-        // Example: If min_step = 5 minutes  and step = 17 minutes
-        //   step % min_step = 17 % 5 = 2 (2 minutes)
-        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
-        step = step - step % min_step;
-    }
-    // this is to ensure we create partitions less than max_query_range
-    if !skip_max_query_range && max_query_range > 0 && step > max_query_range {
-        step = if min_step < max_query_range {
-            max_query_range - max_query_range % min_step
-        } else {
-            max_query_range
-        };
-    }
-
-    let mut is_histogram = sql.histogram_interval.is_some();
-    let mut add_mini_partition = false;
-    // Set this to true to generate partitions aligned with interval
-    // only for logs page when query is non-histogram
-    // and also with query param `align_histogram` is true,
-    // so that logs can reuse the same partitions
-    // for histogram query
-    if !is_histogram && enable_align_histogram {
-        is_histogram = true;
-        // add mini partition for the histogram aligned partitions in the UI search
-        add_mini_partition = true;
-    }
-
-    log::debug!(
-        "[trace_id {trace_id}] search_partition: total_secs: {total_secs}, partition_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {}",
-        is_histogram || enable_align_histogram
     );
 
     let sql_order_by = sql
