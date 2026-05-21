@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { QSelect, QBtn, QTooltip } from "quasar";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -56,6 +55,25 @@ describe("DimensionFiltersBar.vue", () => {
     showApplyButton: true,
   };
 
+  // Stub O2 components so tests don't depend on full O2 lib internals
+  const OSelectStub = {
+    name: "OSelect",
+    props: ["modelValue", "options", "labelKey", "valueKey"],
+    emits: ["update:modelValue"],
+    template: `<select :data-test="$attrs['data-test']" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)"><option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option></select>`,
+  };
+  const OTooltipStub = {
+    name: "OTooltip",
+    props: ["content", "side", "maxWidth"],
+    template: `<div data-test-stub="o-tooltip" :title="content"></div>`,
+  };
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size", "disabled"],
+    emits: ["click"],
+    template: `<button :data-test="$attrs['data-test']" :disabled="disabled || null" @click="$emit('click')"><slot /></button>`,
+  };
+
   const createWrapper = (props = {}) => {
     return mount(DimensionFiltersBar, {
       props: {
@@ -67,6 +85,11 @@ describe("DimensionFiltersBar.vue", () => {
           i18n,
           store,
         ],
+        stubs: {
+          OSelect: OSelectStub,
+          OTooltip: OTooltipStub,
+          OButton: OButtonStub,
+        },
       },
     });
   };
@@ -151,7 +174,7 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should show tooltip for unstable dimensions", () => {
       wrapper = createWrapper();
-      const tooltips = wrapper.findAllComponents(QTooltip);
+      const tooltips = wrapper.findAll('[data-test-stub="o-tooltip"]');
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });

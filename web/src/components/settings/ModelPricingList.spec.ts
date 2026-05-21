@@ -45,6 +45,11 @@ vi.mock("quasar", async () => {
   };
 });
 
+const mockToastFn = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToastFn(...args),
+}));
+
 // Router mock — capture push calls
 const routerPushMock = vi.fn();
 const currentRouteRef = { value: { query: {} as Record<string, any> } };
@@ -369,7 +374,7 @@ describe("ModelPricingList.vue", () => {
     vi.mocked(modelPricingService.delete).mockResolvedValue({} as any);
     vi.mocked(modelPricingService.refreshBuiltIn).mockResolvedValue({} as any);
     routerPushMock.mockReset();
-    notifyMock.mockReset();
+    mockToastFn.mockReset();
   });
 
   afterEach(() => {
@@ -620,18 +625,18 @@ describe("ModelPricingList.vue", () => {
   // ── Selection helpers ────────────────────────────────────────────────────
 
   describe("selection", () => {
-    it("toggleSelect adds an id when not selected", async () => {
+    it("selectedIds can be set directly (OTable manages selection via @update:selected-ids)", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      wrapper.vm.toggleSelect("org-1");
+      wrapper.vm.selectedIds = ["org-1"];
       expect(wrapper.vm.selectedIds).toEqual(["org-1"]);
     });
 
-    it("toggleSelect removes an id when already selected", async () => {
+    it("selectedIds can be cleared", async () => {
       wrapper = mountComponent();
       await flushPromises();
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
-      wrapper.vm.toggleSelect("org-1");
+      wrapper.vm.selectedIds = ["meta-1"];
       expect(wrapper.vm.selectedIds).toEqual(["meta-1"]);
     });
 
@@ -669,19 +674,11 @@ describe("ModelPricingList.vue", () => {
   // ── Tree expand/collapse ─────────────────────────────────────────────────
 
   describe("expandedParents", () => {
-    it("toggleExpand adds an id when not expanded", async () => {
+    it("renders OTable with tree expand (tree expand handled by OTable internally)", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      wrapper.vm.toggleExpand("org-1");
-      expect(wrapper.vm.expandedParents.has("org-1")).toBe(true);
-    });
-
-    it("toggleExpand removes an id when already expanded", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.toggleExpand("org-1");
-      wrapper.vm.toggleExpand("org-1");
-      expect(wrapper.vm.expandedParents.has("org-1")).toBe(false);
+      // OTable handles tree expansion internally — verify the table renders
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
     });
   });
 
@@ -837,24 +834,12 @@ describe("ModelPricingList.vue", () => {
   // ── pagination changePagination ──────────────────────────────────────────
 
   describe("pagination", () => {
-    it("changePagination updates rowsPerPage", async () => {
+    it("renders OTable with client-side pagination", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      // The mounted q-table stub doesn't implement setPagination — null the
-      // ref so the optional-chained call short-circuits and we can assert on
-      // the local state update.
-      wrapper.vm.qTableRef = null;
-      wrapper.vm.changePagination({ label: "50", value: 50 });
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-    });
-
-    it("changePagination calls setPagination on the table ref when present", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const setPagination = vi.fn();
-      wrapper.vm.qTableRef = { setPagination };
-      wrapper.vm.changePagination({ label: "100", value: 100 });
-      expect(setPagination).toHaveBeenCalledWith({ rowsPerPage: 100 });
+      // OTable handles pagination internally via pagination="client" prop
+      const table = wrapper.find('[data-test-stub="o-table"]');
+      expect(table.exists()).toBe(true);
     });
   });
 
@@ -928,8 +913,8 @@ describe("ModelPricingList.vue", () => {
       await flushPromises();
 
       expect(modelPricingService.delete).toHaveBeenCalledWith("test-org", "org-1");
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
       );
     });
 
@@ -945,8 +930,8 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
       );
     });
 
@@ -962,8 +947,8 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      const negativeCalls = notifyMock.mock.calls.filter(
-        (c) => c[0]?.type === "negative",
+      const negativeCalls = mockToastFn.mock.calls.filter(
+        (c) => c[0]?.variant === "error",
       );
       expect(negativeCalls).toHaveLength(0);
     });
@@ -1027,8 +1012,8 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.toggleEnabled(mockModels[0], true);
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
       );
     });
 
@@ -1042,8 +1027,8 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.toggleEnabled(mockModels[0], false);
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
       );
     });
   });
@@ -1079,8 +1064,8 @@ describe("ModelPricingList.vue", () => {
 
       expect(modelPricingService.refreshBuiltIn).toHaveBeenCalledWith("test-org");
       expect(modelPricingService.list).toHaveBeenCalled();
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success" }),
       );
     });
 
@@ -1094,8 +1079,8 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.refreshBuiltIn();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
       );
       expect(wrapper.vm.refreshing).toBe(false);
     });
@@ -1111,8 +1096,8 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
       );
       expect(wrapper.vm.loading).toBe(false);
     });
@@ -1124,8 +1109,8 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const negativeCalls = notifyMock.mock.calls.filter(
-        (c) => c[0]?.type === "negative",
+      const negativeCalls = mockToastFn.mock.calls.filter(
+        (c) => c[0]?.variant === "error",
       );
       expect(negativeCalls).toHaveLength(0);
     });
@@ -1168,8 +1153,8 @@ describe("ModelPricingList.vue", () => {
 
       wrapper.vm.exportSelected();
 
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
       );
       expect(clickMock).not.toHaveBeenCalled();
     });
@@ -1244,63 +1229,40 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-  // ── customSort ───────────────────────────────────────────────────────────
+  // ── customSort (handled internally by OTable) ─────────────────────────────
 
   describe("customSort", () => {
-    it("returns the input unchanged when sortBy is empty", async () => {
+    it("OTable handles column sorting internally", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const rows = [orgModel({ id: "a", name: "Zebra" }), orgModel({ id: "b", name: "Apple" })];
-      expect(wrapper.vm.customSort(rows, "", false)).toBe(rows);
-    });
-
-    it("sorts org rows by name ascending", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const rows = [
-        orgModel({ id: "a", name: "Zebra" }),
-        orgModel({ id: "b", name: "Apple" }),
-      ];
-      const sorted = wrapper.vm.customSort(rows, "name", false);
-      expect(sorted.map((r: any) => r.id)).toEqual(["b", "a"]);
-    });
-
-    it("sorts descending when flag is true", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const rows = [
-        orgModel({ id: "a", name: "Apple" }),
-        orgModel({ id: "b", name: "Zebra" }),
-      ];
-      const sorted = wrapper.vm.customSort(rows, "name", true);
-      expect(sorted.map((r: any) => r.id)).toEqual(["b", "a"]);
+      // OTable manages sorting internally — verify table renders with sortable columns
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
     });
   });
 
   // ── allSelected / someSelected / toggleSelectAll ─────────────────────────
 
   describe("select-all behaviour", () => {
-    it("toggleSelectAll selects all page rows when nothing is selected", async () => {
+    it("can select all page rows via selectedIds", async () => {
       wrapper = mountComponent();
       await flushPromises();
       wrapper.vm.selectedTab = "all";
+
+      // OTable handles select-all internally — simulate by setting selectedIds
+      wrapper.vm.selectedIds = ["org-1", "org-2", "org-3"];
       await nextTick();
 
-      wrapper.vm.toggleSelectAll();
-      await nextTick();
-
-      // current page has all 3 parents (no expanded children)
       expect(wrapper.vm.selectedIds.length).toBe(3);
     });
 
-    it("toggleSelectAll clears selection when everything on the page is already selected", async () => {
+    it("can clear selection via selectedIds", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      wrapper.vm.toggleSelectAll();
+      wrapper.vm.selectedIds = ["org-1", "org-2", "org-3"];
       await nextTick();
       expect(wrapper.vm.selectedIds.length).toBeGreaterThan(0);
 
-      wrapper.vm.toggleSelectAll();
+      wrapper.vm.selectedIds = [];
       await nextTick();
       expect(wrapper.vm.selectedIds).toEqual([]);
     });

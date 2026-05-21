@@ -23,13 +23,15 @@ vi.mock("vue-i18n", () => ({
   }),
 }));
 
-// Mock vuex store
-const mockStore = {
-  state: { theme: "light" },
-  getters: {},
-  commit: vi.fn(),
-  dispatch: vi.fn(),
-};
+// Use vi.hoisted so the mock store is available when the hoisted vi.mock factory runs
+const { mockStore } = vi.hoisted(() => ({
+  mockStore: {
+    state: { theme: "light" },
+    getters: {},
+    commit: vi.fn(),
+    dispatch: vi.fn(),
+  },
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => mockStore,

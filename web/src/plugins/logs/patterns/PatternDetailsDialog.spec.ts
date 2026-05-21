@@ -64,12 +64,28 @@ const OButtonStub = {
   `,
 };
 
+const OTableStub = {
+  name: "OTable",
+  props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter"],
+  template: `
+    <table data-test-stub="o-table">
+      <tbody>
+        <tr v-for="(row, i) in (data || [])" :key="i">
+          <slot name="cell-name" :row="row" />
+          <slot name="cell-type" :row="row" />
+        </tr>
+      </tbody>
+    </table>
+  `,
+};
+
 const globalConfig = {
   plugins: [i18n],
   provide: { store },
   stubs: {
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
+    OTable: OTableStub,
   },
 };
 
@@ -239,7 +255,7 @@ describe("PatternDetailsDialog", () => {
 
   describe("Variables Section", () => {
     it("should display variables table when variables exist", () => {
-      const table = wrapper.findComponent({ name: "QTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       expect(table.exists()).toBe(true);
     });
 
@@ -268,7 +284,7 @@ describe("PatternDetailsDialog", () => {
         },
       });
 
-      const table = wrapper.findComponent({ name: "QTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       expect(table.exists()).toBe(false);
     });
   });

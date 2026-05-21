@@ -40,6 +40,18 @@ vi.mock("quasar", async () => {
   };
 });
 
+// Toast mock
+const mockToastFn = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToastFn(...args),
+}));
+
+// Clipboard mock
+const mockCopyToClipboard = vi.fn().mockResolvedValue(true);
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: (...args: any[]) => mockCopyToClipboard(...args),
+}));
+
 // Router mocks — useRouter/useRoute consumed by the component
 const mockRouterPush = vi.fn();
 let mockRouteQuery: Record<string, any> = {};
@@ -511,8 +523,8 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).addState[0] = { key: "123", value: 1 };
       const result = (wrapper.vm as any).addPrice(tier, 0);
       expect(result).toBe(false);
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative", message: "Usage key cannot be a pure integer" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Usage key cannot be a pure integer" }),
       );
     });
 
@@ -523,8 +535,8 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).addState[0] = { key: "input tokens", value: 1 };
       const result = (wrapper.vm as any).addPrice(tier, 0);
       expect(result).toBe(false);
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative", message: "Usage key must not contain spaces" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Usage key must not contain spaces" }),
       );
     });
 
@@ -564,7 +576,7 @@ describe("ModelPricingEditor.vue", () => {
       const tier: any = { prices: { a: 1 } };
       (wrapper.vm as any).renamePriceByIndex(tier, 0, "1");
       expect(tier.prices).toEqual({ a: 1 });
-      expect(mockNotify).toHaveBeenCalled();
+      expect(mockToastFn).toHaveBeenCalled();
     });
 
     it("ignores out-of-range indices", async () => {
@@ -613,12 +625,11 @@ describe("ModelPricingEditor.vue", () => {
 
   describe("copyPattern", () => {
     it("writes the pattern to clipboard and sets copiedPattern", async () => {
-      const writeText = vi.fn().mockResolvedValue(undefined);
-      Object.assign(navigator, { clipboard: { writeText } });
       const wrapper = createWrapper();
       await flushPromises();
       (wrapper.vm as any).copyPattern("gpt-4o");
-      expect(writeText).toHaveBeenCalledWith("gpt-4o");
+      await flushPromises();
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("gpt-4o", { silent: true });
       expect((wrapper.vm as any).copiedPattern).toBe("gpt-4o");
     });
   });
@@ -701,9 +712,9 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).model.name = "M";
       (wrapper.vm as any).model.match_pattern = "gpt";
       await (wrapper.vm as any).save();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: "Add at least one token price in the default tier.",
         }),
       );
@@ -718,9 +729,9 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
       (wrapper.vm as any).addState[0] = { key: "", value: 5 };
       await (wrapper.vm as any).save();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: expect.stringContaining("has a price without a usage key"),
         }),
       );
@@ -736,9 +747,9 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).addTier();
       (wrapper.vm as any).model.tiers[1].condition.usage_key = "42";
       await (wrapper.vm as any).save();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: expect.stringContaining("Usage key cannot be a plain number"),
         }),
       );
@@ -759,8 +770,8 @@ describe("ModelPricingEditor.vue", () => {
         "test-org",
         expect.objectContaining({ name: "GPT 4o", match_pattern: "gpt-4o" }),
       );
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive", message: "Model pricing saved" }),
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Model pricing saved" }),
       );
       expect(mockRouterPush).toHaveBeenCalled();
     });
@@ -840,9 +851,9 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
       await (wrapper.vm as any).save();
       await flushPromises();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "warning",
+          variant: "warning",
           message: expect.stringContaining("Higher Priority"),
         }),
       );
@@ -861,9 +872,9 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
       await (wrapper.vm as any).save();
       await flushPromises();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: expect.stringContaining("server boom"),
         }),
       );
@@ -881,8 +892,8 @@ describe("ModelPricingEditor.vue", () => {
       (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
       await (wrapper.vm as any).save();
       await flushPromises();
-      const negativeCalls = mockNotify.mock.calls.filter(
-        ([arg]) => arg && arg.type === "negative",
+      const negativeCalls = mockToastFn.mock.calls.filter(
+        ([arg]) => arg && arg.variant === "error",
       );
       expect(negativeCalls).toHaveLength(0);
     });
@@ -937,9 +948,9 @@ describe("ModelPricingEditor.vue", () => {
       });
       createWrapper({ query: { id: "abc" } });
       await flushPromises();
-      expect(mockNotify).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative",
+          variant: "error",
           message: expect.stringContaining("load fail"),
         }),
       );

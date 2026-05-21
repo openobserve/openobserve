@@ -3,20 +3,20 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
 
-// Mock Vuex store
-const mockStore = {
-  state: {
-    theme: 'light',
-    selectedOrganization: {
-      identifier: 'test-org'
+// Use vi.hoisted so mock data is available when hoisted vi.mock factories run
+const { mockStore, mockRouter } = vi.hoisted(() => ({
+  mockStore: {
+    state: {
+      theme: 'light',
+      selectedOrganization: {
+        identifier: 'test-org'
+      }
     }
-  }
-};
-
-// Mock router
-const mockRouter = {
-  push: vi.fn()
-};
+  },
+  mockRouter: {
+    push: vi.fn()
+  },
+}));
 
 // Mock composables
 vi.mock('vuex', () => ({
@@ -146,7 +146,15 @@ describe('ScheduledDashboards', () => {
           'OTable': {
             name: 'OTable',
             template: `<div class="o-table-mock">
-              <div class="o-table-body"><slot name="cell-name" :row="{ name: 'test' }" /><slot name="cell-tab" :row="{ tab: 'test' }" /><slot name="cell-time_range" :row="{ time_range: 'test' }" /><slot name="cell-frequency" :row="{ frequency: 'test' }" /><slot name="cell-last_triggered_at" :row="{ last_triggered_at: 'test' }" /><slot name="cell-created_at" :row="{ created_at: 'test' }" /><slot name="empty" /></div>
+              <div class="o-table-body">
+                <slot name="cell-name" :row="{ name: 'test' }" />
+                <slot name="cell-tab" row="{ tab: 'test' }" />
+                <slot name="cell-time_range" row="{ time_range: 'test' }" />
+                <slot name="cell-frequency" row="{ frequency: 'test' }" />
+                <slot name="cell-last_triggered_at" row="{ last_triggered_at: 'test' }" />
+                <slot name="cell-created_at" row="{ created_at: 'test' }" />
+                <slot name="empty" />
+              </div>
             </div>`,
             props: {
               data: { type: Array, default: () => [] },

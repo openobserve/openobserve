@@ -15,11 +15,11 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import * as quasar from "quasar";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { http, HttpResponse } from "msw";
 
 const node = document.createElement("div");
@@ -34,9 +34,7 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-installQuasar({
-  plugins: [],
-});
+installQuasar();
 
 
 /**
