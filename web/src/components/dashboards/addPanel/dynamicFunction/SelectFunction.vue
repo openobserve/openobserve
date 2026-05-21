@@ -19,9 +19,9 @@
         >
           <div
             class="tw:flex"
-            :style="{ marginLeft: isChild ? '-60px' : '0px' }"
+            :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="tw:mr-2 tw:relative" style="min-height: 50px">
+            <div class="tw:mr-2 tw:relative tw:w-3" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="tw:absolute tw:top-0 tw:w-[1px] tw:bg-[#001495] tw:opacity-50"
@@ -30,12 +30,12 @@
                     argIndex === fields.args.length - 1
                       ? 'calc(100% - 32px)'
                       : '0',
-                  left: '0px',
+                  left: '6px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: -1px">
+              <div class="tw:absolute" style="top: 30px; left: 5px">
                 <SubTaskArrow />
               </div>
             </div>

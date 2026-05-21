@@ -292,7 +292,10 @@ const fieldClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="tw:z-60 tw:rounded-lg tw:border tw:shadow-md tw:overflow-hidden tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border tw:outline-none tw:w-56"
+        :class="[
+          'tw:z-60 tw:rounded-lg tw:border tw:shadow-md tw:overflow-hidden tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border tw:outline-none',
+          withSeconds ? 'tw:w-64' : 'tw:w-56',
+        ]"
         data-test="otime-popup"
       >
         <!-- Time display + AM/PM pill (no heavy header band) -->
