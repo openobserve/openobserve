@@ -467,7 +467,7 @@ pub async fn get_alert_history(
                 );
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
-                    &org_id, user_id, "GET", &alert_obj, &folder_id, &role,
+                    &org_id, user_id, "GET", &alert_obj, &folder_id, &role, false, false, false,
                 )
                 .await;
 
