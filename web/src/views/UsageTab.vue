@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="feature-card"
+        class="feature-card tw:rounded tw:p-4"
         :class="
           store.state.theme === 'dark'
             ? 'dark-stream-container'
@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="home-usage-tab-view-streams-btn"
           >
             <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
+            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
             <router-link
               exact
               :to="{
@@ -87,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tiles-grid">
           <div class="tile">
             <div
-              class="tile-content tw:rounded tw:text-center column tw:justify-between"
+              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -96,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Streams count statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.streams") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
@@ -128,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile">
             <div
-              class="tile-content tw:rounded tw:text-center column tw:justify-between"
+              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -137,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Events count statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
@@ -169,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile">
             <div
-              class="tile-content tw:rounded tw:text-center column tw:justify-between"
+              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -178,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Ingested data size statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
                   <div class="tile-title">
                     {{ t("home.totalDataIngested") }}
@@ -212,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content tw:rounded tw:text-center column tw:justify-between"
+              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -221,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Compressed data size statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
                   <div class="tile-title">
                     {{ t("home.totalDataCompressed") }}
@@ -255,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content tw:rounded tw:text-center column tw:justify-between"
+              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -264,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Index size statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
                   <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
@@ -302,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="functions-dashboards-column">
           <div class="tile-wrapper">
             <div
-              class="feature-card tw:rounded tw:text-center column tw:justify-between"
+              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -311,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Functions count statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div
                   class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
@@ -340,6 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="home-usage-tab-view-functions-btn"
                   >
                     <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
                     <router-link
                       exact
                       :to="{
@@ -367,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile-wrapper">
             <div
-              class="feature-card tw:rounded tw:text-center column tw:justify-between"
+              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -376,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Dashboards count statistics"
             >
-              <div class="column tw:justify-between">
+              <div class="tw:flex tw:flex-col tw:justify-between">
                 <div
                   class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
@@ -405,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
                     <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
                     <router-link
                       exact
                       :to="{
@@ -433,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="feature-card first-chart-container tw:rounded tw:p-4"
+          class="feature-card first-chart-container tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)]"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -463,6 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-view-alerts-btn"
               >
                 <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
                 <router-link
                   exact
                   :to="{
@@ -478,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
             <div class="tw:flex tw:pt-2 home-stat-row">
-              <div class="column">
+              <div class="tw:flex tw:flex-col">
                 <span class="text-subtitle">{{
                   t("home.scheduledAlert")
                 }}</span>
@@ -491,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="column">
+              <div class="tw:flex tw:flex-col">
                 <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
                 <span
                   class="results-count"
@@ -516,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="feature-card second-chart-container tw:rounded tw:p-4"
+          class="feature-card second-chart-container tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)]"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -546,6 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-view-pipelines-btn"
               >
                 <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
                 <router-link
                   exact
                   :to="{
@@ -561,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
             <div class="tw:flex tw:pt-2 home-stat-row">
-              <div class="column">
+              <div class="tw:flex tw:flex-col">
                 <span class="text-subtitle">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
@@ -574,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="column">
+              <div class="tw:flex tw:flex-col">
                 <span class="text-subtitle">{{
                   t("home.rtPipelineTitle")
                 }}</span>
@@ -1295,10 +1300,7 @@ watch(orgId, (newVal, oldVal) => {
   opacity: 0;
 }
 
-.view-button-light::after,
-.view-button-dark::after {
-  content: "arrow_forward";
-  font-family: "Material Icons";
+.view-arrow-icon-in {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -1307,15 +1309,12 @@ watch(orgId, (newVal, oldVal) => {
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;
-  font-size: 1.125rem;
   pointer-events: none;
   z-index: 1;
-  line-height: 1;
-  font-feature-settings: "liga";
 }
 
-.view-button-light:hover::after,
-.view-button-dark:hover::after {
+.view-button-light:hover .view-arrow-icon-in,
+.view-button-dark:hover .view-arrow-icon-in {
   transform: translate(-50%, -50%) translateX(0);
   opacity: 1;
 }
