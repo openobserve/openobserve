@@ -111,17 +111,13 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      dark: {
-        isActive: false,
-      },
-    }),
-  };
-});
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    dark: {
+      isActive: false,
+    },
+  }),
+}));
 
 import serviceGraphService from "@/services/service_graph";
 

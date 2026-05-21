@@ -22,6 +22,7 @@ import axios from "axios";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock services
 vi.mock("@/services/regex_pattern", () => ({

@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { QBtn, QMenu, QCard, QCardSection, QSeparator, QTooltip } from "quasar";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import store from "@/test/unit/helpers/store";
 

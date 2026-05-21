@@ -678,7 +678,7 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       // OTable handles tree expansion internally — verify the table renders
-      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
   });
 
@@ -838,7 +838,7 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       // OTable handles pagination internally via pagination="client" prop
-      const table = wrapper.find('[data-test-stub="o-table"]');
+      const table = wrapper.findComponent({ name: "OTable" });
       expect(table.exists()).toBe(true);
     });
   });
@@ -1236,7 +1236,7 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       // OTable manages sorting internally — verify table renders with sortable columns
-      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
     });
   });
 

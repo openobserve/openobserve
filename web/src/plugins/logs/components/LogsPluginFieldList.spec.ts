@@ -21,7 +21,7 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock("./FieldRow.vue", () => ({
+vi.mock("@/components/common/FieldRow.vue", () => ({
   default: {
     name: "FieldRow",
     template:
@@ -37,7 +37,7 @@ vi.mock("./FieldRow.vue", () => ({
   },
 }));
 
-vi.mock("./FieldExpansion.vue", () => ({
+vi.mock("@/components/common/FieldExpansion.vue", () => ({
   default: {
     name: "FieldExpansion",
     template: '<div class="field-expansion-stub"></div>',
@@ -146,8 +146,8 @@ function createWrapper(props = {}) {
     props: { ...defaultProps, ...props },
     global: {
       stubs: {
-        QTable: {
-          name: "QTable",
+        OFieldList: {
+          name: "OFieldList",
           template:
             '<div class="q-table-stub" :data-test="$attrs[\'data-test\']"><slot name="body-cell-name" v-for="row in rows" :row="row" :props="{row}" /><slot name="top-right" /><slot name="pagination" :pagination="pagination" :pagesNumber="pagesNumber" :isFirstPage="isFirstPage" :isLastPage="isLastPage" :firstPage="() => {}" :lastPage="() => {}" /></div>',
           props: [
@@ -174,35 +174,27 @@ function createWrapper(props = {}) {
             },
           },
         },
-        QTr: {
-          name: "QTr",
-          template:
-            '<tr class="q-tr-stub" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></tr>',
-          emits: ["click"],
-        },
-        QTd: {
-          name: "QTd",
-          template: '<td class="q-td-stub" v-bind="$attrs"><slot /></td>',
-        },
-        QInput: {
-          name: "QInput",
+        OInput: {
+          name: "OInput",
           template:
             '<input class="q-input-stub" :value="modelValue" :data-test="$attrs[\'data-test\']" @input="$emit(\'update:modelValue\', $event.target.value)" />',
           props: ["modelValue", "placeholder", "debounce"],
           emits: ["update:modelValue"],
         },
-        QIcon: {
-          name: "QIcon",
+        OIcon: {
+          name: "OIcon",
           template: '<span class="OIcon-stub" v-bind="$attrs"></span>',
           props: ["name", "color", "size"],
         },
-        QBtn: {
-          name: "QBtn",
+        OButton: {
+          name: "OButton",
           template:
             '<button class="q-btn-stub" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           props: ["icon", "dense", "size", "flat"],
           emits: ["click"],
         },
+        OSkeleton: true,
+        OBadge: true,
       },
     },
   });
