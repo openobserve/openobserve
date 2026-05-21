@@ -94,17 +94,13 @@ vi.mock("@quasar/extras/material-icons-outlined", () => ({
   "window": "outlined_window",
 }));
 
-// Mock Quasar useQuasar — notify must return a function for the dismiss pattern
+// Mock Toast — replaces quasar notify
 const mockNotifyDismiss = vi.fn();
 const mockNotify = vi.fn().mockReturnValue(mockNotifyDismiss);
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 // ── Import component under test (after all mocks) ───────────────────────────
 
@@ -393,7 +389,7 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+        variant: "loading",
         message: "Please wait while loading summary...",
       });
       // The returned dismiss function should have been called
@@ -448,7 +444,7 @@ describe("UsageTab", () => {
       expect((wrapper.vm as any).isLoadingSummary).toBe(false);
       // Error notification should have been shown
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+        variant: "error",
         message: "Error while pulling summary.",
         timeout: 2000,
       });

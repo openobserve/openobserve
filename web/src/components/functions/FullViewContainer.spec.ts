@@ -259,7 +259,7 @@ describe('FullViewContainer.vue', () => {
     it('uses correct icon name', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.text()).toBe('keyboard_arrow_up');
+      expect(icon.text()).toBe('keyboard-arrow-up');
     });
 
     it('applies correct icon size', () => {

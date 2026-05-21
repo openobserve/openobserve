@@ -62,48 +62,18 @@ const globalStubs = {
     props: ["variant", "size"],
     emits: ["click"],
   },
-  "q-card": { template: '<div class="q-card"><slot /></div>' },
-  "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
-  "q-card-actions": {
-    template: '<div class="q-card-actions"><slot /></div>',
-    props: ["align"],
-  },
-  "q-select": {
+  OCardSection: { template: '<div class="o-card-section"><slot /></div>' },
+  OSelect: {
     template:
-      '<select class="q-select"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
-    props: [
-      "modelValue",
-      "options",
-      "label",
-      "rules",
-      "popupContentStyle",
-      "color",
-      "bgColor",
-      "stackLabel",
-      "outlined",
-      "filled",
-      "dense",
-    ],
-  },
-  "q-list": { template: "<div><slot /></div>", props: ["dense"] },
-  "q-item": { template: "<div><slot /></div>", props: ["tag"] },
-  "q-item-section": { template: "<div><slot /></div>", props: ["avatar"] },
-  "q-item-label": {
-    template: "<span class='q-item-label'><slot /></span>",
-    props: ["class"],
-  },
-  "q-checkbox": {
-    template:
-      '<input type="checkbox" class="q-checkbox" :value="val" :checked="modelValue && modelValue.includes(val)" />',
-    props: ["modelValue", "val", "size", "dense"],
+      '<select class="o-select" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
+    props: ["modelValue", "options", "label", "error", "errorMessage"],
     emits: ["update:modelValue"],
   },
-  "q-btn": {
+  OCheckbox: {
     template:
-      '<button class="q-btn" :class="closePop ? \'close-btn\' : \'\'" @click="$emit(\'click\')">{{ label }}</button>',
-    props: ["label", "color", "flat", "noCaps", "class"],
-    attrs: { "v-close-popup": "" },
-    emits: ["click"],
+      '<input type="checkbox" class="o-checkbox" :value="value" :checked="Array.isArray(modelValue) && modelValue.includes(value)" />',
+    props: ["modelValue", "value"],
+    emits: ["update:modelValue"],
   },
 };
 
@@ -148,9 +118,9 @@ describe("FilterCreatorPopup", () => {
       expect(dialog.props("title")).toBe("custom_field");
     });
 
-    it("should render q-select for operator", () => {
+    it("should render OSelect for operator", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".q-select").exists()).toBe(true);
+      expect(wrapper.find(".o-select").exists()).toBe(true);
     });
 
     it("should display Values section label", () => {
@@ -199,7 +169,7 @@ describe("FilterCreatorPopup", () => {
         fieldValues: ["a", "b", "c"],
         defaultValues: [],
       });
-      expect(wrapper.findAll(".q-checkbox")).toHaveLength(3);
+      expect(wrapper.findAll(".o-checkbox")).toHaveLength(3);
     });
 
     it("should show No values present when fieldValues is empty", () => {
@@ -227,7 +197,7 @@ describe("FilterCreatorPopup", () => {
         (_, i) => `value_${i}`,
       );
       wrapper = mountComponent({ fieldValues: longValues, defaultValues: [] });
-      expect(wrapper.findAll(".q-checkbox")).toHaveLength(100);
+      expect(wrapper.findAll(".o-checkbox")).toHaveLength(100);
     });
 
     it("should handle special characters in field values", () => {
@@ -330,9 +300,9 @@ describe("FilterCreatorPopup", () => {
       expect(wrapper.find(".o-dialog").exists()).toBe(true);
     });
 
-    it("should have at least 2 q-card-section elements", () => {
+    it("should have at least 2 OCardSection elements", () => {
       wrapper = mountComponent();
-      expect(wrapper.findAll(".q-card-section").length).toBeGreaterThanOrEqual(
+      expect(wrapper.findAll(".o-card-section").length).toBeGreaterThanOrEqual(
         2,
       );
     });

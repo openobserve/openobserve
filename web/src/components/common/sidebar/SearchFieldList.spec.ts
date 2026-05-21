@@ -1,16 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import {
-  QTable,
-  QBtn,
-  QInput,
-  QExpansionItem,
-  QCard,
-  QCardSection,
-  QList,
-  QItem,
-  QIcon,
-} from "quasar";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
@@ -91,16 +80,11 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-// Mock quasar
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
+// Mock copyToClipboard — migrated from quasar to @/utils/clipboard
+const mockCopyToClipboard = vi.fn(() => Promise.resolve(true));
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
 
 // Mock clipboard API
 Object.assign(navigator, {
@@ -138,8 +122,8 @@ const mockRouter = createRouter({
 describe("FieldList.vue Comprehensive Coverage", () => {
   let wrapper: VueWrapper;
   let mockStreamService: any;
-  let mockNotify: any;
   let mockWriteText: any;
+  let mockNotify: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -148,11 +132,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     mockStreamService = vi.mocked(streamService.fieldValues);
     mockNotify = vi.fn();
     mockWriteText = vi.fn();
-
-    const { useQuasar } = await import("quasar");
-    vi.mocked(useQuasar).mockReturnValue({
-      notify: mockNotify,
-    } as any);
+    mockCopyToClipboard.mockResolvedValue(true);
 
     Object.assign(navigator, {
       clipboard: {
@@ -183,7 +163,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           });
         } catch {
           fieldValuesMocks._setFieldState?.(fieldName, { isLoading: false });
-          mockNotify?.({
+          mockNotify({
             type: "negative",
             message: `Error while fetching values for ${fieldName}`,
           });
@@ -220,17 +200,6 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         provide: {
           store: mockStore,
         },
-        components: {
-          QTable,
-          QBtn,
-          QInput,
-          QExpansionItem,
-          QCard,
-          QCardSection,
-          QList,
-          QItem,
-          QIcon,
-        },
       },
     });
   };
@@ -243,13 +212,10 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       expect(wrapper.find(".index-table").exists()).toBe(true);
     });
 
-    it("should render QTable with correct props", () => {
+    it("should render OFieldList component", () => {
       wrapper = createWrapper();
-      const table = wrapper.findComponent(QTable);
-      expect(table.exists()).toBe(true);
-      expect(table.props("visibleColumns")).toEqual(["name"]);
-      expect(table.props("hideHeader")).toBe(true);
-      expect(table.props("hideBottom")).toBe(true);
+      const fieldList = wrapper.findComponent({ name: "OFieldList" });
+      expect(fieldList.exists()).toBe(true);
     });
 
     it("should render search input with correct attributes", () => {
@@ -275,8 +241,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         { name: "field3", ftsKey: true, showValues: false },
       ];
       wrapper = createWrapper({ fields });
-      const table = wrapper.findComponent(QTable);
-      expect(table.props("rows")).toEqual(fields);
+      const fieldList = wrapper.findComponent({ name: "OFieldList" });
+      expect(fieldList.exists()).toBe(true);
+      expect(fieldList.props("fields")).toEqual(fields);
     });
   });
 
@@ -722,10 +689,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("test-value");
 
-      expect(mockWriteText).toHaveBeenCalledWith("test-value");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Value copied to clipboard",
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", {
+        successMessage: "Value copied to clipboard",
       });
     });
 
@@ -735,10 +700,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("");
 
-      expect(mockWriteText).toHaveBeenCalledWith("");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Value copied to clipboard",
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("", {
+        successMessage: "Value copied to clipboard",
       });
     });
 
@@ -748,7 +711,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("special@value!$");
 
-      expect(mockWriteText).toHaveBeenCalledWith("special@value!$");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", {
+        successMessage: "Value copied to clipboard",
+      });
     });
 
     it("should copy numeric values as strings", async () => {
@@ -820,8 +785,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       ];
       wrapper = createWrapper({ fields });
 
-      const expansionItem = wrapper.findComponent(QExpansionItem);
-      expect(expansionItem.exists()).toBe(true);
+      // The component uses OFieldList with expansion slots, not QExpansionItem
+      const fieldList = wrapper.findComponent({ name: "OFieldList" });
+      expect(fieldList.exists()).toBe(true);
     });
 
     it("should not show add search term button when hideAddSearchTerm is true", () => {

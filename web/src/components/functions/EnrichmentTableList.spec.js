@@ -35,6 +35,14 @@ vi.mock('@/services/jstransform', () => ({
   },
 }));
 
+// Mock toast
+const mockToast = vi.fn(() => vi.fn());
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  useToast: () => ({
+    toast: mockToast,
+  }),
+}));
+
 // Mock useStreams composable
 const mockGetStreams = vi.fn(() => Promise.resolve({
   list: [],
@@ -103,8 +111,6 @@ const ODrawerStub = {
 describe('EnrichmentTableList Component', () => {
   let wrapper;
   let store;
-  let notifyMock;
-  let dismissMock;
   let qTableMock;
 
   beforeEach(async () => {
@@ -117,10 +123,6 @@ describe('EnrichmentTableList Component', () => {
     };
     mockRouter.push.mockReset();
     mockRouter.replace.mockReset();
-
-    // Setup notify mock with dismiss function
-    dismissMock = vi.fn();
-    notifyMock = vi.fn().mockReturnValue(dismissMock);
 
     // Setup qTable mock
     qTableMock = {
@@ -194,11 +196,6 @@ describe('EnrichmentTableList Component', () => {
         }
       },
     });
-
-    // Attach notify mock to wrapper
-    wrapper.vm.$q = {
-      notify: notifyMock
-    };
 
     // Set qTable ref
     wrapper.vm.qTable = qTableMock;
@@ -285,7 +282,7 @@ describe('EnrichmentTableList Component', () => {
 
     it('shows delete confirmation dialog', async () => {
       const testRow = { name: 'test-table' };
-      await wrapper.vm.showDeleteDialogFn({ row: testRow });
+      await wrapper.vm.showDeleteDialogFn(testRow);
       expect(wrapper.vm.confirmDelete).toBe(true);
       expect(wrapper.vm.selectedDelete).toEqual(testRow);
     });
@@ -317,42 +314,27 @@ describe('EnrichmentTableList Component', () => {
 
   describe('Pagination Handling', () => {
     it('updates pagination settings correctly', async () => {
-      const setPaginationSpy = vi.fn();
-      wrapper.vm.qTable = { setPagination: setPaginationSpy };
-
       await wrapper.vm.changePagination({ label: '10', value: 10 });
       await flushPromises();
 
       expect(wrapper.vm.selectedPerPage).toBe(10);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
-      expect(setPaginationSpy).toHaveBeenCalledWith({ rowsPerPage: 10 });
     });
 
     it('handles "All" pagination option', async () => {
-      const setPaginationSpy = vi.fn();
-      wrapper.vm.qTable = { setPagination: setPaginationSpy };
-
       await wrapper.vm.changePagination({ label: 'All', value: 0 });
       await flushPromises();
 
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
-      expect(setPaginationSpy).toHaveBeenCalledWith({ rowsPerPage: 0 });
+      expect(wrapper.vm.selectedPerPage).toBe(0);
     });
 
-    it('validates pagination options', () => {
-      expect(wrapper.vm.perPageOptions).toEqual([
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-        { label: "250", value: 250 },
-        { label: "500", value: 500 },
-      ]);
+    it('validates pagination options list', () => {
+      expect(wrapper.vm.perPageOptionsList).toEqual([20, 50, 100, 250, 500]);
     });
   });
 
   describe('Form Management', () => {
     it('shows add form correctly', async () => {
-      await wrapper.vm.showAddUpdateFn({});
+      await wrapper.vm.showAddUpdateFn(null);
       expect(wrapper.vm.showAddJSTransformDialog).toBe(true);
       expect(wrapper.vm.isUpdated).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
@@ -366,7 +348,7 @@ describe('EnrichmentTableList Component', () => {
 
     it('shows update form correctly', async () => {
       const testRow = { name: 'test-table' };
-      await wrapper.vm.showAddUpdateFn({ row: testRow });
+      await wrapper.vm.showAddUpdateFn(testRow);
       expect(wrapper.vm.showAddJSTransformDialog).toBe(true);
       expect(wrapper.vm.isUpdated).toBe(true);
       expect(mockRouter.push).toHaveBeenCalledWith({
@@ -401,7 +383,7 @@ describe('EnrichmentTableList Component', () => {
 
   describe('Schema Management', () => {
     it('shows schema dialog correctly', async () => {
-      await wrapper.vm.listSchema({ row: { name: 'test-table' } });
+      await wrapper.vm.listSchema({ name: 'test-table' });
       expect(wrapper.vm.showEnrichmentSchema).toBe(true);
       expect(wrapper.vm.selectedEnrichmentTable).toBe('test-table');
     });
@@ -416,27 +398,32 @@ describe('EnrichmentTableList Component', () => {
   });
 
   describe('Table Data Formatting', () => {
-    it('formats document numbers correctly', () => {
-      const column = wrapper.vm.columns.find(c => c.name === 'doc_num');
-      expect(column.field({ doc_num: 1000 })).toBe('1,000');
+    it('has doc_num column with correct id and accessorKey', () => {
+      const column = wrapper.vm.columns.find(c => c.id === 'doc_num');
+      expect(column).toBeDefined();
+      expect(column.accessorKey).toBe('doc_num');
+      expect(column.sortable).toBe(true);
     });
 
-    it('formats storage size correctly', () => {
-      const column = wrapper.vm.columns.find(c => c.name === 'storage_size');
-      expect(column.field({ storage_size: 10 })).toBe('10 MB');
+    it('has storage_size column with correct id and accessorKey', () => {
+      const column = wrapper.vm.columns.find(c => c.id === 'storage_size');
+      expect(column).toBeDefined();
+      expect(column.accessorKey).toBe('original_storage_size');
+      expect(column.sortable).toBe(true);
     });
 
-    it('handles numeric field sorting', () => {
-      const column = wrapper.vm.columns.find(c => c.name === 'doc_num');
-      expect(column.sort(null, null, { doc_num: 1000 }, { doc_num: 500 })).toBe(500);
+    it('has compressed_size column with correct config', () => {
+      const column = wrapper.vm.columns.find(c => c.id === 'compressed_size');
+      expect(column).toBeDefined();
+      expect(column.accessorKey).toBe('original_compressed_size');
+      expect(column.sortable).toBe(true);
     });
 
-    it('handles storage size sorting', () => {
-      const column = wrapper.vm.columns.find(c => c.name === 'storage_size');
-      expect(column.sort(null, null, 
-        { original_storage_size: 1000 }, 
-        { original_storage_size: 500 }
-      )).toBe(500);
+    it('has name column with correct config', () => {
+      const column = wrapper.vm.columns.find(c => c.id === 'name');
+      expect(column).toBeDefined();
+      expect(column.accessorKey).toBe('name');
+      expect(column.sortable).toBe(true);
     });
   });
 
@@ -445,14 +432,14 @@ describe('EnrichmentTableList Component', () => {
       const error = new Error('Forbidden');
       error.response = { status: 403 };
       vi.mocked(streamService.delete).mockRejectedValueOnce(error);
-      
+
       wrapper.vm.selectedDelete = { name: 'test-table' };
       await wrapper.vm.deleteLookupTable();
       await flushPromises();
-      
-      expect(notifyMock).not.toHaveBeenCalledWith(
+
+      expect(mockToast).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          color: 'negative',
+          variant: 'error',
         })
       );
     });
@@ -465,7 +452,7 @@ describe('EnrichmentTableList Component', () => {
         stream_type: 'enrichment_tables'
       };
 
-      await wrapper.vm.exploreEnrichmentTable({ row: testRow });
+      await wrapper.vm.exploreEnrichmentTable(testRow);
       await flushPromises();
 
       expect(store.dispatch).toHaveBeenCalledWith('logs/setIsInitialized', false);
@@ -492,7 +479,7 @@ describe('EnrichmentTableList Component', () => {
         stream_type: 'enrichment_tables'
       };
 
-      await wrapper.vm.exploreEnrichmentTable({ row: testRow });
+      await wrapper.vm.exploreEnrichmentTable(testRow);
       await flushPromises();
 
       expect(mockRouter.push).toHaveBeenCalledWith(
@@ -589,9 +576,9 @@ describe('EnrichmentTableList Component', () => {
       await wrapper.vm.getLookupTables();
       await flushPromises();
 
-      expect(notifyMock).not.toHaveBeenCalledWith(
+      expect(mockToast).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'negative'
+          variant: 'error'
         })
       );
     });
@@ -691,13 +678,11 @@ describe('EnrichmentTableList Component', () => {
   });
 
   describe('Table Sorting', () => {
-    it('handles compressed size sorting', () => {
-      const column = wrapper.vm.columns.find(c => c.name === 'compressed_size');
-      const result = column.sort(null, null,
-        { original_compressed_size: 1000 },
-        { original_compressed_size: 500 }
-      );
-      expect(result).toBe(500);
+    it('has compressed_size column with sortable enabled', () => {
+      const column = wrapper.vm.columns.find(c => c.id === 'compressed_size');
+      expect(column).toBeDefined();
+      expect(column.sortable).toBe(true);
+      expect(column.accessorKey).toBe('original_compressed_size');
     });
   });
 
@@ -744,7 +729,7 @@ describe('EnrichmentTableList Component', () => {
   describe('EnrichmentSchema v-model:open Integration', () => {
     it('toggles showEnrichmentSchema via listSchema and exposes table name', async () => {
       expect(wrapper.vm.showEnrichmentSchema).toBe(false);
-      await wrapper.vm.listSchema({ row: { name: 'schema-table' } });
+      await wrapper.vm.listSchema({ name: 'schema-table' });
       expect(wrapper.vm.showEnrichmentSchema).toBe(true);
       expect(wrapper.vm.selectedEnrichmentTable).toBe('schema-table');
     });

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </defs>
     </svg>
 	
-    <div class="tw:m-0">{{ t("ticket.noDataErrorMsg") }}</div>
+    <div data-test="no-data-message" class="tw:m-0">{{ t("ticket.noDataErrorMsg") }}</div>
   </div>
 </template>
 

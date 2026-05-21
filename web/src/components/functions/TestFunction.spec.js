@@ -6,7 +6,6 @@ import TestFunction from "./TestFunction.vue";
 import jstransform from "@/services/jstransform";
 import searchService from "@/services/search";
 import { nextTick, ref } from 'vue';
-import * as components from "@quasar/extras/material-icons";
 import useStreams from "@/composables/useStreams";
 
 // Mock useQuasar
@@ -363,20 +362,18 @@ describe("TestFunction Component", () => {
 
     it("filters streams based on search input", async () => {
       wrapper.vm.streams = ["stream1", "stream2", "test_stream"];
-      const update = vi.fn();
-      wrapper.vm.filterStreams("stream", update);
+      wrapper.vm.filterStreams("stream");
       await flushPromises();
       await nextTick();
-      expect(update).toHaveBeenCalled();
+      expect(wrapper.vm.filteredStreams).toEqual(["stream1", "stream2", "test_stream"]);
     });
 
     it("handles empty stream filter", async () => {
       wrapper.vm.streams = ["stream1", "stream2"];
-      const update = vi.fn();
-      wrapper.vm.filterStreams("", update);
+      wrapper.vm.filterStreams("");
       await flushPromises();
       await nextTick();
-      expect(update).toHaveBeenCalled();
+      expect(wrapper.vm.filteredStreams).toEqual(["stream1", "stream2"]);
     });
 
     it("handles stream type change to logs", async () => {

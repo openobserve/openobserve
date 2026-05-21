@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import QueryBuilder from "./QueryBuilder.vue";
 
 
@@ -71,6 +71,12 @@ Object.assign(navigator, {
     writeText: vi.fn().mockResolvedValue(undefined),
   },
 });
+
+// Mock Toast
+const mockNotify = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 describe("QueryBuilder", () => {
   let wrapper: any;
@@ -209,17 +215,18 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification after copying", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.copyQuery();
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Query copied to clipboard!",
         })
       );
@@ -270,14 +277,14 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification after clearing", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.clearQuery();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "info",
+          variant: "info",
           message: "Query cleared",
         })
       );
@@ -308,17 +315,17 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification when testing query", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.testQuery();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "info",
+          variant: "info",
           message: "Query testing will be implemented soon",
         })
       );
