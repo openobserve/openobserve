@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.enableDelete && row.status != 'pending'"
               :title="t('user.delete')"
               variant="ghost"
-              size="icon-circle-sm"
+              size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
               @click="confirmDeleteAction(row)"
             >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status == 'pending' && row.token"
               :title="t('user.revoke_invite')"
               variant="ghost"
-              size="icon-circle-sm"
+              size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
               @click="confirmRevokeAction(row)"
             >
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
               :title="t('user.update')"
               variant="ghost"
-              size="icon-circle-sm"
+              size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
               @click="addRoutePush(row)"
             >
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
-              variant="outline"
+              variant="outline-destructive"
               size="sm"
               icon-left="delete"
               @click="openBulkDeleteDialog"

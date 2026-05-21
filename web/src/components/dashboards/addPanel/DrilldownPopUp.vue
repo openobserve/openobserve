@@ -38,35 +38,33 @@
       @update:model-value="nameError = ''"
       data-test="dashboard-config-panel-drilldown-name"
     />
-    <div
-      style="display: flex; flex-direction: row; gap: 10px; align-items: center; margin-top: 0.75rem"
-    >
-      {{ t("dashboard.goTo") }}
+    <div style="margin-top: 0.75rem">
       <OToggleGroup
         :model-value="drilldownData.type"
+        :label="t('dashboard.goTo')"
         @update:model-value="(v) => v && changeTypeOfDrilldown(String(v))"
       >
         <OToggleGroupItem
           value="byDashboard"
           size="sm"
-          data-test="dashboard-drilldown-by-dashboard-btn"
           icon-left="dashboard"
+          data-test="dashboard-drilldown-by-dashboard-btn"
         >
           {{ t("menu.dashboard") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="byUrl"
           size="sm"
-          data-test="dashboard-drilldown-by-url-btn"
           icon-left="link"
+          data-test="dashboard-drilldown-by-url-btn"
         >
           {{ t("common.url") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="logs"
           size="sm"
-          data-test="dashboard-drilldown-by-logs-btn"
           icon-left="search"
+          data-test="dashboard-drilldown-by-logs-btn"
         >
           {{ t("common.logs") }}
         </OToggleGroupItem>
@@ -75,9 +73,8 @@
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
-        <label>{{ t("dashboard.selectLogsMode") }}</label>
         <OToggleGroup
-          class="tw:ml-2"
+          :label="t('dashboard.selectLogsMode')"
           :model-value="drilldownData.data.logsMode"
           @update:model-value="drilldownData.data.logsMode = $event"
         >
@@ -89,7 +86,7 @@
         v-if="drilldownData.data.logsMode === 'custom'"
         style="margin-top: 10px"
       >
-        <label>{{ t("dashboard.enterCustomQuery") }}</label>
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
@@ -104,7 +101,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        {{ t("dashboard.enterUrl") }}
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <textarea
           style="
             min-width: 100%;
@@ -171,7 +168,7 @@
               align-items: center;
             "
           >
-            <div>{{ t("dashboard.variables") }}</div>
+            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"

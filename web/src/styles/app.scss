@@ -132,7 +132,7 @@ small {
   color: var(--o2-text-caption);
 }
 
-label {
+label:not(.o-input-label) {
   font-size: var(--text-sm);
   color: var(--o2-text-label);
   font-weight: var(--font-normal);
@@ -327,33 +327,29 @@ code {
   transition: transform 0.6s ease;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Form-field label color
-// ═══════════════════════════════════════════════════════════════
-// `.o-input-label` is applied by OInput / OTextarea / OSelect / OCombobox.
-// Use hardcoded hex per theme — the `--color-text-primary` token was
-// resolving to a muted grey at consumer sites (likely cascade conflict),
-// so this is the authoritative source of label color across the app.
-// Form-field labels — bold + dark high-contrast color in both modes.
-// Inline `tw:text-[15px] tw:font-bold` classes on each component set the
-// font weight/size; this rule supplies the color and acts as the single
-// shared CSS hook (.o-input-label) so consumers can target labels globally.
+// Form-field label — shared by OInput / OTextarea / OSelect / OCombobox /
+// OCheckbox / ORadio / OSwitch / OOptionGroup / OToggleGroup.
 .o-input-label {
-  color: #171717;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #262626;
 }
 html.dark .o-input-label,
 body.body--dark .o-input-label {
-  color: #fafafa;
+  color: #e5e5e5;
 }
 
-/* Disabled label — same weight + size, just mute the color so users can
-   tell at a glance which fields are disabled vs enabled. */
+// Disabled label — lighter color + lighter weight so disabled fields are
+// visibly distinct from enabled ones without becoming unreadable.
 .o-input-label--disabled {
-  color: #737373 !important;
+  color: #a3a3a3 !important;
+  font-weight: 500 !important;
 }
 html.dark .o-input-label--disabled,
 body.body--dark .o-input-label--disabled {
-  color: #737373 !important;
+  color: #c4c4c4 !important;
+  font-weight: 500 !important;
 }
 
 
@@ -452,6 +448,18 @@ textarea:disabled {
 // Dark mode:  translucent red so the hover signal reads against the dark
 //             surface without blinding. Same red hue, low alpha.
 // ═══════════════════════════════════════════════════════════════
+
+// When a destructive icon is inside a destructive-variant button, it should
+// inherit the parent's color so the icon, text and border all read as a
+// single hue. We scope by `data-o2-variant` so neutral/ghost buttons (e.g.
+// IAM table row delete-action icons that rely on the icon itself signaling
+// destructive intent) keep their forced red.
+[data-o2-variant="destructive"] [data-destructive-icon="true"],
+[data-o2-variant="outline-destructive"] [data-destructive-icon="true"],
+[data-o2-variant="ghost-destructive"] [data-destructive-icon="true"] {
+  color: inherit !important;
+}
+
 button:has([data-destructive-icon="true"]):hover,
 a:has([data-destructive-icon="true"]):hover,
 [role="button"]:has([data-destructive-icon="true"]):hover {

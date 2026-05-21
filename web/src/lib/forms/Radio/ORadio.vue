@@ -100,13 +100,10 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       />
     </RadioGroupItem>
 
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         (font-bold, dark text, muted when disabled) so labels across all
-         form components read consistently. -->
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none',
+        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
         props.disabled && 'o-input-label--disabled',
       ]"
     >
