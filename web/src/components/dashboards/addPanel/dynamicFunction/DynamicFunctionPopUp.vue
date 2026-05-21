@@ -4,10 +4,10 @@
     :class="
       !customQuery && !fields.isDerived
         ? 'tw:flex tw:gap-2'
-        : 'tw:flex tw:flex-col tw:gap-2'
+        : 'tw:flex tw:flex-col tw:gap-y-2'
     "
   >
-    <div style="width: auto; padding-right: 12px; padding-top: 12px">
+    <div style="width: auto;">
       <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
