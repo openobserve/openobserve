@@ -36,6 +36,10 @@ vi.mock("@/services/service_streams", () => ({
   },
 }));
 
+vi.mock("@/aws-exports", () => ({
+  default: { isEnterprise: "true", isCloud: "false" },
+}));
+
 import { loadIdentityConfig } from "@/utils/identityConfig";
 import serviceStreamsApi from "@/services/service_streams";
 
