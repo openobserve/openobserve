@@ -297,44 +297,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
                       class="tw:ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                      size="icon-circle-sm"
+                      size="icon-sm"
+                      :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                       :title="
                         row.enabled
                           ? t('alerts.pause')
                           : t('alerts.start')
                       "
                       @click.stop="toggleAlertState(row)"
-                    >
-                      <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
-                    </OButton>
+                    />
                     <OButton
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="icon-sm"
+                      icon-left="edit"
                       :title="t('alerts.edit')"
                       @click.stop="editAlert(row)"
-                    >
-                      <OIcon name="edit" size="sm" />
-                    </OButton>
+                    />
                     <OButton
                       :title="t('alerts.clone')"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="icon-sm"
+                      icon-left="content-copy"
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
-                    >
-                      <OIcon name="content-copy" size="sm" />
-                    </OButton>
+                    />
                     <ODropdown>
                       <template #trigger>
                         <OButton
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="icon-sm"
+                          icon-left="more-vert"
                           @click.stop="openMenu($event, row)"
                           :data-test="`alert-list-${row.name}-more-options`"
-                        >
-                          <OIcon name="more-vert" size="sm" />
-                        </OButton>
+                        />
                       </template>
                       <ODropdownItem @select="moveAlertToAnotherFolder(row)">
                         <template #icon-left>

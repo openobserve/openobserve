@@ -128,21 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
-              size="icon-circle-sm"
+              size="icon-sm"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
             ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
-              size="icon-circle-sm"
+              size="icon-sm"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
             ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
-              size="icon-circle-sm"
+              size="icon-sm"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
             ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
@@ -707,6 +707,5 @@ body.body--dark {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
 }
 </style>

@@ -31,6 +31,7 @@ import {
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   computed,
+  inject,
   nextTick,
   onBeforeUnmount,
   provide,
@@ -41,6 +42,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
+import { O_DROPDOWN_NESTED_KEY } from "@/lib/overlay/Dropdown/ODropdown.context";
 
 type NormalizedOption = {
   label: string;
@@ -554,6 +556,30 @@ const selectOpen = ref(false);
 const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
+
+// When this OSelect is nested inside an ODropdown, signal its
+// open/close so the parent ignores the pointer event that closes us.
+const parentDropdownRegistry = inject<{ open: () => () => void } | null>(
+  O_DROPDOWN_NESTED_KEY,
+  null,
+);
+let closeNestedRegistration: (() => void) | null = null;
+
+watch(isOpen, (open) => {
+  if (!parentDropdownRegistry) return;
+  if (open && !closeNestedRegistration) {
+    closeNestedRegistration = parentDropdownRegistry.open();
+  } else if (!open && closeNestedRegistration) {
+    closeNestedRegistration();
+    closeNestedRegistration = null;
+  }
+});
+onBeforeUnmount(() => {
+  if (closeNestedRegistration) {
+    closeNestedRegistration();
+    closeNestedRegistration = null;
+  }
+});
 
 // ── Chip overflow (width-aware) ──────────────────────────────────────────
 // In multi-select mode, fit as many chips as the trigger width allows; the
@@ -1245,6 +1271,8 @@ const fieldWidthClass = computed(() => {
             'tw:data-[side=top]:slide-in-from-bottom-2',
           ]"
           :style="dropdownStyle"
+          @click.stop
+          @pointerdown.stop
         >
           <SelectScrollUpButton
             class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"

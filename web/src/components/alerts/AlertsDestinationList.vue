@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="destination-export"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 title="Export Destination"
                 @click.stop="exportDestination(row)"
               >
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(row)"
               >

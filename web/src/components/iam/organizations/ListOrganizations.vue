@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="organization-name-edit"
             variant="ghost"
-            size="icon-circle-sm"
+            size="icon-sm"
             :title="'Edit'"
             @click="renameOrganization(row)"
           >
@@ -214,12 +214,12 @@ export default defineComponent({
     );
 
     onMounted(() => {
+      // Only `action=update` deep-links auto-open the dialog so a shared
+      // edit URL still lands directly on the org's edit form. `action=add`
+      // is intentionally NOT handled here — the dialog only opens via the
+      // "Add Organization" button click; refreshing on an `action=add` URL
+      // should leave the user on the list view.
       if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
         router.currentRoute.value.query.action == "update"
       ) {
         showAddOrganizationDialog.value = true;

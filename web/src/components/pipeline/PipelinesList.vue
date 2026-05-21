@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :data-test="`pipeline-list-${row.name}-pause-start-alert`"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-xs-sq"
+                  size="icon-sm"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   @click.stop="togglePipeline(row)"
@@ -182,20 +182,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :data-test="`pipeline-list-${row.name}-update-pipeline`"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="icon-sm"
                   @click.stop="editPipeline(row)"
                   icon-left="edit"
                 />
                 <OButton
                   :data-test="`pipeline-list-${row.name}-view-pipeline`"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="icon-sm"
                   :title="t('pipeline.view')"
                   icon-left="visibility"
                 >
-                  <template #icon-left>
-                    <OIcon name="visibility" size="sm" />
-                  </template>
                   <OTooltip>
                     <template #content
                       ><PipelineView :pipeline="row"
@@ -206,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="icon-sm"
                       @click.stop
                       :data-test="`pipeline-list-${row.name}-more-options`"
                       icon-left="more-vert"

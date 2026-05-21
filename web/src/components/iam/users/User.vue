@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedUserIds"
           :global-filter="filterQuery"
           pagination="client"
-          :page-size="20"
+          :page-size="500"
           :page-size-options="[20, 50, 100, 250, 500]"
           :footer-title="t('iam.basicUsers')"
           sorting="client"
@@ -81,6 +81,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <NoData />
           </template>
+
+          <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
+          <template #cell-auth="{ row }">
+            <OBadge
+              v-if="row.auth_type"
+              :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
+              size="sm"
+              class="o2-role-chip"
+            >
+              {{ row.auth_type }}
+            </OBadge>
+          </template>
+
+          <!-- Roles badges — yellow outline for built-in, red outline for custom.
+               Built-in role names are displayed capitalised (Admin/Viewer/User),
+               custom role names keep their original casing (nmcdev/admin/etc.). -->
+          <template #cell-roles="{ row }">
+            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
+              <OBadge
+                v-for="(roleName, idx) in (row.roles || [])"
+                :key="`${roleName}-${idx}`"
+                :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
+                size="md"
+                class="o2-role-chip"
+              >
+                {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
+              </OBadge>
+            </div>
+          </template>
+
           <template #cell-actions="{ row }">
             <OButton
               v-if="row.enableDelete && row.status != 'pending'"
@@ -114,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ rows.length }} {{ t('iam.basicUsers') }}</span>
+            <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -191,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -227,6 +258,7 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    OBadge,
     OIcon,
     ODialog,
     OInput,
@@ -302,11 +334,14 @@ export default defineComponent({
 
       updateUserActions();
 
-      // Handle deep-linked / refreshed URL
+      // Handle deep-linked / refreshed URL.
+      // Only `action=update&email=…` auto-opens the dialog so a shared edit
+      // link still lands directly on the user's edit form. `action=add` is
+      // intentionally NOT handled here — the dialog only opens via the
+      // "New user" button click; refreshing on an `action=add` URL should
+      // leave the user on the list view, not pop a dialog on load.
       const query = router.currentRoute.value.query;
-      if (query.action === "add") {
-        addUser({}, false);
-      } else if (query.action === "update" && query.email) {
+      if (query.action === "update" && query.email) {
         const match = usersState.users.find(
           (m: any) => m.email === query.email,
         );
@@ -314,48 +349,68 @@ export default defineComponent({
       }
     });
 
-    const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorFn: (row: any) => row["#"],
-        size: 40,
-        minSize: 32,
-        maxSize: 50,
-        meta: { compactPadding: true, align: "left" },
-      },
-      {
-        id: "email",
-        header: t("user.email"),
-        accessorKey: "email",
+    const isEnterpriseOrCloud =
+      config.isEnterprise === "true" || config.isCloud === "true";
+
+    const columns = computed<OTableColumnDef[]>(() => {
+      const cols: OTableColumnDef[] = [
+        {
+          id: "#",
+          header: "#",
+          accessorFn: (row: any) => row["#"],
+          size: 40,
+          minSize: 32,
+          maxSize: 50,
+          meta: { compactPadding: true, align: "left" },
+        },
+        {
+          id: "email",
+          header: t("user.email"),
+          accessorKey: "email",
+          sortable: true,
+          meta: { align: "left", autoWidth: true },
+        },
+        {
+          id: "first_name",
+          header: t("user.firstName"),
+          accessorKey: "first_name",
+          sortable: true,
+          size: 150,
+          meta: { align: "left" },
+        },
+        {
+          id: "last_name",
+          header: t("user.lastName"),
+          accessorKey: "last_name",
+          sortable: true,
+          size: 150,
+          meta: { align: "left" },
+        },
+      ];
+
+      // Auth column — only meaningful in enterprise/cloud where SSO/LDAP is in play
+      if (isEnterpriseOrCloud) {
+        cols.push({
+          id: "auth",
+          header: "Auth",
+          accessorKey: "auth_type",
+          sortable: true,
+          size: 120,
+          meta: { align: "left" },
+        });
+      }
+
+      // Roles column — array of role chips in enterprise/cloud, single role string otherwise
+      cols.push({
+        id: isEnterpriseOrCloud ? "roles" : "role",
+        header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
+        accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
-      },
-      {
-        id: "first_name",
-        header: t("user.firstName"),
-        accessorKey: "first_name",
-        sortable: true,
-        size: 150,
+        size: 220,
         meta: { align: "left" },
-      },
-      {
-        id: "last_name",
-        header: t("user.lastName"),
-        accessorKey: "last_name",
-        sortable: true,
-        size: 150,
-        meta: { align: "left" },
-      },
-      {
-        id: "role",
-        header: t("user.role"),
-        accessorKey: "role",
-        sortable: true,
-        size: 150,
-        meta: { align: "left" },
-      },
-      {
+      });
+
+      cols.push({
         id: "actions",
         header: t("user.actions"),
         isAction: true,
@@ -364,8 +419,24 @@ export default defineComponent({
         minSize: 80,
         maxSize: 140,
         meta: { align: "center" },
-      },
-    ];
+      });
+
+      return cols;
+    });
+
+    // Built-in role names get the muted (yellow) outline badge; anything else
+    // is treated as a custom role and gets the destructive (red) outline badge.
+    const BUILTIN_ROLES = new Set([
+      "admin",
+      "viewer",
+      "user",
+      "root",
+      "member",
+      "editor",
+      "serviceaccount",
+    ]);
+    const isBuiltinRole = (r: string) =>
+      BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
     const options = ref([]);
     const customRoles = ref([]);
@@ -449,12 +520,38 @@ export default defineComponent({
                 addUser({ row: data }, true);
               }
 
+              // Normalise roles to an array. Enterprise APIs surface roles in
+              // various shapes — pull from every plausible field and dedupe.
+              const rolesSet = new Set<string>();
+              if (data?.role) rolesSet.add(String(data.role));
+              if (Array.isArray(data?.roles)) {
+                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+              }
+              if (Array.isArray(data?.custom_roles)) {
+                data.custom_roles.forEach(
+                  (r: any) => r && rolesSet.add(String(r)),
+                );
+              }
+              if (Array.isArray(data?.assigned_roles)) {
+                data.assigned_roles.forEach(
+                  (r: any) => r && rolesSet.add(String(r)),
+                );
+              }
+              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
+
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                roles: rolesArr,
+                auth_type: data?.auth_type
+                  ? data.auth_type
+                  : data?.is_external
+                    ? "SSO"
+                    : "Native",
+                is_external: !!data?.is_external,
                 enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
@@ -466,7 +563,51 @@ export default defineComponent({
             tableKey.value++;
             dismiss();
 
+            // Resolve immediately so the caller (onBeforeMount) can run
+            // updateUserActions() and surface the row action buttons without
+            // waiting on the per-user role fetch below.
             resolve(true);
+
+            // Enterprise/cloud: the org-members API only returns a single
+            // `role` per user, so users with multiple role assignments
+            // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
+            // full per-user role list in the background — fire-and-forget —
+            // and re-render the rows when each fetch completes. This keeps
+            // the table responsive instead of blocking the whole UI on the
+            // role API.
+            if (isEnterpriseOrCloud) {
+              const orgId = store.state.selectedOrganization.identifier;
+              const realUsers = usersState.users.filter(
+                (u: any) => u.email && u.status !== "pending",
+              );
+              // Don't await — let the role fetches run in the background.
+              Promise.allSettled(
+                realUsers.map(async (u: any) => {
+                  try {
+                    const resp: any = await usersService.getUserRoles(
+                      orgId,
+                      u.email,
+                    );
+                    const fetched: string[] = Array.isArray(resp?.data)
+                      ? resp.data.filter(Boolean).map(String)
+                      : [];
+                    if (fetched.length) {
+                      const merged = new Set<string>([
+                        ...(u.roles || []),
+                        ...fetched,
+                      ]);
+                      u.roles = Array.from(merged);
+                    }
+                  } catch {
+                    // Per-user role fetch failures are non-fatal — fall back
+                    // to whatever role string came with the org-members row.
+                  }
+                }),
+              ).then(() => {
+                rows.value = [...usersState.users];
+                tableKey.value++;
+              });
+            }
           })
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
@@ -956,6 +1097,9 @@ export default defineComponent({
       router,
       store,
       config,
+      isEnterpriseOrCloud,
+      isBuiltinRole,
+      toCamelCase,
       usersState,
       columns,
       orgData,
@@ -1015,6 +1159,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
+/* Role chip — matches the incident "dimension-badge" sizing so role pills
+   read consistently across the app (2px 8px padding, 11px font, weight 600). */
+:deep(.o2-role-chip) {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  line-height: 1.4;
+}
 
 .iconHoverBtn {
   cursor: pointer !important;

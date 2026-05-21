@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Export Template"
             class="tw:ml-1"
             variant="ghost"
-            size="icon-circle-sm"
+            size="icon-sm"
             @click.stop="exportTemplate(row)"
             data-test="destination-export"
           >
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`alert-template-list-${row.name}-update-template`"
             class="tw:ml-1"
             variant="ghost"
-            size="icon-circle-sm"
+            size="icon-sm"
             :title="t('alert_templates.edit')"
             @click="editTemplate(row)"
           >
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`alert-template-list-${row.name}-delete-template`"
             class="tw:ml-1"
             variant="ghost"
-            size="icon-circle-sm"
+            size="icon-sm"
             :title="t('alert_templates.delete')"
             @click="conformDeleteDestination(row)"
           >

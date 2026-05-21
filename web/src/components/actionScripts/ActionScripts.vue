@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`alert-list-${row.name}-update-alert`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('alerts.edit')"
                 @click="showAddUpdateFn({ row })"
                 ><OIcon name="edit" size="sm"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`alert-list-${row.name}-delete-alert`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('alerts.delete')"
                 @click="showDeleteDialogFn({ row })"
                 ><OIcon name="delete" size="sm"

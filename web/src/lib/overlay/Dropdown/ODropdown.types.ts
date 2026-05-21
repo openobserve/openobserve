@@ -31,6 +31,22 @@ export interface DropdownProps {
   align?: DropdownAlign;
   /** Pixel offset from the trigger */
   sideOffset?: DropdownMenuContentProps["sideOffset"];
+  /**
+   * Outside-click persistence. Controls how many outside-click events must
+   * happen before this dropdown actually dismisses:
+   *
+   *   false (default) — close immediately on the first outside click
+   *   true            — never close on outside click (only via trigger / Esc / programmatic)
+   *   number  N >= 1  — require N outside clicks to close
+   *
+   * Use a number when the dropdown contains nested popups (e.g. an OSelect)
+   * and you want each outer-click to peel one layer at a time:
+   *   <ODropdown :persistent="2">  ←  outer dropdown
+   *     <OSelect />                ←  nested popup
+   *   </ODropdown>
+   * First click closes the OSelect; second click closes the ODropdown.
+   */
+  persistent?: boolean | number;
 }
 
 export interface DropdownEmits {

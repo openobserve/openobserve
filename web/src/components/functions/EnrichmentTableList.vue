@@ -172,13 +172,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #cell-actions="{ row }">
-                <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
+                <div class="tw:flex tw:items-center tw:justify-center">
                   <OButton
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
                     :data-test="`${row.name}-explore-btn`"
                     :title="t('logStream.explore')"
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
                   />
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
                     :title="t('logStream.schemaHeader')"
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
                   />
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
                     :title="t('function.enrichmentTables')"
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
                   />
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :title="t('function.delete')"
                     variant="ghost-destructive"
-                    size="icon-circle-sm"
+                    size="icon-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
                   />

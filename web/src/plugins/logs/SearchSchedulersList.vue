@@ -68,51 +68,47 @@
               <OButton
                 data-test="search-scheduler-cancel-btn"
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
+                icon-left="cancel"
                 :title="t('search_scheduler_job.cancel')"
                 :disabled="
                   row.status_code !== 0 &&
                   row.status_code !== 1
                 "
                 @click="confirmCancelJob(row)"
-              >
-                <OIcon name="cancel" size="xs" />
-              </OButton>
+              />
 
               <OButton
                 data-test="search-scheduler-delete-btn"
                 variant="ghost-destructive"
-                size="icon"
+                size="icon-sm"
+                icon-left="delete"
                 :title="t('search_scheduler_job.delete')"
                 @click="confirmDeleteJob(row)"
-              >
-                <OIcon name="delete" size="xs" />
-              </OButton>
+              />
               <OButton
                 data-test="search-scheduler-restart-btn"
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
+                icon-left="refresh"
                 :title="t('search_scheduler_job.restart')"
                 :disabled="
                   row.status_code !== 2 &&
                   row.status_code !== 3
                 "
                 @click="retrySearchJob(row)"
-              >
-                <OIcon name="refresh" size="xs" />
-              </OButton>
+              />
               <OButton
                 data-test="search-scheduler-explore-btn"
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
+                icon-left="search"
                 :title="t('search_scheduler_job.explore')"
                 :disabled="
                   row.status_code == 0 || row.status_code == 3
                 "
                 @click="fetchSearchResults(row)"
-              >
-                <OIcon name="search" size="xs" />
-              </OButton>
+              />
             </template>
             <template #expansion="{ row }">
               <div class="app-tabs-schedule-list report-list-tabs">

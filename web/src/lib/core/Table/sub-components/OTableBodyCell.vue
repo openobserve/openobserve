@@ -187,7 +187,9 @@ function handleClick() {
         ? 'tw:break-words tw:whitespace-normal'
         : horizontalScroll?.value
           ? 'tw:whitespace-nowrap'
-          : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+          : isAction
+            ? 'tw:whitespace-nowrap'
+            : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
       isTreeColumn ? 'o2-tree-cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',

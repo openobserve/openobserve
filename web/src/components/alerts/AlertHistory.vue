@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               variant="ghost"
-              size="icon-circle-sm"
+              size="icon-sm"
               icon-left="visibility"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.error"
               :data-test="`pipeline-list-${row.name}-error-indicator`"
               variant="ghost-destructive"
-              size="icon-circle-sm"
+              size="icon-sm"
               icon-left="error"
               @click.stop="showErrorDialog(row)"
             >

@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('common.edit')"
                 @click="editGroup(row)"
               >
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-sm"
                 :title="t('common.delete')"
                 @click="showConfirmDialog(row)"
               >
