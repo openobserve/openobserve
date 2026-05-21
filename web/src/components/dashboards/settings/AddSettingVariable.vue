@@ -263,18 +263,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'Is Not Null',
                       ]"
                     />
-                    <CommonAutoComplete
+                    <OCombobox
                       v-if="
                         !['Is Null', 'Is Not Null'].includes(filter.operator)
                       "
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
-                      searchRegex="(?:^|[^$])\$?(\w+)"
-                      debounce="1000"
+                      search-regex="(?:^|[^$])\$?(\w+)"
+                      :debounce="1000"
                       class="tw:flex-[2] tw:min-w-0"
-                      style="margin-top: 0 !important; padding-bottom: 0 !important;"
                       placeholder="Enter Value"
-                    ></CommonAutoComplete>
+                    />
                     <OButton
                       variant="ghost"
                       size="icon"
@@ -578,13 +577,13 @@ import {
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip, OForm,
+  components: { DashboardHeader, OCombobox, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip, OForm,
     OIcon,
 },
   emits: ["close", "save"],

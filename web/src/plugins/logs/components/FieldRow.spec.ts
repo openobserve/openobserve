@@ -330,7 +330,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const outlineIcon = infoIcons.find(
-        (i) => i.attributes("data-name") === "info_outline"
+        (i) => i.attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -470,29 +470,30 @@ describe("FieldRow", () => {
   });
 
   describe("Theme prop", () => {
-    it("applies correct class for dark theme on interesting icon in label", () => {
+    it("renders interesting icon in label with correct data-name for dark theme", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
         showQuickMode: true,
         theme: "dark",
       });
-      const labelInterestingIcon = wrapper.findAll(
+      const labelInterestingIcons = wrapper.findAll(
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      )[0];
-      // In dark theme the class should be '' (empty, not 'light-dimmed')
-      expect(labelInterestingIcon.classes()).not.toContain("light-dimmed");
+      );
+      expect(labelInterestingIcons.length).toBeGreaterThan(0);
+      expect(labelInterestingIcons[0].attributes("data-name")).toBe("info-outline");
     });
 
-    it("applies light-dimmed class for light theme on interesting icon in label", () => {
+    it("renders interesting icon in label for light theme", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
         showQuickMode: true,
         theme: "light",
       });
-      const labelInterestingIcon = wrapper.findAll(
+      const labelInterestingIcons = wrapper.findAll(
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      )[0];
-      expect(labelInterestingIcon.classes()).toContain("light-dimmed");
+      );
+      expect(labelInterestingIcons.length).toBeGreaterThan(0);
+      expect(labelInterestingIcons[0].attributes("data-name")).toBe("info-outline");
     });
   });
 

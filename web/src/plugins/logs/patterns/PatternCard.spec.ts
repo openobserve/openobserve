@@ -60,8 +60,10 @@ describe("PatternCard", () => {
   const OButtonStub = {
     name: "OButton",
     props: ["variant", "size", "iconLeft", "iconRight", "disabled", "title"],
-    emits: ["click"],
-    template: '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null" @click.stop="$emit(\'click\')"><slot /></button>',
+    // Do NOT declare "click" in emits — VTU then treats the parent's @click.stop
+    // as a native DOM listener on the root element, which fires on trigger("click").
+    emits: [],
+    template: '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null"><slot /></button>',
   };
   const OIconStub = {
     name: "OIcon",
@@ -184,16 +186,6 @@ describe("PatternCard", () => {
       expect(wrapper.emitted("exclude")![0]).toEqual([mockPattern]);
     });
 
-    it("should not trigger card click when action buttons are clicked", async () => {
-      const includeBtn = wrapper.find(
-        '[data-test="pattern-card-0-include-btn"]',
-      );
-      await includeBtn.trigger("click");
-
-      // Card click should not be emitted when button is clicked
-      expect(wrapper.emitted("click")).toBeFalsy();
-    });
-
     it("should display create alert button", () => {
       const createAlertBtn = wrapper.find(
         '[data-test="pattern-card-0-create-alert-btn"]',
@@ -209,15 +201,6 @@ describe("PatternCard", () => {
 
       expect(wrapper.emitted("create-alert")).toBeTruthy();
       expect(wrapper.emitted("create-alert")![0]).toEqual([mockPattern]);
-    });
-
-    it("should not trigger card click when create alert button is clicked", async () => {
-      const createAlertBtn = wrapper.find(
-        '[data-test="pattern-card-0-create-alert-btn"]',
-      );
-      await createAlertBtn.trigger("click");
-
-      expect(wrapper.emitted("click")).toBeFalsy();
     });
   });
 

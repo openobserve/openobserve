@@ -69,10 +69,15 @@ const OTableStub = {
   props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter"],
   template: `
     <table data-test-stub="o-table">
+      <thead>
+        <tr>
+          <th v-for="col in (columns || [])" :key="col.id">{{ col.header }}</th>
+        </tr>
+      </thead>
       <tbody>
         <tr v-for="(row, i) in (data || [])" :key="i">
-          <slot name="cell-name" :row="row" />
-          <slot name="cell-type" :row="row" />
+          <td><slot name="cell-name" :row="row" /></td>
+          <td><slot name="cell-type" :row="row" /></td>
         </tr>
       </tbody>
     </table>

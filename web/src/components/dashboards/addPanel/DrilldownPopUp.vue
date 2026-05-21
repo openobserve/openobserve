@@ -38,35 +38,33 @@
       @update:model-value="nameError = ''"
       data-test="dashboard-config-panel-drilldown-name"
     />
-    <div
-      style="display: flex; flex-direction: row; gap: 10px; align-items: center; margin-top: 0.75rem"
-    >
-      {{ t("dashboard.goTo") }}
+    <div style="margin-top: 0.75rem">
       <OToggleGroup
         :model-value="drilldownData.type"
+        :label="t('dashboard.goTo')"
         @update:model-value="(v) => v && changeTypeOfDrilldown(String(v))"
       >
         <OToggleGroupItem
           value="byDashboard"
           size="sm"
-          data-test="dashboard-drilldown-by-dashboard-btn"
           icon-left="dashboard"
+          data-test="dashboard-drilldown-by-dashboard-btn"
         >
           {{ t("menu.dashboard") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="byUrl"
           size="sm"
-          data-test="dashboard-drilldown-by-url-btn"
           icon-left="link"
+          data-test="dashboard-drilldown-by-url-btn"
         >
           {{ t("common.url") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="logs"
           size="sm"
-          data-test="dashboard-drilldown-by-logs-btn"
           icon-left="search"
+          data-test="dashboard-drilldown-by-logs-btn"
         >
           {{ t("common.logs") }}
         </OToggleGroupItem>
@@ -75,9 +73,8 @@
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
-        <label>{{ t("dashboard.selectLogsMode") }}</label>
         <OToggleGroup
-          class="tw:ml-2"
+          :label="t('dashboard.selectLogsMode')"
           :model-value="drilldownData.data.logsMode"
           @update:model-value="drilldownData.data.logsMode = $event"
         >
@@ -89,7 +86,7 @@
         v-if="drilldownData.data.logsMode === 'custom'"
         style="margin-top: 10px"
       >
-        <label>{{ t("dashboard.enterCustomQuery") }}</label>
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
@@ -104,7 +101,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        {{ t("dashboard.enterUrl") }}
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <textarea
           style="
             min-width: 100%;
@@ -171,7 +168,7 @@
               align-items: center;
             "
           >
-            <div>{{ t("dashboard.variables") }}</div>
+            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"
@@ -196,22 +193,18 @@
               style="display: flex; gap: 10px; margin-bottom: 10px"
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
-              <CommonAutoComplete
+              <OCombobox
                 :placeholder="t('dashboard.name')"
                 v-model="variable.name"
-                searchRegex="(.*)"
+                search-regex="(.*)"
                 :items="variableNamesFn"
-                style="width: auto !important; padding-top: 3px !important"
-              >
-              </CommonAutoComplete>
-              <CommonAutoComplete
+              />
+              <OCombobox
                 :placeholder="t('panel.value')"
-                searchRegex="(.*)"
+                search-regex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
-                style="width: auto !important; padding-top: 3px !important"
-              >
-              </CommonAutoComplete>
+              />
 
               <OIcon
                 class="tw:mr-1"
@@ -269,7 +262,7 @@ import {
 import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -288,7 +281,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     DrilldownUserGuide,
-    CommonAutoComplete,
+    OCombobox,
     QueryEditor,
     OButton,
     OInput,

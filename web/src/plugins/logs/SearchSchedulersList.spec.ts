@@ -55,8 +55,11 @@ vi.mock("vue-router", () => ({
   })
 }));
 
-// Mock Toast
-const mockToast = vi.fn();
+// Mock Toast — vi.hoisted runs before hoisted vi.mock factories, avoiding TDZ errors
+const { mockToast } = vi.hoisted(() => {
+  const mockToast = vi.fn();
+  return { mockToast };
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
@@ -164,7 +167,7 @@ describe("SearchSchedulersList Component", () => {
     it("should initialize with correct default data", () => {
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
       expect(wrapper.vm.columnsToBeRendered).toEqual([]);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
       expect(wrapper.vm.showSearchResults).toBe(false);
       expect(wrapper.vm.confirmDelete).toBe(false);
@@ -172,21 +175,12 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.activeTab).toBe("query");
     });
 
-    it("should initialize pagination correctly", () => {
-      expect(wrapper.vm.pagination.page).toBe(1);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(100);
-      expect(wrapper.vm.selectedPerPage).toBe(100);
+    it("should initialize pageSize correctly", () => {
+      expect(wrapper.vm.pageSize).toBe(100);
     });
 
-    it("should initialize perPageOptions correctly", () => {
-      expect(wrapper.vm.perPageOptions).toEqual([
-        { label: "5", value: 5 },
-        { label: "10", value: 10 },
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-        { label: "All", value: 0 }
-      ]);
+    it("should initialize pageSizeOptions correctly", () => {
+      expect(wrapper.vm.pageSizeOptions).toEqual([5, 10, 20, 50, 100]);
     });
 
     it("should initialize tabs correctly", () => {
@@ -233,57 +227,49 @@ describe("SearchSchedulersList Component", () => {
     it("should generate correct columns for data", () => {
       const mockData = [{ id: "1", user_id: "test" }];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      expect(columns).toHaveLength(7);
+
+      expect(columns).toHaveLength(6);
       expect(columns[0]).toMatchObject({
-        name: "#",
-        label: "#",
-        align: "left",
-        sortable: false
+        id: "user_id",
+        accessorKey: "user_id",
+        sortable: true,
+        size: 200,
       });
     });
 
     it("should set correct alignment for different columns", () => {
-      const mockData = [{ 
-        user_id: "test", 
-        Actions: "delete", 
+      const mockData = [{
+        user_id: "test",
         duration: "1s",
         status: "finished",
-        "#": "1"
       }];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      const userIdColumn = columns.find(col => col.name === "user_id");
-      const actionsColumn = columns.find(col => col.name === "Actions");
-      const durationColumn = columns.find(col => col.name === "duration");
-      const statusColumn = columns.find(col => col.name === "status");
-      const indexColumn = columns.find(col => col.name === "#");
-      
-      expect(userIdColumn.align).toBe("center");
-      expect(actionsColumn.align).toBe("left");
-      expect(durationColumn.align).toBe("left");
-      expect(statusColumn.align).toBe("left");
-      expect(indexColumn.align).toBe("left");
+
+      const userIdColumn = columns.find(col => col.id === "user_id");
+      const actionsColumn = columns.find(col => col.id === "actions");
+      const durationColumn = columns.find(col => col.id === "duration");
+      const statusColumn = columns.find(col => col.id === "status");
+
+      expect(userIdColumn.meta.align).toBe("left");
+      expect(actionsColumn.meta.align).toBe("center");
+      expect(durationColumn.meta.align).toBe("left");
+      expect(statusColumn.meta.align).toBe("left");
     });
 
     it("should set sortable correctly for different columns", () => {
-      const mockData = [{ 
-        user_id: "test", 
-        Actions: "delete", 
+      const mockData = [{
+        user_id: "test",
         status: "finished",
-        "#": "1"
       }];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      const userIdColumn = columns.find(col => col.name === "user_id");
-      const actionsColumn = columns.find(col => col.name === "Actions");
-      const statusColumn = columns.find(col => col.name === "status");
-      const indexColumn = columns.find(col => col.name === "#");
-      
+
+      const userIdColumn = columns.find(col => col.id === "user_id");
+      const actionsColumn = columns.find(col => col.id === "actions");
+      const statusColumn = columns.find(col => col.id === "status");
+
       expect(userIdColumn.sortable).toBe(true);
-      expect(actionsColumn.sortable).toBe(false);
+      expect(actionsColumn.sortable).toBeUndefined();
       expect(statusColumn.sortable).toBe(false);
-      expect(indexColumn.sortable).toBe(false);
     });
   });
 
@@ -459,73 +445,24 @@ describe("SearchSchedulersList Component", () => {
     });
   });
 
-  describe("Sorting Methods", () => {
-    const mockRows = [
-      { user_id: "alice", rawDuration: 10, toBeStoredStartTime: 2000, toBeCreatedAt: 3000 },
-      { user_id: "bob", rawDuration: 5, toBeStoredStartTime: 1000, toBeCreatedAt: 2000 },
-      { user_id: "charlie", rawDuration: 15, toBeStoredStartTime: 3000, toBeCreatedAt: 1000 }
-    ];
+  describe("Sorting Configuration", () => {
+    it("should mark user_id, created_at, and start_time columns as sortable", () => {
+      const mockData = [{ id: "1", user_id: "test" }];
+      const columns = wrapper.vm.generateColumns(mockData);
 
-    it("should sort by user_id ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "user_id", false);
-      expect(result[0].user_id).toBe("alice");
-      expect(result[1].user_id).toBe("bob");
-      expect(result[2].user_id).toBe("charlie");
+      const sortableColumns = columns.filter(col => col.sortable === true);
+      const sortableIds = sortableColumns.map(col => col.id);
+      expect(sortableIds).toEqual(["user_id", "created_at", "start_time"]);
     });
 
-    it("should sort by user_id descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "user_id", true);
-      expect(result[0].user_id).toBe("charlie");
-      expect(result[1].user_id).toBe("bob");
-      expect(result[2].user_id).toBe("alice");
-    });
+    it("should mark duration, status, and actions as non-sortable", () => {
+      const mockData = [{ id: "1", user_id: "test" }];
+      const columns = wrapper.vm.generateColumns(mockData);
 
-    it("should sort by duration ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "duration", false);
-      expect(result[0].rawDuration).toBe(5);
-      expect(result[1].rawDuration).toBe(10);
-      expect(result[2].rawDuration).toBe(15);
-    });
-
-    it("should sort by duration descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "duration", true);
-      expect(result[0].rawDuration).toBe(15);
-      expect(result[1].rawDuration).toBe(10);
-      expect(result[2].rawDuration).toBe(5);
-    });
-
-    it("should sort by start_time ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "start_time", false);
-      expect(result[0].toBeStoredStartTime).toBe(1000);
-      expect(result[1].toBeStoredStartTime).toBe(2000);
-      expect(result[2].toBeStoredStartTime).toBe(3000);
-    });
-
-    it("should sort by start_time descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "start_time", true);
-      expect(result[0].toBeStoredStartTime).toBe(3000);
-      expect(result[1].toBeStoredStartTime).toBe(2000);
-      expect(result[2].toBeStoredStartTime).toBe(1000);
-    });
-
-    it("should sort by created_at ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "created_at", false);
-      expect(result[0].toBeCreatedAt).toBe(1000);
-      expect(result[1].toBeCreatedAt).toBe(2000);
-      expect(result[2].toBeCreatedAt).toBe(3000);
-    });
-
-    it("should sort by created_at descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "created_at", true);
-      expect(result[0].toBeCreatedAt).toBe(3000);
-      expect(result[1].toBeCreatedAt).toBe(2000);
-      expect(result[2].toBeCreatedAt).toBe(1000);
-    });
-
-    it("should not modify original array", () => {
-      const originalLength = mockRows.length;
-      wrapper.vm.sortMethod(mockRows, "user_id", false);
-      expect(mockRows.length).toBe(originalLength);
+      const nonSortableIds = columns
+        .filter(col => col.sortable !== true)
+        .map(col => col.id);
+      expect(nonSortableIds).toEqual(expect.arrayContaining(["duration", "status", "actions"]));
     });
   });
 
@@ -569,52 +506,49 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Expand/Collapse Functionality", () => {
-    it("should expand row when clicked", () => {
-      const mockProps = {
-        row: {
-          trace_id: "test-uuid",
-          start_time: 1000,
-          end_time: 2000
-        }
-      };
-      
-      wrapper.vm.triggerExpand(mockProps);
-      
-      expect(wrapper.vm.expandedRow).toBe("test-uuid");
+    it("should expand row and set query when onExpandedIdsChange is called", () => {
+      wrapper.vm.dataToBeLoaded = [{
+        trace_id: "test-uuid",
+        start_time: 1000,
+        end_time: 2000,
+        started_at: 1500,
+        ended_at: 2500,
+      }];
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
       expect(wrapper.vm.query).toContain("test-uuid");
     });
 
-    it("should collapse row when same row clicked again", () => {
-      const mockProps = {
-        row: {
-          trace_id: "test-uuid",
-          start_time: 1000,
-          end_time: 2000
-        }
-      };
-      
-      // First expand
-      wrapper.vm.triggerExpand(mockProps);
-      expect(wrapper.vm.expandedRow).toBe("test-uuid");
-      
-      // Then collapse
-      wrapper.vm.triggerExpand(mockProps);
-      expect(wrapper.vm.expandedRow).toBe(null);
+    it("should collapse row and clear query when onExpandedIdsChange is called with empty array", () => {
+      wrapper.vm.dataToBeLoaded = [{
+        trace_id: "test-uuid",
+        start_time: 1000,
+        end_time: 2000,
+      }];
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
+
+      wrapper.vm.onExpandedIdsChange([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
+      expect(wrapper.vm.query).toBe("");
     });
 
-    it("should expand different row and collapse previous", () => {
-      const mockProps1 = {
-        row: { trace_id: "uuid-1", start_time: 1000, end_time: 2000 }
-      };
-      const mockProps2 = {
-        row: { trace_id: "uuid-2", start_time: 1000, end_time: 2000 }
-      };
-      
-      wrapper.vm.triggerExpand(mockProps1);
-      expect(wrapper.vm.expandedRow).toBe("uuid-1");
-      
-      wrapper.vm.triggerExpand(mockProps2);
-      expect(wrapper.vm.expandedRow).toBe("uuid-2");
+    it("should expand different row and update query", () => {
+      wrapper.vm.dataToBeLoaded = [
+        { trace_id: "uuid-1", start_time: 1000, end_time: 2000, started_at: 1500, ended_at: 2500 },
+        { trace_id: "uuid-2", start_time: 3000, end_time: 4000, started_at: 3500, ended_at: 4500 },
+      ];
+
+      wrapper.vm.onExpandedIdsChange(["uuid-1"]);
+      expect(wrapper.vm.expandedIds).toEqual(["uuid-1"]);
+      expect(wrapper.vm.query).toContain("uuid-1");
+
+      wrapper.vm.onExpandedIdsChange(["uuid-2"]);
+      expect(wrapper.vm.expandedIds).toEqual(["uuid-2"]);
+      expect(wrapper.vm.query).toContain("uuid-2");
     });
   });
 
@@ -923,7 +857,7 @@ describe("SearchSchedulersList Component", () => {
     it("should have utility functions available", () => {
       expect(typeof wrapper.vm.copyToClipboard).toBe('function');
       expect(typeof wrapper.vm.updateDateTime).toBe('function');
-      expect(typeof wrapper.vm.triggerExpand).toBe('function');
+      expect(typeof wrapper.vm.onExpandedIdsChange).toBe('function');
     });
 
     it("should have loading and result tracking", () => {

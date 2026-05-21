@@ -128,9 +128,9 @@ const globalConfig = {
     ODrawer: ODrawerStub,
     AddFolder: AddFolderStub,
     OButton: OButtonStub,
-    "q-select": {
+    "OSelect": {
       template: `
-        <div class="q-select-stub" :data-disable="String(disable)">
+        <div class="o-select-stub" :data-disable="String(disable)">
           <select
             :value="modelValue"
             @change="$emit('update:modelValue', $event.target.value)"
@@ -185,7 +185,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
 
     it("renders the q-select", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".q-select-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-select-stub").exists()).toBe(true);
     });
   });
 
@@ -238,13 +238,13 @@ describe("InlineSelectFolderDropdown.vue", () => {
 
     it("forwards disable=true to q-select stub", () => {
       wrapper = createWrapper({ disable: true });
-      const select = wrapper.find(".q-select-stub");
+      const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("true");
     });
 
     it("forwards disable=false to q-select stub by default", () => {
       wrapper = createWrapper();
-      const select = wrapper.find(".q-select-stub");
+      const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("false");
     });
   });
@@ -440,7 +440,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
     it("emits 'update:modelValue' when q-select updates", async () => {
       wrapper = createWrapper();
 
-      const select = wrapper.find(".q-select-stub select");
+      const select = wrapper.find(".o-select-stub select");
       // Set the option value, then trigger change
       (select.element as HTMLSelectElement).value = "folder-1";
       await select.trigger("change");
@@ -452,7 +452,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
 
     it("passes the modelValue prop down to q-select", () => {
       wrapper = createWrapper({ modelValue: "folder-2" });
-      const select = wrapper.find(".q-select-stub select");
+      const select = wrapper.find(".o-select-stub select");
       expect((select.element as HTMLSelectElement).value).toBe("folder-2");
     });
   });

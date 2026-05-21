@@ -86,7 +86,7 @@ function createWrapper(props = {}) {
         OCollapsible: {
           name: "OCollapsible",
           template:
-            '<div class="q-expansion-item-stub"><slot name="header" /><slot /></div>',
+            '<div class="q-expansion-item-stub"><slot name="trigger" /><slot /></div>',
           props: ["modelValue", "label", "dense", "hideExpandIcon"],
           emits: ["before-show", "before-hide", "update:modelValue"],
         },
@@ -153,7 +153,7 @@ describe("FieldExpansion", () => {
       // The chevron_right icon is shown when not expanded
       const icons = wrapper.findAll(".OIcon-stub");
       const expandIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron_right"
+        (i) => i.attributes("data-name") === "chevron-right"
       );
       expect(expandIcon).toBeDefined();
     });
@@ -237,7 +237,7 @@ describe("FieldExpansion", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const outlineIcon = icons.find(
-        (i) => i.attributes("data-name") === "info_outline"
+        (i) => i.attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -334,7 +334,7 @@ describe("FieldExpansion", () => {
       // We verify the chevron_right icon is shown (not expanded)
       const icons = wrapper.findAll(".OIcon-stub");
       const chevronIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron_right"
+        (i) => i.attributes("data-name") === "chevron-right"
       );
       expect(chevronIcon).toBeDefined();
     });
@@ -355,12 +355,12 @@ describe("FieldExpansion", () => {
       expect(expandIconSpan.exists()).toBe(true);
     });
 
-    it("does not render expand icon span when field has no dataType", () => {
+    it("renders expand icon span even when field has no dataType", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: undefined },
       });
       const expandIconSpan = wrapper.find(".field-type-container");
-      expect(expandIconSpan.exists()).toBe(false);
+      expect(expandIconSpan.exists()).toBe(true);
     });
   });
 

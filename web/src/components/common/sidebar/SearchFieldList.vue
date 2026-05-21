@@ -62,6 +62,8 @@
               :show-multi-select="!hideIncludeExlcude"
               :default-values-count="defaultValuesCount"
               :theme="store.state.theme"
+              :active-include-values="activeIncludeFilterValues[row.name] ?? []"
+              :active-exclude-values="activeExcludeFilterValues[row.name] ?? []"
               @add-search-term="handleAddSearchTerm"
               @add-multiple-search-terms="handleAddMultipleSearchTerms"
               @remove-field-filter="handleRemoveFieldFilter"
@@ -131,6 +133,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const props = defineProps({
   fields: {
@@ -190,6 +193,85 @@ const defaultValuesCount = computed(
 const showFtsFieldValues = computed(
   () => store.state.zoConfig?.showFtsFieldValues ?? false,
 );
+
+// ─── Derive currently-filtered values from the active query ──────────
+// Mirrors logs IndexList.vue's activeIncludeFilterValues/activeExcludeFilterValues
+// so previously selected checkboxes stay ticked when a field is re-expanded.
+// The query here is a non-SQL flat WHERE string (e.g. `a='x' and b!='y'`); we
+// wrap it as `select * from stream where ${query}` and reuse the SQL AST walker
+// from useLogs so paren'd OR groups (built by handleAddMultipleSearchTerms) are
+// handled correctly.
+
+const { fnParsedSQL } = logsUtils();
+
+const extractColName = (col: any): string | null => {
+  if (typeof col === "string") return col.replace(/^"|"$/g, "");
+  if (col?.expr?.value != null) return String(col.expr.value);
+  return null;
+};
+
+function walkFilters(
+  query: string,
+): { include: Record<string, string[]>; exclude: Record<string, string[]> } {
+  const include: Record<string, string[]> = {};
+  const exclude: Record<string, string[]> = {};
+  if (!query?.trim()) return { include, exclude };
+
+  try {
+    const parsed = fnParsedSQL(`select * from stream where ${query}`);
+    if (!parsed?.where) return { include, exclude };
+
+    const push = (
+      target: Record<string, string[]>,
+      field: string,
+      value: string,
+    ) => {
+      if (!target[field]) target[field] = [];
+      if (!target[field].includes(value)) target[field].push(value);
+    };
+
+    const walk = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "AND" || op === "OR") {
+        walk(node.left);
+        walk(node.right);
+      } else if (op === "=") {
+        if (node.left?.type === "column_ref") {
+          const col = extractColName(node.left.column);
+          if (col && node.right?.value != null) {
+            push(include, col, String(node.right.value));
+          }
+        }
+      } else if (op === "!=" || op === "<>") {
+        if (node.left?.type === "column_ref") {
+          const col = extractColName(node.left.column);
+          if (col && node.right?.value != null) {
+            push(exclude, col, String(node.right.value));
+          }
+        }
+      } else if (op === "IS") {
+        if (node.left?.type === "column_ref") {
+          const col = extractColName(node.left.column);
+          if (col) push(include, col, "");
+        }
+      } else if (op === "IS NOT") {
+        if (node.left?.type === "column_ref") {
+          const col = extractColName(node.left.column);
+          if (col) push(exclude, col, "");
+        }
+      }
+    };
+    walk(parsed.where);
+  } catch {
+    // ignore parse errors — partial/invalid queries just produce empty filters
+  }
+  return { include, exclude };
+}
+
+const parsedFilters = computed(() => walkFilters((props as any).query));
+const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
+const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 
 // Build field items — pass all fields, rendering handles expandable vs non
 const fieldListItems = computed(() => props.fields as any[]);
@@ -274,7 +356,9 @@ function openFilterCreator({ name, ftsKey, stream_name }: any) {
   const resolvedStream = stream_name || props.streamName;
   fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
   expandedRows.value[name] = true;
-  expandedIds.value = [name];
+  if (!expandedIds.value.includes(name)) {
+    expandedIds.value = [...expandedIds.value, name];
+  }
 
   fetchFieldValues({
     fields: [name],

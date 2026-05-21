@@ -244,45 +244,44 @@ describe("PipelineHistory.vue", () => {
     });
   });
 
-  describe("getStatusColor helper", () => {
-    it("should return positive color for success status", () => {
+  describe("getStatusVariant helper", () => {
+    it("should return success-outline variant for success status", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.getStatusColor("success")).toBe("positive");
-      expect(vm.getStatusColor("ok")).toBe("positive");
-      expect(vm.getStatusColor("completed")).toBe("positive");
+      expect(vm.getStatusVariant("success")).toBe("success-outline");
+      expect(vm.getStatusVariant("ok")).toBe("success-outline");
+      expect(vm.getStatusVariant("completed")).toBe("success-outline");
     });
 
-    it("should return negative color for error status", () => {
+    it("should return error-outline variant for error status", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.getStatusColor("error")).toBe("negative");
-      expect(vm.getStatusColor("failed")).toBe("negative");
+      expect(vm.getStatusVariant("error")).toBe("error-outline");
+      expect(vm.getStatusVariant("failed")).toBe("error-outline");
     });
 
-    it("should return warning color for warning status", () => {
+    it("should return warning-outline variant for warning status", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.getStatusColor("warning")).toBe("warning");
+      expect(vm.getStatusVariant("warning")).toBe("warning-outline");
     });
 
-    it("should return info color for pending/running status", () => {
+    it("should return primary-outline variant for pending/running status", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.getStatusColor("pending")).toBe("info");
-      expect(vm.getStatusColor("running")).toBe("info");
+      expect(vm.getStatusVariant("pending")).toBe("primary-outline");
+      expect(vm.getStatusVariant("running")).toBe("primary-outline");
     });
 
-    it("should return theme-based color for unknown status", () => {
+    it("should return default-outline variant for unknown status", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      const color = vm.getStatusColor("unknown");
-      expect(["white", "black"]).toContain(color);
+      expect(vm.getStatusVariant("unknown")).toBe("default-outline");
     });
   });
 
@@ -294,11 +293,11 @@ describe("PipelineHistory.vue", () => {
       expect(vm.columns).toBeDefined();
       expect(Array.isArray(vm.columns)).toBe(true);
 
-      const columnNames = vm.columns.map((col: any) => col.name);
-      expect(columnNames).toContain("pipeline_name");
-      expect(columnNames).toContain("timestamp");
-      expect(columnNames).toContain("status");
-      expect(columnNames).toContain("duration");
+      const columnIds = vm.columns.map((col: any) => col.id);
+      expect(columnIds).toContain("pipeline_name");
+      expect(columnIds).toContain("timestamp");
+      expect(columnIds).toContain("status");
+      expect(columnIds).toContain("duration");
     });
   });
 
@@ -317,9 +316,9 @@ describe("PipelineHistory.vue", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.rowsPerPageOptions).toBeDefined();
-      expect(Array.isArray(vm.rowsPerPageOptions)).toBe(true);
-      expect(vm.rowsPerPageOptions.length).toBeGreaterThan(0);
+      expect(vm.pageSizeOptions).toBeDefined();
+      expect(Array.isArray(vm.pageSizeOptions)).toBe(true);
+      expect(vm.pageSizeOptions.length).toBeGreaterThan(0);
     });
   });
 
@@ -332,10 +331,11 @@ describe("PipelineHistory.vue", () => {
       expect(searchSelect.exists()).toBe(true);
     });
 
-    it("should have search icon prepend", () => {
+    it("should have searchable select for pipeline search", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find(".o2-search-input-icon").exists()).toBe(true);
+      const searchSelect = wrapper.find('[data-test="pipeline-history-search-select"]');
+      expect(searchSelect.exists()).toBe(true);
     });
   });
 

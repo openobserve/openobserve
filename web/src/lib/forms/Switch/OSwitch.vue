@@ -152,13 +152,11 @@ const hasLabel = computed(
       />
     </button>
 
-    <!-- Label — uses the same `o-input-label` styling as OInput/OSelect/etc.
-         so labels across all form components read consistently. -->
     <span
       v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-none tw:flex tw:items-center tw:gap-1',
+        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight tw:flex tw:items-center tw:gap-1',
         disabled && 'o-input-label--disabled',
       ]"
     >

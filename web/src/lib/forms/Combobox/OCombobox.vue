@@ -124,7 +124,7 @@ const hasLabel = computed(
       v-if="hasLabel || $slots.tooltip"
       :for="inputId"
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
+        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
         disabled && 'o-input-label--disabled',
       ]"
     >
@@ -140,9 +140,10 @@ const hasLabel = computed(
 
     <ComboboxRoot
       :model-value="internalValue"
-      :filter-function="() => filteredOptions.map((o) => o.value)"
+      :ignore-filter="true"
+      :open-on-click="true"
+      :open-on-focus="true"
       :disabled="disabled"
-      ignore-diacritics
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="tw:relative tw:flex tw:items-center tw:w-full">
