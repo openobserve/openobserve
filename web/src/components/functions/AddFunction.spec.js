@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import AddFunction, { defaultValue } from "./AddFunction.vue"; // Import defaultValue for prop tests
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { nextTick } from 'vue';
@@ -65,16 +64,6 @@ vi.mock('quasar', async (importOriginal) => {
   };
 });
 
-installQuasar({
-  plugins: [],
-  config: {
-    notify: {},
-    platform: {
-      is: { desktop: true },
-      has: { touch: false }
-    }
-  }
-});
 
 describe("AddFunction Component", () => {
   let wrapper;

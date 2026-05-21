@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
 
@@ -59,9 +58,6 @@ const ODialogStub = defineComponent({
   },
 });
 
-installQuasar({
-  plugins: [],
-});
 
 // Create a persistent mock for router push
 const mockRouterPush = vi.fn();
@@ -111,17 +107,13 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      dark: {
-        isActive: false,
-      },
-    }),
-  };
-});
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    dark: {
+      isActive: false,
+    },
+  }),
+}));
 
 import serviceGraphService from "@/services/service_graph";
 

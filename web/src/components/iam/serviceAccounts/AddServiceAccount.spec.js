@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import * as service_accounts from "@/services/service_accounts";
@@ -38,10 +37,6 @@ const platform = {
   has: { touch: false },
 };
 
-installQuasar({
-  plugins: [],
-  config: { platform },
-});
 
 // ODrawer stub: keeps slot content queryable, surfaces open state and
 // proxies the migration emit so the parent's @update:open wiring is exercised.

@@ -15,8 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "../../test/unit/helpers/install-quasar-plugin";
-import { Mock } from 'vitest';
+import { Mock } from "vitest";
 
 import Index from "@/plugins/logs/Index.vue";
 import i18n from "@/locales";

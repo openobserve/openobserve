@@ -168,13 +168,13 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QSelect: {
-          template: `<div data-test-stub='q-select' :data-test='$attrs["data-test"]'>
+        OSelect: {
+          template: `<div data-test-stub='o-select' :data-test='$attrs["data-test"]'>
             <slot name="prepend"></slot>
             <slot name="option" :opt="{}" v-for="i in 3" :key="i"></slot>
             <slot name="no-option"></slot>
           </div>`,
-          props: ["modelValue", "options", "label", "filled", "dense", "hideSelected"],
+          props: ["modelValue", "options", "label", "inputDebounce", "behavior", "useInput", "hideSelected", "fillInput"],
           emits: ["update:modelValue", "filter"],
         },
         OTable: {
@@ -187,67 +187,42 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
           emits: ["row-click"],
         },
-        QInput: {
-          template: `<input 
-            data-test-stub='q-input' 
+        OInput: {
+          template: `<input
+            data-test-stub='o-input'
             :data-test='$attrs["data-test"]'
             :value='modelValue'
             @input='$emit("update:modelValue", $event.target.value)'
           />`,
-          props: ["modelValue", "placeholder", "filled", "dense", "clearable", "debounce"],
+          props: ["modelValue", "placeholder", "clearable", "debounce"],
           emits: ["update:modelValue"],
         },
-        QIcon: {
-          template: "<span data-test-stub='OIcon' :title='title'></span>",
+        OIcon: {
+          template: "<span data-test-stub='o-icon' :title='title'></span>",
           props: ["name", "size", "title"],
         },
-        QItem: {
-          template: "<div data-test-stub='q-item'><slot></slot></div>",
-          props: ["tag"],
-        },
-        QItemSection: {
-          template: "<div data-test-stub='q-item-section' :title='title'><slot></slot></div>",
-          props: ["avatar", "title"],
-        },
-        QItemLabel: {
-          template: "<div data-test-stub='q-item-label'><slot></slot></div>",
-        },
-        QTr: {
-          template: "<tr data-test-stub='q-tr'><slot></slot></tr>",
-          props: ["props"],
-        },
-        QTd: {
-          template: "<td data-test-stub='q-td'><slot></slot></td>",
-          props: ["props"],
-        },
-        QExpansionItem: {
-          template: `<div data-test-stub='q-expansion-item'>
-            <div @click='$emit("before-show", $event)'><slot name="header"></slot></div>
-            <div><slot></slot></div>
+        OCollapsible: {
+          template: `<div data-test-stub='o-collapsible'>
+            <div @click='$emit("update:modelValue", true)'><slot name="trigger"></slot></div>
+            <div v-if="true"><slot></slot></div>
           </div>`,
-          props: ["dense", "switchToggleSide", "label", "expandIcon", "expandedIcon", "expandIconClass"],
-          emits: ["before-show"],
+          props: ["variant", "modelValue"],
+          emits: ["update:modelValue"],
         },
-        QCard: {
-          template: "<div data-test-stub='q-card'><slot></slot></div>",
+        OInnerLoading: {
+          template: "<div data-test-stub='o-inner-loading' />",
+          props: ["showing", "label", "size"],
         },
-        QCardSection: {
-          template: "<div data-test-stub='q-card-section'><slot></slot></div>",
-        },
-        QList: {
-          template: "<div data-test-stub='q-list'><slot></slot></div>",
-          props: ["dense"],
-        },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
+        OButton: {
+          template: `<button
+            data-test-stub='o-button'
             :data-test='$attrs["data-test"]'
-            @click='$emit("click", $event)'
+            @click.stop='$emit("click", $event)'
             :title='title'
           >
             <slot></slot>
           </button>`,
-          props: ["icon", "size", "round", "title"],
+          props: ["iconLeft", "variant", "size", "title"],
           emits: ["click"],
         },
         EqualIcon: {

@@ -41,6 +41,18 @@ describe("WildcardValuePopover", () => {
     return el;
   };
 
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size"],
+    emits: ["click"],
+    template: '<button :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\')"><slot /></button>',
+  };
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon" />',
+  };
+
   const mountComponent = (overrides: Record<string, unknown> = {}) => {
     return mount(WildcardValuePopover, {
       props: {
@@ -52,6 +64,10 @@ describe("WildcardValuePopover", () => {
       },
       global: {
         plugins: [i18n],
+        stubs: {
+          OButton: OButtonStub,
+          OIcon: OIconStub,
+        },
       },
       attachTo: document.body,
     });

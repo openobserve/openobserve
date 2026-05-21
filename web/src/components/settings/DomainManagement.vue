@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:px-3 tw:py-3 tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
     <div class="tw:mb-6">
-      <div class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1">
+      <div
+        data-test="domain-management-claim-parser-title"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+      >
         {{ t("settings.claimParserFunction") }}
       </div>
       <div class="tw:text-sm tw:text-gray-400 tw:mb-3">
@@ -145,7 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Divider -->
     <OSeparator class="tw:mb-8" />
 
-    <div class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1">
+    <div
+      data-test="domain-management-domain-restrictions-title"
+      class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+    >
       {{ t("settings.domainRestrictionsSubsection") }}
     </div>
     <div class="tw:text-sm tw:text-gray-400 tw:mb-4">
@@ -266,7 +272,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </template>
     </div>
-    <div v-else class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 domain-card">
+    <div
+      v-else
+      data-test="domain-management-no-domain-message"
+      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 domain-card"
+    >
       {{ t("settings.noDomainMessage") }}
     </div>
 

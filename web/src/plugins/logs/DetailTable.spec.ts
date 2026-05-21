@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";
@@ -58,14 +58,17 @@ vi.mock("@/utils/zincutils", async () => {
   };
 });
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
+// Mock Toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
+
+// Mock clipboard utils
+vi.mock("@/utils/clipboard", async () => {
+  const actual = await vi.importActual("@/utils/clipboard");
   return {
     ...actual,
-    copyToClipboard: vi.fn(() => Promise.resolve()),
-    useQuasar: () => ({
-      notify: vi.fn()
-    })
+    copyToClipboard: vi.fn(() => Promise.resolve(true)),
   };
 });
 
@@ -143,42 +146,25 @@ describe("DetailTable Component", () => {
         },
         plugins: [i18n, router],
         stubs: {
-          'q-card': {
-            template: '<div class="q-card" :data-test="$attrs[\'data-test\']"><slot /></div>'
-          },
-          'q-card-section': {
-            template: '<div class="q-card-section"><slot /></div>'
-          },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>'
-          },
-          'q-tabs': {
+          'OTabs': {
             template: '<div class="q-tabs"><slot /></div>',
             props: ['modelValue'],
             emits: ['update:modelValue']
           },
-          'q-tab': {
-            template: '<div class="q-tab" :class="{ \'q-tab--active\': active }" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
+          'OTab': {
+            template: '<div class="q-tab" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
             props: ['name', 'label'],
-            computed: {
-              active() {
-                return this.$parent?.modelValue === this.name;
-              }
-            },
             emits: ['click']
           },
-          'q-tab-panels': {
+          'OTabPanels': {
             template: '<div class="q-tab-panels" :data-test="$attrs[\'data-test\']"><slot /></div>',
             props: ['modelValue']
           },
-          'q-tab-panel': {
-            template: '<div class="q-tab-panel" v-show="name === $parent?.modelValue"><slot /></div>',
+          'OTabPanel': {
+            template: '<div class="q-tab-panel"><slot /></div>',
             props: ['name']
           },
-          'q-toggle': {
+          'OSwitch': {
             template: '<div class="q-toggle" :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
             props: ['modelValue', 'label'],
             methods: {
@@ -188,26 +174,14 @@ describe("DetailTable Component", () => {
             },
             emits: ['update:modelValue']
           },
-          'q-list': {
-            template: '<div class="q-list"><slot /></div>'
+          'OButton': {
+            template: '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>'
           },
-          'q-item': {
-            template: '<div class="q-item" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-item-section': {
-            template: '<div class="q-item-section" :data-test="$attrs[\'data-test\']"><slot /></div>'
-          },
-          'q-item-label': {
-            template: '<div class="q-item-label" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-btn-dropdown': {
-            template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            emits: ['click']
-          },
-          'q-select': {
-            template: '<select class="q-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
+          'ODropdown': true,
+          'ODropdownItem': true,
+          'ODropdownSeparator': true,
+          'OSelect': {
+            template: '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
             props: ['modelValue', 'options'],
             methods: {
               onChange(e: any) {
@@ -219,11 +193,15 @@ describe("DetailTable Component", () => {
           'OIcon': {
             template: '<div class="OIcon"><slot /></div>'
           },
-          'json-preview': {
-            template: '<div data-test="json-preview"><slot /></div>',
-            props: ['value', 'showCopyButton', 'mode'],
-            emits: ['copy', 'add-field-to-table', 'add-search-term', 'view-trace', 'send-to-ai-chat', 'closeTable']
+          'OSpinner': true,
+          'OSeparator': true,
+          'OCardSection': {
+            template: '<div><slot /></div>',
           },
+          'OLogsHighLighting': true,
+          'OChunkedContent': true,
+          'OTelemetryCorrelationDashboard': true,
+          'OCorrelatedLogsTable': true,
           'O2AIContextAddBtn': {
             template: '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
             emits: ['sendToAiChat']
@@ -260,7 +238,7 @@ describe("DetailTable Component", () => {
 
   it("should initialize reactive data correctly", () => {
     expect(wrapper.vm.tab).toBe("json");
-    expect(wrapper.vm.selectedRelativeValue).toBe("10");
+    expect(wrapper.vm.selectedRelativeValue).toBe(10);
     expect(wrapper.vm.shouldWrapValues).toBe(true);
     expect(wrapper.vm.recordSizeOptions).toEqual([10, 20, 50, 100, 200, 500, 1000]);
   });
@@ -308,7 +286,7 @@ describe("DetailTable Component", () => {
   });
 
   it("should render O2AIContextAddBtn component", () => {
-    const aiButton = wrapper.find('[data-test="o2ai-context-btn"]');
+    const aiButton = wrapper.find('[data-test="logs-detail-ai-context-btn"]');
     expect(aiButton.exists()).toBe(true);
   });
 
@@ -412,7 +390,7 @@ describe("DetailTable Component", () => {
     wrapper.vm.tab = "table";
     await nextTick();
     
-    const recordSelect = wrapper.find(".q-select");
+    const recordSelect = wrapper.find(".o-select");
     expect(recordSelect.exists()).toBe(true);
   });
 
@@ -622,7 +600,10 @@ describe("DetailTable Component", () => {
     
     await wrapper.vm.copyContentToClipboard(testData);
     
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(JSON.stringify(testData));
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      JSON.stringify(testData),
+      { successMessage: "Content Copied Successfully!", timeout: 1000 },
+    );
   });
 
   it("should emit add:table when addFieldToTable called", () => {

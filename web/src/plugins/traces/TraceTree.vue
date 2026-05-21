@@ -275,12 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="tw:flex tw:items-center tw:text-xs text-red-6"
-                      style="
-                        margin-top: -4px;
-                        margin-bottom: 2px;
-                        line-height: 1;
-                      "
+                      class="tw:flex tw:items-center tw:text-xs tw:text-[var(--o2-status-error-text)]! tw:mt-[-0.125rem] tw:mb-[0.125rem] tw:leading-none"
                     >
                       <span
                         v-if="

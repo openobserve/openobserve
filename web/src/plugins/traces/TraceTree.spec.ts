@@ -57,17 +57,12 @@ vi.mock("@/composables/useTraces", () => ({
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceTree from "@/plugins/traces/TraceTree.vue";
-
-installQuasar({
-  plugins: [],
-});
 
 const mockStore = createStore({
   state: {

@@ -3,14 +3,12 @@
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
 import O2AIChat from '@/components/O2AIChat.vue';
 
 // Ensure Quasar plugin
-installQuasar();
 
 // Stub clipboard
 // @ts-ignore

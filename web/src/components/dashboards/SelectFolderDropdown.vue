@@ -15,11 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="tw:flex tw:items-center tw:gap-2">
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
+      labelPosition="inside"
       :options="
         store.state.organizationData.folders.map((item: any) => {
           return { label: item.name, value: item.folderId };
@@ -57,7 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="showAddFolderDialog = false"
     @click:primary="handleAddFolder"
   >
-    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
+    <AddFolder
+      ref="addFolderRef"
+      @update:modelValue="updateFolderList"
+      :edit-mode="false"
+    />
   </ODrawer>
 </template>
 

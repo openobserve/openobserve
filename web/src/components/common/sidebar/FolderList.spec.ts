@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { installQuasar } from '@/test/unit/helpers'
+
 import FolderList from './FolderList.vue'
 import { useRouter } from 'vue-router'
 import { nextTick } from 'vue'

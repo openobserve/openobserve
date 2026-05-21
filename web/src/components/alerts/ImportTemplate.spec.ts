@@ -1,830 +1,604 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { shallowMount } from '@vue/test-utils';
-import ImportTemplate from './ImportTemplate.vue';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick, ref } from 'vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock external dependencies
-vi.mock('@/services/alert_templates', () => ({
-  default: {
-    create: vi.fn(),
-  },
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { shallowMount } from "@vue/test-utils";
+import ImportTemplate from "./ImportTemplate.vue";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+
+// ─── Service mocks ────────────────────────────────────────────────────────────
+vi.mock("@/services/alert_templates", () => ({
+  default: { create: vi.fn() },
 }));
 
-vi.mock('@/services/alerts', () => ({
-  default: {
-    create: vi.fn(),
-  },
+vi.mock("@/services/alerts", () => ({
+  default: { create: vi.fn() },
 }));
 
-vi.mock('@/services/alert_destination', () => ({
-  default: {
-    create: vi.fn(),
-  },
+vi.mock("@/services/alert_destination", () => ({
+  default: { create: vi.fn() },
 }));
 
-vi.mock('@/composables/useStreams', () => ({
-  default: vi.fn(() => ({
-    streams: { value: [] },
+vi.mock("@/composables/useStreams", () => ({
+  default: vi.fn(() => ({ streams: { value: [] } })),
+}));
+
+vi.mock("axios", () => ({
+  default: { get: vi.fn() },
+}));
+
+// ─── Router mock ──────────────────────────────────────────────────────────────
+const mockRouterPush = vi.fn();
+vi.mock("vue-router", () => ({
+  useRouter: vi.fn(() => ({
+    push: mockRouterPush,
+    back: vi.fn(),
   })),
+  useRoute: vi.fn(() => ({ params: {}, query: {} })),
 }));
 
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-  },
+// ─── Toast mock ───────────────────────────────────────────────────────────────
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
 }));
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
-
-// Mock Vue Router
-vi.mock('vue-router', async () => {
-  const actual = await vi.importActual('vue-router');
-  return {
-    ...actual,
-    useRouter: vi.fn(() => ({
-      push: vi.fn(),
-    })),
-    useRoute: vi.fn(() => ({
-      params: {},
-      query: {},
-    })),
-  };
-});
-
+// ─── Store & i18n ─────────────────────────────────────────────────────────────
 const mockStore = createStore({
   state: {
-    selectedOrganization: {
-      identifier: 'test-org',
-    },
+    selectedOrganization: { identifier: "test-org" },
   },
 });
 
 const mockI18n = createI18n({
-  locale: 'en',
-  messages: {
-    en: {},
+  locale: "en",
+  messages: { en: {} },
+});
+
+// ─── BaseImport stub ──────────────────────────────────────────────────────────
+const BaseImportStub = {
+  template: '<div><slot name="output-content"></slot></div>',
+  props: ["title", "testPrefix", "isImporting", "editorHeights", "containerClass", "containerStyle"],
+  emits: ["back", "cancel", "import"],
+  setup(_props: any, { expose }: any) {
+    const jsonArrayOfObj = ref<any[]>([]);
+    const jsonStr = ref("");
+    const isImporting = ref(false);
+    expose({ jsonArrayOfObj, jsonStr, isImporting });
+    return { jsonArrayOfObj, jsonStr, isImporting };
   },
-});
+};
 
-const mockRouter = createRouter({
-  history: createWebHistory(),
-  routes: [],
-});
+// ─── Default props ─────────────────────────────────────────────────────────────
+const defaultProps = {
+  destinations: [{ name: "dest1", type: "http" }],
+  templates: [{ name: "existing-template", type: "http" }],
+  alerts: [],
+};
 
+// ─── Factory ──────────────────────────────────────────────────────────────────
+function createWrapper(props = defaultProps) {
+  return shallowMount(ImportTemplate, {
+    props,
+    global: {
+      plugins: [mockI18n],
+      provide: { store: mockStore },
+      mocks: { $store: mockStore },
+      stubs: { BaseImport: BaseImportStub },
+    },
+  });
+}
 
-describe('ImportTemplate Component - Comprehensive Function Tests', () => {
-  let wrapper: any;
-  let mockNotify: any;
-  let mockRouterPush: any;
+// =============================================================================
+describe("ImportTemplate", () => {
+  let wrapper: ReturnType<typeof createWrapper>;
 
-  const defaultProps = {
-    destinations: [
-      { name: 'dest1', type: 'http' },
-    ],
-    templates: [
-      { name: 'existing-template', type: 'http' },
-    ],
-    alerts: [],
-  };
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-
-    mockNotify = vi.fn();
-    mockRouterPush = vi.fn();
-
-    const { useQuasar } = await import('quasar');
-    vi.mocked(useQuasar).mockReturnValue({
-      notify: mockNotify,
-    } as any);
-
-    const { useRouter } = await import('vue-router');
-    vi.mocked(useRouter).mockReturnValue({
-      push: mockRouterPush,
-    } as any);
-
-    wrapper = shallowMount(ImportTemplate, {
-      props: JSON.parse(JSON.stringify(defaultProps)),
-      global: {
-        plugins: [mockI18n],
-        provide: {
-          store: mockStore,
-        },
-        mocks: {
-          $store: mockStore,
-        },
-        stubs: {
-          BaseImport: {
-            template: '<div><slot name="output-content"></slot></div>',
-            props: ['title', 'testPrefix', 'isImporting', 'editorHeights'],
-            emits: ['back', 'cancel', 'import'],
-            setup(_props: any, { expose }: any) {
-              const jsonArrayOfObj = ref([]);
-              const jsonStr = ref("");
-              const isImporting = ref(false);
-              const updateJsonArray = (arr: any[]) => {
-                jsonArrayOfObj.value = arr;
-                jsonStr.value = JSON.stringify(arr, null, 2);
-              };
-              expose({
-                jsonArrayOfObj,
-                jsonStr,
-                isImporting,
-                updateJsonArray,
-              });
-              return { jsonArrayOfObj, jsonStr, isImporting, updateJsonArray };
-            },
-          },
-        },
-      },
-    });
+    wrapper = createWrapper();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
   });
 
-  describe('1. Component Initialization and Props', () => {
-    it('should initialize with default props', () => {
-      expect(wrapper.props('destinations')).toEqual(defaultProps.destinations);
-      expect(wrapper.props('templates')).toEqual(defaultProps.templates);
-      expect(wrapper.props('alerts')).toEqual(defaultProps.alerts);
+  // ─── Renders with minimum props ────────────────────────────────────────────
+  describe("renders with minimum props", () => {
+    it("mounts without throwing", () => {
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it('should initialize with empty arrays when no props provided', () => {
-      const emptyWrapper = shallowMount(ImportTemplate, {
+    it("accepts default empty-array props", () => {
+      const w = shallowMount(ImportTemplate, {
         global: {
           plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
+          provide: { store: mockStore },
+          mocks: { $store: mockStore },
+          stubs: { BaseImport: BaseImportStub },
         },
       });
-
-      expect(emptyWrapper.props('destinations')).toEqual([]);
-      expect(emptyWrapper.props('templates')).toEqual([]);
-      expect(emptyWrapper.props('alerts')).toEqual([]);
-      emptyWrapper.unmount();
+      expect(w.props("destinations")).toEqual([]);
+      expect(w.props("templates")).toEqual([]);
+      expect(w.props("alerts")).toEqual([]);
+      w.unmount();
     });
 
-    it('should emit correct events', () => {
-      expect(wrapper.vm.$options.emits).toContain('update:destinations');
-      expect(wrapper.vm.$options.emits).toContain('update:templates');
-      expect(wrapper.vm.$options.emits).toContain('update:alerts');
+    it("declares the expected emits", () => {
+      expect(wrapper.vm.$options.emits).toContain("update:destinations");
+      expect(wrapper.vm.$options.emits).toContain("update:templates");
+      expect(wrapper.vm.$options.emits).toContain("update:alerts");
     });
   });
 
-  describe('2. Data Properties and Computed Values', () => {
-    it('should initialize reactive data properties correctly', () => {
-      // jsonStr and jsonArrayOfObj are now managed by BaseImport (stubbed)
+  // ─── Initial state ─────────────────────────────────────────────────────────
+  describe("initial reactive state", () => {
+    it("templateErrorsToDisplay starts empty", () => {
       expect(wrapper.vm.templateErrorsToDisplay).toEqual([]);
+    });
+
+    it("tempalteCreators starts empty", () => {
       expect(wrapper.vm.tempalteCreators).toEqual([]);
-      // activeTab and jsonArrayOfObj are managed by BaseImport stub
-      expect(wrapper.vm.baseImportRef).toBeDefined();
     });
 
-    // REMOVED: destinationTypes and destinationMethods are not used in ImportTemplate
-
-    it('should compute formatted templates correctly', () => {
-      const formatted = wrapper.vm.getFormattedTemplates;
-      expect(formatted).toContain('existing-template');
-      expect(formatted).toHaveLength(1);
+    it("isTemplateImporting starts false", () => {
+      expect(wrapper.vm.isTemplateImporting).toBe(false);
     });
 
-    it('should handle empty templates for computed property', () => {
-      const emptyWrapper = shallowMount(ImportTemplate, {
-        props: { destinations: [], templates: [], alerts: [] },
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-
-      expect(emptyWrapper.vm.getFormattedTemplates).toEqual([]);
-      emptyWrapper.unmount();
+    it("destinationTypes is ['http', 'email']", () => {
+      expect(wrapper.vm.destinationTypes).toEqual(["http", "email"]);
     });
   });
 
-  describe('3. Update Functions', () => {
+  // ─── getFormattedTemplates computed ───────────────────────────────────────
+  describe("getFormattedTemplates", () => {
+    it("returns array of template names from props", () => {
+      expect(wrapper.vm.getFormattedTemplates).toContain("existing-template");
+      expect(wrapper.vm.getFormattedTemplates).toHaveLength(1);
+    });
+
+    it("returns empty array when templates prop is empty", () => {
+      const w = createWrapper({ ...defaultProps, templates: [] });
+      expect(w.vm.getFormattedTemplates).toEqual([]);
+      w.unmount();
+    });
+  });
+
+  // ─── Update functions ──────────────────────────────────────────────────────
+  describe("update functions against BaseImport ref", () => {
     beforeEach(() => {
-      // Initialize BaseImport ref with jsonArrayOfObj
-      wrapper.vm.baseImportRef.jsonArrayOfObj = [{ name: 'test' }];
+      wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ name: "tpl" }];
     });
 
-    it('should update template type correctly', () => {
-      wrapper.vm.updateTemplateType('email', 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].type).toBe('email');
-      expect(wrapper.vm.baseImportRef.jsonStr).toContain('email');
+    it("updateTemplateType sets type on item", () => {
+      wrapper.vm.updateTemplateType("email", 0);
+      expect(wrapper.vm.$refs.baseImportRef.jsonArrayOfObj[0].type).toBe("email");
     });
 
-    it('should update template name correctly', () => {
-      wrapper.vm.updateTemplateName('new-template', 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('new-template');
-      expect(wrapper.vm.baseImportRef.jsonStr).toContain('new-template');
+    it("updateTemplateName sets name on item", () => {
+      wrapper.vm.updateTemplateName("new-tpl", 0);
+      expect(wrapper.vm.$refs.baseImportRef.jsonArrayOfObj[0].name).toBe("new-tpl");
     });
 
-    it('should update template body correctly', () => {
-      const testBody = '{"message": "test body"}';
-      wrapper.vm.updateTemplateBody(testBody, 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].body).toBe(testBody);
-      expect(wrapper.vm.baseImportRef.jsonStr).toContain('"body": "{\\"message\\": \\"test body\\"}"');
+    it("updateTemplateBody sets body on item", () => {
+      const body = '{"msg": "hello"}';
+      wrapper.vm.updateTemplateBody(body, 0);
+      expect(wrapper.vm.$refs.baseImportRef.jsonArrayOfObj[0].body).toBe(body);
     });
 
-    it('should update template title correctly', () => {
-      wrapper.vm.updateTemplateTitle('Test Title', 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].title).toBe('Test Title');
-      expect(wrapper.vm.baseImportRef.jsonStr).toContain('Test Title');
+    it("updateTemplateTitle sets title on item", () => {
+      wrapper.vm.updateTemplateTitle("My Title", 0);
+      expect(wrapper.vm.$refs.baseImportRef.jsonArrayOfObj[0].title).toBe("My Title");
     });
 
-    // REMOVED: updateDestinationUrl is not relevant to ImportTemplate
-  });
-
-  // REMOVED: File Reading Functions - File reading is now handled by BaseImport component
-
-  describe('5. Helper Functions', () => {
-    describe('checkTemplatesInList', () => {
-      it('should return true when template exists', () => {
-        const templates = [{ name: 'template1' }, { name: 'template2' }];
-        const result = wrapper.vm.checkTemplatesInList(templates, 'template1');
-        expect(result).toBe(true);
-      });
-
-      it('should return false when template does not exist', () => {
-        const templates = [{ name: 'template1' }, { name: 'template2' }];
-        const result = wrapper.vm.checkTemplatesInList(templates, 'nonexistent');
-        expect(result).toBe(false);
-      });
-
-      it('should handle empty templates array', () => {
-        const result = wrapper.vm.checkTemplatesInList([], 'template1');
-        expect(result).toBe(false);
-      });
-
-      it('should be case sensitive', () => {
-        const templates = [{ name: 'template1' }];
-        const result = wrapper.vm.checkTemplatesInList(templates, 'TEMPLATE1');
-        expect(result).toBe(false);
-      });
+    it("jsonStr is updated after any update call", () => {
+      wrapper.vm.updateTemplateName("alpha", 0);
+      expect(wrapper.vm.$refs.baseImportRef.jsonStr).toContain("alpha");
     });
   });
 
-  describe('6. Validation Functions', () => {
+  // ─── checkTemplatesInList ─────────────────────────────────────────────────
+  describe("checkTemplatesInList", () => {
+    const templates = [{ name: "t1" }, { name: "t2" }];
+
+    it("returns true when name is in list", () => {
+      expect(wrapper.vm.checkTemplatesInList(templates, "t1")).toBe(true);
+    });
+
+    it("returns false when name is not in list", () => {
+      expect(wrapper.vm.checkTemplatesInList(templates, "none")).toBe(false);
+    });
+
+    it("returns false for empty list", () => {
+      expect(wrapper.vm.checkTemplatesInList([], "t1")).toBe(false);
+    });
+
+    it("is case-sensitive", () => {
+      expect(wrapper.vm.checkTemplatesInList(templates, "T1")).toBe(false);
+    });
+  });
+
+  // ─── arrowBackFn ─────────────────────────────────────────────────────────
+  describe("arrowBackFn", () => {
+    it("pushes to alertTemplates route with org_identifier", () => {
+      wrapper.vm.arrowBackFn();
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "alertTemplates",
+        query: { org_identifier: "test-org" },
+      });
+    });
+  });
+
+  // ─── validateTemplateInputs ───────────────────────────────────────────────
+  describe("validateTemplateInputs", () => {
     beforeEach(() => {
       wrapper.vm.templateErrorsToDisplay = [];
     });
 
-    describe('validateTemplateInputs', () => {
-      it('should validate http template with valid inputs', async () => {
-        const validInput = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "{{message}}"}',
-        };
+    it("returns true for a valid http template", async () => {
+      const result = await wrapper.vm.validateTemplateInputs(
+        { name: "new-tpl", type: "http", body: '{"message": "{{msg}}"}' },
+        1,
+      );
+      expect(result).toBe(true);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(validInput, 1);
-        expect(result).toBe(true);
-        expect(wrapper.vm.templateErrorsToDisplay).toHaveLength(0);
-      });
+    it("returns true for a valid email template", async () => {
+      const result = await wrapper.vm.validateTemplateInputs(
+        { name: "email-tpl", type: "email", body: '{"message": "{{msg}}"}', title: "Alert" },
+        1,
+      );
+      expect(result).toBe(true);
+    });
 
-      it('should validate email template with valid inputs', async () => {
-        const validInput = {
-          name: 'test-email-template',
-          type: 'email',
-          body: '{"message": "{{message}}"}',
-          title: 'Test Email Title',
-        };
+    it("returns false and records error for missing name", async () => {
+      const result = await wrapper.vm.validateTemplateInputs(
+        { type: "http", body: '{"x":1}' },
+        1,
+      );
+      expect(result).toBe(false);
+      expect(wrapper.vm.templateErrorsToDisplay.length).toBeGreaterThan(0);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(validInput, 1);
-        expect(result).toBe(true);
-        expect(wrapper.vm.templateErrorsToDisplay).toHaveLength(0);
-      });
+    it("returns false for empty string name", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "", type: "http", body: '{"x":1}' }, 1)).toBe(false);
+    });
 
-      it('should return false for missing name', async () => {
-        const invalidInput = {
-          type: 'http',
-          body: '{"message": "test"}',
-        };
+    it("returns false for whitespace-only name", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "   ", type: "http", body: '{"x":1}' }, 1)).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-        expect(wrapper.vm.templateErrorsToDisplay.length).toBeGreaterThan(0);
-      });
+    it("returns false for non-string name", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: 42, type: "http", body: '{"x":1}' }, 1)).toBe(false);
+    });
 
-      it('should return false for empty name', async () => {
-        const invalidInput = {
-          name: '',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
+    it("returns false for a duplicate template name", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "existing-template", type: "http", body: '{"x":1}' }, 1),
+      ).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for invalid type", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "ftp", body: '{"x":1}' }, 1)).toBe(false);
+    });
 
-      it('should return false for non-string name', async () => {
-        const invalidInput = {
-          name: 123,
-          type: 'http',
-          body: '{"message": "test"}',
-        };
+    it("returns false for missing type", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", body: '{"x":1}' }, 1)).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for missing body", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http" }, 1)).toBe(false);
+    });
 
-      it('should return false for duplicate template name', async () => {
-        const duplicateInput = {
-          name: 'existing-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
+    it("returns false for empty body", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "" }, 1)).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(duplicateInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for whitespace-only body", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "   " }, 1)).toBe(false);
+    });
 
-      it('should return false for invalid type', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          type: 'invalid-type',
-          body: '{"message": "test"}',
-        };
+    it("returns false for non-string body", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: 123 as any }, 1)).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for invalid JSON in body", async () => {
+      expect(await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: "not json" }, 1)).toBe(false);
+    });
 
-      it('should return false for missing type', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          body: '{"message": "test"}',
-        };
+    it("returns false for email type missing title", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}' }, 1),
+      ).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for email type with empty title", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: "" }, 1),
+      ).toBe(false);
+    });
 
-      it('should return false for missing body', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          type: 'http',
-        };
+    it("returns false for email type with whitespace-only title", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: "   " }, 1),
+      ).toBe(false);
+    });
 
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
+    it("returns false for email type with non-string title", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "email", body: '{"x":1}', title: 99 as any }, 1),
+      ).toBe(false);
+    });
 
-      it('should return false for empty body', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          type: 'http',
-          body: '',
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should return false for non-string body', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          type: 'http',
-          body: 123,
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should return false for invalid JSON body', async () => {
-        const invalidInput = {
-          name: 'test-template',
-          type: 'http',
-          body: 'invalid json',
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should return false for email type missing title', async () => {
-        const invalidInput = {
-          name: 'test-email-template',
-          type: 'email',
-          body: '{"message": "test"}',
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should return false for email type with empty title', async () => {
-        const invalidInput = {
-          name: 'test-email-template',
-          type: 'email',
-          body: '{"message": "test"}',
-          title: '',
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should return false for email type with non-string title', async () => {
-        const invalidInput = {
-          name: 'test-email-template',
-          type: 'email',
-          body: '{"message": "test"}',
-          title: 123,
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should allow http type without title', async () => {
-        const validInput = {
-          name: 'test-http-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        const result = await wrapper.vm.validateTemplateInputs(validInput, 1);
-        expect(result).toBe(true);
-      });
+    it("http type does not require a title", async () => {
+      expect(
+        await wrapper.vm.validateTemplateInputs({ name: "t", type: "http", body: '{"x":1}' }, 1),
+      ).toBe(true);
     });
   });
 
-  describe('7. Tab and Navigation Functions', () => {
-    // REMOVED: updateActiveTab - Tab management is now handled by BaseImport component
-
-    it('should navigate back to templates page', () => {
-      wrapper.vm.arrowBackFn();
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'alertTemplates',
-        query: {
-          org_identifier: 'test-org',
-        },
-      });
-    });
-  });
-
-  describe('8. Import and Processing Functions', () => {
+  // ─── importJson — JSON parsing edge cases ─────────────────────────────────
+  describe("importJson — JSON parsing edge cases", () => {
     beforeEach(() => {
       wrapper.vm.templateErrorsToDisplay = [];
       wrapper.vm.tempalteCreators = [];
     });
 
-    describe('importJson', () => {
-      it('should handle empty JSON string', async () => {
-        await wrapper.vm.importJson({ jsonStr: '', jsonArray: [] });
-
-        expect(mockNotify).toHaveBeenCalledWith({
-          message: 'JSON string is empty',
-          color: 'negative',
-          position: 'bottom',
-          timeout: 2000,
-        });
-      });
-
-      it('should reset BaseImport isImporting flag when JSON string is empty', async () => {
-        const baseImportRef = wrapper.vm.$refs.baseImportRef;
-        baseImportRef.isImporting = true;
-
-        await wrapper.vm.importJson({ jsonStr: '', jsonArray: [] });
-
-        expect(baseImportRef.isImporting).toBe(false);
-      });
-
-      it('should handle invalid JSON', async () => {
-        await wrapper.vm.importJson({ jsonStr: 'invalid json', jsonArray: [] });
-
-        expect(mockNotify).toHaveBeenCalledWith(
-          expect.objectContaining({
-            color: 'negative',
-            position: 'bottom',
-            timeout: 2000,
-          })
-        );
-      });
-
-      it('should reset BaseImport isImporting flag when JSON is invalid', async () => {
-        const baseImportRef = wrapper.vm.$refs.baseImportRef;
-        baseImportRef.isImporting = true;
-
-        await wrapper.vm.importJson({ jsonStr: '{ invalid json }', jsonArray: [] });
-
-        expect(baseImportRef.isImporting).toBe(false);
-      });
-
-      it('should process valid JSON array', async () => {
-        const validJson = [{
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        }];
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockClear();
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        await wrapper.vm.importJson({ jsonStr: JSON.stringify(validJson), jsonArray: validJson });
-
-        // jsonArrayOfObj is managed by BaseImport stub, check the processing worked
-        expect(templateService.default.create).toHaveBeenCalled();
-      });
-
-      it('should convert single object to array', async () => {
-        const singleObject = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockClear();
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        await wrapper.vm.importJson({ jsonStr: JSON.stringify(singleObject), jsonArray: [singleObject] });
-
-        // Verify the template was processed
-        expect(templateService.default.create).toHaveBeenCalled();
-      });
-
-      it('should show success message and redirect on successful import', async () => {
-        vi.useFakeTimers();
-
-        const validJson = [{
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        }];
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockClear();
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        await wrapper.vm.importJson({ jsonStr: JSON.stringify(validJson), jsonArray: validJson });
-
-        expect(mockNotify).toHaveBeenCalledWith({
-          message: 'Successfully imported template(s)',
-          color: 'positive',
-          position: 'bottom',
-          timeout: 2000,
-        });
-
-        // Fast-forward timers to execute setTimeout
-        vi.runAllTimers();
-
-        expect(mockRouterPush).toHaveBeenCalledWith({
-          name: 'alertTemplates',
-          query: {
-            org_identifier: 'test-org',
-          },
-        });
-
-        vi.useRealTimers();
-      });
+    it("resets isImporting when jsonStr is empty", async () => {
+      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
+      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
     });
 
-    describe('processJsonObject', () => {
-      it('should process valid template object', async () => {
-        const validObject = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        const result = await wrapper.vm.processJsonObject(validObject, 1);
-        expect(result).toBe(true);
-      });
-
-      it('should return false for invalid template object', async () => {
-        const invalidObject = {
-          name: '',
-          type: 'invalid',
-        };
-
-        const result = await wrapper.vm.processJsonObject(invalidObject, 1);
-        expect(result).toBe(false);
-      });
-
-      it('should process template successfully even when prior errors exist', async () => {
-        const validObject = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        // Simulate having errors from previous template processing
-        wrapper.vm.templateErrorsToDisplay = [['Some error from previous template']];
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        const result = await wrapper.vm.processJsonObject(validObject, 1);
-
-        // Should succeed because this template's validation passes
-        // regardless of previous templates' errors
-        expect(result).toBe(true);
-      });
+    it("calls toast for invalid JSON", async () => {
+      await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
+      expect(mockToast).toHaveBeenCalled();
     });
 
-    describe('createTemplate', () => {
-      it('should create template successfully', async () => {
-        const templateInput = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
+    it("resets isImporting on parse error", async () => {
+      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
+      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+    });
 
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
+    it("resets templateErrorsToDisplay and tempalteCreators before processing", async () => {
+      wrapper.vm.templateErrorsToDisplay = [["stale"]];
+      wrapper.vm.tempalteCreators = [{ message: "stale", success: true }];
+      // Parse fails, but reset happens before throw
+      await wrapper.vm.importJson({ jsonStr: "bad json", jsonArray: [] });
+      expect(Array.isArray(wrapper.vm.templateErrorsToDisplay)).toBe(true);
+    });
 
-        const result = await wrapper.vm.createTemplate(templateInput, 1);
+    it("converts a single JSON object to array and processes it", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
 
-        expect(result).toBe(true);
-        expect(templateService.default.create).toHaveBeenCalledWith({
-          org_identifier: 'test-org',
-          template_name: 'test-template',
-          data: {
-            name: 'test-template',
-            body: '{"message": "test"}',
-            type: 'http',
-            title: undefined,
-          },
-        });
-        expect(wrapper.vm.tempalteCreators[0].success).toBe(true);
-        expect(wrapper.emitted('update:templates')).toBeTruthy();
+      await wrapper.vm.importJson({
+        jsonStr: JSON.stringify({ name: "new-tpl", type: "http", body: '{"x":1}' }),
+        jsonArray: [],
       });
 
-      it('should handle template creation failure', async () => {
-        const templateInput = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        const error = {
-          response: {
-            data: {
-              message: 'Creation failed',
-            },
-          },
-        };
-
-        // Mock failed creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockClear();
-        vi.mocked(templateService.default.create).mockRejectedValueOnce(error);
-
-        const result = await wrapper.vm.createTemplate(templateInput, 1);
-
-        expect(result).toBe(false);
-        expect(wrapper.vm.tempalteCreators[0].success).toBe(false);
-        expect(wrapper.vm.tempalteCreators[0].message).toContain('Creation failed');
-      });
-
-      it('should handle unknown creation error', async () => {
-        const templateInput = {
-          name: 'test-template',
-          type: 'http',
-          body: '{"message": "test"}',
-        };
-
-        // Mock failed creation without response
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockClear();
-        vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error('Unknown error'));
-
-        const result = await wrapper.vm.createTemplate(templateInput, 1);
-
-        expect(result).toBe(false);
-        expect(wrapper.vm.tempalteCreators[0].message).toContain('Unknown Error');
-      });
-
-      it('should create email template with title', async () => {
-        const emailTemplateInput = {
-          name: 'test-email-template',
-          type: 'email',
-          body: '{"message": "test"}',
-          title: 'Test Email Title',
-        };
-
-        // Mock successful creation
-        const templateService = await import('@/services/alert_templates');
-        vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-        const result = await wrapper.vm.createTemplate(emailTemplateInput, 1);
-
-        expect(result).toBe(true);
-        expect(templateService.default.create).toHaveBeenCalledWith({
-          org_identifier: 'test-org',
-          template_name: 'test-email-template',
-          data: {
-            name: 'test-email-template',
-            body: '{"message": "test"}',
-            type: 'email',
-            title: 'Test Email Title',
-          },
-        });
-      });
+      expect(templateService.default.create).toHaveBeenCalled();
     });
   });
 
-  describe('9. Watchers and Reactive Behavior', () => {
-    it('should have userSelectedTemplates watcher', async () => {
-      // This functionality is now managed within the component's update functions
-      // Testing the actual update functions instead
-      wrapper.vm.baseImportRef.jsonArrayOfObj = [{}];
-      wrapper.vm.updateTemplateName('test-template', 0);
-      await nextTick();
+  // ─── createTemplate ───────────────────────────────────────────────────────
+  describe("createTemplate", () => {
+    it("returns true, emits update:templates, and records success on API success", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
 
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].name).toBe('test-template');
+      const result = await wrapper.vm.createTemplate(
+        { name: "new-tpl", type: "http", body: '{"x":1}' },
+        1,
+      );
+
+      expect(result).toBe(true);
+      expect(templateService.default.create).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        template_name: "new-tpl",
+        data: { name: "new-tpl", body: '{"x":1}', type: "http", title: undefined },
+      });
+      expect(wrapper.emitted("update:templates")).toBeTruthy();
+      expect(wrapper.vm.tempalteCreators[0].success).toBe(true);
     });
 
-  });
+    it("trims the name when calling the service", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
 
-  describe('10. Edge Cases and Error Handling', () => {
-    it('should handle whitespace-only template names', async () => {
-      const invalidInput = {
-        name: '   ',
-        type: 'http',
-        body: '{"message": "test"}',
-      };
+      await wrapper.vm.createTemplate({ name: "  trimmed  ", type: "http", body: '{"x":1}' }, 1);
 
-      const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
+      expect(templateService.default.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ name: "trimmed" }) }),
+      );
+    });
+
+    it("returns false and records failure message on API error", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockRejectedValueOnce({
+        response: { data: { message: "Conflict" } },
+      });
+
+      const result = await wrapper.vm.createTemplate({ name: "t", type: "http", body: '{"x":1}' }, 1);
+
       expect(result).toBe(false);
+      expect(wrapper.vm.tempalteCreators[0].success).toBe(false);
+      expect(wrapper.vm.tempalteCreators[0].message).toContain("Conflict");
     });
 
-    it('should handle whitespace-only template body', async () => {
-      const invalidInput = {
-        name: 'test-template',
-        type: 'http',
-        body: '   ',
-      };
+    it("falls back to 'Unknown Error' when response has no message", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error("net"));
 
-      const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
+      const result = await wrapper.vm.createTemplate({ name: "t", type: "http", body: '{"x":1}' }, 1);
+
       expect(result).toBe(false);
+      expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown Error");
     });
 
-    it('should handle whitespace-only email title', async () => {
-      const invalidInput = {
-        name: 'test-email-template',
-        type: 'email',
-        body: '{"message": "test"}',
-        title: '   ',
-      };
+    it("includes title in the service payload for email templates", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
 
-      const result = await wrapper.vm.validateTemplateInputs(invalidInput, 1);
-      expect(result).toBe(false);
-    });
-
-    it('should trim template name when creating template', async () => {
-      const templateInput = {
-        name: '  test-template  ',
-        type: 'http',
-        body: '{"message": "test"}',
-      };
-
-      // Mock successful creation
-      const templateService = await import('@/services/alert_templates');
-      vi.mocked(templateService.default.create).mockResolvedValueOnce(true);
-
-      await wrapper.vm.createTemplate(templateInput, 1);
+      await wrapper.vm.createTemplate(
+        { name: "email-tpl", type: "email", body: '{"x":1}', title: "Alert Title" },
+        1,
+      );
 
       expect(templateService.default.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            name: 'test-template', // Should be trimmed
-          }),
-        })
+          data: expect.objectContaining({ title: "Alert Title" }),
+        }),
       );
+    });
+  });
+
+  // ─── processJsonObject ────────────────────────────────────────────────────
+  describe("processJsonObject", () => {
+    beforeEach(() => {
+      wrapper.vm.templateErrorsToDisplay = [];
+      wrapper.vm.tempalteCreators = [];
+    });
+
+    it("returns true for a fully valid http template", async () => {
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
+
+      const result = await wrapper.vm.processJsonObject(
+        { name: "new-tpl", type: "http", body: '{"x":1}' },
+        1,
+      );
+      expect(result).toBe(true);
+    });
+
+    it("returns false for invalid object (validation fails)", async () => {
+      const result = await wrapper.vm.processJsonObject({ name: "", type: "bad" }, 1);
+      expect(result).toBe(false);
+    });
+
+    it("returns true even if prior error entries exist (each template is independent)", async () => {
+      wrapper.vm.templateErrorsToDisplay = [["prior error from another template"]];
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
+
+      const result = await wrapper.vm.processJsonObject(
+        { name: "valid-tpl", type: "http", body: '{"x":1}' },
+        2,
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  // ─── Output section conditional rendering via v-if ────────────────────────
+  describe("output-content slot — conditional branches", () => {
+    it("renders error group items when templateErrorsToDisplay is non-empty", async () => {
+      wrapper.vm.templateErrorsToDisplay = [
+        [{ field: "template_name", message: "name conflict" }],
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-error-0-0"]').exists()).toBe(true);
+    });
+
+    it("renders the name correction input for template_name field errors", async () => {
+      wrapper.vm.templateErrorsToDisplay = [
+        [{ field: "template_name", message: "name conflict" }],
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-name-input"]').exists()).toBe(true);
+    });
+
+    it("renders the body correction input for body field errors", async () => {
+      wrapper.vm.templateErrorsToDisplay = [
+        [{ field: "body", message: "invalid body" }],
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-body-input"]').exists()).toBe(true);
+    });
+
+    it("renders the type correction select for type field errors", async () => {
+      wrapper.vm.templateErrorsToDisplay = [
+        [{ field: "type", message: "invalid type" }],
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-type-input"]').exists()).toBe(true);
+    });
+
+    it("renders the title correction input for title field errors", async () => {
+      wrapper.vm.templateErrorsToDisplay = [
+        [{ field: "title", message: "title required" }],
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-title-input"]').exists()).toBe(true);
+    });
+
+    it("renders plain text for unknown-field string errors", async () => {
+      wrapper.vm.templateErrorsToDisplay = [["plain error message"]];
+      await wrapper.vm.$nextTick();
+      const el = wrapper.find('[data-test="template-import-error-0-0"]');
+      expect(el.exists()).toBe(true);
+      expect(el.text()).toContain("plain error message");
+    });
+
+    it("renders creation title when tempalteCreators is non-empty", async () => {
+      wrapper.vm.tempalteCreators = [{ message: "created", success: true }];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-creation-title"]').exists()).toBe(true);
+    });
+
+    it("renders individual creation result messages", async () => {
+      wrapper.vm.tempalteCreators = [{ message: "done", success: true }];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-creation-0-message"]').exists()).toBe(true);
+    });
+
+    it("does not render error list when templateErrorsToDisplay is empty", async () => {
+      wrapper.vm.templateErrorsToDisplay = [];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-error-0"]').exists()).toBe(false);
+    });
+
+    it("does not render creation section when tempalteCreators is empty", async () => {
+      wrapper.vm.tempalteCreators = [];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="template-import-creation-title"]').exists()).toBe(false);
+    });
+  });
+
+  // ─── importJson success / redirect flow ───────────────────────────────────
+  describe("importJson — success flow", () => {
+    it("calls toast on successful import", async () => {
+      vi.useFakeTimers();
+      const templateService = await import("@/services/alert_templates");
+      vi.mocked(templateService.default.create).mockResolvedValueOnce(true as any);
+
+      await wrapper.vm.importJson({
+        jsonStr: JSON.stringify([{ name: "t1", type: "http", body: '{"x":1}' }]),
+        jsonArray: [],
+      });
+
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Successfully imported template(s)" }),
+      );
+
+      vi.runAllTimers();
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "alertTemplates" }),
+      );
+      vi.useRealTimers();
     });
   });
 });

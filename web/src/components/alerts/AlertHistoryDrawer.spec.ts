@@ -470,7 +470,6 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should reset pagination to page 1 on date change", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      vm.pagination.page = 3;
       vm.currentPage = 3;
 
       const dateTimeComponent = wrapper.findComponent(DateTime);
@@ -482,7 +481,6 @@ describe("AlertHistoryDrawer.vue", () => {
       await flushPromises();
 
       expect(vm.currentPage).toBe(1);
-      expect(vm.pagination.page).toBe(1);
     });
   });
 
@@ -490,12 +488,11 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should have pagination data initialized", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.pagination).toBeDefined();
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.pagination.page).toBe(1);
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.currentPage).toBe(1);
     });
 
-    it("should call getHistory when table requests data", async () => {
+    it("should call getHistory when pagination changes", async () => {
       await mountComponent();
       vi.clearAllMocks();
 
@@ -503,13 +500,8 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const qTable = wrapper.findComponent({ name: "QTable" });
-      await qTable.vm.$emit("request", {
-        pagination: {
-          page: 2,
-          rowsPerPage: 50,
-        },
-      });
+      // Trigger pagination change directly via component's onPaginationChange
+      await (wrapper.vm as any).onPaginationChange({ page: 2, size: 50 });
       await flushPromises();
 
       expect(alertsService.getHistory).toHaveBeenCalledWith(
@@ -521,10 +513,10 @@ describe("AlertHistoryDrawer.vue", () => {
       );
     });
 
-    it("should update rows number from response total", async () => {
+    it("should update resultTotal from response total", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.pagination.rowsNumber).toBe(3);
+      expect(vm.resultTotal).toBe(3);
     });
   });
 
@@ -568,13 +560,11 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should reset pagination when alertId changes", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      vm.pagination.page = 5;
       vm.currentPage = 5;
 
       await wrapper.setProps({ alertId: "alert-789" });
       await flushPromises();
 
-      expect(vm.pagination.page).toBe(1);
       expect(vm.currentPage).toBe(1);
     });
 
@@ -627,10 +617,11 @@ describe("AlertHistoryDrawer.vue", () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // Store theme is "dark" by default in test helper
-      expect(vm.getRowClass("firing")).toBe("row-error-dark");
-      expect(vm.getRowClass("error")).toBe("row-error-dark");
-      expect(vm.getRowClass("ok")).toBe("");
-      expect(vm.getRowClass("success")).toBe("");
+      // getRowClass takes a row object with status property
+      expect(vm.getRowClass({ status: "firing" })).toBe("row-error-dark");
+      expect(vm.getRowClass({ status: "error" })).toBe("row-error-dark");
+      expect(vm.getRowClass({ status: "ok" })).toBe("");
+      expect(vm.getRowClass({ status: "success" })).toBe("");
     });
 
     it("formatTimestamp should return N/A for falsy timestamps", async () => {
@@ -666,22 +657,17 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Per Page Options", () => {
-    it("should have correct per page options", async () => {
+    it("should have a default selectedPerPage value", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.perPageOptions).toEqual([
-        { label: "10", value: 10 },
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-      ]);
+      expect(typeof vm.selectedPerPage).toBe("number");
+      expect(vm.selectedPerPage).toBeGreaterThan(0);
     });
 
     it("should default to 50 rows per page", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
     });
   });
 
@@ -689,8 +675,9 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should have the correct columns defined", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      const columnNames = vm.historyTableColumns.map((col: any) => col.name);
-      expect(columnNames).toEqual([
+      // columns use 'id' property (OTable OTableColumnDef type), not 'name'
+      const columnIds = vm.historyTableColumns.map((col: any) => col.id);
+      expect(columnIds).toEqual([
         "#",
         "timestamp",
         "status",

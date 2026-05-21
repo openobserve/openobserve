@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import * as quasar from "quasar";
 import Index from "@/plugins/traces/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -28,10 +27,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-installQuasar({
-  plugins: [],
-});
 
 // Mock data
 const mockStreamList = {

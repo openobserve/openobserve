@@ -5,7 +5,7 @@ export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
 
-    this.panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
+    this.panelNameInput = page.locator('[data-test="dashboard-panel-name"] input');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');

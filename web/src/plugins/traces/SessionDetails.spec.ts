@@ -72,23 +72,18 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
   splitDuration: vi.fn((n: number) => ({ value: n, unit: "ns" })),
 }));
 
-// quasar copyToClipboard mock
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, any>;
-  return {
-    ...actual,
-    copyToClipboard: vi.fn().mockResolvedValue(undefined),
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
+// Quasar mock (no longer a dependency)
+vi.mock("quasar", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(undefined),
+  useQuasar: () => ({
+    notify: vi.fn(),
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import * as quasar from "quasar";
 import SessionDetails from "./SessionDetails.vue";
 
 
@@ -141,7 +136,7 @@ const globalStubs = {
     template: '<span class="q-icon-stub" :data-name="name"><slot /></span>',
     props: ["name", "size"],
   },
-  OTooltip: { template: "<div><slot /><span>{{ content }}</span></div>", props: ["content"] },
+  OTooltip: { template: '<div><slot /><span><slot name="content" /></span></div>', props: ["content", "maxWidth"] },
   OSkeleton: {
     template: '<div class="q-skeleton-stub" />',
     props: ["type", "width", "height"],

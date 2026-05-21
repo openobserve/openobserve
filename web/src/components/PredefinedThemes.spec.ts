@@ -19,9 +19,6 @@ import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [],
-});
 
 // Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn());

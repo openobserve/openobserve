@@ -24,7 +24,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import * as quasar from "quasar";
 
 // Hoisted mock references — available inside vi.mock factories so individual
 // tests can assert against them without re-mocking entire modules.
@@ -116,9 +115,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [],
-});
 
 const mockStore = createStore({
   state: {
@@ -520,9 +516,6 @@ describe("TraceDetailsSidebar", async () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       mockSpan.span_id,
     );
-
-    // Check if notification was triggered
-    expect(wrapper.vm.$q.notify).toBeTruthy();
   });
 
   it("should show error notification when copy fails", async () => {
@@ -545,9 +538,6 @@ describe("TraceDetailsSidebar", async () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       mockSpan.span_id,
     );
-
-    // Check if error notification was triggered
-    expect(wrapper.vm.$q.notify).toBeTruthy();
 
     // Restore original mock
     (navigator.clipboard.writeText as any) = originalWriteText;
@@ -1477,9 +1467,6 @@ describe("TraceDetailsSidebar", async () => {
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
           mockSpan.span_id,
         );
-
-        // Check if error notification was triggered
-        expect(wrapper.vm.$q.notify).toBeTruthy();
       } else {
         console.log("Copy button not found, skipping test");
       }

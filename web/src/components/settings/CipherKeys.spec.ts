@@ -541,6 +541,7 @@ describe("CipherKeys", () => {
       mockToastFn.mockClear();
 
       await wrapper.vm.deleteCipherKey();
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledTimes(2);
       expect(mockToastFn).toHaveBeenCalledWith({
@@ -569,6 +570,7 @@ describe("CipherKeys", () => {
       mockToastFn.mockClear();
 
       await wrapper.vm.deleteCipherKey();
+      await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledTimes(2);
       expect(mockToastFn).toHaveBeenCalledWith({

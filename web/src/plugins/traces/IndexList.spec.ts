@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -25,11 +24,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [],
-});
 
 // ── vi.mock calls must be at the top level so Vitest can hoist them ──────────
 
@@ -109,17 +103,15 @@ vi.mock("@/utils/zincutils", async (importOriginal: any) => {
   };
 });
 
-// Mock Quasar notify
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock Quasar (no longer a dependency — provide minimal stub)
+const { mockNotify } = vi.hoisted(() => ({
+  mockNotify: vi.fn(),
+}));
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    notify: mockNotify,
+  }),
+}));
 
 // ── Shared mock state — must be defined before the vi.mock factory runs ──────
 // The factory for useTraces references mockSearchObj via closure.

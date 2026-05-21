@@ -19,9 +19,6 @@ import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/services/iam", () => ({
   getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),

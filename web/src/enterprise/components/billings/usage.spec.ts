@@ -18,14 +18,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingService from "@/services/billings";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [],
-});
 
 // Mock the billings service
 vi.mock("@/services/billings", () => ({

@@ -46,6 +46,29 @@ describe("PatternCard", () => {
 
   const mockIndex = 0;
 
+  const OBadgeStub = {
+    name: "OBadge",
+    props: ["size"],
+    // Vue 3 auto-merges parent class onto root element, so wildcard-chip etc. appear naturally
+    template: '<span data-test-stub="o-badge"><slot /></span>',
+  };
+  const OTooltipStub = {
+    name: "OTooltip",
+    props: ["content", "maxWidth"],
+    template: '<div data-test-stub="o-tooltip" />',
+  };
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size", "iconLeft", "iconRight", "disabled", "title"],
+    emits: ["click"],
+    template: '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null" @click.stop="$emit(\'click\')"><slot /></button>',
+  };
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon"><slot /></span>',
+  };
+
   beforeEach(() => {
     wrapper = mount(PatternCard, {
       props: {
@@ -58,6 +81,10 @@ describe("PatternCard", () => {
         stubs: {
           EqualIcon: { template: '<div class="equal-icon"></div>' },
           NotEqualIcon: { template: '<div class="not-equal-icon"></div>' },
+          OBadge: OBadgeStub,
+          OTooltip: OTooltipStub,
+          OButton: OButtonStub,
+          OIcon: OIconStub,
         },
       },
     });

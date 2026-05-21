@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 
 // Stable spy references — must be declared before vi.mock() factories reference them.
@@ -72,16 +71,12 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: notifyMock,
-      dialog: vi.fn(),
-    }),
-  };
-});
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    notify: notifyMock,
+    dialog: vi.fn(),
+  }),
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: toastMock,

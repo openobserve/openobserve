@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldRow from "./FieldRow.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
@@ -37,16 +37,16 @@ vi.mock("@quasar/extras/material-icons-outlined", () => ({
   "visibility-off": "visibility_off",
 }));
 
-const quasarStubs = {
-  QBtn: {
-    name: "QBtn",
+const componentStubs = {
+  OButton: {
+    name: "OButton",
     template:
       '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\', $event)"><slot /></button>',
     props: ["icon", "size", "round"],
     emits: ["click"],
   },
-  QIcon: {
-    name: "QIcon",
+  OIcon: {
+    name: "OIcon",
     template:
       '<span class="OIcon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click.stop="$emit(\'click\', $event)"></span>',
     props: ["name", "size", "title"],
@@ -81,7 +81,7 @@ function createWrapper(props = {}, slots = {}) {
     props: { ...defaultProps, ...props },
     slots,
     global: {
-      stubs: quasarStubs,
+      stubs: componentStubs,
     },
   });
 }

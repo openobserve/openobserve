@@ -8,7 +8,7 @@ export default class DashboardDrilldownPage {
     // Config sidebar — drilldown section
     this.addButton = page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').first();
     this.popup = page.locator('[data-test="dashboard-drilldown-popup"]');
-    this.nameInput = page.locator('[data-test="dashboard-config-panel-drilldown-name"]');
+    this.nameInput = page.locator('[data-test="dashboard-config-panel-drilldown-name"] input');
     this.logsButton = page.locator('[data-test="dashboard-drilldown-by-logs-btn"]');
     this.urlButton = page.locator('[data-test="dashboard-drilldown-by-url-btn"]');
     this.urlTextarea = page.locator('[data-test="dashboard-drilldown-url-textarea"]');

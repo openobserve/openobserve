@@ -59,15 +59,11 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush }),
 }));
 
-// Mock useQuasar (notify is exercised by navigateToLicense error path).
+// Mock toast (replaces quasar useQuasar/notify — exercised by navigateToLicense error path).
 const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<typeof import("quasar")>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 import config from "@/aws-exports";
 import EnterpriseUpgradeDialog from "@/components/EnterpriseUpgradeDialog.vue";

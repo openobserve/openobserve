@@ -19,9 +19,6 @@ import AddGroup from "@/components/iam/groups/AddGroup.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [],
-});
 
 vi.mock("@/services/iam", () => ({
   createGroup: vi.fn(),

@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       clearable
                     >
                       <template #icon-left>
-                        <OIcon name="search" size="xs" />
+                        <OIcon name="search" size="sm" />
                       </template>
                     </OInput>
                   </div>
@@ -250,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 )
                               "
                               size="xs"
+                              @update:model-value="toggleMetricStream(stream)"
                             />
                           </div>
                           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -310,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OBadge
                         :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
                         class="tw:ml-0.5"
+                        size="sm"
                       >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                     </div>
                   </OTab>
@@ -635,7 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 clearable
               >
                 <template #icon-left>
-                  <OIcon name="search" size="xs" />
+                  <OIcon name="search" size="sm" />
                 </template>
               </OInput>
             </div>
@@ -711,6 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                             size="xs"
+                            @update:model-value="toggleMetricStream(stream)"
                           />
                         </div>
                         <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -779,6 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OBadge
                       :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
                       class="tw:ml-0.5"
+                      size="sm"
                     >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                   </div>
                 </OTab>

@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useQuasar } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -27,7 +26,6 @@ vi.mock('quasar', async () => {
   };
 });
 
-installQuasar();
 
 // Mock services and composables
 vi.mock("@/services/search", () => ({

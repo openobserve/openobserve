@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showFolderSelection = false"
       @click:primary="confirmAdd"
     >
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="tw:flex tw:items-end tw:gap-2">
         <OSelect
           v-model="selectedFolderObj"
           :options="folderOptions"
@@ -128,15 +128,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:grow"
           data-test="add-dashboard-github-folder-select"
         />
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="showAddFolderDialog = true"
-          data-test="add-dashboard-github-add-folder"
-          title="Add New Folder"
-        >
-          <template #icon-left><OIcon name="add" size="sm" /></template>
-        </OButton>
+        <div style="width: 40px; margin-bottom: 2px">
+          <OButton
+            variant="outline"
+            size="icon-xs"
+            icon-left="add"
+            @click="showAddFolderDialog = true"
+            data-test="add-dashboard-github-add-folder"
+            title="Add New Folder"
+          />
+        </div>
       </div>
     </ODialog>
 
@@ -353,8 +354,10 @@ export default defineComponent({
           value: f.folderId,
         }));
 
-        // Don't auto-select - let user choose
-        selectedFolderObj.value = null;
+        // Auto-select the default folder; preserve existing selection if still valid
+        if (!selectedFolderObj.value || !folderOptions.value.some((o) => o.value === selectedFolderObj.value)) {
+          selectedFolderObj.value = sorted.find((f: any) => f.folderId === 'default')?.folderId ?? sorted[0]?.folderId ?? null;
+        }
       } catch (err) {
         console.error("Error loading folders:", err);
       }

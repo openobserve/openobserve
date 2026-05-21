@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchSchedulersList from "./SearchSchedulersList.vue";
@@ -71,8 +70,6 @@ vi.mock('vue-i18n', async (importOriginal) => {
     })
   };
 });
-
-installQuasar();
 
 describe("SearchSchedulersList Component", () => {
   let wrapper;
@@ -309,9 +306,9 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.getStatusText(2)).toBe("search_scheduler_job.status_finished");
       expect(wrapper.vm.getStatusText(3)).toBe("search_scheduler_job.status_cancelled");
 
-      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
-      expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
-      expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
+      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass-empty");
+      expect(wrapper.vm.getStatusIcon(1)).toBe("pause");
+      expect(wrapper.vm.getStatusIcon(2)).toBe("check-circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
 
       expect(wrapper.vm.getStatusColor(0)).toBe("orange");

@@ -423,6 +423,7 @@ export default defineComponent({
 
 .date-time-table {
   display: flex;
+  flex-direction: column;
 
   .relative-row {
     display: flex;

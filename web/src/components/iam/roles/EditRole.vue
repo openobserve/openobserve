@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <template v-if="isFetchingInitialRoles">
-      <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
-        <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="tw:text-center tw:w-full">
+      <div data-test="edit-role-page-loading-spinner" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:w-full" style="margin-top: 64px">
+        <OSpinner size="md" class="tw:mb-2" />
+        <div class="tw:text-center">
           Hold on tight, we're fetching your role details...
         </div>
       </div>
@@ -130,22 +130,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div></div>
-            <OToggleGroup
-              data-test="edit-role-permissions-ui-type-toggle"
-              class="tw:mr-3 tw:my-1"
-              :model-value="permissionsUiType"
-              @update:model-value="(v) => updatePermissionsUi(v as string)"
-            >
-              <OToggleGroupItem
-                v-for="visual in permissionUiOptions"
-                :key="visual.value"
-                :value="visual.value"
-                size="sm"
-                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <span
+                data-test="edit-role-permissions-count"
+                class="tw:font-bold tw:text-[14px]"
               >
-                {{ visual.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
+                {{ countOfVisibleResources }} Permissions
+              </span>
+              <OToggleGroup
+                data-test="edit-role-permissions-ui-type-toggle"
+                class="tw:mr-3 tw:my-1"
+              :model-value="permissionsUiType"
+                @update:model-value="(v) => updatePermissionsUi(v as string)"
+              >
+                <OToggleGroupItem
+                  v-for="visual in permissionUiOptions"
+                  :key="visual.value"
+                  :value="visual.value"
+                  size="sm"
+                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                >
+                  {{ visual.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
           </div>
 
           <div data-test="edit-role-permissions-table-section" class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto">

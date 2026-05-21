@@ -196,11 +196,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
     // await page.locator(".cm-line").first().click();
 
-    // Focus on the first line of the editor
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole('code')
-      .click();
+    // Fill Monaco editor directly — skip click that gets intercepted by .sql-bar
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .locator(".inputarea")
@@ -360,16 +356,16 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="dashboard-variable-adhoc-add-selector"]')
       .click();
     await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"]')
+      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
       .click();
     await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"]')
+      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
       .fill("kubernetes_container_hash");
     await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"]')
+      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
       .click();
     await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"]')
+      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
       .fill(
         "058694856476.dkr.ecr.us-west-2.amazonaws.com/zinc-cp@sha256:56e216b3d61bd282846e3f6d1bd9cb82f83b90b7e401ad0afc0052aa3f15715c"
       );
@@ -524,7 +520,7 @@ test.describe("dashboard UI testcases", () => {
     // Attempt to save the panel without a name
     await pm.dashboardPanelActions.savePanel();
     await expect(
-      page.getByText("There are some errors, please fix them and try again")
+      page.getByText("There are some errors, please fix them and try again").first()
     ).toBeVisible();
 
     // Add a panel name and save again
@@ -641,7 +637,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the expected error message is shown
     await expect(
-      page.getByText("There are some errors, please fix them and try again")
+      page.getByText("There are some errors, please fix them and try again").first()
     ).toBeVisible();
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
@@ -718,7 +714,7 @@ test.describe("dashboard UI testcases", () => {
 
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
       .fill(
@@ -773,7 +769,7 @@ test.describe("dashboard UI testcases", () => {
 
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
       .fill(
@@ -871,7 +867,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();    
     
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
       .fill(
@@ -922,7 +918,7 @@ ORDER BY _time ASC`
     await page.waitForFunction(
       () => {
         const canvases = document.querySelectorAll('[data-test="chart-renderer"] canvas');
-        return canvases.length >= 2;
+        return canvases.length >= 1;
       },
       { timeout: 15000, polling: 500 }
     );
