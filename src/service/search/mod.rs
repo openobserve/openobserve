@@ -27,7 +27,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
         self_reporting::usage::{RequestStats, UsageType},
@@ -45,10 +44,7 @@ use config::{
     },
 };
 use hashbrown::HashMap;
-use infra::{
-    cluster::get_cached_online_querier_nodes,
-    errors::{Error, ErrorCodes},
-};
+use infra::errors::{Error, ErrorCodes};
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;
@@ -737,38 +733,8 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let role_group = if is_http_req {
-        Some(RoleGroup::Interactive)
-    } else {
-        Some(RoleGroup::Background)
-    };
-    let nodes = get_cached_online_querier_nodes(role_group)
-        .await
-        .unwrap_or_default();
-    if nodes.is_empty() {
-        log::error!("[trace_id {trace_id}] search_partition: no querier node online");
-        return Err(Error::Message("no querier node online".to_string()));
-    }
-
-    // Use the configured node selection strategy so cpu_cores reflects the
-    // actual nodes this query will fan out to — not the entire cluster.
-    // With "org" or "stream" strategies only a subset of nodes are used;
-    // summing all nodes' CPU would under-estimate total_secs and create too
-    // few partitions.
-    #[cfg(feature = "enterprise")]
-    let cpu_cores = {
-        let stream_key = sql.get_first_stream_key();
-        let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            org_id,
-            &stream_key,
-            nodes,
-            role_group,
-        )
-        .await;
-        selected.iter().map(|n| n.cpu_num).sum::<u64>() as usize
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
+    let cpu_cores =
+        partition::cpu_cores::get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
 
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
@@ -823,19 +789,13 @@ pub async fn search_partition(
         total_secs += 1;
     }
 
-    // If total secs is <= aggs_min_num_partition_secs (default 3 seconds), then disable
-    // partitioning even if streaming aggs is true. This optimization avoids partition overhead
-    // for fast queries.
     #[cfg(feature = "enterprise")]
     if is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs {
         log::info!(
-            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({}) <= aggs_min_num_partition_secs ({}), returning single partition",
-            total_secs,
+            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({total_secs}) <= aggs_min_num_partition_secs ({}), returning single partition",
             cfg.limit.aggs_min_num_partition_secs
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
-        resp.streaming_aggs = false;
-        resp.streaming_id = None;
         return Ok(resp);
     }
 

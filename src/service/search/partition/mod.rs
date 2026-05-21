@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub(crate) mod aggregate;
+pub(crate) mod cpu_cores;
 pub(crate) mod stream_files;
 
 use std::cmp::max;
