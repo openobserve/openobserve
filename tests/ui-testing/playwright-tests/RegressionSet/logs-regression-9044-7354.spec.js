@@ -5,7 +5,7 @@ const logData = require('../../fixtures/log.json');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -88,7 +88,7 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
 });
 
 test.describe('Regression: Undefined Length error on Logs -> Scheduled Search -> Streams -> Logs (#7354)', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
