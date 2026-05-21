@@ -36,7 +36,7 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-label-rotate"]'
     );
     this.noValueReplacement = page.locator(
-      '[data-test="dashboard-config-no-value-replacement"]'
+      '[data-test="dashboard-config-no-value-replacement"] input'
     );
     this.trellisLayout = page.locator('[data-test="dashboard-trellis-chart"]');
     this.queryLimit = page.locator('[data-test="dashboard-config-limit"]');
