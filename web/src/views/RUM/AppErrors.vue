@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
+            :query="errorTrackingState.data.editorValue"
             @event-emitted="handleSidebarEvent"
           />
         </div>
@@ -94,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               horizontal-scroll
               class="tw:h-full"
               data-test="rum-app-errors-table"
+              row-class="tw:cursor-pointer"
               @row-click="handleRowClick"
             >
               <template #empty>
