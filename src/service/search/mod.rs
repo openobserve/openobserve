@@ -680,11 +680,8 @@ pub async fn search_partition(
     // if there is no _timestamp field or EXPLAIN in the query, return single partitions
     let is_explain_query = is_explain_query(&req.sql);
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
+    let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
-
-    let mut use_single_partition = ts_column.is_none() || apply_over_hits;
-    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
-    let is_http_distinct = is_simple_distinct && is_http_req;
 
     #[allow(unused_mut)]
     let mut is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
@@ -693,15 +690,10 @@ pub async fn search_partition(
         is_http_distinct,
     );
 
-    // if need streaming output and is simple query, we shouldn't skip file list
-    if use_single_partition && req.streaming_output && is_streaming_aggregate {
-        use_single_partition = false;
-    }
-
-    // if http distinct, we should skip file list
-    if is_http_distinct || is_explain_query {
-        use_single_partition = true;
-    }
+    let use_single_partition = is_http_distinct
+        || is_explain_query
+        || ((ts_column.is_none() || apply_over_hits)
+            && !(req.streaming_output && is_streaming_aggregate));
 
     let query_duration_secs = (req.end_time - req.start_time) / 1000 / 1000;
     let stream_files = partition::stream_files::collect_stream_files(
@@ -719,9 +711,7 @@ pub async fn search_partition(
     let max_query_range = stream_files.max_query_range;
     let max_query_range_in_hour = stream_files.max_query_range_in_hour;
     log::info!(
-        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
-        max_query_range,
-        max_query_range_in_hour
+        "[trace_id {trace_id}] max_query_range: {max_query_range}, max_query_range_in_hour: {max_query_range_in_hour}",
     );
 
     let file_list_took = start.elapsed().as_millis() as usize;
