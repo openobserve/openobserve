@@ -325,17 +325,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div
-            v-if="loading"
-            class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:mt-1"
-            style="font-size: 1.5rem; height: calc(100vh - 220px);"
-          >
-            <OSpinner size="lg" />
-          </div>
+          <OSpinner v-if="loading" size="lg" />
           <div
             v-else
             class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-y-3"
-            style="height: calc(100vh - 220px);"
           >
             <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
             <div class="tw:text-base tw:font-medium tw:text-gray-400 tw:mt-2">
