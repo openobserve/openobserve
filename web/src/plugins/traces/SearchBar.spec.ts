@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, computed, reactive } from "vue";
-import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 

@@ -3,8 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Custom from "@/components/ingestion/Custom.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
-
 
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
@@ -23,6 +21,11 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
+// Mock the clipboard utility that the component actually uses
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
+
 // Mock router
 const mockRouter = {
   currentRoute: {
@@ -39,19 +42,12 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
+// Mock Quasar — kept as safety net for any transitive dependency that might need it.
+// Does NOT use importOriginal() since quasar has been removed from the project.
+vi.mock("quasar", () => ({
+  useQuasar: () => ({ notify: vi.fn() }),
+  copyToClipboard: vi.fn(),
+}));
 
 describe("Custom Component", () => {
   let wrapper: any = null;
@@ -74,11 +70,11 @@ describe("Custom Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
+          'OSplitter': {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
-          'q-tabs': true,
-          'q-route-tab': true,
+          'OTabs': true,
+          'ORouteTab': true,
           'router-view': true
         }
       },
@@ -134,11 +130,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -156,11 +152,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -178,11 +174,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -211,11 +207,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -232,61 +228,55 @@ describe("Custom Component", () => {
 
   describe("copyToClipboardFn", () => {
     it("should copy content and show success notification", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const mockContent = {
         innerText: "test content to copy"
       };
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy");
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
+
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
         timeout: 5000,
       });
     });
 
     it("should show error notification when copy fails", async () => {
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("Copy failed"));
-      
+
       const mockContent = {
         innerText: "test content to copy"
       };
-      
+
       try {
         await wrapper.vm.copyToClipboardFn(mockContent);
       } catch (error) {
         // Expected error
       }
-      
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy");
-      
-      // Wait for the promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "negative",
-        message: "Error while copy content.",
+
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
         timeout: 5000,
       });
     });
 
     it("should track segment analytics for copy action", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const segment = await import("@/services/segment_analytics");
-      
+
       const mockContent = {
         innerText: "test content"
       };
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
+
       expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: mockRouter.currentRoute.value.name,
@@ -318,11 +308,11 @@ describe("Custom Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
+              'OSplitter': {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
               },
-              'q-tabs': true,
-              'q-route-tab': true,
+              'OTabs': true,
+              'ORouteTab': true,
               'router-view': true
             }
           },
@@ -342,11 +332,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -384,11 +374,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -407,11 +397,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -430,11 +420,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -453,11 +443,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -480,11 +470,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -507,11 +497,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -534,11 +524,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -560,11 +550,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -583,11 +573,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -606,11 +596,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -629,11 +619,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -652,11 +642,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -675,11 +665,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -701,11 +691,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -737,11 +727,11 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -764,20 +754,20 @@ describe("Custom Component", () => {
 
   describe("Segment Analytics", () => {
     it("should track analytics with correct parameters for different routes", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const segment = await import("@/services/segment_analytics");
-      
+
       // Test with different route
       mockRouter.currentRoute.value.name = "prometheus";
-      
+
       const mockContent = {
         innerText: "test analytics content"
       };
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
+
       expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "prometheus",
@@ -787,71 +777,75 @@ describe("Custom Component", () => {
       });
     });
 
-    it("should track analytics even when copy fails", async () => {
-      const { copyToClipboard } = await import("quasar");
+    it("should not track analytics when copy fails", async () => {
+      const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("Copy failed"));
-      
+
       const segment = await import("@/services/segment_analytics");
-      
+
       const mockContent = {
         innerText: "test analytics content"
       };
-      
+
       try {
         await wrapper.vm.copyToClipboardFn(mockContent);
       } catch (error) {
         // Expected error
       }
-      
-      // Wait for promises to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: mockRouter.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
+
+      // segment.track is only called on success, so it should NOT be called on failure
+      expect(segment.default.track).not.toHaveBeenCalled();
     });
   });
 
   describe("Error Handling", () => {
     it("should handle clipboard copy with empty content", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const mockContent = {
         innerText: ""
       };
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
-      expect(copyToClipboard).toHaveBeenCalledWith("");
+
+      expect(copyToClipboard).toHaveBeenCalledWith("", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
 
     it("should handle clipboard copy with null content", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const mockContent = {
         innerText: null
       };
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
-      expect(copyToClipboard).toHaveBeenCalledWith(null);
+
+      expect(copyToClipboard).toHaveBeenCalledWith(null, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
 
     it("should handle missing innerText property", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-      
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
+
       const mockContent = {};
-      
+
       await wrapper.vm.copyToClipboardFn(mockContent);
-      
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
   });
 

@@ -17,21 +17,18 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import OrganizationSettings from "./OrganizationSettings.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 
 
-// Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn());
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock toast from @/lib/feedback/Toast/useToast (replaces Quasar $q.notify)
+// Must use vi.hoisted so the mock factory can access mockToast before it's initialized
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock organizations service
 vi.mock("@/services/organizations", () => ({
@@ -49,7 +46,8 @@ vi.mock("vuex", () => ({
 }));
 
 // Create enhanced mock store with proper dispatch mock
-const mockStore = {
+// Use reactive() so watchers in the component can observe state changes
+const mockStore = reactive({
   ...store,
   dispatch: vi.fn(),
   state: {
@@ -68,7 +66,7 @@ const mockStore = {
       },
     },
   },
-};
+}) as any;
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(OrganizationSettings, {
@@ -77,31 +75,24 @@ const createWrapper = (props = {}, options = {}) => {
     },
     global: {
       plugins: [i18n],
-      mocks: {
-        $store: mockStore,
-        $q: {
-          notify: mockNotify,
-        },
-      },
       provide: {
         store: mockStore,
       },
       stubs: {
-        QInput: {
-          template: `<input 
-            data-test-stub='q-input' 
+        OInput: {
+          template: `<input
+            data-test-stub='o-input'
             :data-test='$attrs["data-test"]'
             :value='modelValue'
-            @input='$emit("update:modelValue", $event.target.value.trim())'
-            :class='$attrs.class'
+            @input='$emit("update:modelValue", $event.target.value)'
           />`,
-          props: ["modelValue", "label", "rules", "color", "bgColor", "outlined", "filled", "dense", "stackLabel"],
+          props: ["modelValue", "label", "error", "errorMessage", "helpText"],
           emits: ["update:modelValue"],
         },
-        QToggle: {
-          template: `<input 
-            type='checkbox' 
-            data-test-stub='q-toggle' 
+        OSwitch: {
+          template: `<input
+            type='checkbox'
+            data-test-stub='o-switch'
             :data-test='$attrs["data-test"]'
             :checked='modelValue'
             @change='$emit("update:modelValue", $event.target.checked)'
@@ -109,18 +100,24 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue", "label"],
           emits: ["update:modelValue"],
         },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
+        OButton: {
+          template: `<button
+            data-test-stub='o-btn'
             :data-test='$attrs["data-test"]'
             @click='$emit("click", $event)'
-            :disabled='loading'
           >
-            {{ label }}
             <slot></slot>
           </button>`,
-          props: ["label", "loading", "color", "padding", "noCaps", "textColor"],
+          props: ["variant", "size", "type", "loading"],
           emits: ["click"],
+        },
+        OSeparator: {
+          template: '<hr data-test-stub="o-separator" />',
+        },
+        CrossLinkManager: {
+          template: '<div data-test="cross-link-manager">CrossLinkManager</div>',
+          props: ["modelValue", "title", "subtitle"],
+          emits: ["update:modelValue", "change"],
         },
       },
     },
@@ -159,7 +156,7 @@ describe("OrganizationSettings", () => {
 
     it("should display the settings title", () => {
       const wrapper = createWrapper();
-      const title = wrapper.find(".text-body1.text-bold");
+      const title = wrapper.get("div.tw\\:text-base.tw\\:font-bold");
       expect(title.exists()).toBe(true);
       expect(title.text()).toContain("Log Details");
     });
@@ -216,58 +213,58 @@ describe("OrganizationSettings", () => {
   describe("Form inputs", () => {
     it("should render trace ID field name input", () => {
       const wrapper = createWrapper();
-      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="q-input"]');
+      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="o-input"]');
       expect(traceInput.exists()).toBe(true);
     });
 
     it("should render span ID field name input", () => {
       const wrapper = createWrapper();
-      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="q-input"]');
+      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="o-input"]');
       expect(spanInput.exists()).toBe(true);
     });
 
     it("should render toggle ingestion logs", () => {
       const wrapper = createWrapper();
-      const toggleInput = wrapper.find('input[data-test-stub="q-toggle"]');
+      const toggleInput = wrapper.find('input[data-test-stub="o-switch"]');
       expect(toggleInput.exists()).toBe(true);
     });
 
     it("should update traceIdFieldName when input changes", async () => {
       const wrapper = createWrapper();
-      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="q-input"]');
-      
+      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="o-input"]');
+
       await traceInput.setValue("new_trace_id");
       expect(wrapper.vm.traceIdFieldName).toBe("new_trace_id");
     });
 
     it("should update spanIdFieldName when input changes", async () => {
       const wrapper = createWrapper();
-      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="q-input"]');
-      
+      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="o-input"]');
+
       await spanInput.setValue("new_span_id");
       expect(wrapper.vm.spanIdFieldName).toBe("new_span_id");
     });
 
     it("should update toggleIngestionLogs when toggle changes", async () => {
       const wrapper = createWrapper();
-      const toggle = wrapper.find('input[data-test-stub="q-toggle"]');
-      
+      const toggle = wrapper.find('input[data-test-stub="o-switch"]');
+
       await toggle.setChecked(true);
       expect(wrapper.vm.toggleIngestionLogs).toBe(true);
     });
 
     it("should trim whitespace from trace ID input", async () => {
       const wrapper = createWrapper();
-      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="q-input"]');
-      
+      const traceInput = wrapper.find('.trace-id-field-name input[data-test-stub="o-input"]');
+
       await traceInput.setValue("  trace_with_spaces  ");
       expect(wrapper.vm.traceIdFieldName).toBe("trace_with_spaces");
     });
 
     it("should trim whitespace from span ID input", async () => {
       const wrapper = createWrapper();
-      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="q-input"]');
-      
+      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="o-input"]');
+
       await spanInput.setValue("  span_with_spaces  ");
       expect(wrapper.vm.spanIdFieldName).toBe("span_with_spaces");
     });
@@ -396,13 +393,13 @@ describe("OrganizationSettings", () => {
 
     it("should be called when span input changes", async () => {
       const wrapper = createWrapper();
-      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="q-input"]');
-      
+      const spanInput = wrapper.find('.span-id-field-name input[data-test-stub="o-input"]');
+
       // Set spy on updateFieldName
       const updateFieldNameSpy = vi.spyOn(wrapper.vm, 'updateFieldName');
-      
+
       await spanInput.setValue('new_span');
-      
+
       // The template calls updateFieldName('span') on @update:model-value
       // Since we're testing the function exists and works, let's call it directly
       wrapper.vm.updateFieldName('span');
@@ -454,10 +451,9 @@ describe("OrganizationSettings", () => {
 
       await wrapper.vm.saveOrgSettings();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Organization settings updated successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -471,10 +467,9 @@ describe("OrganizationSettings", () => {
 
       await wrapper.vm.saveOrgSettings();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: errorMessage,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -485,10 +480,9 @@ describe("OrganizationSettings", () => {
 
       await wrapper.vm.saveOrgSettings();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error saving organization settings",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -499,10 +493,9 @@ describe("OrganizationSettings", () => {
 
       await wrapper.vm.saveOrgSettings();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error saving organization settings",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -556,11 +549,11 @@ describe("OrganizationSettings", () => {
   describe("Form validation rules", () => {
     it("should have validation rules for trace ID field", () => {
       const wrapper = createWrapper();
-      const traceInput = wrapper.findComponent({ name: 'QInput' });
-      
+      const traceInput = wrapper.findComponent({ name: 'OInput' });
+
       if (traceInput.exists()) {
-        expect(traceInput.props('rules')).toBeDefined();
-        expect(Array.isArray(traceInput.props('rules'))).toBe(true);
+        expect(traceInput.props('error')).toBeDefined();
+        expect(traceInput.props('errorMessage')).toBeDefined();
       }
     });
 
@@ -695,13 +688,12 @@ describe("OrganizationSettings", () => {
         message: "Network timeout",
         code: "TIMEOUT"
       });
-      
+
       await wrapper.vm.saveOrgSettings();
-      
-      expect(mockNotify).toHaveBeenCalledWith({
+
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Network timeout",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
@@ -749,32 +741,140 @@ describe("OrganizationSettings", () => {
         usage_stream_enabled: false,
       });
       
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Organization settings updated successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     });
 
     it("should handle form submission with validation errors", async () => {
       const wrapper = createWrapper();
-      
+
       // Set invalid field names
       wrapper.vm.traceIdFieldName = "invalid trace";
       wrapper.vm.spanIdFieldName = "invalid span";
-      
+
       wrapper.vm.updateFieldName("trace");
       wrapper.vm.updateFieldName("span");
-      
+
       expect(wrapper.vm.isValidTraceField).toBe(false);
       expect(wrapper.vm.isValidSpanField).toBe(false);
-      
-      // Even with validation errors, saveOrgSettings should still attempt to save
-      // as validation is primarily for UI feedback
+
+      // The component now validates before saving and returns early on invalid data
       await wrapper.vm.saveOrgSettings();
-      
-      expect(mockPostOrganizationSettings).toHaveBeenCalled();
+
+      expect(mockPostOrganizationSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Usage stream settings", () => {
+    it("should render usage stream toggle", () => {
+      const wrapper = createWrapper();
+      const usageToggle = wrapper.find('[data-test="add-toggle-usage-stream"] input[data-test-stub="o-switch"]');
+      expect(usageToggle.exists()).toBe(true);
+    });
+
+    it("should update usageStreamEnabled when toggle changes", async () => {
+      const wrapper = createWrapper();
+
+      const usageToggle = wrapper.find('[data-test="add-toggle-usage-stream"] input[data-test-stub="o-switch"]');
+      await usageToggle.setChecked(true);
+
+      expect(wrapper.vm.usageStreamEnabled).toBe(true);
+    });
+
+    it("should initialize usageStreamEnabled from store", () => {
+      mockStore.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      const wrapper = createWrapper();
+      expect(wrapper.vm.usageStreamEnabled).toBe(true);
+    });
+  });
+
+  describe("Cross-linking", () => {
+    beforeEach(() => {
+      mockStore.state.zoConfig.enable_cross_linking = true;
+    });
+
+    afterEach(() => {
+      mockStore.state.zoConfig.enable_cross_linking = undefined;
+    });
+
+    it("should render CrossLinkManager when cross-linking is enabled", () => {
+      const wrapper = createWrapper();
+      const crossLinkManager = wrapper.find('[data-test="cross-link-manager"]');
+      expect(crossLinkManager.exists()).toBe(true);
+    });
+
+    it("should update crossLinks when the watch triggers", async () => {
+      const wrapper = createWrapper();
+
+      // Mutate the store's cross_links array to a new reference to trigger the watcher
+      mockStore.state.organizationData.organizationSettings = {
+        ...mockStore.state.organizationData.organizationSettings,
+        cross_links: [{ sourceField: "trace_id", targetOrg: "other-org" }],
+      };
+
+      await nextTick();
+
+      // The watch should have updated crossLinks ref from the store
+      expect(wrapper.vm.crossLinks).toEqual([
+        { sourceField: "trace_id", targetOrg: "other-org" },
+      ]);
+    });
+  });
+
+  describe("Validation errors during save", () => {
+    it("should set traceIdFieldNameError when trace name is empty", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.traceIdFieldName = "";
+      wrapper.vm.spanIdFieldName = "valid_span";
+
+      await wrapper.vm.saveOrgSettings();
+
+      expect(wrapper.vm.traceIdFieldNameError).not.toBe("");
+    });
+
+    it("should set spanIdFieldNameError when span name is empty", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.traceIdFieldName = "valid_trace";
+      wrapper.vm.spanIdFieldName = "";
+
+      await wrapper.vm.saveOrgSettings();
+
+      expect(wrapper.vm.spanIdFieldNameError).not.toBe("");
+    });
+
+    it("should not call API when both fields are empty", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.traceIdFieldName = "";
+      wrapper.vm.spanIdFieldName = "";
+
+      await wrapper.vm.saveOrgSettings();
+
+      expect(mockPostOrganizationSettings).not.toHaveBeenCalled();
+    });
+
+    it("should set format error when trace name is invalid", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.traceIdFieldName = "invalid trace";
+      wrapper.vm.isValidTraceField = false;
+      wrapper.vm.spanIdFieldName = "valid_span";
+
+      await wrapper.vm.saveOrgSettings();
+
+      expect(wrapper.vm.traceIdFieldNameError).not.toBe("");
+    });
+
+    it("should set format error when span name is invalid", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.traceIdFieldName = "valid_trace";
+      wrapper.vm.spanIdFieldName = "invalid span";
+      wrapper.vm.isValidSpanField = false;
+
+      await wrapper.vm.saveOrgSettings();
+
+      expect(wrapper.vm.spanIdFieldNameError).not.toBe("");
     });
   });
 });

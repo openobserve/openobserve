@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import TestFunction from "./TestFunction.vue";
@@ -123,22 +122,6 @@ describe("TestFunction Component", () => {
     }));
 
     // Install Quasar
-    installQuasar({
-      plugins: [],
-      components,
-      config: {
-        notify: {},
-        iconSet: {
-          name: 'material-icons',
-          type: {
-            positive: 'check_circle',
-            negative: 'warning',
-            info: 'info',
-            warning: 'priority_high'
-          }
-        }
-      }
-    });
 
     // Mount component
     wrapper = mount(TestFunction, {

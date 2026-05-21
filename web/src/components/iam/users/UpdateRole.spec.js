@@ -15,7 +15,6 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 import UpdateRole from "./UpdateRole.vue";
 import organizationsService from "@/services/organizations";
@@ -38,7 +37,6 @@ vi.mock("vue-i18n", async (importOriginal) => {
   };
 });
 
-installQuasar();
 
 // ODrawer stub: exposes the migrated props (open/title/size/persistent) and
 // emits the standard update:open / click:* events. Slot content (q-form,

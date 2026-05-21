@@ -136,18 +136,13 @@ vi.mock("vue-router", () => ({
   useRouter: () => mockRouter
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar
-  };
-});
+// Mock Toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock window methods
 Object.assign(window, {
@@ -218,30 +213,29 @@ describe("JsonPreview Component", () => {
           store,
         },
         stubs: {
-          'app-tabs': {
+          'AppTabs': {
             template: '<div><slot></slot></div>',
             props: ['tabs', 'activeTab'],
             emits: ['update:activeTab']
           },
-          'code-query-editor': {
+          'CodeQueryEditor': {
             template: '<div class="mock-code-editor"></div>',
             methods: {
               formatDocument: vi.fn()
             }
           },
           ODialog: ODialogStub,
-          'q-btn': true,
-          'q-btn-dropdown': true,
-          'q-list': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-select': true,
+          'OButton': true,
+          'ODropdown': true,
+          'ODropdownItem': true,
+          'ODropdownSeparator': true,
+          'OSelect': true,
           'OIcon': true,
-          'q-input': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
+          'OInput': true,
+          'OSpinner': true,
+          'OTooltip': true,
+          'LogsHighLighting': true,
+          'ChunkedContent': true,
           'EqualIcon': true,
           'NotEqualIcon': true
         }
@@ -280,22 +274,21 @@ describe("JsonPreview Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'app-tabs': true,
-            'code-query-editor': true,
+            'AppTabs': true,
+            'CodeQueryEditor': true,
             ODialog: ODialogStub,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
+            'OButton': true,
+            'ODropdown': true,
+            'ODropdownItem': true,
+            'ODropdownSeparator': true,
+            'OSelect': true,
             'OIcon': true,
-            'q-input': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
-              'EqualIcon': true,
+            'OInput': true,
+            'OSpinner': true,
+            'OTooltip': true,
+            'LogsHighLighting': true,
+            'ChunkedContent': true,
+            'EqualIcon': true,
             'NotEqualIcon': true
           }
         },
@@ -517,10 +510,9 @@ describe("JsonPreview Component", () => {
       await wrapper.vm.getOriginalData();
       
       expect(wrapper.vm.loading).toBe(false);
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Failed to get the Original data",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 1500,
       });
     });
@@ -538,10 +530,9 @@ describe("JsonPreview Component", () => {
       
       await wrapper.vm.getOriginalData();
       
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Custom error message",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 1500,
       });
     });
@@ -671,10 +662,9 @@ describe("JsonPreview Component", () => {
       
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
       expect(wrapper.vm.showMenu).toBe(false);
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Text copied to clipboard",
-        color: "positive",
-        position: "bottom",
         timeout: 1500,
       });
     });
@@ -759,27 +749,26 @@ describe("JsonPreview Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'app-tabs': true,
-            'code-query-editor': true,
+            'AppTabs': true,
+            'CodeQueryEditor': true,
             ODialog: ODialogStub,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
+            'OButton': true,
+            'ODropdown': true,
+            'ODropdownItem': true,
+            'ODropdownSeparator': true,
+            'OSelect': true,
             'OIcon': true,
-            'q-input': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
-              'EqualIcon': true,
+            'OInput': true,
+            'OSpinner': true,
+            'OTooltip': true,
+            'LogsHighLighting': true,
+            'ChunkedContent': true,
+            'EqualIcon': true,
             'NotEqualIcon': true
           }
         },
       });
-      
+
       // Event listeners should not be called for non-enterprise
     });
   });

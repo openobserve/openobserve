@@ -15,11 +15,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, VueWrapper } from '@vue/test-utils'
-import { installQuasar } from '@/test/unit/helpers'
+
 import store from '@/test/unit/helpers/store'
 import OtelConfig from './OtelConfig.vue'
 
-installQuasar()
 
 // Mock the zincutils functions
 vi.mock('@/utils/zincutils', () => ({

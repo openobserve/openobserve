@@ -179,12 +179,6 @@ describe("DomainManagement Component", () => {
       props,
       global: {
         plugins: [i18n],
-        stubs: {
-          QDrawer: {
-            template: '<div class="q-drawer-stub"><slot /></div>',
-            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
-          },
-        },
       },
     });
   };
@@ -204,17 +198,18 @@ describe("DomainManagement Component", () => {
       const mainContainer = wrapper.find(".domain_management");
       expect(mainContainer.exists()).toBeTruthy();
 
-      // Check for Claim Parser section title (should contain "Claim Parser")
-      const claimParserTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Claim Parser")
+      // Check for Claim Parser section title via data-test
+      const claimParserTitle = mainContainer.find(
+        '[data-test="domain-management-claim-parser-title"]'
       );
-      expect(claimParserTitle).toBeTruthy();
+      expect(claimParserTitle.exists()).toBeTruthy();
+      expect(claimParserTitle.text()).toContain("Claim Parser");
 
-      // Check for Domain Restrictions section title
-      const domainRestrictionsTitle = mainContainer.findAll(".text-h6").find((el: any) =>
-        el.text().includes("Domain") || el.text().includes("Restriction")
+      // Check for Domain Restrictions section title via data-test
+      const domainRestrictionsTitle = mainContainer.find(
+        '[data-test="domain-management-domain-restrictions-title"]'
       );
-      expect(domainRestrictionsTitle).toBeTruthy();
+      expect(domainRestrictionsTitle.exists()).toBeTruthy();
     });
 
     it("should load domain settings on mount", async () => {
@@ -338,24 +333,27 @@ describe("DomainManagement Component", () => {
 
     it("should show confirmation dialog when removing domain", async () => {
       const vm = wrapper.vm;
-      
+
       // Add a test domain first
       vm.domains.push({ name: "test.com", allowAllUsers: true, allowedEmails: [] });
       await nextTick();
-      
-      // Mock q.dialog instead of Dialog.create
-      const mockDialog = vi.fn().mockReturnValue({
-        onOk: vi.fn((callback) => callback()),
-        onCancel: vi.fn(),
-      });
-      
-      // Replace the dialog method on the component's q object
-      vm.$q.dialog = mockDialog;
-      
+
+      const initialDomainCount = vm.domains.length;
+
+      // Call removeDomain which should open the ODialog by setting refs
       await vm.removeDomain(0);
-      
-      expect(mockDialog).toHaveBeenCalled();
-      expect(vm.domains).toHaveLength(0);
+
+      // Assert the dialog state is set (ODialog v-model:open pattern)
+      expect(vm.confirmRemoveDomainOpen).toBe(true);
+      expect(vm.pendingRemoveDomainIndex).toBe(0);
+
+      // Confirm the removal (simulates clicking the ODialog primary button)
+      await vm.doRemoveDomain();
+
+      // Domain should be removed
+      expect(vm.domains).toHaveLength(initialDomainCount - 1);
+      expect(vm.confirmRemoveDomainOpen).toBe(false);
+      expect(vm.pendingRemoveDomainIndex).toBeNull();
     });
   });
 
@@ -556,12 +554,14 @@ describe("DomainManagement Component", () => {
 
     it("should show no domain message when no domains exist", async () => {
       const vm = wrapper.vm;
-      
+
       // Clear all domains
       vm.domains.splice(0, vm.domains.length);
       await nextTick();
-      
-      const noDomainMessage = wrapper.find(".text-center");
+
+      const noDomainMessage = wrapper.find(
+        '[data-test="domain-management-no-domain-message"]'
+      );
       expect(noDomainMessage.exists()).toBeTruthy();
     });
   });

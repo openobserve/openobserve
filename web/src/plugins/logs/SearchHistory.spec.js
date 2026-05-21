@@ -1,7 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useQuasar } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchHistory from "./SearchHistory.vue";
@@ -9,16 +7,10 @@ import searchService from "@/services/search";
 import useLogs from "@/composables/useLogs";
 import { useRouter, useRoute } from "vue-router";
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn()
-    }))
-  };
-});
+// Mock Toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // Mock the search service
 vi.mock("@/services/search", () => ({
@@ -83,12 +75,9 @@ vi.mock('vue-i18n', async (importOriginal) => {
 describe("SearchHistory Component", () => {
   let wrapper;
   let mockStore;
-  let notifyMock;
   let routerPushMock;
 
   beforeEach(() => {
-    // Install Quasar for this test instance
-    installQuasar();
     // Setup mock store
     mockStore = {
       state: {
@@ -104,12 +93,6 @@ describe("SearchHistory Component", () => {
         },
         timezone: "UTC"
       }
-    };
-
-    // Setup notify mock
-    notifyMock = vi.fn();
-    const $q = {
-      notify: notifyMock
     };
 
     // Setup router mock
@@ -133,13 +116,11 @@ describe("SearchHistory Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: true,
-          QTable: true,
-          QTr: true,
-          QTd: true,
-          QBtn: true,
-          QIcon: true,
-          QToggle: true,
+          OButton: true,
+          OIcon: true,
+          OSwitch: true,
+          OTable: true,
+          OSpinner: true,
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
@@ -147,10 +128,11 @@ describe("SearchHistory Component", () => {
             }
           },
           AppTabs: true,
-          QueryEditor: true
+          QueryEditor: true,
+          TenstackTable: true,
+          NoData: true
         },
         mocks: {
-          $q,
           $router: { push: routerPushMock }
         }
       },

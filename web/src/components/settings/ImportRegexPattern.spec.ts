@@ -23,6 +23,13 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
+const { mockToastFn } = vi.hoisted(() => ({
+  mockToastFn: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToastFn(...args),
+}));
+
 // Mock services
 vi.mock("@/services/regex_pattern", () => ({
   default: {
@@ -41,9 +48,6 @@ vi.mock("@/utils/cookies", () => ({
   getLanguage: vi.fn(() => "en-gb")
 }));
 
-installQuasar({
-  plugins: []
-});
 
 describe("ImportRegexPattern", () => {
   let wrapper: any = null;
@@ -443,13 +447,14 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith({
+      expect(mockToastFn).toHaveBeenCalledWith({
         message: "JSON string is empty",
-        color: "negative",
+        variant: "error",
         position: "bottom",
         timeout: 2000,
       });
@@ -475,18 +480,19 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "negative",
+          variant: "error",
           position: "bottom",
           timeout: 2000,
         })
       );
-      expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
+      expect(mockToastFn.mock.calls[0][0].message).toContain("JSON");
     });
 
     it("should reset BaseImport isImporting flag when JSON is invalid", async () => {

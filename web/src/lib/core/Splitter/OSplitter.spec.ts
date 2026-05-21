@@ -2,7 +2,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin'
 import { nextTick } from 'vue'
 
 // Mock useResizer composable - must be hoisted before import
@@ -13,7 +12,6 @@ vi.mock('@/composables/useResizer', () => ({
 import OSplitter from './OSplitter.vue'
 import useResizer from '@/composables/useResizer'
 
-installQuasar()
 
 describe('OSplitter', () => {
   let wrapper: VueWrapper

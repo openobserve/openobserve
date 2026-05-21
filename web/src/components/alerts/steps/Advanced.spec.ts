@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
 import Advanced, { type Variable } from "./Advanced.vue";
 import i18n from "@/locales";
 

@@ -55,22 +55,16 @@ vi.mock("vue-router", () => ({
   })
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn(),
-  dialog: vi.fn()
-};
+// Mock Toast
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    date: {
-      formatDate: vi.fn((date, format) => "2024-01-01T10:00:00Z")
-    }
-  };
-});
+// Mock date utils
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn((date: any, format: string) => "2024-01-01T10:00:00Z"),
+}));
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -140,7 +134,6 @@ describe("SearchSchedulersList Component", () => {
           'JsonPreview': true
         },
         mocks: {
-          $q: mockQuasar,
           $router: mockRouter
         }
       },
@@ -346,8 +339,8 @@ describe("SearchSchedulersList Component", () => {
 
     it("should return correct status icons", () => {
       expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass-empty");
-      expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
-      expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
+      expect(wrapper.vm.getStatusIcon(1)).toBe("pause");
+      expect(wrapper.vm.getStatusIcon(2)).toBe("check-circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
       expect(wrapper.vm.getStatusIcon(999)).toBe("help");
     });
@@ -542,42 +535,35 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should copy text to clipboard successfully", async () => {
-      await wrapper.vm.copyToClipboard("test text", "Query");
-      
+      await wrapper.vm.copyToClipboard("test text", { successMessage: "Query Copied Successfully!", timeout: 5000 });
+
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Query Copied Successfully!",
-        timeout: 5000
+        timeout: 5000,
       });
     });
 
     it("should handle clipboard error", async () => {
       navigator.clipboard.writeText.mockRejectedValueOnce(new Error("Failed"));
-      
-      try {
-        await wrapper.vm.copyToClipboard("test text", "Query");
-      } catch (error) {
-        // Handle the error if the function doesn't catch it internally
-      }
-      
-      // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "negative",
-        message: "Error while copy content.",
-        timeout: 5000
+
+      await wrapper.vm.copyToClipboard("test text", "Query");
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Failed to copy to clipboard",
+        timeout: 2000,
       });
     });
 
     it("should handle different content types", async () => {
-      await wrapper.vm.copyToClipboard("function code", "Function");
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      await wrapper.vm.copyToClipboard("function code", { successMessage: "Function Copied Successfully!", timeout: 5000 });
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Function Copied Successfully!",
-        timeout: 5000
+        timeout: 5000,
       });
     });
   });
@@ -764,10 +750,10 @@ describe("SearchSchedulersList Component", () => {
           to: 2000000
         })
       });
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Search Job have been applied successfully",
-        timeout: 2000
+        timeout: 2000,
       });
     });
 

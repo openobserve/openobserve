@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldExpansion from "./FieldExpansion.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
@@ -83,29 +83,21 @@ function createWrapper(props = {}) {
     props: { ...defaultProps, ...props },
     global: {
       stubs: {
-        QExpansionItem: {
-          name: "QExpansionItem",
+        OCollapsible: {
+          name: "OCollapsible",
           template:
             '<div class="q-expansion-item-stub"><slot name="header" /><slot /></div>',
           props: ["modelValue", "label", "dense", "hideExpandIcon"],
           emits: ["before-show", "before-hide", "update:modelValue"],
         },
-        QCard: {
-          name: "QCard",
-          template: '<div class="q-card-stub"><slot /></div>',
-        },
-        QCardSection: {
-          name: "QCardSection",
-          template: '<div class="q-card-section-stub"><slot /></div>',
-        },
-        QBtn: {
-          name: "QBtn",
+        OButton: {
+          name: "OButton",
           template:
             '<button class="q-btn-stub" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
-        QIcon: {
-          name: "QIcon",
+        OIcon: {
+          name: "OIcon",
           template:
             '<span class="OIcon-stub" :data-name="name" v-bind="$attrs" @click="$emit(\'click\', $event)"></span>',
           props: ["name", "size"],
