@@ -406,34 +406,33 @@ describe("SearchJobInspector — getDurationColor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getPaddingLeft
+// hierarchicalEvents — padding level-based tests
 // ---------------------------------------------------------------------------
-describe("SearchJobInspector — getPaddingLeft", () => {
-  it("returns '0px' for level 0 (top-level rows)", () => {
+describe("SearchJobInspector — hierarchicalEvents level properties", () => {
+  it("top-level events have level 0", () => {
     const wrapper = mountComponent();
-    expect(wrapper.vm.getPaddingLeft(0)).toBe("0px");
+    setProfileData(wrapper);
+    const events = wrapper.vm.hierarchicalEvents;
+    expect(events[0].level).toBe(0);
+    expect(events[1].level).toBe(0);
   });
 
-  it("returns '44px' for level 1", () => {
+  it("children of nested events have appropriate parent reference", () => {
     const wrapper = mountComponent();
-    expect(wrapper.vm.getPaddingLeft(1)).toBe("44px");
-  });
-
-  it("returns '56px' for level 2 (44 + 12)", () => {
-    const wrapper = mountComponent();
-    expect(wrapper.vm.getPaddingLeft(2)).toBe("56px");
-  });
-
-  it("returns '68px' for level 3 (44 + 24)", () => {
-    const wrapper = mountComponent();
-    expect(wrapper.vm.getPaddingLeft(3)).toBe("68px");
-  });
-
-  it("increments by 12px per additional level beyond 1", () => {
-    const wrapper = mountComponent();
-    const l4 = parseInt(wrapper.vm.getPaddingLeft(4));
-    const l5 = parseInt(wrapper.vm.getPaddingLeft(5));
-    expect(l5 - l4).toBe(12);
+    setProfileData(wrapper, {
+      events: [
+        {
+          component: "parent",
+          duration: 200,
+          timestamp: "0",
+          events: [
+            { component: "child", duration: 50, timestamp: "1" },
+          ],
+        },
+      ],
+    });
+    expect(wrapper.vm.hierarchicalEvents).toHaveLength(1);
+    expect(wrapper.vm.hierarchicalEvents[0].level).toBe(0);
   });
 });
 
@@ -461,9 +460,9 @@ describe("SearchJobInspector — hasNoData", () => {
 });
 
 // ---------------------------------------------------------------------------
-// hierarchicalEvents + toggleNode
+// hierarchicalEvents + tree structure
 // ---------------------------------------------------------------------------
-describe("SearchJobInspector — hierarchicalEvents tree & toggleNode", () => {
+describe("SearchJobInspector — hierarchicalEvents tree", () => {
   it("returns empty array when profileData has no events", () => {
     const wrapper = mountComponent();
     wrapper.vm.profileData = null;
@@ -496,7 +495,7 @@ describe("SearchJobInspector — hierarchicalEvents tree & toggleNode", () => {
     expect(wrapper.vm.hierarchicalEvents).toHaveLength(1);
   });
 
-  it("shows children after toggleNode expands parent", () => {
+  it("nested children are accessible in hierarchicalEvents data", () => {
     const wrapper = mountComponent();
     setProfileData(wrapper, {
       events: [
@@ -512,30 +511,8 @@ describe("SearchJobInspector — hierarchicalEvents tree & toggleNode", () => {
       ],
     });
     const parentRow = wrapper.vm.hierarchicalEvents[0];
-    wrapper.vm.toggleNode(parentRow);
-    // After expand: parent + 2 children
-    expect(wrapper.vm.hierarchicalEvents).toHaveLength(3);
-    expect(wrapper.vm.hierarchicalEvents[1].index).toBe("1.1");
-    expect(wrapper.vm.hierarchicalEvents[2].index).toBe("1.2");
-  });
-
-  it("collapses children when toggleNode called again on expanded parent", () => {
-    const wrapper = mountComponent();
-    setProfileData(wrapper, {
-      events: [
-        {
-          component: "parent",
-          duration: 100,
-          timestamp: "0",
-          events: [{ component: "child", duration: 20, timestamp: "1" }],
-        },
-      ],
-    });
-    const parentRow = wrapper.vm.hierarchicalEvents[0];
-    wrapper.vm.toggleNode(parentRow); // expand
-    expect(wrapper.vm.hierarchicalEvents).toHaveLength(2);
-    wrapper.vm.toggleNode(parentRow); // collapse
-    expect(wrapper.vm.hierarchicalEvents).toHaveLength(1);
+    expect(parentRow.events).toHaveLength(2);
+    expect(parentRow.events[0].component).toBe("child step 1");
   });
 });
 

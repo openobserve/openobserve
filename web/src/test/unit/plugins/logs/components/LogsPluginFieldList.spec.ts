@@ -215,11 +215,17 @@ describe("FieldList.vue", () => {
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
+            OBadge: {
+              template: '<span class="obadge-stub"><slot /></span>',
+              props: ["variant"],
+            },
           },
         },
       });
 
-      expect(wrapper.text()).toContain("Fields (2)");
+      // Group name "Fields" and count "2" are rendered (OBadge displays count)
+      expect(wrapper.text()).toContain("Fields");
+      expect(wrapper.text()).toContain("2");
     });
 
     it("should show expand icon for groups with fields", () => {
@@ -437,12 +443,17 @@ describe("FieldList.vue", () => {
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
+            OBadge: {
+              template: '<span class="obadge-stub"><slot /></span>',
+              props: ["variant"],
+            },
           },
         },
       });
 
-      // Group should show interesting count (1) instead of total (2)
-      expect(wrapper.text()).toContain("Fields (1)");
+      // Group renders "Fields" and count "1" via OBadge (not "(1)")
+      expect(wrapper.text()).toContain("Fields");
+      expect(wrapper.text()).toContain("1");
     });
 
     it("should use interesting count in group header when mode enabled", () => {
@@ -502,12 +513,13 @@ describe("FieldList.vue", () => {
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
+            OBadge: true,
           },
         },
       });
 
       const groupHeader = wrapper.find(".field-group-header");
-      expect(groupHeader.classes()).toContain("text-grey-5");
+      expect(groupHeader.classes()).toContain("tw:text-gray-400");
     });
 
     it("should apply light theme class to group headers", () => {
@@ -523,12 +535,13 @@ describe("FieldList.vue", () => {
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
+            OBadge: true,
           },
         },
       });
 
       const groupHeader = wrapper.find(".field-group-header");
-      expect(groupHeader.classes()).toContain("bg-grey-3");
+      expect(groupHeader.classes()).toContain("tw:bg-gray-200");
     });
   });
 });

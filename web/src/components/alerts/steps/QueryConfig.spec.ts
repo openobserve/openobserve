@@ -574,6 +574,9 @@ describe("QueryConfig.vue", () => {
       expect(result).toBe(true);
     });
 
+    // validate() no longer uses customConditionsForm — it validates form fields directly.
+    // The test setup replicates conditions that cause validateCustomMode() to return true.
+
     it("should validate successfully with valid conditions", async () => {
       await wrapper.setProps({
         inputData: {
@@ -593,11 +596,7 @@ describe("QueryConfig.vue", () => {
         },
       });
 
-      const mockForm = {
-        validate: vi.fn().mockResolvedValue(true),
-      };
-      wrapper.vm.customConditionsForm = mockForm;
-
+      // selectedFunction defaults to 'total_events' and triggerThreshold is 3 — both valid
       const result = await wrapper.vm.validate();
       expect(result).toBe(true);
     });
@@ -621,27 +620,30 @@ describe("QueryConfig.vue", () => {
         },
       });
 
-      const mockForm = {
-        validate: vi.fn().mockResolvedValue(false),
-      };
-      wrapper.vm.customConditionsForm = mockForm;
+      // Switch to measure function to trigger conditionValue validation which is empty
+      wrapper.vm.selectedFunction = "avg";
+      await nextTick();
 
       const result = await wrapper.vm.validate();
       expect(result).toBe(false);
     });
 
     it("should handle async validation", async () => {
-      const mockForm = {
-        validate: vi.fn().mockResolvedValue(true),
-      };
-      wrapper.vm.customConditionsForm = mockForm;
-
+      // validate is now async internally — it handles all modes directly
+      wrapper.vm.selectedFunction = "total_events";
+      wrapper.vm.triggerThreshold = 3;
       const result = await wrapper.vm.validate();
       expect(result).toBe(true);
     });
 
-    it("should return true when form ref is not available", async () => {
-      wrapper.vm.customConditionsForm = null;
+    it("should return true when custom tab with no conditions", async () => {
+      // validateCustomMode returns true when conditions array is empty
+      await wrapper.setProps({
+        inputData: {
+          ...mockInputData,
+          conditions: { filterType: "group", logicalOperator: "AND", conditions: [] },
+        },
+      });
       const result = await wrapper.vm.validate();
       expect(result).toBe(true);
     });
@@ -1198,7 +1200,7 @@ describe("QueryConfig.vue", () => {
     });
   });
 
-  describe("Issue #6: filteredLogMeasureColumns — numeric column filtering", () => {
+  describe("Issue #6: numericColumns — numeric column filtering", () => {
     const mixedColumns = [
       { label: "message", value: "message", type: "Utf8" },
       { label: "status", value: "status", type: "Int64" },
@@ -1214,7 +1216,7 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "avg";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       const colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       expect(colValues).toContain("status");
       expect(colValues).toContain("duration");
@@ -1230,7 +1232,7 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "count";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       expect(cols.length).toBe(mixedColumns.length);
     });
 
@@ -1239,7 +1241,7 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "total_events";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       expect(cols.length).toBe(mixedColumns.length);
     });
 
@@ -1248,7 +1250,7 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "sum";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       const colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       expect(colValues).not.toContain("message");
       expect(colValues).not.toContain("tags");
@@ -1261,13 +1263,13 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "min";
       await nextTick();
 
-      let cols = wrapper.vm.filteredLogMeasureColumns;
+      let cols = wrapper.vm.numericColumns;
       let colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       expect(colValues).not.toContain("message");
 
       wrapper.vm.selectedFunction = "max";
       await nextTick();
-      cols = wrapper.vm.filteredLogMeasureColumns;
+      cols = wrapper.vm.numericColumns;
       colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       expect(colValues).not.toContain("message");
     });
@@ -1278,7 +1280,7 @@ describe("QueryConfig.vue", () => {
       for (const fn of percentiles) {
         wrapper.vm.selectedFunction = fn;
         await nextTick();
-        const cols = wrapper.vm.filteredLogMeasureColumns;
+        const cols = wrapper.vm.numericColumns;
         const colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
         expect(colValues).not.toContain("message");
         expect(colValues).not.toContain("tags");
@@ -1297,7 +1299,7 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "avg";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       const colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       // col_a and col_c have no type → should be filtered out
       expect(colValues).not.toContain("col_a");
@@ -1314,32 +1316,32 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.selectedFunction = "avg";
       await nextTick();
 
-      const cols = wrapper.vm.filteredLogMeasureColumns;
+      const cols = wrapper.vm.numericColumns;
       const colValues = cols.map((c: any) => (typeof c === "string" ? c : c.value));
       expect(colValues).not.toContain("plain_string_col");
       expect(colValues).toContain("numeric_col");
     });
 
-    it("should update filteredLogMeasureColumns when selectedFunction changes from avg to count", async () => {
+    it("should update numericColumns when selectedFunction changes from avg to count", async () => {
       await wrapper.setProps({ columns: mixedColumns });
       wrapper.vm.selectedFunction = "avg";
       await nextTick();
-      expect(wrapper.vm.filteredLogMeasureColumns.length).toBeLessThan(mixedColumns.length);
+      expect(wrapper.vm.numericColumns.length).toBeLessThan(mixedColumns.length);
 
       wrapper.vm.selectedFunction = "count";
       await nextTick();
-      expect(wrapper.vm.filteredLogMeasureColumns.length).toBe(mixedColumns.length);
+      expect(wrapper.vm.numericColumns.length).toBe(mixedColumns.length);
     });
 
-    it("should update filteredLogMeasureColumns when selectedFunction changes from count to avg", async () => {
+    it("should update numericColumns when selectedFunction changes from count to avg", async () => {
       await wrapper.setProps({ columns: mixedColumns });
       wrapper.vm.selectedFunction = "count";
       await nextTick();
-      expect(wrapper.vm.filteredLogMeasureColumns.length).toBe(mixedColumns.length);
+      expect(wrapper.vm.numericColumns.length).toBe(mixedColumns.length);
 
       wrapper.vm.selectedFunction = "avg";
       await nextTick();
-      expect(wrapper.vm.filteredLogMeasureColumns.length).toBeLessThan(mixedColumns.length);
+      expect(wrapper.vm.numericColumns.length).toBeLessThan(mixedColumns.length);
     });
   });
 });

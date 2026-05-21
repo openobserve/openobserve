@@ -20,7 +20,6 @@ import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import * as vueRouter from 'vue-router';
 
 // Mock vue-router
@@ -265,25 +264,7 @@ describe("ReportList Component", () => {
     it("should initialize with correct default values", () => {
       expect(wrapper.vm.activeTab).toBe("shared");
       expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-    });
-
-    it("should update pagination when rows per page changes", async () => {
-      // Find the QTablePagination component
-      const paginationComponent = wrapper.findComponent(QTablePagination);
-      expect(paginationComponent.exists()).toBe(true);
-      
-      // Trigger the pagination change event
-      await paginationComponent.vm.$emit('update:changeRecordPerPage', {
-        label: "50 / page",
-        value: 50
-      });
-      
-      await nextTick();
-
-      // Verify the pagination state was updated
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.selectedPerPage).toBe(50);
+      expect(wrapper.vm.pageSize).toBe(20);
     });
 
     it("should show loading state during initialization", async () => {
@@ -405,7 +386,7 @@ describe("ReportList Component", () => {
     it("formats unix timestamp correctly", () => {
       const timestamp = 1234567890000000; // microseconds
       const formatted = wrapper.vm.convertUnixToQuasarFormat(timestamp);
-      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/);
     });
 
     it("handles null timestamp", () => {

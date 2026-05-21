@@ -629,6 +629,14 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: {
+              name: vm.folderData.name,
+              description: vm.folderData.description,
+            },
+          },
+        },
       };
 
       await vm.submit();
@@ -652,6 +660,14 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: {
+              name: vm.folderData.name,
+              description: vm.folderData.description,
+            },
+          },
+        },
       };
 
       await vm.submit();
@@ -709,6 +725,14 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: {
+              name: vm.folderData.name,
+              description: vm.folderData.description,
+            },
+          },
+        },
       };
 
       await vm.submit();

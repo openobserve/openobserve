@@ -378,7 +378,7 @@ describe("AssociatedStreamFunction", () => {
   });
 
   describe("Row Expansion (toggleStreamRow)", () => {
-    it("should expand a row when clicked", async () => {
+    it("should expand a row when onExpandRow is called", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -388,7 +388,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       expect(vm.expandedRow.name).toBe("");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
       expect(vm.expandedRow.stream_type).toBe("logs");
     });
@@ -401,10 +401,10 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("");
     });
 
@@ -418,7 +418,7 @@ describe("AssociatedStreamFunction", () => {
       mockStreamFunction.mockResolvedValue(mockStreamFunctionResult);
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
 
       await flushPromises();
       expect(mockStreamFunction).toHaveBeenCalledWith("test-org", "stream1", "logs");
@@ -434,7 +434,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       vm.addFunctionInProgress = true;
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.addFunctionInProgress).toBe(false);
     });
   });

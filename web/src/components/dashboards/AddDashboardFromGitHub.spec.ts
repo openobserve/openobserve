@@ -711,7 +711,7 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(wrapper.vm.folderOptions[0].value).toBe("default");
     });
 
-    it("should set selectedFolderObj to null after loading", async () => {
+    it("should auto-select default folder when previous selection is no longer valid", async () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
         mockFolderList as any
       );
@@ -722,7 +722,7 @@ describe("AddDashboardFromGitHub Component", () => {
       await wrapper.vm.handleNext();
       await flushPromises();
 
-      expect(wrapper.vm.selectedFolderObj).toBeNull();
+      expect(wrapper.vm.selectedFolderObj).toBe("default");
     });
   });
 

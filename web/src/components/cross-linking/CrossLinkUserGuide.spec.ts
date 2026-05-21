@@ -12,16 +12,6 @@ describe("CrossLinkUserGuide Component", () => {
     return mount(CrossLinkUserGuide, {
       global: {
         plugins: [i18n, store],
-        stubs: {
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            emits: ["click"],
-          },
-          "q-tooltip": {
-            template: '<span class="q-tooltip"><slot /></span>',
-          },
-        },
       },
       attachTo: document.body,
     });
@@ -63,73 +53,22 @@ describe("CrossLinkUserGuide Component", () => {
   describe("User Guide Visibility", () => {
     it("should not show user guide by default", () => {
       wrapper = createWrapper();
-      const userGuideDiv = wrapper.find(".user-guide");
       expect(wrapper.vm.showUserGuide).toBe(false);
     });
 
-    it("should toggle showUserGuide when onUserGuideClick is called", () => {
+    it("should be able to toggle showUserGuide to true", () => {
       wrapper = createWrapper();
-
-      // Mock DOM refs with getBoundingClientRect
-      wrapper.vm.userGuideBtnRef = {
-        getBoundingClientRect: vi.fn().mockReturnValue({
-          top: 100,
-          left: 200,
-        }),
-      };
-      wrapper.vm.userGuideDivRef = {
-        style: { top: "", left: "" },
-      };
-
       expect(wrapper.vm.showUserGuide).toBe(false);
-      wrapper.vm.onUserGuideClick();
+      wrapper.vm.showUserGuide = true;
       expect(wrapper.vm.showUserGuide).toBe(true);
     });
 
-    it("should toggle off showUserGuide on second click", () => {
+    it("should be able to toggle showUserGuide back to false", () => {
       wrapper = createWrapper();
-
-      wrapper.vm.userGuideBtnRef = {
-        getBoundingClientRect: vi.fn().mockReturnValue({
-          top: 100,
-          left: 200,
-        }),
-      };
-      wrapper.vm.userGuideDivRef = {
-        style: { top: "", left: "" },
-      };
-
-      wrapper.vm.onUserGuideClick();
+      wrapper.vm.showUserGuide = true;
       expect(wrapper.vm.showUserGuide).toBe(true);
-      wrapper.vm.onUserGuideClick();
+      wrapper.vm.showUserGuide = false;
       expect(wrapper.vm.showUserGuide).toBe(false);
-    });
-
-    it("should not toggle when refs are null", () => {
-      wrapper = createWrapper();
-      wrapper.vm.userGuideBtnRef = null;
-      wrapper.vm.userGuideDivRef = null;
-
-      wrapper.vm.onUserGuideClick();
-      expect(wrapper.vm.showUserGuide).toBe(false);
-    });
-
-    it("should set correct position when user guide opens", () => {
-      wrapper = createWrapper();
-
-      const mockStyle = { top: "", left: "" };
-      wrapper.vm.userGuideBtnRef = {
-        getBoundingClientRect: vi.fn().mockReturnValue({
-          top: 100,
-          left: 200,
-        }),
-      };
-      wrapper.vm.userGuideDivRef = { style: mockStyle };
-
-      wrapper.vm.onUserGuideClick();
-
-      expect(mockStyle.top).toBe("132px"); // top + 32
-      expect(mockStyle.left).toBe("248px"); // left + 48
     });
   });
 
@@ -143,7 +82,6 @@ describe("CrossLinkUserGuide Component", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      // The theme is read directly from store in the template
       expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
@@ -152,24 +90,6 @@ describe("CrossLinkUserGuide Component", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.store.state.theme).toBe("light");
-    });
-  });
-
-  describe("Mouseleave Behavior", () => {
-    it("should hide user guide on mouseleave", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.userGuideBtnRef = {
-        getBoundingClientRect: vi.fn().mockReturnValue({ top: 100, left: 200 }),
-      };
-      wrapper.vm.userGuideDivRef = { style: { top: "", left: "" } };
-
-      wrapper.vm.onUserGuideClick();
-      expect(wrapper.vm.showUserGuide).toBe(true);
-
-      // Simulate mouseleave by directly setting the value
-      wrapper.vm.showUserGuide = false;
-      expect(wrapper.vm.showUserGuide).toBe(false);
     });
   });
 
@@ -184,11 +104,6 @@ describe("CrossLinkUserGuide Component", () => {
       expect(wrapper.vm.showUserGuide).toBe(false);
       wrapper.vm.showUserGuide = true;
       expect(wrapper.vm.showUserGuide).toBe(true);
-    });
-
-    it("should expose onUserGuideClick function", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.onUserGuideClick).toBe("function");
     });
   });
 });

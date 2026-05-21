@@ -319,11 +319,17 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icon = wrapper.find(".field_overlay [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
+      // Interesting icon is inside .field_label in the refactored component
+      const icon = wrapper.find(
+        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
       await icon.trigger("click");
 
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([defaultProps.field, false]);
+      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([
+        defaultProps.field,
+        false,
+      ]);
     });
 
     it("should not show interesting icon for timestamp column", () => {
@@ -347,7 +353,7 @@ describe("FieldRow.vue", () => {
   });
 
   describe("theme support", () => {
-    it("should apply light theme classes", () => {
+    it("should render interesting icon with correct cursor class in light theme", () => {
       const wrapper = mount(FieldRow, {
         props: {
           ...defaultProps,
@@ -359,11 +365,14 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
-      expect(icon.classes()).toContain("light-dimmed");
+      const icon = wrapper.find(
+        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
+      expect(icon.classes()).toContain("tw:cursor-pointer");
     });
 
-    it("should not apply light-dimmed class for dark theme", () => {
+    it("should render interesting icon in dark theme", () => {
       const wrapper = mount(FieldRow, {
         props: {
           ...defaultProps,
@@ -375,8 +384,10 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
-      expect(icon.classes()).not.toContain("light-dimmed");
+      const icon = wrapper.find(
+        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
     });
   });
 

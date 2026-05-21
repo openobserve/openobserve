@@ -184,7 +184,7 @@ describe("SearchResult", () => {
   it("should render the main container with correct data-test attribute", () => {
     const container = wrapper.find('[data-test="traces-search-result"]');
     expect(container.exists()).toBe(true);
-    expect(container.classes()).toContain("overflow-hidden");
+    expect(container.classes()).toContain("tw:overflow-hidden");
   });
 
   it("should render the search list container", () => {

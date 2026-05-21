@@ -16,13 +16,10 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { tempQuasarPlugin } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-tempQuasarPlugin();
-
-// ─── Toast & Quasar mocks ───────────────────────────────────────────────────
+// ─── Toast mocks ────────────────────────────────────────────────────────────
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(),
 }));
@@ -32,14 +29,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toastRecords: [],
   useToast: () => ({ toast: mockToast, toasts: [] }),
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
 
 // ─── useTraceDetails mock — tests control return values per test ───────────
 const { mockUseTraceDetails } = vi.hoisted(() => ({
@@ -106,6 +95,27 @@ function mountTraceErrorTab(props: Record<string, unknown> = {}) {
     },
     global: {
       plugins: [i18n, store],
+      stubs: {
+        OTable: {
+          name: "OTable",
+          template: `<div :data-test="$attrs['data-test']">
+            <template v-for="(row, idx) in data" :key="row[rowKey] ?? idx">
+              <div :data-test="'trace-event-detail-' + row._timestamp">
+                <slot name="cell-@timestamp" :row="row" />
+                <slot name="cell-type" :row="row" />
+              </div>
+              <div :data-test="'trace-details-sidebar-exceptions-table-expand-btn-' + idx" @click="$emit('update:expanded-ids', expandedIds.includes(String(idx)) ? [] : [String(idx)])">
+                <slot name="expand-button" :row="row" :index="idx" />
+              </div>
+              <div v-if="expandedIds.includes(String(idx))" :data-test="'trace-details-sidebar-exceptions-table-expanded-row-' + idx">
+                <slot name="expansion" :row="row" />
+              </div>
+            </template>
+          </div>`,
+          props: ["data", "columns", "rowKey", "expandedIds", "loading", "pagination", "showGlobalFilter", "expansion"],
+          emits: ["update:expanded-ids"],
+        },
+      },
     },
   });
 }

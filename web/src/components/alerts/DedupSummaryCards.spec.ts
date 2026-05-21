@@ -143,13 +143,13 @@ describe("DedupSummaryCards", () => {
     it("renders suppression rate card when rate > 0.5", async () => {
       wrapper = await mountComp(makeSummary({ suppression_rate: 0.8 }));
       expect(byTestId(wrapper, "suppression-rate-card").exists()).toBe(true);
-      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("80%");
+      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("80.0%");
     });
 
     it("renders suppression rate card when 0 < rate <= 0.5", async () => {
       wrapper = await mountComp(makeSummary({ suppression_rate: 0.3 }));
       expect(byTestId(wrapper, "suppression-rate-card").exists()).toBe(true);
-      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("30%");
+      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("30.0%");
     });
 
     it("renders suppression rate card when rate is 0", async () => {
@@ -160,7 +160,7 @@ describe("DedupSummaryCards", () => {
 
     it("boundary at exactly 0.5 shows 50%", async () => {
       wrapper = await mountComp(makeSummary({ suppression_rate: 0.5 }));
-      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("50%");
+      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("50.0%");
     });
 
     it("displays label text", async () => {
@@ -282,7 +282,7 @@ describe("DedupSummaryCards", () => {
 
     it("updates suppression rate when fetchSummary is called with new data", async () => {
       wrapper = await mountComp(makeSummary({ suppression_rate: 0.4 }));
-      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("40%");
+      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("40.0%");
 
       vi.spyOn(alertsService, "get_dedup_summary").mockResolvedValue({
         data: makeSummary({ suppression_rate: 0.7 }),
@@ -290,7 +290,7 @@ describe("DedupSummaryCards", () => {
       await wrapper.vm.fetchSummary();
       await flushPromises();
 
-      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("70%");
+      expect(byTestId(wrapper, "suppression-rate-value").text()).toBe("70.0%");
     });
   });
 });

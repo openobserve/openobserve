@@ -21,7 +21,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import ReportList from "./ReportList.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
 
@@ -247,8 +246,8 @@ describe("ReportList", () => {
       expect(wrapper.vm.filterQuery).toBe("");
     });
 
-    it("should initialize pagination rowsPerPage to 20", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
+    it("should initialize pageSize to 20", () => {
+      expect(wrapper.vm.pageSize).toBe(20);
     });
 
     it("should set isLoadingReports to false after fetching", () => {
@@ -282,22 +281,6 @@ describe("ReportList", () => {
   });
 
   // ── Pagination ───────────────────────────────────────────────────────────
-
-  describe("pagination", () => {
-    it("should update rowsPerPage when pagination changes", async () => {
-      const paginationComp = wrapper.findComponent(QTablePagination);
-      expect(paginationComp.exists()).toBe(true);
-      await paginationComp.vm.$emit("update:changeRecordPerPage", {
-        label: "50",
-        value: 50,
-      });
-      await nextTick();
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-    });
-  });
-
-  // ── Tab filtering ────────────────────────────────────────────────────────
 
   describe("tab filtering", () => {
     it("should map all staticReportsList rows to reportsTableRows on 'shared' tab", async () => {
@@ -414,7 +397,7 @@ describe("ReportList", () => {
     it("should format a valid unix microsecond timestamp", () => {
       const formatted = wrapper.vm.convertUnixToQuasarFormat(1234567890000000);
       expect(formatted).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/,
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/,
       );
     });
 

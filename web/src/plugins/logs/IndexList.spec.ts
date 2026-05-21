@@ -494,13 +494,9 @@ describe("Index List", async () => {
     expect(wrapper.vm.traceIdMapper["fooField"]).toBeUndefined();
   });
 
-  it("handles single stream selection correctly", async () => {
-    const opt = { value: "stream1", label: "Stream 1" };
-    wrapper.vm.handleSingleStreamSelect(opt);
-    expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-      "stream1",
-    ]);
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+  it("handles multi stream selection correctly", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+    wrapper.vm.handleMultiStreamSelection();
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -1031,34 +1027,13 @@ describe("Index List", async () => {
   });
 
   describe("Additional Stream management tests", () => {
-    it("should handle single stream selection when stream not already selected", async () => {
-      const opt = { value: "newStream", label: "New Stream" };
+    it("should handle stream change on multi stream selection", async () => {
       wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
 
-      wrapper.vm.handleSingleStreamSelect(opt);
+      wrapper.vm.handleMultiStreamSelection();
 
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-        "newStream",
-      ]);
       expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
-    });
-
-    it("should not clear fields when selecting same stream", async () => {
-      const opt = { value: "sameStream", label: "Same Stream" };
-      wrapper.vm.searchObj.data.stream.selectedStream = ["sameStream"];
-      wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-
-      wrapper.vm.handleSingleStreamSelect(opt);
-
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "field1",
-        "field2",
-      ]);
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-        "sameStream",
-      ]);
     });
   });
 
@@ -1587,13 +1562,9 @@ describe("Index List", async () => {
     );
   });
 
-  it("handles single stream selection correctly", async () => {
-    const opt = { value: "stream1", label: "Stream 1" };
-    wrapper.vm.handleSingleStreamSelect(opt);
-    expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-      "stream1",
-    ]);
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+  it("handles multi stream selection correctly", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+    wrapper.vm.handleMultiStreamSelection();
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -2146,34 +2117,13 @@ describe("Index List", async () => {
   });
 
   describe("Additional Stream management tests", () => {
-    it("should handle single stream selection when stream not already selected", async () => {
-      const opt = { value: "newStream", label: "New Stream" };
+    it("should handle stream change on multi stream selection", async () => {
       wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
 
-      wrapper.vm.handleSingleStreamSelect(opt);
+      wrapper.vm.handleMultiStreamSelection();
 
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-        "newStream",
-      ]);
       expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
-    });
-
-    it("should not clear fields when selecting same stream", async () => {
-      const opt = { value: "sameStream", label: "Same Stream" };
-      wrapper.vm.searchObj.data.stream.selectedStream = ["sameStream"];
-      wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-
-      wrapper.vm.handleSingleStreamSelect(opt);
-
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "field1",
-        "field2",
-      ]);
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-        "sameStream",
-      ]);
     });
   });
 
