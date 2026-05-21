@@ -588,7 +588,7 @@ pub async fn create_org(
 
             #[cfg(feature = "cloud")]
             if let Some(payer_org) = _make_billed_member_of {
-                add_as_billing_member(user_email, &payer_org, &org.identifier)
+                add_as_billing_member(user_email, &payer_org, &org.identifier, None)
                     .await
                     .map_err(|e| {
                         anyhow::anyhow!(
