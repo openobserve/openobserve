@@ -198,13 +198,10 @@ pub(crate) async fn create_context(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
+    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
     let cfg = get_config();
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.cpu_num
-    };
+    let target_partitions = cfg.limit.cpu_num
+        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 

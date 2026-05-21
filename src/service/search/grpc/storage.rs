@@ -239,12 +239,9 @@ pub async fn search(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.cpu_num
-    };
+    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
+    let target_partitions = cfg.limit.cpu_num
+        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
 
     log::debug!("search->storage: session target_partitions: {target_partitions}");
 
@@ -512,12 +509,9 @@ pub async fn tantivy_search(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.query_index_thread_num
-    };
+    // linear interpolation: cached_ratio=0 -> cpu*4, cached_ratio=1 -> cpu
+    let target_partitions = cfg.limit.cpu_num
+        + ((cfg.limit.query_thread_num - cfg.limit.cpu_num) as f64 * (1.0 - cached_ratio)) as usize;
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();

@@ -2603,11 +2603,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     if cfg.limit.query_index_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.query_index_thread_num = cpu_num;
-        } else {
-            cfg.limit.query_index_thread_num = cpu_num * 4;
-        }
+        cfg.limit.query_index_thread_num = cpu_num;
     }
 
     if cfg.limit.file_download_thread_num == 0 {
