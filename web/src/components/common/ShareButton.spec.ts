@@ -23,7 +23,7 @@ import shortURLService from "@/services/short_url";
 
 // Mock copyToClipboard — migrated from quasar to @/utils/clipboard
 vi.mock("@/utils/clipboard", () => ({
-  copyToClipboard: vi.fn(() => Promise.resolve()),
+  copyToClipboard: vi.fn(() => Promise.resolve(true)),
 }));
 
 import { copyToClipboard } from "@/utils/clipboard";
@@ -93,11 +93,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :data-test="dataTest"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -113,11 +113,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -149,12 +149,12 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button @click="$emit(\'click\')"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
             emits: ['click'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -163,7 +163,11 @@ describe("ShareButton", () => {
     await flushPromises();
 
     expect(mockCreate).toHaveBeenCalledWith("test-org", "https://example.com/logs?query=test");
-    expect(mockCopyToClipboard).toHaveBeenCalledWith("https://short.url/abc123");
+    expect(mockCopyToClipboard).toHaveBeenCalledWith("https://short.url/abc123", {
+      successMessage: "Link copied successfully",
+      errorMessage: "Error copying link",
+      timeout: 5000,
+    });
   });
 
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {
@@ -176,7 +180,8 @@ describe("ShareButton", () => {
     const mockCopyToClipboard = copyToClipboard as any;
     const mockCreate = shortURLService.create as any;
 
-    mockCopyToClipboard.mockResolvedValue(undefined);
+    // Must resolve to true so the component emits copy:success (not copy:error)
+    mockCopyToClipboard.mockResolvedValue(true);
     mockCreate.mockResolvedValue({
       status: 200,
       data: { short_url: "https://short.url/abc123" },
@@ -189,12 +194,12 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button @click="$emit(\'click\')"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
             emits: ['click'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -219,11 +224,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: {
+          OTooltip: {
             template: '<div class="tooltip">{{ $slots.default?.()[0]?.children }}</div>',
           },
         },
@@ -243,7 +248,7 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -261,11 +266,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -282,11 +287,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
@@ -321,11 +326,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [storeWithoutWebUrl, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
             props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: '<div><slot /></div>' },
         },
       },
     });

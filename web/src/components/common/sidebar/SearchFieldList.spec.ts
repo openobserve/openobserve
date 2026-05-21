@@ -123,12 +123,14 @@ describe("FieldList.vue Comprehensive Coverage", () => {
   let wrapper: VueWrapper;
   let mockStreamService: any;
   let mockWriteText: any;
+  let mockNotify: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     fieldValuesMocks._reset?.();
 
     mockStreamService = vi.mocked(streamService.fieldValues);
+    mockNotify = vi.fn();
     mockWriteText = vi.fn();
     mockCopyToClipboard.mockResolvedValue(true);
 
@@ -161,7 +163,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           });
         } catch {
           fieldValuesMocks._setFieldState?.(fieldName, { isLoading: false });
-          mockNotify?.({
+          mockNotify({
             type: "negative",
             message: `Error while fetching values for ${fieldName}`,
           });
@@ -687,10 +689,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("test-value");
 
-      expect(mockWriteText).toHaveBeenCalledWith("test-value");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Value copied to clipboard",
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", {
+        successMessage: "Value copied to clipboard",
       });
     });
 
@@ -700,10 +700,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("");
 
-      expect(mockWriteText).toHaveBeenCalledWith("");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Value copied to clipboard",
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("", {
+        successMessage: "Value copied to clipboard",
       });
     });
 
@@ -713,7 +711,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("special@value!$");
 
-      expect(mockWriteText).toHaveBeenCalledWith("special@value!$");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", {
+        successMessage: "Value copied to clipboard",
+      });
     });
 
     it("should copy numeric values as strings", async () => {
