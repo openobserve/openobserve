@@ -345,5 +345,11 @@ export default {
   &:focus {
     border-color: var(--q-primary);
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--o2-primary-background);
+  }
 }
 </style>
