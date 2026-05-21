@@ -81,7 +81,9 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 // Mock copyToClipboard — migrated from quasar to @/utils/clipboard
-const mockCopyToClipboard = vi.fn(() => Promise.resolve(true));
+const { mockCopyToClipboard } = vi.hoisted(() => ({
+  mockCopyToClipboard: vi.fn(() => Promise.resolve(true)),
+}));
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
@@ -99,6 +101,11 @@ const mockStore = createStore({
       identifier: "test-org",
     },
     theme: "dark",
+    zoConfig: {
+      timestamp_column: "_timestamp",
+      query_values_default_num: 10,
+      showFtsFieldValues: false,
+    },
   },
 });
 
@@ -220,13 +227,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
     it("should render search input with correct attributes", () => {
       wrapper = createWrapper();
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
-      );
+      // Search input is provided by OFieldList, queried by placeholder
+      const searchInput = wrapper.find('[placeholder="Search field"]');
       expect(searchInput.exists()).toBe(true);
-      expect(searchInput.attributes("data-cy")).toBe(
-        "index-field-search-input",
-      );
     });
 
     it("should render with empty fields array", () => {
@@ -733,6 +736,11 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         state: {
           selectedOrganization: { identifier: "test-org" },
           theme: "dark",
+          zoConfig: {
+            timestamp_column: "_timestamp",
+            query_values_default_num: 10,
+            showFtsFieldValues: false,
+          },
         },
       });
 
@@ -756,6 +764,11 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         state: {
           selectedOrganization: { identifier: "test-org" },
           theme: "light",
+          zoConfig: {
+            timestamp_column: "_timestamp",
+            query_values_default_num: 10,
+            showFtsFieldValues: false,
+          },
         },
       });
 
