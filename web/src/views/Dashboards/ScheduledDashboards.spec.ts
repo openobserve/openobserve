@@ -175,6 +175,12 @@ describe('ScheduledDashboards', () => {
             props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
             emits: ['update:modelValue']
           },
+          'OInput': {
+            name: 'OInput',
+            template: '<input class="q-input-mock" :data-test="$attrs[\'data-test\']" />',
+            props: ['modelValue', 'placeholder'],
+            emits: ['update:modelValue']
+          },
           'q-btn': {
             name: 'q-btn',
             template: '<button class="q-btn-mock"><slot /></button>',
@@ -240,10 +246,10 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.find('.scheduled-dashboards').classes()).toContain('dark-mode');
     });
 
-    it('should apply bg-white class when theme is light', () => {
+    it('should apply light-mode class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('bg-white');
+      expect(wrapper.find('.scheduled-dashboards').classes()).toContain('tw:bg-white');
     });
   });
 
@@ -508,7 +514,9 @@ describe('ScheduledDashboards', () => {
   describe('Loading States', () => {
     it('should show loading spinner when loading is true', () => {
       const wrapper = createWrapper({ loading: true });
-      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(true);
+      const table = wrapper.findComponent({ name: 'OTable' });
+      expect(table.exists()).toBe(true);
+      expect(table.props('loading')).toBe(true);
     });
 
     it('should show no data message when not loading and no reports', () => {
