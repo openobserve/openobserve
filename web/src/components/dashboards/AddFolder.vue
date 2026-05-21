@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:px-3 tw:py-2">
-      <OForm ref="addFolderForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+      <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
         <OFormInput
           name="name"
           :label="t('dashboard.nameOfVariable') + '*'"

@@ -144,6 +144,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       'tw:inline-flex tw:items-center tw:gap-2',
       isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
+    @click.stop
   >
     <!-- Plain button — avoids reka-ui controlled-component timing issues -->
     <button

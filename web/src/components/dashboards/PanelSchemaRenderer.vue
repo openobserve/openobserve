@@ -1467,7 +1467,7 @@ export default defineComponent({
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
-        return "overflow-auto";
+        return "tw:overflow-auto";
       }
 
       return "";

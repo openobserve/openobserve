@@ -517,7 +517,7 @@ const virtualizer = useVirtualizer(
   computed(() => ({
     count: filteredOptions.value.length,
     getScrollElement: () => listboxScrollEl.value,
-    estimateSize: () => 36,
+    estimateSize: () => 28,
     overscan: 8,
   })),
 );
