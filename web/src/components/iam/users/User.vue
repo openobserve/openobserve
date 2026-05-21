@@ -108,11 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
               </OBadge>
-              <span
-                v-if="row.rolesLoading"
-                class="o2-role-chip o2-role-chip-skeleton"
-                aria-label="Loading roles"
-              />
             </div>
           </template>
 
@@ -339,11 +334,14 @@ export default defineComponent({
 
       updateUserActions();
 
-      // Handle deep-linked / refreshed URL
+      // Handle deep-linked / refreshed URL.
+      // Only `action=update&email=…` auto-opens the dialog so a shared edit
+      // link still lands directly on the user's edit form. `action=add` is
+      // intentionally NOT handled here — the dialog only opens via the
+      // "New user" button click; refreshing on an `action=add` URL should
+      // leave the user on the list view, not pop a dialog on load.
       const query = router.currentRoute.value.query;
-      if (query.action === "add") {
-        addUser({}, false);
-      } else if (query.action === "update" && query.email) {
+      if (query.action === "update" && query.email) {
         const match = usersState.users.find(
           (m: any) => m.email === query.email,
         );
@@ -548,10 +546,6 @@ export default defineComponent({
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
                 roles: rolesArr,
-                // True while we're still fetching the full role list from
-                // getUserRoles. Used by the cell-roles template to render a
-                // skeleton chip alongside the primary role.
-                rolesLoading: isEnterpriseOrCloud && data?.status !== "pending" && !!data?.email,
                 auth_type: data?.auth_type
                   ? data.auth_type
                   : data?.is_external
@@ -569,19 +563,25 @@ export default defineComponent({
             tableKey.value++;
             dismiss();
 
+            // Resolve immediately so the caller (onBeforeMount) can run
+            // updateUserActions() and surface the row action buttons without
+            // waiting on the per-user role fetch below.
+            resolve(true);
+
             // Enterprise/cloud: the org-members API only returns a single
             // `role` per user, so users with multiple role assignments
             // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full per-user role list in parallel via getUserRoles and
-            // merge it into the row's `roles` array. Each row exposes
-            // `rolesLoading: true` until its fetch resolves so the template
-            // can render a skeleton chip in the meantime.
+            // full per-user role list in the background — fire-and-forget —
+            // and re-render the rows when each fetch completes. This keeps
+            // the table responsive instead of blocking the whole UI on the
+            // role API.
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
               const realUsers = usersState.users.filter(
                 (u: any) => u.email && u.status !== "pending",
               );
-              await Promise.allSettled(
+              // Don't await — let the role fetches run in the background.
+              Promise.allSettled(
                 realUsers.map(async (u: any) => {
                   try {
                     const resp: any = await usersService.getUserRoles(
@@ -601,16 +601,13 @@ export default defineComponent({
                   } catch {
                     // Per-user role fetch failures are non-fatal — fall back
                     // to whatever role string came with the org-members row.
-                  } finally {
-                    u.rolesLoading = false;
                   }
                 }),
-              );
-              rows.value = [...usersState.users];
-              tableKey.value++;
+              ).then(() => {
+                rows.value = [...usersState.users];
+                tableKey.value++;
+              });
             }
-
-            resolve(true);
           })
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
@@ -1171,33 +1168,6 @@ export default defineComponent({
   font-weight: 600;
   border-radius: 6px;
   line-height: 1.4;
-}
-
-/* Skeleton placeholder shown while a row's per-user role fetch is in flight.
-   Mirrors the chip dimensions so it occupies the same footprint as a real
-   chip, with a shimmer animation to signal "loading". */
-:deep(.o2-role-chip-skeleton) {
-  display: inline-block;
-  width: 60px;
-  height: 18px;
-  background: linear-gradient(
-    90deg,
-    rgba(148, 163, 184, 0.18) 0%,
-    rgba(148, 163, 184, 0.36) 50%,
-    rgba(148, 163, 184, 0.18) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-role-chip-shimmer 1.2s ease-in-out infinite;
-  border: 1px solid transparent;
-}
-
-@keyframes o2-role-chip-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .iconHoverBtn {

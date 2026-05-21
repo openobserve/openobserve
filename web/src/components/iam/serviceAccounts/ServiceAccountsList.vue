@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-refresh"
                   :title="t('serviceAccounts.refresh')"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="icon-sm"
                   icon-left="refresh"
                   @click="confirmRefreshAction(row)"
                 />
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="icon-sm"
                   icon-left="edit"
                   @click="addRoutePush(row)"
                 />
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-delete"
                   :title="t('serviceAccounts.delete')"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="icon-sm"
                   icon-left="delete"
                   @click="confirmDeleteAction(row)"
                 />
@@ -298,10 +298,13 @@ export default defineComponent({
     onBeforeMount(async () => {
       await getServiceAccountsUsers();
 
+      // Only `action=update&email=…` auto-opens the edit dialog so a shared
+      // edit link still lands directly on the user's form. `action=add` is
+      // intentionally NOT handled here — the dialog only opens via the
+      // "Add Service Account" button click; refreshing on an `action=add`
+      // URL should leave the user on the list view.
       const query = router.currentRoute.value.query;
-      if (query.action === "add") {
-        addUser({}, false);
-      } else if (query.action === "update" && query.email) {
+      if (query.action === "update" && query.email) {
         const match = serviceAccountsState.service_accounts_users.find(
           (m: any) => m.email === query.email,
         );

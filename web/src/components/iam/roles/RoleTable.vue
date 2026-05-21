@@ -79,7 +79,7 @@ const columns: OTableColumnDef[] = [
         <OButton
           :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
           variant="ghost"
-          size="icon-circle-sm"
+          size="icon-sm"
           :title="t('common.edit')"
           @click="emit('edit', row)"
         >
@@ -88,7 +88,7 @@ const columns: OTableColumnDef[] = [
         <OButton
           :data-test="`iam-roles-delete-${row.role_name}-role-icon`"
           variant="ghost"
-          size="icon-circle-sm"
+          size="icon-sm"
           :title="t('common.delete')"
           @click="emit('delete', row)"
         >
