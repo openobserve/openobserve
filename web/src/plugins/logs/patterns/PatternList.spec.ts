@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PatternList from "./PatternList.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar();
 
 describe("PatternList", () => {
   let wrapper: any;

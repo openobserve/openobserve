@@ -133,25 +133,16 @@ function makeTrace(overrides: Record<string, any> = {}) {
 }
 
 const globalStubs = {
-  QSpinnerHourglass: {
+  OSpinner: {
     template: '<div data-test="loading-spinner" />',
-    props: ["color", "size"],
+    props: ["size"],
   },
-  QIcon: {
+  OIcon: {
     template: '<span class="q-icon-stub" :data-name="name"><slot /></span>',
-    props: ["name"],
+    props: ["name", "size"],
   },
-  QTooltip: { template: "<div><slot /></div>" },
-  QInput: {
-    template:
-      "<div class='q-input-stub'><slot /><slot name='prepend' /></div>",
-    props: ["modelValue", "placeholder"],
-  },
-  QSelect: {
-    template: '<div class="q-select-stub"><slot /></div>',
-    props: ["modelValue", "options"],
-  },
-  QSkeleton: {
+  OTooltip: { template: "<div><slot /><span>{{ content }}</span></div>", props: ["content"] },
+  OSkeleton: {
     template: '<div class="q-skeleton-stub" />',
     props: ["type", "width", "height"],
   },

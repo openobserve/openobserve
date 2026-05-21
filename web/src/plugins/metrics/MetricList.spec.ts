@@ -354,8 +354,8 @@ describe("MetricList", () => {
       expect(wrapper.vm.metricsIconMapping).toEqual({
         summary: "description",
         gauge: "speed", 
-        histogram: "bar_chart",
-        counter: "pin",
+        histogram: "bar-chart",
+        counter: "tag",
       });
     });
 
@@ -1142,14 +1142,14 @@ describe("MetricList — metricsIconMapping completeness", () => {
     expect(wrapper.vm.metricsIconMapping.gauge).toBe("speed");
   });
 
-  it("maps 'histogram' to 'bar_chart' icon", () => {
+  it("maps 'histogram' to 'bar-chart' icon", () => {
     const wrapper = createWrapper();
-    expect(wrapper.vm.metricsIconMapping.histogram).toBe("bar_chart");
+    expect(wrapper.vm.metricsIconMapping.histogram).toBe("bar-chart");
   });
 
-  it("maps 'counter' to 'pin' icon", () => {
+  it("maps 'counter' to 'tag' icon", () => {
     const wrapper = createWrapper();
-    expect(wrapper.vm.metricsIconMapping.counter).toBe("pin");
+    expect(wrapper.vm.metricsIconMapping.counter).toBe("tag");
   });
 
   it("returns empty string for an unknown metric type", () => {

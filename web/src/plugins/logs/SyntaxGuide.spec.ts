@@ -292,8 +292,7 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ sqlmode: false });
     const button = wrapper.findComponent({ name: "OButton" });
 
-    // OButton uses q-ml-xs and normal-mode classes; syntax-guide-button and q-pa-xs were removed in migration
-    expect(button.classes()).toContain("q-ml-xs");
+    // OButton uses normal-mode class; syntax-guide-button and q-pa-xs were removed in migration
     expect(button.classes()).toContain("normal-mode");
   });
 
@@ -336,15 +335,13 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ noBorder: true });
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.classes()).toContain("syntax-guide-no-border");
-    expect(button.classes()).not.toContain("q-ml-xs");
     // q-pa-xs was removed in OButton migration
   });
 
   // Test 32: noBorder false keeps standard spacing classes
-  it("should apply q-ml-xs class when noBorder is false", () => {
+  it("should not have syntax-guide-no-border class when noBorder is false", () => {
     wrapper = createWrapper({ noBorder: false });
     const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.classes()).toContain("q-ml-xs");
     // q-pa-xs was removed in OButton migration
     expect(button.classes()).not.toContain("syntax-guide-no-border");
   });

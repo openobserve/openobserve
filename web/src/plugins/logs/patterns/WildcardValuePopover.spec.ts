@@ -15,11 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import i18n from "@/locales";
-
-installQuasar();
 
 describe("WildcardValuePopover", () => {
   let wrapper: VueWrapper<any>;
