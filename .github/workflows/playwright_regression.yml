@@ -128,8 +128,7 @@ jobs:
                 "logs-regression-bugs.spec.js",
                 "logs-regression-bugs-2.spec.js",
                 "logs-9754.spec.js",
-                "scroll-retention-9044.spec.js",
-                "undefined-length-7354.spec.js",
+                "logs-regression-9044-7354.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
