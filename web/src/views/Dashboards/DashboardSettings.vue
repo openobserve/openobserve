@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
   <div
+    data-test="dashboard-settings-main-container"
     class="tw:p-0"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
     style="min-height: inherit"

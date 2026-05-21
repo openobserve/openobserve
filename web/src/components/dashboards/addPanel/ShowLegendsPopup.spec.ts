@@ -4,14 +4,10 @@ import ShowLegendsPopup from "./ShowLegendsPopup.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Mock quasar's copyToClipboard
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    copyToClipboard: vi.fn().mockResolvedValue(undefined),
-  };
-});
+// Mock clipboard util
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
 
 // Mock color utilities
 vi.mock("@/utils/dashboard/colorPalette", () => ({
@@ -285,11 +281,11 @@ describe("ShowLegendsPopup Component", () => {
 
   describe("copyLegend", () => {
     it("should call copyToClipboard with legend text", async () => {
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyLegend("Series A", 0);
       await flushPromises();
-      expect(copyToClipboard).toHaveBeenCalledWith("Series A");
+      expect(copyToClipboard).toHaveBeenCalledWith("Series A", expect.any(Object));
     });
 
     it("should add index to copiedLegendIndices after copy", async () => {
@@ -313,11 +309,11 @@ describe("ShowLegendsPopup Component", () => {
 
   describe("copyAllLegends", () => {
     it("should call copyToClipboard with all legend names joined by newline", async () => {
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyAllLegends();
       await flushPromises();
-      expect(copyToClipboard).toHaveBeenCalledWith("Series A\nSeries B\nSeries C");
+      expect(copyToClipboard).toHaveBeenCalledWith("Series A\nSeries B\nSeries C", expect.any(Object));
     });
 
     it("should set isAllCopied to true after copy", async () => {
@@ -339,7 +335,7 @@ describe("ShowLegendsPopup Component", () => {
     });
 
     it("should trigger copyAllLegends from copy all button", async () => {
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       wrapper = createWrapper({ panelData: simplePanelData });
       const copyAllBtn = wrapper.find('[data-test="dashboard-show-legends-copy-all"]');
       expect(copyAllBtn.exists()).toBe(true);

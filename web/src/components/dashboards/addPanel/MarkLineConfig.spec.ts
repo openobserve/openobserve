@@ -344,12 +344,7 @@ describe("MarkLineConfig", () => {
 
       // Value input should be present for xAxis type
       const valueInputs = wrapper
-        .findAll("input")
-        .filter(
-          (input) =>
-            input.attributes("label") === "Value" ||
-            input.element.getAttribute("data-test")?.includes("value"),
-        );
+        .findAll('[data-test*="dashboard-config-markline-value"]');
       expect(valueInputs.length).toBeGreaterThanOrEqual(0);
     });
 

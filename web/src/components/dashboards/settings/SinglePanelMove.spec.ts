@@ -457,7 +457,8 @@ describe("SinglePanelMove", () => {
 
       expect(wrapper.emitted("update:ok")).toBeTruthy();
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
-      expect(wrapper.emitted("update:ok")?.[0]).toEqual(["tab1"]);
+      // First option is set as full {label, value} object on mount.
+      expect(wrapper.emitted("update:ok")?.[0]).toEqual([{ label: "Tab 1", value: "tab1" }]);
     });
 
     it("should not emit update:ok when secondary (cancel) is clicked", async () => {
@@ -520,10 +521,8 @@ describe("SinglePanelMove", () => {
       const newTabData = { name: "New Tab", tabId: "new-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
-      expect(wrapper.vm.selectedMoveTabId).toEqual({
-        label: "New Tab",
-        value: "new-tab",
-      });
+      // refreshRequired sets selectedMoveTabId to the tabId string directly.
+      expect(wrapper.vm.selectedMoveTabId).toBe("new-tab");
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
@@ -609,7 +608,8 @@ describe("SinglePanelMove", () => {
       const newTabData = { name: "Updated Tab", tabId: "updated-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
-      expect(wrapper.vm.selectedMoveTabId.value).toBe("updated-tab");
+      // refreshRequired assigns the tabId string directly.
+      expect(wrapper.vm.selectedMoveTabId).toBe("updated-tab");
     });
   });
 

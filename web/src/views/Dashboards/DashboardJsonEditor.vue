@@ -11,7 +11,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
-  <div class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'">
+  <div data-test="dashboard-json-editor-container" class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'">
     <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
     <div class="tw:flex-1 tw:min-h-0">
       <query-editor
@@ -29,6 +29,7 @@
     <!-- Display validation errors -->
     <div
       v-if="validationErrors.length > 0"
+      data-test="dashboard-json-editor-validation-errors"
       class="tw:p-3 tw:text-red-500 validation-errors"
     >
       <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>

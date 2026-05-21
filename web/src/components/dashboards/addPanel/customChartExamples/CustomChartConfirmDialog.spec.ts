@@ -73,25 +73,21 @@ const ODialogStub = {
   `,
 };
 
-const QBannerStub = {
-  name: "QBanner",
-  template: `<div data-test="q-banner" :class="$attrs.class"><slot name="avatar" /><slot /></div>`,
+const OBannerStub = {
+  name: "OBanner",
+  props: ["variant", "icon", "content"],
+  template: `<div data-test="o-banner" :data-variant="variant" :data-icon="icon"><span data-test="OIcon" :data-name="icon" /><span>{{ content }}</span></div>`,
 };
 
-const QIconStub = {
-  name: "QIcon",
-  props: ["name", "size"],
-  template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
-};
-
-const QCheckboxStub = {
-  name: "QCheckbox",
+const OCheckboxStub = {
+  name: "OCheckbox",
   props: ["modelValue", "label"],
   emits: ["update:modelValue"],
+  inheritAttrs: false,
   template: `
     <label
       data-test="replace-query-checkbox"
-      :class="$attrs.class"
+      v-bind="$attrs"
     >
       <input
         type="checkbox"
@@ -116,9 +112,8 @@ function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
       plugins: [i18n, store],
       stubs: {
         ODialog: ODialogStub,
-        "q-banner": QBannerStub,
-        "OIcon": QIconStub,
-        "q-checkbox": QCheckboxStub,
+        OBanner: OBannerStub,
+        OCheckbox: OCheckboxStub,
       },
     },
   });
@@ -189,9 +184,8 @@ describe("CustomChartConfirmDialog", () => {
           plugins: [i18n, store],
           stubs: {
             ODialog: ODialogStub,
-            "q-banner": QBannerStub,
-            "OIcon": QIconStub,
-            "q-checkbox": QCheckboxStub,
+            OBanner: OBannerStub,
+            OCheckbox: OCheckboxStub,
           },
         },
       });
@@ -229,13 +223,13 @@ describe("CustomChartConfirmDialog", () => {
 
   describe("Warning banner rendering", () => {
     it("does not render the warning banner when warningMessage is empty", () => {
-      expect(wrapper.find('[data-test="q-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o-banner"]').exists()).toBe(false);
     });
 
     it("renders the warning banner with its message when warningMessage is provided", () => {
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Be careful" });
-      const banner = wrapper.find('[data-test="q-banner"]');
+      const banner = wrapper.find('[data-test="o-banner"]');
       expect(banner.exists()).toBe(true);
       expect(banner.text()).toContain("Be careful");
     });
@@ -248,40 +242,36 @@ describe("CustomChartConfirmDialog", () => {
       expect(icon.attributes("data-name")).toBe("warning");
     });
 
-    it("applies dark-theme banner classes when store theme is dark", () => {
+    it("forwards variant='warning' to the OBanner in dark theme", () => {
       store.state.theme = "dark";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Be careful" });
-      const banner = wrapper.find('[data-test="q-banner"]');
-      const cls = banner.classes().join(" ");
-      expect(cls).toContain("tw:bg-gray-800/60");
-      expect(cls).toContain("tw:border-yellow-600/70");
+      const banner = wrapper.find('[data-test="o-banner"]');
+      expect(banner.attributes("data-variant")).toBe("warning");
     });
 
-    it("applies light-theme banner classes when store theme is light", () => {
+    it("forwards variant='warning' to the OBanner in light theme", () => {
       store.state.theme = "light";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Be careful" });
-      const banner = wrapper.find('[data-test="q-banner"]');
-      const cls = banner.classes().join(" ");
-      expect(cls).toContain("tw:bg-orange-50");
-      expect(cls).toContain("tw:border-orange-400");
+      const banner = wrapper.find('[data-test="o-banner"]');
+      expect(banner.attributes("data-variant")).toBe("warning");
     });
 
-    it("applies dark-theme icon class when store theme is dark", () => {
+    it("forwards icon='warning' to the OBanner in dark theme", () => {
       store.state.theme = "dark";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="OIcon"]');
-      expect(icon.classes().join(" ")).toContain("tw:text-yellow-500/80");
+      const banner = wrapper.find('[data-test="o-banner"]');
+      expect(banner.attributes("data-icon")).toBe("warning");
     });
 
-    it("applies light-theme icon class when store theme is light", () => {
+    it("forwards icon='warning' to the OBanner in light theme", () => {
       store.state.theme = "light";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="OIcon"]');
-      expect(icon.classes().join(" ")).toContain("tw:text-orange-500");
+      const banner = wrapper.find('[data-test="o-banner"]');
+      expect(banner.attributes("data-icon")).toBe("warning");
     });
   });
 
@@ -322,20 +312,20 @@ describe("CustomChartConfirmDialog", () => {
       expect(wrapper.vm.replaceQuery).toBe(false);
     });
 
-    it("applies dark-theme text class to the checkbox when store theme is dark", () => {
+    it("renders OCheckbox in dark theme", () => {
       store.state.theme = "dark";
       wrapper.unmount();
       wrapper = buildWrapper({ currentQuery: "SELECT 1" });
       const checkbox = wrapper.find('[data-test="replace-query-checkbox"]');
-      expect(checkbox.classes().join(" ")).toContain("tw:text-gray-300");
+      expect(checkbox.exists()).toBe(true);
     });
 
-    it("applies light-theme text class to the checkbox when store theme is light", () => {
+    it("renders OCheckbox in light theme", () => {
       store.state.theme = "light";
       wrapper.unmount();
       wrapper = buildWrapper({ currentQuery: "SELECT 1" });
       const checkbox = wrapper.find('[data-test="replace-query-checkbox"]');
-      expect(checkbox.classes().join(" ")).toContain("tw:text-gray-700");
+      expect(checkbox.exists()).toBe(true);
     });
 
     it("updates replaceQuery when the checkbox emits update:modelValue", async () => {
@@ -343,7 +333,7 @@ describe("CustomChartConfirmDialog", () => {
       wrapper = buildWrapper({ currentQuery: "SELECT 1" });
       expect(wrapper.vm.replaceQuery).toBe(false);
 
-      const checkbox = wrapper.findComponent(QCheckboxStub);
+      const checkbox = wrapper.findComponent(OCheckboxStub);
       await checkbox.vm.$emit("update:modelValue", true);
       expect(wrapper.vm.replaceQuery).toBe(true);
     });
@@ -372,7 +362,7 @@ describe("CustomChartConfirmDialog", () => {
       wrapper.unmount();
       wrapper = buildWrapper({ currentQuery: "SELECT 1" });
 
-      const checkbox = wrapper.findComponent(QCheckboxStub);
+      const checkbox = wrapper.findComponent(OCheckboxStub);
       await checkbox.vm.$emit("update:modelValue", true);
 
       const dialog = wrapper.findComponent(ODialogStub);

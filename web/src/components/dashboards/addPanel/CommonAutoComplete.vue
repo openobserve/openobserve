@@ -1,5 +1,10 @@
 <template>
-  <div class="tw:relative" style="margin-top: 5px" data-no-autofocus>
+  <div
+    class="tw:relative"
+    style="margin-top: 5px"
+    data-no-autofocus
+    data-test="common-auto-complete-container"
+  >
     <OInput
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
@@ -15,6 +20,7 @@
     </OInput>
     <div
       class="options-container"
+      data-test="common-auto-complete-options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
       :style="{
         'background-color': store.state.theme === 'dark' ? '#2d2d2d' : 'white',

@@ -25,39 +25,39 @@ describe('Smooth.vue', () => {
 
     it('renders an SVG element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-svg"]').exists()).toBe(true);
     });
 
     it('has correct SVG dimensions', () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
+      const svg = wrapper.find('[data-test="dashboard-icon-smooth-svg"]');
       expect(svg.attributes('width')).toBe('132');
       expect(svg.attributes('height')).toBe('84');
     });
 
     it('has correct viewBox', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 132 84');
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-svg"]').attributes('viewBox')).toBe('0 0 132 84');
     });
 
     it('contains a path element for the curve', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-path"]').exists()).toBe(true);
     });
 
     it('path uses currentColor stroke', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('stroke')).toBe('currentColor');
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-path"]').attributes('stroke')).toBe('currentColor');
     });
 
     it('path has curved data (C command)', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('d')).toContain('C');
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-path"]').attributes('d')).toContain('C');
     });
 
     it('contains circle elements for data points', () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('circle').length).toBeGreaterThanOrEqual(2);
+      expect(wrapper.findAll('[data-test="dashboard-icon-smooth-circle"]').length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -97,7 +97,7 @@ describe('Smooth.vue', () => {
 
     it('has xmlns attribute', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('xmlns')).toBe('http://www.w3.org/2000/svg');
+      expect(wrapper.find('[data-test="dashboard-icon-smooth-svg"]').attributes('xmlns')).toBe('http://www.w3.org/2000/svg');
     });
   });
 });

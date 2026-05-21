@@ -63,7 +63,7 @@ describe("CustomHTMLEditor", () => {
     it("should render HTML editor container", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.html-editor').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-custom-html-editor-container"]').exists()).toBe(true);
     });
 
     it("should render splitter component", () => {
@@ -313,7 +313,7 @@ describe("CustomHTMLEditor", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find('.html-editor');
+      const container = wrapper.find('[data-test="dashboard-custom-html-editor-container"]');
       const style = container.element.getAttribute('style');
 
       expect(style).toContain('width: 100%');
@@ -331,7 +331,7 @@ describe("CustomHTMLEditor", () => {
     it("should have proper layout structure", () => {
       wrapper = createWrapper();
 
-      const editorSection = wrapper.find('.col');
+      const editorSection = wrapper.find('[data-test="dashboard-custom-html-editor-flex-col"]');
       expect(editorSection.exists()).toBe(true);
 
       // Test component structure exists

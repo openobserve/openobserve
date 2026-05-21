@@ -252,19 +252,21 @@ describe("BuildFieldPopUp", () => {
   describe("Component Structure", () => {
     it("should have correct container structure", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div[style*="padding"]');
+      const container = wrapper.find('[data-test="dashboard-build-field-popup-container"]');
       expect(container.exists()).toBe(true);
     });
 
     it("should have two main sections", () => {
       wrapper = createWrapper();
-      const divs = wrapper.findAll("div");
-      expect(divs.length).toBeGreaterThan(0);
+      const leftSection = wrapper.find('[data-test="dashboard-build-field-popup-left-section"]');
+      const rightSection = wrapper.find('[data-test="dashboard-build-field-popup-right-section"]');
+      expect(leftSection.exists()).toBe(true);
+      expect(rightSection.exists()).toBe(true);
     });
 
     it("should apply correct styles", () => {
       wrapper = createWrapper();
-      const mainDiv = wrapper.find('div[style*="padding"]');
+      const mainDiv = wrapper.find('[data-test="dashboard-build-field-popup-container"]');
       expect(mainDiv.exists()).toBe(true);
     });
   });

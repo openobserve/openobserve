@@ -90,7 +90,7 @@ describe("Group.vue", () => {
         groupNestedIndex: 2
       });
       
-      const groupDiv = wrapper.find('.group');
+      const groupDiv = wrapper.find('[data-test="dashboard-group"]');
       expect(groupDiv.exists()).toBe(true);
       expect(groupDiv.attributes('style')).toBe('--group-index: 2;');
     });
@@ -192,10 +192,10 @@ describe("Group.vue", () => {
         }
       });
       
-      const groupConditions = wrapper.find('.group-conditions');
+      const groupConditions = wrapper.find('[data-test="dashboard-group-conditions"]');
       expect(groupConditions.exists()).toBe(true);
-      
-      const conditionGroups = wrapper.findAll('.condition-group');
+
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(1);
     });
 
@@ -220,7 +220,7 @@ describe("Group.vue", () => {
         }
       });
       
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(2);
     });
 
@@ -589,7 +589,7 @@ describe("Group.vue", () => {
         }
       });
       
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(0);
     });
 
@@ -686,7 +686,7 @@ describe("Group.vue", () => {
       const wrapper = createWrapper({ group: complexGroup });
       
       // Should render all condition groups (including nested ones)
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBeGreaterThanOrEqual(3);
     });
 

@@ -105,46 +105,22 @@ describe("ColorPaletteDropDown", () => {
           dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          "q-select": {
+          "OSelect": {
             template: `
-              <div class="q-select" 
-                   :model-value="modelValue" 
-                   data-test="color-palette-select">
-                <slot name="option" v-for="opt in options" :key="opt.value" :opt="opt" :itemProps="{}" />
+              <div class="o-select"
+                   data-test="color-palette-select"
+                   :model-value="modelValue">
+                <slot name="option" v-for="opt in options" :key="opt.value" :opt="opt" />
               </div>
             `,
             props: [
               "modelValue",
               "options",
-              "outlined",
-              "dense",
               "label",
-              "displayValue",
+              "dropdownStyle",
             ],
             emits: ["update:model-value"],
-          },
-          "q-item": {
-            template: `
-              <div class="q-item" v-bind="$attrs">
-                <slot />
-              </div>
-            `,
-            inheritAttrs: true,
-          },
-          "q-item-section": {
-            template: `
-              <div class="q-item-section">
-                <slot />
-              </div>
-            `,
-          },
-          "q-item-label": {
-            template: `
-              <div class="q-item-label" :class="{ caption: caption }">
-                <slot />
-              </div>
-            `,
-            props: ["caption"],
+            inheritAttrs: false,
           },
           "OToggleGroup": {
             template: `
@@ -158,7 +134,7 @@ describe("ColorPaletteDropDown", () => {
             emits: ["update:modelValue"],
           },
           "OToggleGroupItem": {
-            template: `<button :value="value"><slot /></button>`,
+            template: `<button data-test="o-toggle-group-item" :value="value"><slot /></button>`,
             props: ["value", "size", "disabled"],
           },
         },
@@ -228,15 +204,9 @@ describe("ColorPaletteDropDown", () => {
             dashboardPanelDataPageKey: "customKey",
           },
           stubs: {
-            "q-select": { template: "<div class='q-select'></div>" },
-            "q-item": { template: "<div class='q-item'><slot /></div>" },
-            "q-item-section": {
-              template: "<div class='q-item-section'><slot /></div>",
-            },
-            "q-item-label": {
-              template: "<div class='q-item-label'><slot /></div>",
-            },
-            "q-btn-toggle": { template: "<div class='q-btn-toggle'></div>" },
+            "OSelect": { template: "<div class='o-select'></div>" },
+            "OToggleGroup": { template: "<div class='o-toggle-group'><slot /></div>" },
+            "OToggleGroupItem": { template: "<button><slot /></button>" },
           },
         },
       });
@@ -272,13 +242,13 @@ describe("ColorPaletteDropDown", () => {
         (opt) => opt.label === "<b>By Series</b>",
       );
       expect(bySeriesGroup).toBeDefined();
-      expect(bySeriesGroup.isGroup).toBe(true);
+      expect(bySeriesGroup.header).toBe(true);
 
       const byValueGroup = colorOptions.find(
         (opt) => opt.label === "<b>By Value</b>",
       );
       expect(byValueGroup).toBeDefined();
-      expect(byValueGroup.isGroup).toBe(true);
+      expect(byValueGroup.header).toBe(true);
     });
 
     it("should include palette-classic-by-series option with theme-based colors", () => {
@@ -389,9 +359,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle fixed color mode change", async () => {
-      const value = { value: "fixed", colorPalette: [] };
-
-      wrapper.vm.onColorModeChange(value);
+      wrapper.vm.onColorModeChange("fixed");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
@@ -402,9 +370,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle shades color mode change", async () => {
-      const value = { value: "shades", colorPalette: [] };
-
-      wrapper.vm.onColorModeChange(value);
+      wrapper.vm.onColorModeChange("shades");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("shades");
@@ -415,12 +381,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle palette-classic-by-series mode change", async () => {
-      const value = {
-        value: "palette-classic-by-series",
-        colorPalette: mockColorPalette,
-      };
-
-      wrapper.vm.onColorModeChange(value);
+      wrapper.vm.onColorModeChange("palette-classic-by-series");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe(
@@ -430,12 +391,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle palette-classic mode change", async () => {
-      const value = {
-        value: "palette-classic",
-        colorPalette: ["#color1", "#color2"],
-      };
-
-      wrapper.vm.onColorModeChange(value);
+      wrapper.vm.onColorModeChange("palette-classic");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe(
@@ -445,13 +401,8 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle continuous color modes", async () => {
-      const customPalette = ["#red", "#yellow", "#green"];
-      const value = {
-        value: "continuous-red-yellow-green",
-        colorPalette: customPalette,
-      };
-
-      wrapper.vm.onColorModeChange(value);
+      const customPalette = ["red", "yellow", "green"];
+      wrapper.vm.onColorModeChange("continuous-red-yellow-green");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe(
@@ -503,10 +454,10 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should render main container with correct structure", () => {
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-color-palette-root"]');
       expect(container.exists()).toBeTruthy();
 
-      const flexContainer = wrapper.find("div[style*='display: flex']");
+      const flexContainer = wrapper.find('[data-test="dashboard-color-palette-flex-container"]');
       expect(flexContainer.exists()).toBeTruthy();
       expect(flexContainer.attributes("style")).toContain(
         "align-items: center",
@@ -519,7 +470,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should not show color input by default", () => {
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-color-palette-color-input"]');
       expect(colorInput.exists()).toBeFalsy();
     });
 
@@ -527,7 +478,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-color-palette-color-input"]');
       expect(colorInput.exists()).toBeTruthy();
     });
 
@@ -535,7 +486,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "shades";
       await nextTick();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-color-palette-color-input"]');
       expect(colorInput.exists()).toBeTruthy();
     });
 
@@ -543,7 +494,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 
-      const wrapper_element = wrapper.find(".color-input-wrapper");
+      const wrapper_element = wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]');
       expect(wrapper_element.exists()).toBeTruthy();
       expect(wrapper_element.attributes("style")).toContain("margin-top: 30px");
       expect(wrapper_element.attributes("style")).toContain("margin-left: 5px");
@@ -570,7 +521,7 @@ describe("ColorPaletteDropDown", () => {
       const toggle = wrapper.find("[data-test='series-by-toggle']");
       expect(toggle.exists()).toBeTruthy();
 
-      const buttons = toggle.findAll("button");
+      const buttons = toggle.findAll('[data-test="o-toggle-group-item"]');
       expect(buttons).toHaveLength(3);
       expect(buttons[0].text()).toBe("Last");
       expect(buttons[1].text()).toBe("Min");
@@ -586,7 +537,7 @@ describe("ColorPaletteDropDown", () => {
     it("should render option template for regular options", () => {
       const colorOptions = wrapper.vm.colorOptions;
       const regularOption = colorOptions.find(
-        (opt) => !opt.isGroup && opt.value,
+        (opt) => !opt.header && opt.value,
       );
 
       expect(regularOption).toBeDefined();
@@ -595,7 +546,7 @@ describe("ColorPaletteDropDown", () => {
 
     it("should render option template for group headers", () => {
       const colorOptions = wrapper.vm.colorOptions;
-      const groupOption = colorOptions.find((opt) => opt.isGroup);
+      const groupOption = colorOptions.find((opt) => opt.header);
 
       expect(groupOption).toBeDefined();
       expect(groupOption.label).toContain("<b>");
@@ -626,9 +577,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should update model value when color mode changes", async () => {
-      const newValue = { value: "fixed", colorPalette: [] };
-
-      wrapper.vm.onColorModeChange(newValue);
+      wrapper.vm.onColorModeChange("fixed");
       await flushPromises();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
@@ -639,7 +588,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.fixedColor = ["#ff0000"];
       await nextTick();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-color-palette-color-input"]');
       expect(colorInput.exists()).toBeTruthy();
     });
 
@@ -730,29 +679,23 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should handle onColorModeChange with missing colorPalette", async () => {
-      const value = { value: "continuous-test" };
-
       expect(() => {
-        wrapper.vm.onColorModeChange(value);
+        wrapper.vm.onColorModeChange("continuous-test");
       }).not.toThrow();
     });
 
     it("should handle invalid color modes", async () => {
-      const value = { value: "invalid-mode", colorPalette: ["#test"] };
-
       // Ensure the component is properly initialized
       wrapper = createWrapper();
       await nextTick();
 
-      wrapper.vm.onColorModeChange(value);
+      wrapper.vm.onColorModeChange("invalid-mode");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe(
         "invalid-mode",
       );
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
-        "#test",
-      ]);
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
   });
 
@@ -815,17 +758,14 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       // Change to fixed mode
-      wrapper.vm.onColorModeChange({ value: "fixed" });
+      wrapper.vm.onColorModeChange("fixed");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
       expect(wrapper.vm.selectedOptionLabel).toBe("Single Color");
 
       // Change to continuous mode
-      wrapper.vm.onColorModeChange({
-        value: "continuous-temperature",
-        colorPalette: ["#F6EADB", "#FBDBA2", "#FFC86D", "#FC8585"],
-      });
+      wrapper.vm.onColorModeChange("continuous-temperature");
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe(
@@ -843,14 +783,14 @@ describe("ColorPaletteDropDown", () => {
       );
 
       // Change to fixed
-      wrapper.vm.onColorModeChange({ value: "fixed" });
+      wrapper.vm.onColorModeChange("fixed");
       await nextTick();
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
         "#53ca53",
       ]);
 
       // Change to palette-classic (should clear fixedColor)
-      wrapper.vm.onColorModeChange({ value: "palette-classic" });
+      wrapper.vm.onColorModeChange("palette-classic");
       await nextTick();
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
@@ -860,7 +800,7 @@ describe("ColorPaletteDropDown", () => {
     it("should apply correct CSS classes", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find("div");
+      const container = wrapper.find('[data-test="dashboard-color-palette-root"]');
       expect(container.exists()).toBeTruthy();
     });
 
@@ -869,7 +809,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      const colorWrapper = wrapper.find(".color-input-wrapper");
+      const colorWrapper = wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]');
       expect(colorWrapper.exists()).toBeTruthy();
     });
   });

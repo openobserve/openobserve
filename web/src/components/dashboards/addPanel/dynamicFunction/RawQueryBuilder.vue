@@ -1,8 +1,8 @@
 <template>
-  <div style="width: 100%">
-    <div class="query-section">
-      <div class="query-label">Query</div>
-      <div class="query-label tw:text-xs">
+  <div style="width: 100%" data-test="dashboard-raw-query-builder">
+    <div class="query-section" data-test="dashboard-raw-query-section">
+      <div class="query-label" data-test="dashboard-raw-query-title">Query</div>
+      <div class="query-label tw:text-xs" data-test="dashboard-raw-query-instruction">
         Write a SQL query for complex actions.
       </div>
 

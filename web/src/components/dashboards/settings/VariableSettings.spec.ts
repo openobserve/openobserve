@@ -285,7 +285,7 @@ describe("VariableSettings", () => {
     });
 
     it("should display variables list header", () => {
-      expect(wrapper.find(".variables-list-header").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variables-list-header"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Name");
       expect(wrapper.text()).toContain("Type");
       expect(wrapper.text()).toContain("Actions");
@@ -302,7 +302,7 @@ describe("VariableSettings", () => {
     });
 
     it("should show add variable button", () => {
-      expect(wrapper.find('button').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-variable-btn"]').exists()).toBe(true);
     });
 
     it("should display variable type labels correctly", async () => {

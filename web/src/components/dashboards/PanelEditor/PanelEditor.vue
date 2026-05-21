@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor">
+  <div class="panel-editor" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div class="tw:pl-[0.625rem]">
@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed card-container"
+          data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
@@ -421,6 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed card-container"
+          data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >

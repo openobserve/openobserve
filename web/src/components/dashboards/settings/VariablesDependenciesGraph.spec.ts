@@ -237,7 +237,7 @@ describe("VariablesDependenciesGraph", () => {
 
   describe("Component Styling and Layout", () => {
     it("should have correct container styling", () => {
-      const container = wrapper.find('div');
+      const container = wrapper.find('[data-test="dashboard-variables-dependencies-graph-container"]');
       expect(container.attributes('style')).toContain('height: 100%');
       expect(container.attributes('style')).toContain('width: 100%');
     });

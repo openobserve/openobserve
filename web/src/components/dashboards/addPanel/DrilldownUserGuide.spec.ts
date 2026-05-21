@@ -344,7 +344,8 @@ describe("DrilldownUserGuide", () => {
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
       expect(userGuide!.classList.contains("theme-light")).toBe(true);
-      expect(userGuide!.classList.contains("bg-white")).toBe(true);
+      // Tailwind v4 with tw: prefix
+      expect(userGuide!.classList.contains("tw:bg-white")).toBe(true);
     });
 
     it("should apply dark theme classes", async () => {
@@ -357,7 +358,10 @@ describe("DrilldownUserGuide", () => {
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
       expect(userGuide!.classList.contains("theme-dark")).toBe(true);
-      expect(userGuide!.classList.contains("bg-dark")).toBe(true);
+      // Component uses tw:bg-[var(--o2-bg-card-dark,#1a1a1a)] for dark theme
+      expect(
+        Array.from(userGuide!.classList).some((c) => c.startsWith("tw:bg-["))
+      ).toBe(true);
     });
 
     it("should have access to store", () => {

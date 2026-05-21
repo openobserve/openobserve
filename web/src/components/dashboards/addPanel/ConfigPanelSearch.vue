@@ -18,6 +18,8 @@ const emit = defineEmits<{
 
 <template>
   <OInput
+    id="dashboard-config-panel-search-input"
+    data-test="dashboard-config-panel-search"
     :model-value="props.modelValue"
     @update:model-value="$emit('update:modelValue', String($event || ''))"
     :placeholder="t('dashboard.configPanelSearchPlaceholder')"

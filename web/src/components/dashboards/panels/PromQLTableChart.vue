@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="promql-table-chart"
+    data-test="promql-table-chart"
     style="
       height: 100%;
       width: 100%;

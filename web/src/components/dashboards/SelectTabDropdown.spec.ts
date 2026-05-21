@@ -202,10 +202,8 @@ describe("SelectTabDropdown", () => {
 
     await flushPromises();
 
-    expect(wrapper.vm.selectedTab).toEqual({
-      label: "Tab 1",
-      value: "tab1",
-    });
+    // selectedTab is a primitive tab id, not an option object.
+    expect(wrapper.vm.selectedTab).toBe("tab1");
   });
 
   it("should emit tab-list-updated after loading tabs", async () => {
@@ -253,10 +251,7 @@ describe("SelectTabDropdown", () => {
     await wrapper.vm.updateTabList(newTab);
 
     expect(wrapper.vm.showAddTabDialog).toBe(false);
-    expect(wrapper.vm.selectedTab).toEqual({
-      label: "New Tab",
-      value: "newTab123",
-    });
+    expect(wrapper.vm.selectedTab).toBe("newTab123");
   });
 
   it("should close dialog and update selected tab when AddTab emits refresh", async () => {
@@ -280,9 +275,6 @@ describe("SelectTabDropdown", () => {
     await flushPromises();
 
     expect(wrapper.vm.showAddTabDialog).toBe(false);
-    expect(wrapper.vm.selectedTab).toEqual({
-      label: "Emitted Tab",
-      value: "emitted123",
-    });
+    expect(wrapper.vm.selectedTab).toBe("emitted123");
   });
 });

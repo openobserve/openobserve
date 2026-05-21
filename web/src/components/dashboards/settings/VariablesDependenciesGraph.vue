@@ -14,7 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div style="height: 100%; width: 100%">
+  <div
+    data-test="dashboard-variables-dependencies-graph-container"
+    style="height: 100%; width: 100%"
+  >
     <ChartRenderer
       :data="{ options: options ?? { backgroundColor: 'transparent' } }"
     />

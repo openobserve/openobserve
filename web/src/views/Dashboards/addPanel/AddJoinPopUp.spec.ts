@@ -99,7 +99,9 @@ describe("AddJoinPopUp", () => {
     expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(
       true,
     );
-    expect(wrapper.find(".join-header").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="dashboard-join-pop-up-header"]').exists(),
+    ).toBe(true);
   });
 
   it("displays correct join type", () => {
@@ -294,7 +296,6 @@ describe("AddJoinPopUp", () => {
 
   it("displays join summary", () => {
     // The component should show join summary
-    const summaryElement = wrapper.find(".join-preview");
     // Component may or may not show preview based on conditions
     expect(wrapper.exists()).toBe(true);
   });

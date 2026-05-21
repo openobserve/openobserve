@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
       >
         <img
+          data-test="header-openobserve-logo"
           class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
           :src="
             getImageURL(
@@ -113,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Default OpenObserve logo (when no custom logo) -->
     <div v-else class="tw:flex relative-position tw:mr-2 logo-container">
       <img
+        data-test="header-openobserve-logo"
         class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
           getImageURL(

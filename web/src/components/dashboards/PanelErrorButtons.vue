@@ -73,6 +73,7 @@
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
       class="lastRefreshedAt"
+      data-test="panel-last-refreshed-at"
     >
       <span class="lastRefreshedAtIcon">
         🕑
