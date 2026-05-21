@@ -121,10 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
-                  store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
-                  isLLMTrace((spans as any[])[virtualRow.index])
-                    ? ''
-                    : 'tw:pt-2',
+                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
                 ]"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
@@ -217,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'ERROR'
                         "
                         name="error" size="sm"
-                        class="text-red-6 tw:mr-1"
+                        class="tw:text-[var(--o2-status-error-text)]! tw:mr-1"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
@@ -856,15 +853,15 @@ export default defineComponent({
 }
 
 .span-count-box {
-  min-width: 1.2rem;
-  height: 1.2rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
   padding: 0 0.25rem;
   border-radius: 50%;
   border: 0.0625rem solid;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   margin-right: 0.25rem;
   transition: background-color 0.2s ease;

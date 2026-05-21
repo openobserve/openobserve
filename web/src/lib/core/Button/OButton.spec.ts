@@ -238,7 +238,11 @@ describe("OButton", () => {
       props: { asChild: true },
       slots: { default: '<a href="/home">Home</a>' },
     });
-    expect(wrapper.element.tagName.toLowerCase()).toBe("a");
+    // asChild merges the button's attributes onto the slot's first child.
+    // The <a> element should be present with the expected href.
+    const link = wrapper.find('a[href="/home"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe("Home");
   });
 
   // --- Base layout / transition / focus-ring offset ---

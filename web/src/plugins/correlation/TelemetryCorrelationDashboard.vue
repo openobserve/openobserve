@@ -249,7 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   (s) => s.stream_name === stream.stream_name,
                                 )
                               "
-                              @update:model-value="toggleMetricStream(stream)"
                               size="xs"
                             />
                           </div>
@@ -711,7 +710,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 (s) => s.stream_name === stream.stream_name,
                               )
                             "
-                            @update:model-value="toggleMetricStream(stream)"
                             size="xs"
                           />
                         </div>
@@ -2999,7 +2997,7 @@ body.body--dark .metric-splitter-separator {
 // Metric group tabs (Infra / Network / Others sub-tabs within the metrics section)
 .metric-group-tabs {
   flex-shrink: 0;
-  background: var(--o2-bg-color, #fff);
+  background: var(--color-surface-panel);
 
   :deep(.o-tab) {
     min-height: 2rem;

@@ -16,13 +16,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import Invitations from "./Invitations.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 describe("Invitations", () => {
   let store: any;

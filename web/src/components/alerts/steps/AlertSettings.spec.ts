@@ -20,7 +20,6 @@ import { nextTick } from "vue";
 import AlertSettings from "./AlertSettings.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock router
 const mockRouter = {

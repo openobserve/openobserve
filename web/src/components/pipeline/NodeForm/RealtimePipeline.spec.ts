@@ -15,12 +15,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Stub FieldsInput to avoid pulling in its full dependency tree
 const FieldsInputStub = {

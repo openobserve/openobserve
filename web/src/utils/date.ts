@@ -250,6 +250,7 @@ function normalizeFormat(format: string): string {
   return format
     .replace(/YYYY/g, "yyyy")
     .replace(/DD/g, "dd")
+    .replace(/(?<!d)D(?!D)/g, "d")
     .replace(/(?<!')T(?!')/g, "'T'")
     .replace(/(?<!')Z(?!')/g, "X");
 }

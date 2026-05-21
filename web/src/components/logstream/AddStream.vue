@@ -19,17 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="!isInPipeline"
     data-test="add-stream-dialog"
     :open="open"
-    size="md"
+    size="lg"
     :title="t('logStream.add')"
-    :secondary-button-label="t('logStream.cancel')"
-    :primary-button-label="t('common.save')"
+    persistent
     @update:open="emits('update:open', $event)"
-    @click:secondary="emits('update:open', false)"
-    @click:primary="submitForm()"
   >
-    <div class="tw:px-3 tw:py-3 add-stream-inputs">
-      <div>
-        <div data-test="add-stream-name-input">
+    <div class="tw:p-4 tw:w-full">
+      <OForm :default-values="streamInputsDefault" @submit.prevent="submitForm">
+        <div data-test="add-stream-name-input" class="tw:mt-2">
           <OInput
             v-model="streamInputs.name"
             :label="t('common.name') + ' *'"
@@ -41,21 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-type-input">
+        <div data-test="add-stream-type-input" class="tw:mt-2">
           <OSelect
             v-model="streamInputs.stream_type"
             :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"
             labelKey="label"
             valueKey="value"
-            class="showLabelOnTop no-case"
+            class="showLabelOnTop"
             :error="!!streamTypeError"
             :error-message="streamTypeError"
             @update:model-value="streamTypeError = ''"
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
           <OInput
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
@@ -68,77 +65,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <StreamFieldInputs
+          class="tw:mt-4"
           :fields="fields"
           @add="addField"
           @remove="removeField"
         />
-      </div>
+
+        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="add-stream-cancel-btn"
+            @click="emits('update:open', false)"
+          >
+            {{ t('logStream.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            data-test="add-stream-save-btn"
+          >
+            {{ t('common.save') }}
+          </OButton>
+        </div>
+      </OForm>
     </div>
   </ODrawer>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
-  <div v-else class="tw:px-3 tw:py-3 add-stream-inputs">
-    <div>
-      <div data-test="add-stream-name-input">
-        <OInput
-          v-model="streamInputs.name"
-          :label="t('common.name') + ' *'"
-          class="showLabelOnTop"
-          :error="!!nameError"
-          :error-message="nameError"
-          @update:model-value="nameError = ''"
-          tabindex="0"
+    <div v-else class="tw:p-4 tw:w-full">
+      <OForm :default-values="streamInputsDefault" @submit.prevent="submitForm">
+        <div data-test="add-stream-name-input" class="tw:mt-2">
+          <OInput
+            v-model="streamInputs.name"
+            :label="t('common.name') + ' *'"
+            class="showLabelOnTop"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
+            tabindex="0"
+          />
+        </div>
+
+        <div data-test="add-stream-type-input" class="tw:mt-2">
+          <OSelect
+            v-model="streamInputs.stream_type"
+            :options="filteredStreamTypes"
+            :label="t('alerts.streamType') + ' *'"
+            labelKey="label"
+            valueKey="value"
+            class="showLabelOnTop"
+            :error="!!streamTypeError"
+            :error-message="streamTypeError"
+            @update:model-value="streamTypeError = ''"
+          />
+        </div>
+
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+          <OInput
+            v-model="streamInputs.dataRetentionDays"
+            :label="t('logStream.dataRetention') + ' *'"
+            class="showLabelOnTop"
+            type="number"
+            :error="!!dataRetentionError"
+            :error-message="dataRetentionError"
+            @update:model-value="dataRetentionError = ''"
+          />
+        </div>
+
+        <StreamFieldInputs
+          class="tw:mt-4"
+          :fields="fields"
+          @add="addField"
+          @remove="removeField"
         />
-      </div>
 
-      <div data-test="add-stream-type-input">
-        <OSelect
-          v-model="streamInputs.stream_type"
-          :options="filteredStreamTypes"
-          :label="t('alerts.streamType') + ' *'"
-          labelKey="label"
-          valueKey="value"
-          class="showLabelOnTop no-case"
-          :error="!!streamTypeError"
-          :error-message="streamTypeError"
-          @update:model-value="streamTypeError = ''"
-        />
-      </div>
-
-      <div data-test="add-stream-data-retention-input" v-if="showDataRetention">
-        <OInput
-          v-model="streamInputs.dataRetentionDays"
-          :label="t('logStream.dataRetention') + ' *'"
-          class="showLabelOnTop"
-          type="number"
-          :error="!!dataRetentionError"
-          :error-message="dataRetentionError"
-          @update:model-value="dataRetentionError = ''"
-        />
-      </div>
-
-      <StreamFieldInputs
-        :fields="fields"
-        @add="addField"
-        @remove="removeField"
-      />
-
-      <div class="tw:flex tw:gap-2 tw:mt-2">
-        <OButton
-          data-test="add-stream-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="emits('close')"
-        >{{ t('logStream.cancel') }}</OButton>
-        <OButton
-          data-test="add-stream-save-btn"
-          variant="primary"
-          size="sm-action"
-          @click="saveStream"
-        >{{ t('common.save') }}</OButton>
-      </div>
+        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+          <OButton
+            data-test="add-stream-cancel-btn"
+            variant="outline"
+            size="sm-action"
+            @click="emits('close')"
+          >{{ t('logStream.cancel') }}</OButton>
+          <OButton
+            data-test="add-stream-save-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+          >{{ t('common.save') }}</OButton>
+        </div>
+      </OForm>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -154,6 +172,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -191,17 +210,22 @@ const store = useStore();
 
 const { track } = useReo();
 
-const streamInputs = ref({
+const streamInputsDefault = {
   name: "",
   stream_type: "",
   index_type: [],
   dataRetentionDays: 14,
+};
+
+const streamInputs = ref({
+  ...streamInputsDefault,
 });
 
 const getDefaultField = () => {
   return {
+    uuid: crypto.randomUUID(),
     name: "",
-    type: "",
+    type: undefined,
     index_type: [],
   };
 };
@@ -404,14 +428,3 @@ const removeField = (field: any, index: number) => {
 };
 </script>
 
-<style lang="scss">
-.add-stream-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 13px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-    top: 12px !important;
-  }
-}
-</style>

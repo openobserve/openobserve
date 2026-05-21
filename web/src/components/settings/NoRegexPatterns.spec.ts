@@ -15,11 +15,9 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import NoRegexPatterns from "./NoRegexPatterns.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 // Mock external utilities
 vi.mock("@/utils/zincutils", () => ({

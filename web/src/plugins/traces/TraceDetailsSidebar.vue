@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service Badge -->
           <OBadge
             size="sm"
-            class="toolbar-chip service-chip"
+            class="toolbar-chip service-chip tw:mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OBadge
             size="sm"
-            class="toolbar-chip duration-chip"
+            class="toolbar-chip duration-chip tw:mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-if="getTTFT"
             size="sm"
-            class="toolbar-chip ttft-chip"
+            class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OBadge
             size="sm"
-            class="toolbar-chip time-chip"
+            class="toolbar-chip time-chip tw:mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-if="spanHttpResendCount"
             size="sm"
-            class="toolbar-chip resend-chip"
+            class="toolbar-chip resend-chip tw:mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             size="sm"
             clickable
-            class="toolbar-chip span-id-chip"
+            class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -279,14 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="error"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-error"
-                    class="tw:font-normal!"
-
+          class="tw:font-normal! tw:gap-1!"
         >
           {{ t('common.error') }}
           <OBadge
             v-if="hasExceptionEvents.length"
             variant="error"
-            class="tw:font-normal! tw:ml-1 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
+            size="sm"
+            class="tw:font-normal! tw:text-[10px]!  tw:ml-0 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]! tw:rounded!"
             data-test="trace-details-sidebar-tabs-error-count"
           >{{ hasExceptionEvents.length }}</OBadge>
         </OTab>
@@ -525,7 +525,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     v-for="action in filterActions"
                     :key="action.operator"
                     :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
-                    class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
@@ -582,7 +582,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                         v-for="action in filterActions"
                         :key="action.operator"
                         :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
                         @click.stop="
                           $emit('apply-filter-immediately', {
                             field,
@@ -618,11 +618,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
         >
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:pb-[0.325rem] tw:pl-1">
               <OSwitch
                 v-model="eventsWrap"
-                label="Wrap"
-                size="sm"
+                :label="t('common.wrap')"
+                size="md"
+                class="tw:gap-1!"
               />
             </div>
             <!-- TenstackTable for events -->

@@ -21,29 +21,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="regex-pattern-list-title">
         {{ t("regex_patterns.title") }}
       </div>
-      <OInput
-        v-model="filterQuery"
-        class="tw:ml-auto no-border o2-search-input"
-        :placeholder="t('regex_patterns.search')"
-      >
-        <template #icon-left>
-          <OIcon class="o2-search-input-icon" name="search" size="sm" />
-        </template>
-      </OInput>
-      <OButton
-        class="tw:ml-2"
-        variant="outline"
-        size="sm-action"
-        @click="importRegexPattern"
-        data-test="regex-pattern-list-import"
-      >{{ t("regex_patterns.import") }}</OButton>
-      <OButton
-        data-test="regex-pattern-list-add-pattern-btn"
-        class="tw:ml-2"
-        variant="primary"
-        size="sm-action"
-        @click="createRegexPattern"
-      >{{ t("regex_patterns.create_pattern") }}</OButton>
+      <div class="tw:flex">
+        <OInput
+          v-model="filterQuery"
+          class="tw:ml-auto no-border o2-search-input"
+          :placeholder="t('regex_patterns.search')"
+        >
+          <template #icon-left>
+            <OIcon class="o2-search-input-icon" name="search" size="sm" />
+          </template>
+        </OInput>
+        <OButton
+          class="tw:ml-2"
+          variant="outline"
+          size="sm"
+          @click="importRegexPattern"
+          data-test="regex-pattern-list-import"
+        >{{ t("regex_patterns.import") }}</OButton>
+        <OButton
+          data-test="regex-pattern-list-add-pattern-btn"
+          class="tw:ml-2"
+          variant="primary"
+          size="sm"
+          @click="createRegexPattern"
+        >{{ t("regex_patterns.create_pattern") }}</OButton>
+      </div>
     </div>
     <div class="tw:flex-1 tw:min-h-0">
     <OTable

@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import NoSymbol from '@/components/icons/dashboards/NoSymbol.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('NoSymbol.vue', () => {
   let wrapper: VueWrapper;

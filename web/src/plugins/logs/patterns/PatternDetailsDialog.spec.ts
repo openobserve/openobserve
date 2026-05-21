@@ -15,15 +15,9 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [],
-});
 
 // Stub ODrawer so its slots render inline (no portal) and we can drive its
 // emits directly. Mirrors the same shape used by other migrated specs.

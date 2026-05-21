@@ -16,10 +16,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import RetryJobDialog from "./RetryJobDialog.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 
-installQuasar();
 
 describe("RetryJobDialog", () => {
   let store: any;

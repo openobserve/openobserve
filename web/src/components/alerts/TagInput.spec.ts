@@ -16,9 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import TagInput from "./TagInput.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
 
 describe("TagInput", () => {
   it("should render the component", () => {

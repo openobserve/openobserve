@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 
@@ -30,7 +29,6 @@ vi.mock("../panels/ChartRenderer.vue", () => ({
   default: MockChartRenderer
 }));
 
-installQuasar();
 
 describe("VariablesDependenciesGraph", () => {
   let wrapper: VueWrapper<any>;

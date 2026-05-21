@@ -405,19 +405,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OToggleGroup>
                       </div>
 
-                      <div v-if="hasUserDefinedSchema" class="tw:ml-2">
+                      <div v-if="hasUserDefinedSchema" class="tw:ml-2 tw:flex tw:items-center">
                         <OIcon
                           name="info"
-                          class="tw:mr-1"
                           size="sm"
                           style="color: #f5a623; cursor: pointer"
-                        >
-                          <OTooltip side="right">
-                            Other fields show only the schema fields that
-                            existed before the stream was configured to use a
-                            user-defined schema.
-                          </OTooltip>
-                        </OIcon>
+                        />
+                        <OTooltip
+                          side="right"
+                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                        />
                       </div>
                     </div>
 
@@ -576,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template #cell-index_type="{ row }">
-                        <OSelect
+                        <div
                           v-if="
                             !(
                               row.name ==
@@ -584,22 +581,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               row.name == allFieldsName
                             )
                           "
-                          :model-value="computedIndexType({ row }).value"
-                          :options="indexTypeOptionsForRow(row)"
-                          label-key="label"
-                          value-key="value"
-                          class="mini-select"
-                          multiple
-                          clearable
-                          :data-test="`schema-field-${row.name}-index-type-select`"
-                          style="width: 190px;"
-                          @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                          class="tw:flex tw:items-center tw:gap-1"
                         >
+                          <OSelect
+                            :model-value="computedIndexType({ row }).value"
+                            :options="indexTypeOptionsForRow(row)"
+                            label-key="label"
+                            value-key="value"
+                            class="mini-select"
+                            multiple
+                            clearable
+                            :data-test="`schema-field-${row.name}-index-type-select`"
+                            style="width: 190px;"
+                            @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                          />
                           <OTooltip
                             v-if="row.index_type && row.index_type.length > 0"
                             :content="streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
                           />
-                        </OSelect>
+                        </div>
                       </template>
                       <template #cell-patterns="{ row }">
                         <template
@@ -2720,7 +2720,6 @@ export default defineComponent({
 
     return {
       t,
-      q,
       store,
       config,
       dateChangeValue,
@@ -2840,6 +2839,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
+      /* v8 ignore next */ // unreachable in tests: Vue 3 Options API auto-unwraps refs on `this`, so loadingState here is a primitive boolean not a Ref
       this.loadingState.value = false;
     }
   },

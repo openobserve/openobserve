@@ -36,7 +36,7 @@ describe("OTextarea", () => {
 
   it("shows error message when provided", () => {
     wrapper = mount(OTextarea, {
-      props: { errorMessage: "Required field" },
+      props: { error: true, errorMessage: "Required field" },
     });
     expect(wrapper.text()).toContain("Required field");
   });

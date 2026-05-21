@@ -22,7 +22,6 @@ import {
   vi,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";

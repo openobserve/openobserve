@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SelectTabDropdown from "./SelectTabDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Stub AddTab to expose v-model:open + refresh contract used by the
 // ODialog/ODrawer-based migration of SelectTabDropdown.

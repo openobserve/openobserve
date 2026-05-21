@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MessageQueues from "./MessageQueues.vue";
 import store from "../../test/unit/helpers/store";
 
@@ -88,7 +87,6 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-installQuasar();
 
 describe("MessageQueues.vue", () => {
   let wrapper: any;

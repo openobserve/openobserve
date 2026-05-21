@@ -15,7 +15,6 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Login from "@/components/login/Login.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
@@ -76,7 +75,6 @@ vi.mock("@openobserve/browser-rum", () => ({
   },
 }));
 
-installQuasar();
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

@@ -41,7 +41,7 @@ describe("OInput", () => {
   });
 
   it("shows error message when provided", () => {
-    wrapper = mount(OInput, { props: { errorMessage: "Required field" } });
+    wrapper = mount(OInput, { props: { error: true, errorMessage: "Required field" } });
     expect(wrapper.text()).toContain("Required field");
   });
 

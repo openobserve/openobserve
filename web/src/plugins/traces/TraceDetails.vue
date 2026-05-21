@@ -191,14 +191,12 @@ size="xs"
 
             <!-- Expand button (embedded mode) -->
             <OButton
-              v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
-              variant="ghost-muted"
+              variant="outline"
               size="icon-xs"
-              class="tw:ml-1.5"
               @click="handleExpandToFullView"
             >
-              <OIcon name="open-in-new" size="xs" />
+              <OIcon name="open-in-new" size="sm" />
               <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
@@ -215,12 +213,11 @@ size="xs"
             <OButton
               v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost-muted"
+              variant="ghost"
               size="icon-xs"
-              class="tw:mx-1.5"
               @click="handleBackOrClose"
             >
-              <OIcon name="close" size="xs" />
+              <OIcon name="close" size="sm" />
               <OTooltip :content="t('common.cancel')" />
             </OButton>
           </div>
@@ -243,7 +240,7 @@ size="xs"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><OIcon name="align-left" size="xs" class="tw:shrink-0"
+                  ><OIcon name="align-left" size="sm" class="tw:shrink-0"
                 /></template>
                 Waterfall
               </OToggleGroupItem>
@@ -255,7 +252,7 @@ size="xs"
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
+                  ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
@@ -307,7 +304,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-0!"
+              class="unified-search-group tw:mr-0! tw:gap-1 tw:flex tw:items-center"
             >
               <div class="log-stream-search-input">
                 <OInput
@@ -315,6 +312,7 @@ size="sm">
                   data-test="trace-details-search-input"
                   :placeholder="t('traces.searchInSpans')"
                   clearable
+                  size="sm"
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
                 >
@@ -324,7 +322,7 @@ size="sm">
                 </OInput>
               </div>
               <!-- Search Results Navigation -->
-              <div class="search-navigation-container">
+              <div class="search-navigation-container tw:h-8.2! tw:py-[0.125px]!">
                 <div
                   class="search-results-counter"
                   data-test="trace-details-search-results"
@@ -462,18 +460,14 @@ size="sm"
                       <div
                         data-test="trace-details-resizer"
                         :style="{
-                          width: '1px',
                           left: `${leftWidth}px`,
                           backgroundColor:
                             store.state.theme === 'dark'
                               ? '#3c3c3c'
                               : '#ececec',
                           zIndex: 999,
-                          top: '-28px',
-                          height: `${spanPositionList.length * spanDimensions.height + 28}px`,
-                          cursor: 'col-resize',
                         }"
-                        class="tw:absolute resize"
+                        class="tw:absolute resize tw:h-full tw:cursor-col-resize tw:top-0 tw:w-[1px]"
                         @mousedown="startResize"
                       />
                       <trace-tree
@@ -2990,13 +2984,6 @@ $traceChartCollapseHeight: 42px;
 }
 }
 
-.log-stream-search-input {
-  width: 20.2rem;
-
-  .q-field .q-field__control {
-    padding: 0px 8px;
-  }
-}
 
 .toolbar-operation-name {
   max-width: 225px;
@@ -3180,115 +3167,24 @@ html:has(.trace-details) {
   }
 }
 
-.log-stream-search-input {
-  .q-field {
-    height: 1.875rem !important;
-    min-height: 1.875rem !important;
-  }
-
-  .q-field .q-field__control {
-    padding: 0px 4px;
-    border-radius: 0.2rem;
-  }
-
-  .q-field .q-field__control:before,
-  .q-field .q-field__control:after {
-    border: none !important;
-    content: none !important;
-  }
-
-  .q-field {
-    &.showLabelOnTop {
-      padding-top: 26px;
-    }
-
-    .q-field__inner {
-      align-self: center;
-      height: 1.875rem !important;
-      min-height: 1.875rem !important;
-    }
-
-    .q-field__control {
-      height: 1.875rem !important;
-      min-height: 1.875rem !important;
-      background-color: var(--o2-page-bg);
-      border: 1px solid var(--o2-border-color);
-      padding: 0 0.5rem !important;
-
-      .q-field__control-container {
-        height: calc(100% - 1px) !important;
-        padding-top: 0px;
-
-        .q-field__native {
-          min-height: calc(100% - 2px) !important;
-          height: 1.875rem !important;
-        }
-
-        .q-field__label {
-          top: 8px;
-        }
-      }
-
-      .q-field__marginal {
-        height: 1.875rem !important;
-}
-    }
-
-    &.q-field--dark .q-field__control {
-      background-color: var(--o2-dark-page-bg);
-    }
-
-    .q-field__bottom {
-      padding: 0.1rem 0 0;
-      min-height: fit-content !important;
-    }
-  }
-}
-
 // Unified Search Group - input and navigation as one element
 .unified-search-group {
   display: flex;
   align-items: stretch;
   width: fit-content;
-  border-radius: 0.2rem;
-  overflow: hidden;
-  border: 0.0625rem solid var(--o2-border-color);
-  background-color: var(--o2-page-bg);
+  border-radius: var(--radius-md);
   transition: border-color 0.2s ease;
-
-  &:hover,
-  &:focus-within {
-    border-color: var(--o2-theme-color);
-  }
-
-  // Remove borders from child elements
-  .log-stream-search-input {
-    border: none;
-
-    .q-field {
-      .q-field__control {
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-
-        &:before,
-        &:after {
-          border: none !important;
-        }
-      }
-    }
-  }
 }
 
 // Search Navigation Container - integrated with input
 .search-navigation-container {
   display: inline-flex;
   align-items: center;
-  height: 1.875rem;
-  border-left: 0.0625rem solid var(--o2-border-color);
   background-color: transparent;
   padding: 0 0.125rem;
   transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  border: 0.0625rem solid var(--color-input-border);
 
   .search-results-counter {
     display: flex;

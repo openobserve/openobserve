@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { date } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelineHistory from "@/components/pipelines/PipelineHistory.vue";
 import i18n from "@/locales";
 import router from "../../helpers/router";
@@ -65,7 +64,6 @@ vi.mock("@/services/http", () => ({
   })),
 }));
 
-installQuasar();
 
 describe("PipelineHistory.vue", () => {
   let store: any;

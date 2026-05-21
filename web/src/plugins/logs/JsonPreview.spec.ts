@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
-installQuasar();
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can drive primary/secondary actions via emits.

@@ -15,11 +15,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TablePaginationControls from "./TablePaginationControls.vue";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
 
 const mockI18n = createI18n({
   locale: "en",

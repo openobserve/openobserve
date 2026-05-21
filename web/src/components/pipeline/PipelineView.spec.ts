@@ -15,12 +15,10 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import PipelineView from "@/components/pipeline/PipelineView.vue";
 
-installQuasar();
 
 // --------------------------------------------------------------------------
 // Module mocks

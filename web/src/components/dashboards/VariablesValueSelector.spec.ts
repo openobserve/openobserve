@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 
@@ -132,7 +131,6 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   default: vi.fn(() => mockStreamingComposable),
 }));
 
-installQuasar();
 
 describe("VariablesValueSelector", () => {
   let wrapper: VueWrapper;

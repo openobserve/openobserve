@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="tw:flex tw:flex-col" v-if="alertDetails">
+    <div class="tw:flex tw:flex-col tw:h-[calc(100vh-3.5rem)]" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
@@ -141,10 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- History Panel -->
         <OTabPanel
           name="history"
-          class="tw:flex tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
+          class="tw:flex tw:h-full tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
         >
           <div
-            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
+            class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
           >
             <!-- Loading state -->
             <div
@@ -220,7 +220,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="historyTableColumns"
                 row-key="timestamp"
                 pagination="server"
-                sorting="none"
                 v-model:current-page="currentPage"
                 v-model:page-size="selectedPerPage"
                 :total-count="resultTotal"
@@ -592,7 +591,7 @@ const alertHistoryColumns = [
     id: "timestamp",
     header: t("alerts.historyTable.timestamp"),
     accessorKey: "timestamp",
-    sortable: false,
+    sortable: true,
     size: 140,
     meta: { align: "left" as const },
   },
@@ -600,30 +599,30 @@ const alertHistoryColumns = [
     id: "status",
     header: t("alerts.historyTable.status"),
     accessorKey: "status",
-    sortable: false,
-    size: 110,
+    sortable: true,
+    size: 200,
     meta: { align: "left" as const },
   },
   {
     id: "evaluation_time",
     header: t("alerts.historyTable.evaluationTime"),
     accessorKey: "evaluation_took_in_secs",
-    sortable: false,
-    size: 130,
-    meta: { align: "right" as const },
+    sortable: true,
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
     id: "query_time",
     header: t("alerts.historyTable.queryTime"),
     accessorKey: "query_took",
-    sortable: false,
-    size: 120,
-    meta: { align: "right" as const },
+    sortable: true,
+    size: 100,
+    meta: { align: "left" as const },
   },
   {
     id: "error",
     header: t("alerts.historyTable.error"),
-    accessorKey: "error",
+    accessorKey: "true",
     sortable: false,
   },
 ];

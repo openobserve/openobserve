@@ -15,14 +15,12 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricLegends from "@/plugins/metrics/MetricLegends.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
 // Install Quasar plugins
-installQuasar();
 
 /**
  * Helper to query the dropdown theme wrapper div. The migrated component
@@ -130,11 +128,11 @@ describe("MetricLegends", () => {
     });
 
     it("should have correct Histogram metric mapping", () => {
-      expect(wrapper.vm.metricsIconMapping.Histogram).toBe("bar_chart");
+      expect(wrapper.vm.metricsIconMapping.Histogram).toBe("bar-chart");
     });
 
     it("should have correct Counter metric mapping", () => {
-      expect(wrapper.vm.metricsIconMapping.Counter).toBe("pin");
+      expect(wrapper.vm.metricsIconMapping.Counter).toBe("tag");
     });
 
     it("should have exactly 4 metric mappings", () => {
@@ -290,7 +288,7 @@ describe("MetricLegends", () => {
       const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
       if (histogramItem) {
         const icon = histogramItem.find('.OIcon');
-        expect(icon.classes()).toContain('bar_chart');
+        expect(icon.classes()).toContain('bar-chart');
       }
     });
 
@@ -299,7 +297,7 @@ describe("MetricLegends", () => {
       const counterItem = legendItems.find(item => item.text().includes('Counter'));
       if (counterItem) {
         const icon = counterItem.find('.OIcon');
-        expect(icon.classes()).toContain('pin');
+        expect(icon.classes()).toContain('tag');
       }
     });
   });
@@ -562,7 +560,7 @@ describe("MetricLegends", () => {
 
     it("should have consistent spacing classes", () => {
       const categoryIcon = wrapper.find('.OIcon.category');
-      expect(categoryIcon.classes()).toContain('q-mr-sm');
+      expect(categoryIcon.classes()).toContain('tw:mr-2');
     });
   });
 });

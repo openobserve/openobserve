@@ -17,9 +17,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldListPagination from "@/plugins/logs/components/FieldListPagination.vue";
 import i18n from "@/locales";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
 
 describe("FieldListPagination.vue", () => {
   const defaultProps = {

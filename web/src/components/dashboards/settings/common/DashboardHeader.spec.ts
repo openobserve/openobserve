@@ -15,10 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DashboardHeader from "./DashboardHeader.vue";
 
-installQuasar();
 
 describe("DashboardHeader", () => {
   let wrapper: VueWrapper<any>;

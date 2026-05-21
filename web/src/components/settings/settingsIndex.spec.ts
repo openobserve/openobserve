@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import SettingsIndex from './index.vue';
 
-installQuasar();
 
 // Mock composables and config with factory functions
 vi.mock('@/composables/useIsMetaOrg', () => ({

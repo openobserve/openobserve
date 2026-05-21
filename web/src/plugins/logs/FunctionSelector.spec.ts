@@ -15,7 +15,6 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FunctionSelector from "@/plugins/logs/FunctionSelector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -39,7 +38,6 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalWrapContent: vi.fn(() => false),
 }));
 
-installQuasar();
 
 const mockFunctionOptions = [
   { name: "Function 1", function: "SELECT * FROM table1" },

@@ -2253,7 +2253,7 @@ defineExpose({
 @import "@/assets/styles/log-highlighting.css";
 </style>
 <style scoped lang="scss">
-@import "@/styles/logs/tenstack-table.scss";
+
 
 // Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
 .my-sticky-virtscroll-table {

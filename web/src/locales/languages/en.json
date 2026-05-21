@@ -2615,7 +2615,8 @@
       "rowTemplateTooltip": "Row Template is used to format the alert message.",
       "templateType": "Template Type:",
       "noTemplatesAvailable": "No templates available",
-      "refreshTemplates": "Refresh latest Templates"
+      "refreshTemplates": "Refresh latest Templates",
+      "selectTemplate": "Select Template"
     },
     "editJson": "Edit Alert JSON",
     "additional_settings":"Additional Settings",

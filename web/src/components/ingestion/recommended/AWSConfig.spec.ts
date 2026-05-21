@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import AWSConfig from "./AWSConfig.vue";
 import { createI18n } from 'vue-i18n';
@@ -82,7 +81,6 @@ vi.mock('./AWSIndividualServices.vue', () => ({
 // Mock console.error to test error handling
 const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-installQuasar();
 
 // Create mock store
 const mockStore = createStore({

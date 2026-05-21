@@ -15,14 +15,17 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 
 // Stable spy references — must be declared before vi.mock() factories reference them.
 // vi.mock is hoisted so these plain vi.fn() declarations are fine here.
-const notifyMock = vi.fn();
-const routerPushMock = vi.fn();
+// BUT when vi.mock references them, they must be in hoisted scope too.
+const { notifyMock, toastMock, routerPushMock } = vi.hoisted(() => ({
+  notifyMock: vi.fn(),
+  toastMock: vi.fn(),
+  routerPushMock: vi.fn(),
+}));
 
 // vi.mock calls are hoisted — must come before component import
 vi.mock("@/services/search", () => ({
@@ -80,11 +83,14 @@ vi.mock("quasar", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: toastMock,
+}));
+
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -639,9 +645,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       await viewRelatedLogsBtn.trigger("click");
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "warning",
+          variant: "warning",
           message: "traces.noLogsAvailableForService",
         }),
       );
@@ -670,9 +676,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       await viewRelatedLogsBtn.trigger("click");
       await flushPromises();
 
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "warning",
+          variant: "warning",
           message: "traces.noLogsAvailableForService",
         }),
       );

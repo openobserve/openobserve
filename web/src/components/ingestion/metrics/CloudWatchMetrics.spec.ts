@@ -15,11 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import CloudWatchMetrics from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
 
-installQuasar();
 
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({

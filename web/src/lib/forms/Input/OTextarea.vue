@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<TextareaProps>(), {
   readonly: false,
   autofocus: false,
   autogrow: false,
+  fill: false,
 });
 
 const emit = defineEmits<TextareaEmits>();
@@ -102,7 +103,14 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
+  <div
+    v-bind="$attrs"
+    :class="[
+      'tw:flex tw:flex-col tw:gap-1',
+      fieldWidthClass,
+      fill && 'tw:h-full tw:min-h-0',
+    ]"
+  >
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
@@ -120,7 +128,7 @@ const wrapperClasses = computed(() => [
     </label>
 
     <!-- Textarea wrapper -->
-    <div :class="wrapperClasses">
+    <div :class="[wrapperClasses, fill && 'tw:flex-1 tw:min-h-0']">
       <textarea
         :id="textareaId"
         ref="textareaRef"
@@ -139,8 +147,8 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           'tw:py-2 tw:px-3 tw:text-sm',
-          'tw:min-h-[80px]',
-          autogrow ? 'tw:resize-none' : 'tw:resize-y',
+          fill ? 'tw:h-full tw:min-h-0 tw:resize-none' : 'tw:min-h-[80px]',
+          !fill && (autogrow ? 'tw:resize-none' : 'tw:resize-y'),
         ]"
         @input="
           emit(

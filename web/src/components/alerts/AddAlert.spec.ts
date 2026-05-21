@@ -32,7 +32,6 @@ import { useLocalOrganization } from "@/utils/zincutils";
 
 import searchService from "@/services/search";
 
-installQuasar();
 vi.mock('@/composables/useStreams', () => {
   return {
     default: () => ({

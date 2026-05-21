@@ -17,7 +17,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ImportRegexPattern from "@/components/settings/ImportRegexPattern.vue";
 import regexPatternsService from "@/services/regex_pattern";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 import axios from "axios";
 import store from "@/test/unit/helpers/store";

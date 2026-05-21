@@ -293,12 +293,19 @@ export default defineComponent({
             borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),
             borderWidth: index === 0 ? 4 : 2,
           },
-          // Node label hidden at rest. Only renders on hover (emphasis state).
-          // Previously it was always visible with full tooltip-style styling
-          // (background pill, shadow), which read as a permanent tooltip
-          // floating below the node — the bug the user was reporting.
           label: {
-            show: false,
+            show: true,
+            position: "bottom",
+            distance: 5,
+            fontSize: 11,
+            fontWeight: 500,
+            color: isDarkMode.value ? "#e5e7eb" : "#374151",
+            formatter: `{b}`,
+            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.85)" : "rgba(255, 255, 255, 0.9)",
+            borderRadius: 4,
+            padding: [3, 7],
+            borderColor: isDarkMode.value ? "#4b5563" : "#e5e7eb",
+            borderWidth: 1,
           },
           emphasis: {
             label: {
@@ -309,11 +316,11 @@ export default defineComponent({
               fontWeight: 600,
               color: isDarkMode.value ? "#e5e7eb" : "#374151",
               formatter: `{b}`,
-              backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+              backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 1)",
               borderRadius: 4,
-              padding: [4, 8],
-              shadowColor: "rgba(0, 0, 0, 0.3)",
-              shadowBlur: 4,
+              padding: [3, 7],
+              borderColor: isDarkMode.value ? "#6b7280" : "#d1d5db",
+              borderWidth: 1,
             },
           },
           tooltip: {

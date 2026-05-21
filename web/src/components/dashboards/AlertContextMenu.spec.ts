@@ -1,9 +1,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AlertContextMenu from "./AlertContextMenu.vue";
 
-installQuasar();
 
 describe("AlertContextMenu Component", () => {
   let wrapper: any;

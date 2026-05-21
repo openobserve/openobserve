@@ -35,73 +35,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="create-stream-toggle"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
+        class="tw:px-3 tw:mb-3"
       />
 
       <div>
-        <div v-if="!createNewStream" class="tw:px-3">
-          <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
-            <div
+        <div v-if="!createNewStream" class="tw:p-4 tw:flex tw:flex-col tw:gap-3">
+          <div data-test="input-node-stream-type-select" class="tw:w-full">
+            <OSelect
+              v-model="stream_type"
+              :options="(filteredStreamTypes as any)"
+              :label="t('alerts.streamType') + ' *'"
+              :searchable="false"
+              @update:model-value="updateStreams()"
               data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input tw:mr-2 tw:w-full"
-              style="padding-top: 0"
-            >
-              <OSelect
-                v-model="stream_type"
-                :options="filteredStreamTypes"
-                :label="t('alerts.streamType') + ' *'"
-                @update:model-value="updateStreams()"
-                data-test="input-node-stream-type-select"
-              />
-            </div>
-            <div
-              data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input tw:mr-2 tw:w-full"
-              style="padding-top: 0"
-            >
-              <OSelect
-                v-model="stream_name"
-                :options="indexOptions"
-                :label="t('alerts.stream_name') + ' *'"
-                :loading="isFetchingStreams"
-                searchable
-                :creatable="selectedNodeType === 'output'"
-                :error="!!streamNameError"
-                :error-message="streamNameError"
-                @update:model-value="streamNameError = ''"
-                @create="handleCreateStreamName"
-                data-test="input-node-stream-name-select"
-              />
+            />
+          </div>
 
-              <OSwitch
-                v-if="
-                  stream_type == 'enrichment_tables' &&
-                  selectedNodeType == 'output'
-                "
-                v-model="appendData"
-                :label="t('function.appendData')"
-              />
-            </div>
-            <div
-              v-if="selectedNodeType == 'output'"
-              style="font-size: 14px"
-              class="note-message"
-            >
-              <span class="tw:flex tw:items-center">
-                <OIcon name="info" size="sm" class="tw:pr-1" /> Select an existing stream
-                from the list or enter the name to create a new one</span
-              >
-              <span class="tw:flex tw:items-center">
-                <OIcon name="info" size="sm" class="tw:pr-1" /> Enrichment_tables as
-                destination stream is only available for scheduled
-                pipelines</span
-              >
+          <div class="tw:w-full">
+            <OSelect
+              v-model="stream_name"
+              :options="indexOptions"
+              :label="t('alerts.stream_name') + ' *'"
+              :loading="isFetchingStreams"
+              searchable
+              :creatable="selectedNodeType === 'output'"
+              :error="!!streamNameError"
+              :error-message="streamNameError"
+              @update:model-value="streamNameError = ''"
+              @create="handleCreateStreamName"
+              data-test="input-node-stream-name-select"
+            />
 
-              <span class="tw:flex">
-                <OIcon name="info" size="sm" class="tw:pr-1 tw:pt-1" /> Use curly braces
-                '{}' to configure stream name dynamically. e.g.
-                static_text_{fieldname}_postfix. Static text before/after {} is
-                optional</span
-              >
+            <OSwitch
+              v-if="
+                stream_type == 'enrichment_tables' &&
+                selectedNodeType == 'output'
+              "
+              v-model="appendData"
+              :label="t('function.appendData')"
+              class="tw:mt-2"
+            />
+          </div>
+
+          <div
+            v-if="selectedNodeType == 'output'"
+            class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
+          >
+            <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Select an existing stream from the list or enter the name to create a new one
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
+                  <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional
+                </span>
+              </div>
             </div>
           </div>
 
@@ -110,19 +110,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="pipelineObj.isEditNode"
               data-test="input-node-stream-delete-btn"
               variant="outline-destructive"
-              size="sm-action"
+              size="sm"
               @click="openDeleteDialog"
             >{{ t("pipeline.deleteNode") }}</OButton>
             <OButton
               data-test="input-node-stream-cancel-btn"
               variant="outline"
-              size="sm-action"
+              size="sm"
               @click="openCancelDialog"
             >{{ t('alerts.cancel') }}</OButton>
             <OButton
               data-test="input-node-stream-save-btn"
               variant="primary"
-              size="sm-action"
+              size="sm"
               @click="saveStream"
             >{{ t('alerts.save') }}</OButton>
           </div>
@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AddStream
             ref="addStreamRef"
             @added:stream-added="getLogStream"
+            @close="openCancelDialog"
             :is-in-pipeline="true"
           />
         </div>
@@ -497,11 +498,20 @@ defineExpose({
 
 .note-message {
   background-color: #f9f290;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
+}
+
+.note-message .highlight {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.note-message .code {
+  font-family: monospace;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #b30059;
 }
 </style>

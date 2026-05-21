@@ -16,12 +16,10 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ExternalDestination from "./ExternalDestination.vue";
 
-installQuasar();
 
 // --------------------------------------------------------------------------
 // Module mocks

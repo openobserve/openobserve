@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import AddEnrichmentTable from './AddEnrichmentTable.vue';
 
 // Mock dependencies
@@ -33,7 +32,6 @@ vi.mock('quasar', async () => {
   };
 });
 
-installQuasar({});
 
 describe('AddEnrichmentTable.vue', () => {
   let wrapper: any;

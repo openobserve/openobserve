@@ -16,7 +16,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldRow from "@/components/common/FieldRow.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -28,7 +27,6 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-installQuasar();
 
 describe("FieldRow.vue", () => {
   const defaultProps = {

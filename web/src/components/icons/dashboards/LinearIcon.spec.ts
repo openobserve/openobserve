@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import LinearIcon from '@/components/icons/dashboards/LinearIcon.vue';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 
-installQuasar();
 
 describe('LinearIcon.vue', () => {
   let wrapper: VueWrapper;

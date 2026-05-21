@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import SyslogNg from './SyslogNg.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -77,7 +76,6 @@ const mockI18n = createI18n({
   },
 });
 
-installQuasar();
 
 describe('SyslogNg.vue Comprehensive Coverage', () => {
   let mockStore: any;

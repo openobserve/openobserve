@@ -16,12 +16,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import Recommended from "./Recommended.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({

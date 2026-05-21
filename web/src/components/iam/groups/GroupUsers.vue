@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="iam-users-selection-search-input"
         class="tw:mr-3"
-        style="width: 400px"
       >
         <OInput
           data-test="alert-list-search-input"
@@ -364,18 +363,26 @@ const getchOrgUsers = async () => {
 };
 
 const toggleUserSelection = (user: any) => {
-  if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
-    props.addedUsers.add(user.email);
-  } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
-    props.removedUsers.add(user.email);
-  }
+  user.isInGroup = !user.isInGroup;
 
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.addedUsers.delete(user.email);
-  }
-
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.removedUsers.delete(user.email);
+  if (user.isInGroup) {
+    // Newly selected
+    if (!groupUsersMap.value.has(user.email)) {
+      // Not originally in group — stage for addition
+      props.addedUsers.add(user.email);
+    } else {
+      // Was originally in group — undo pending removal
+      props.removedUsers.delete(user.email);
+    }
+  } else {
+    // Newly deselected
+    if (groupUsersMap.value.has(user.email)) {
+      // Was originally in group — stage for removal
+      props.removedUsers.add(user.email);
+    } else {
+      // Was not originally in group — undo pending addition
+      props.addedUsers.delete(user.email);
+    }
   }
 };
 

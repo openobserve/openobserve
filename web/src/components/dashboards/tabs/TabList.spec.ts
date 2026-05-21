@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TabList from "./TabList.vue";
 
 // Mock vue-router
@@ -40,7 +39,6 @@ vi.mock("./AddTab.vue", () => ({
   },
 }));
 
-installQuasar();
 
 describe("TabList", () => {
   let wrapper: VueWrapper<any>;

@@ -15,10 +15,8 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DualListSelector from "@/components/common/DualListSelector.vue";
 
-installQuasar();
 
 describe("DualListSelector", () => {
   const mockItems = [
