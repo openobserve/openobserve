@@ -448,46 +448,47 @@ describe("IngestLogs Index Component", () => {
   describe("Edge Cases", () => {
     it("should handle null content in copyToClipboardFn", async () => {
       const mockContent = { innerText: null };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null);
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        null,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
       const mockContent = { innerText: undefined };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle missing innerText property", async () => {
       const mockContent = {};
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle very long content", async () => {
       const longContent = "a".repeat(10000);
       const mockContent = { innerText: longContent };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(longContent);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        longContent,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
@@ -503,11 +504,13 @@ describe("IngestLogs Index Component", () => {
   describe("Event Handling", () => {
     it("should handle copy-to-clipboard functionality", async () => {
       const mockContent = { innerText: "test" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle component updates", async () => {
