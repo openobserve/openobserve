@@ -2057,7 +2057,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getLogDetailTracesTab() {
-    return this.page.locator('[data-test="log-detail-traces-tab"]');
+    return this.page.locator('[name="correlated-traces"]');
   }
 
   /**

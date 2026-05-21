@@ -7987,6 +7987,8 @@ export class LogsPage {
             const btn = pagination.querySelector('button[aria-current="true"]');
             return btn ? btn.getAttribute('aria-label') : '';
         });
+    }
+
     /**
      * Get timestamp column header in logs result table
      * @returns {import('@playwright/test').Locator}

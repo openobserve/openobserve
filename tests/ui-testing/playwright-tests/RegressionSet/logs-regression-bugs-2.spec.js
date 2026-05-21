@@ -325,6 +325,9 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       expect(inputValue).not.toMatch(/e2ee2e/);
     }
 
+    // UNCONDITIONAL: Stream dropdown must remain functional after search
+    await expect(streamDropdown, 'Bug #7310: Stream dropdown must remain visible').toBeVisible({ timeout: 5000 });
+
     testLogger.info('Bug #7310 verification complete');
   });
 
@@ -359,6 +362,10 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       expect(await sourceHeader.isVisible({ timeout: 5000 }).catch(() => false)).toBe(true);
       testLogger.info('Column positions persisted after re-running query');
     }
+
+    // UNCONDITIONAL: Query editor must remain visible regardless of column state
+    const queryEditor = pm.logsPage.getQueryEditor();
+    await expect(queryEditor, 'Bug #5277: Query editor must remain visible').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #5277 verification complete');
   });
@@ -399,6 +406,10 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       testLogger.info('Main table still visible and aligned after closing detail');
     }
 
+    // UNCONDITIONAL: Logs result table must remain visible regardless of detail state
+    const mainTable = pm.logsPage.getLogsTable();
+    await expect(mainTable, 'Bug #4426: Logs result table must remain visible').toBeVisible({ timeout: 5000 });
+
     testLogger.info('Bug #4426 verification complete');
   });
 
@@ -434,6 +445,10 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       await expect(visualizeToggle).toBeVisible({ timeout: 5000 });
       testLogger.info('Visualize tab remains active');
     }
+
+    // UNCONDITIONAL: Query editor must remain visible regardless of visualize toggle state
+    const queryEditor = pm.logsPage.getQueryEditor();
+    await expect(queryEditor, 'Bug #4091: Query editor must remain visible on logs page').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #4091 verification complete');
   });

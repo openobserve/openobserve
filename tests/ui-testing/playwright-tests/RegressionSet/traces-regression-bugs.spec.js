@@ -304,6 +304,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await expect(searchBar, 'Bug #11815: Search bar must remain visible after duration sort').toBeVisible({ timeout: 5000 });
     }
 
+    // UNCONDITIONAL: Search bar must remain visible regardless of sort state
+    const postSearchBar = pm.tracesPage.getSearchBarElement();
+    await expect(postSearchBar, 'Bug #11815: Search bar must remain visible').toBeVisible({ timeout: 5000 });
+
     testLogger.info('Bug #11815 verification complete');
   });
 
@@ -352,6 +356,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       }
     }
 
+    // UNCONDITIONAL: Search bar must remain visible regardless of span state
+    const searchBar = pm.tracesPage.getSearchBarElement();
+    await expect(searchBar, 'Bug #11531: Search bar must remain visible').toBeVisible({ timeout: 5000 });
+
     testLogger.info('Bug #11531 verification complete');
   });
 
@@ -389,6 +397,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
         testLogger.info('No traces tab for this log entry - normal for logs without traces');
       }
     }
+
+    // UNCONDITIONAL: Query editor must remain visible regardless of detail state
+    const queryEditor = pm.logsPage.getQueryEditor();
+    await expect(queryEditor, 'Bug #11446: Query editor must remain visible').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #11446 verification complete');
   });
@@ -465,6 +477,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       expect(timestampText).toMatch(/\d/);
     }
 
+    // UNCONDITIONAL: Timestamp header or search bar must remain visible
+    const logsSearchBar = pm.tracesPage.getSearchBarElement();
+    await expect(logsSearchBar, 'Bug #11244: Search bar must remain visible').toBeVisible({ timeout: 5000 });
+
     testLogger.info('Bug #11244 verification complete');
   });
 
@@ -533,6 +549,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       testLogger.info(`Hover elements found: ${hoverCount}`);
     }
 
+    // UNCONDITIONAL: Search bar must remain visible regardless of hover results
+    const searchBar = pm.tracesPage.getSearchBarElement();
+    await expect(searchBar, 'Bug #4151: Search bar must remain visible in dark mode').toBeVisible({ timeout: 5000 });
+
     // Switch back to light mode
     await pm.homePage.switchToLightMode();
     await page.waitForTimeout(500);
@@ -580,8 +600,6 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await page.waitForTimeout(2000);
       testLogger.info('Duration sort direction toggled');
 
-      // Wait for results to reload after sort
-      await page.waitForTimeout(2000);
       const results = pm.tracesPage.getTraceResultItems();
       const resultCount = await results.count().catch(() => 0);
       testLogger.info(`Results after sorting: ${resultCount}`);
@@ -591,6 +609,10 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       const headerCount = await headers.count().catch(() => 0);
       testLogger.info(`Found ${headerCount} column headers`);
     }
+
+    // UNCONDITIONAL: Search bar must remain visible regardless of sort state
+    const searchBar = pm.tracesPage.getSearchBarElement();
+    await expect(searchBar, 'Bug #2887: Search bar must remain visible').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #2887 verification complete');
   });
