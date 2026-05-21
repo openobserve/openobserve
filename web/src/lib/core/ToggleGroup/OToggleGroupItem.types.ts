@@ -14,6 +14,10 @@ export interface ToggleGroupItemProps {
   disabled?: boolean;
   /** Size controls padding and font-size. md (default) = full toolbar; sm = small toolbar; xs = compact inline toggle */
   size?: ToggleGroupItemSize;
+  /** Icon name (from OIcon registry) placed before the label. For custom icon components, use the `icon-left` slot. */
+  iconLeft?: string;
+  /** Icon name (from OIcon registry) placed after the label. For custom icon components, use the `icon-right` slot. */
+  iconRight?: string;
 }
 
 export interface ToggleGroupItemSlots {

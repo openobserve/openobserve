@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
                 :class="row.is_realtime ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
-                size="xs"
+                size="md"
               />
             </OTooltip>
           </template>

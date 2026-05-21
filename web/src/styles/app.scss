@@ -452,6 +452,18 @@ textarea:disabled {
 // Dark mode:  translucent red so the hover signal reads against the dark
 //             surface without blinding. Same red hue, low alpha.
 // ═══════════════════════════════════════════════════════════════
+
+// When a destructive icon is inside a destructive-variant button, it should
+// inherit the parent's color so the icon, text and border all read as a
+// single hue. We scope by `data-o2-variant` so neutral/ghost buttons (e.g.
+// IAM table row delete-action icons that rely on the icon itself signaling
+// destructive intent) keep their forced red.
+[data-o2-variant="destructive"] [data-destructive-icon="true"],
+[data-o2-variant="outline-destructive"] [data-destructive-icon="true"],
+[data-o2-variant="ghost-destructive"] [data-destructive-icon="true"] {
+  color: inherit !important;
+}
+
 button:has([data-destructive-icon="true"]):hover,
 a:has([data-destructive-icon="true"]):hover,
 [role="button"]:has([data-destructive-icon="true"]):hover {

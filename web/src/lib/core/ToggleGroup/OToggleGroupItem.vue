@@ -4,19 +4,28 @@ import type {
   ToggleGroupItemSlots,
 } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
   size: "md",
 });
 
-defineSlots<ToggleGroupItemSlots>();
+const slots = defineSlots<ToggleGroupItemSlots>();
 
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   md: "tw:h-9 tw:px-3 tw:text-sm",
   sm: "tw:h-7 tw:px-2.5 tw:text-xs",
   xs: "tw:h-3 tw:px-1.5 tw:text-xs",
 };
+
+// Icon size mirrors the toggle size — md = sm icon (16px), sm/xs = xs icon (12px)
+const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
+  {
+    md: "sm",
+    sm: "sm",
+    xs: "xs",
+  };
 </script>
 
 <template>
@@ -45,8 +54,11 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
       'tw:data-[disabled]:cursor-not-allowed tw:data-[disabled]:pointer-events-none',
     ]"
   >
-    <slot name="icon-left" />
+    <!-- Slot takes precedence; falls back to `icon-left` prop -->
+    <slot v-if="slots['icon-left']" name="icon-left" />
+    <OIcon v-else-if="iconLeft" :name="iconLeft" :size="iconSize[props.size]" />
     <slot />
-    <slot name="icon-right" />
+    <slot v-if="slots['icon-right']" name="icon-right" />
+    <OIcon v-else-if="iconRight" :name="iconRight" :size="iconSize[props.size]" />
   </ToggleGroupItem>
 </template>

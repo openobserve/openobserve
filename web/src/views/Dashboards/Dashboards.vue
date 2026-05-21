@@ -292,36 +292,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
+              <div class="tw:flex tw:items-center actions-container">
                 <OButton
                   v-if="row.actions == 'true'"
+                  icon-left="drive-file-move"
                   :title="t('dashboard.move_to_another_folder')"
-                  size="icon"
                   variant="ghost"
-                  @click.stop="showMoveDashboardPanel(row)"
+                  size="icon-sm"
                   data-test="dashboard-move-to-another-folder"
-                >
-                  <OIcon name="drive-file-move" size="sm" />
-                </OButton>
-                <OButton
-                  v-if="row.actions == 'true'"
-                  :title="t('dashboard.duplicate')"
-                  size="icon"
-                  icon-left="content-copy"
-                  variant="ghost"
-                  @click.stop="duplicateDashboard(row.id, row.folder_id)"
-                  data-test="dashboard-duplicate"
+                  @click.stop="showMoveDashboardPanel(row)"
                 />
                 <OButton
                   v-if="row.actions == 'true'"
-                  :title="t('dashboard.delete')"
-                  size="icon"
+                  icon-left="content-copy"
+                  :title="t('dashboard.duplicate')"
                   variant="ghost"
-                  @click.stop="showDeleteDialogFn({ row })"
+                  size="icon-sm"
+                  data-test="dashboard-duplicate"
+                  @click.stop="duplicateDashboard(row.id, row.folder_id)"
+                />
+                <OButton
+                  v-if="row.actions == 'true'"
+                  icon-left="delete"
+                  :title="t('dashboard.delete')"
+                  variant="ghost-destructive"
+                  size="icon-sm"
                   data-test="dashboard-delete"
-                >
-                  <OIcon name="delete" size="sm" />
-                </OButton>
+                  @click.stop="showDeleteDialogFn({ row })"
+                />
               </div>
             </template>
             <template #empty>
@@ -359,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="selectedIds.length > 0"
-                    variant="outline"
+                    variant="outline-destructive"
                     size="sm"
                     class="tw:mr-2 tw:h-9"
                     icon-left="delete"
