@@ -15,6 +15,7 @@
 
 use config::meta::cluster::RoleGroup;
 use infra::{cluster::get_cached_online_querier_nodes, errors::Error};
+
 use super::super::sql::Sql;
 
 /// Resolves the effective CPU core count for the querier nodes that will

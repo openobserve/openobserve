@@ -107,7 +107,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        sql.time_range.unwrap_or_default(),
+        sql.time_range,
     )
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();

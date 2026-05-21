@@ -51,7 +51,7 @@ pub async fn collect_stream_files(
     user_id: Option<&str>,
     stream_type: StreamType,
     schemas: &HashMap<TableReference, Arc<SchemaCache>>,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
     query_duration_secs: i64,
     use_single_partition: bool,
 ) -> Result<StreamFiles, Error> {
@@ -78,7 +78,7 @@ pub async fn collect_stream_files(
                 org_id,
                 stream_type,
                 &stream_name,
-                time_range.unwrap_or_default(),
+                time_range,
             )
             .await?;
             max_query_range = max(

@@ -561,10 +561,10 @@ pub async fn prepare_cache_response(
             req_time_range.1 = now_micros();
         }
 
-        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
+        let meta_time_range_is_empty = sql.time_range == (0, 0);
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-                Some(req_time_range)
+                req_time_range
             } else {
                 sql.time_range
             };
