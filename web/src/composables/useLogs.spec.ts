@@ -23,6 +23,7 @@ import { defineComponent, nextTick } from "vue";
 import useLogs from "../composables/useLogs";
 import searchService from "../services/search";
 import savedviewsService from "../services/saved_views";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import * as zincutils from "../utils/zincutils";
 
 // Import functions from their respective composables
@@ -36,6 +37,11 @@ import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 
+
+// Mock toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // Create i18n instance
 const i18n = createI18n({
@@ -116,7 +122,7 @@ const TestComponent = defineComponent({
     const { searchObj, notificationMsg, fieldValues } = searchState();
     const { showErrorNotification } = useNotifications();
     const { updateGridColumns, updateFieldValues } = useStreamFields();
-    const { $q, ...restProps } = logsComposable;
+    const { ...restProps } = logsComposable;
     return {
       ...restProps,
       setDateTime,
@@ -808,7 +814,6 @@ describe("Use Logs Composable", () => {
   });
 
   describe("refreshData", () => {
-    let notifySpy: any;
     beforeEach(() => {
       // Mock store
       wrapper.vm.store = {
@@ -820,7 +825,6 @@ describe("Use Logs Composable", () => {
 
       // Mock getQueryData
       wrapper.vm.getQueryData = vi.fn();
-      notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       // Mock clearInterval and setInterval
       vi.spyOn(global, "clearInterval");
@@ -848,10 +852,9 @@ describe("Use Logs Composable", () => {
 
       await wrapper.vm.$nextTick();
 
-      expect(notifySpy).toHaveBeenCalledWith({
+      expect(toast).toHaveBeenCalledWith({
         message: `Live mode is enabled. Only top ${wrapper.vm.searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-        color: "positive",
-        position: "top",
+        position: "top-center",
         timeout: 1000,
       });
     });
@@ -864,7 +867,7 @@ describe("Use Logs Composable", () => {
       refreshData();
       expect(global.setInterval).not.toHaveBeenCalled();
 
-      expect(notifySpy).not.toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 
@@ -2650,9 +2653,9 @@ describe("Use Logs Composable", () => {
         expect(router).toBeDefined();
       });
 
-      it("should expose $q property", () => {
-        const { $q } = wrapper.vm;
-        expect($q).toBeDefined();
+      it.skip("should expose $q property", () => {
+        // $q is no longer used — replaced by toast from @/lib/feedback/Toast/useToast
+        expect(true).toBe(true);
       });
 
       it("should expose initialQueryPayload property", () => {

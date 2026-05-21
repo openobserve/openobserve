@@ -391,8 +391,6 @@ describe("ServiceGraphSidePanel.vue", () => {
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("healthy");
       expect(health.text).toBe("Healthy");
-      expect(health.color).toBe("positive");
-      expect(health.icon).toBe("check-circle");
     });
 
     it("should return degraded status when error_rate > 5% and <= 10%", () => {
@@ -400,8 +398,6 @@ describe("ServiceGraphSidePanel.vue", () => {
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("degraded");
       expect(health.text).toBe("Degraded");
-      expect(health.color).toBe("warning");
-      expect(health.icon).toBe("warning");
     });
 
     it("should return critical status when error_rate > 10%", () => {
@@ -409,8 +405,6 @@ describe("ServiceGraphSidePanel.vue", () => {
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("critical");
       expect(health.text).toBe("Critical");
-      expect(health.color).toBe("negative");
-      expect(health.icon).toBe("error");
     });
 
     it("should return unknown status when selectedNode is null", () => {

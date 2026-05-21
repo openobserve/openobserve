@@ -14,21 +14,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 
-// ─── Quasar mock — override useQuasar with a notify spy ────────────────────
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
+// ─── Toast & Quasar mocks ───────────────────────────────────────────────────
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  toastRecords: [],
+  useToast: () => ({ toast: mockToast, toasts: [] }),
 }));
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    useQuasar: () => ({ notify: mockNotify, dialog: vi.fn() }),
+    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
   };
 });
 
@@ -46,7 +53,7 @@ import TraceErrorTab from "./TraceErrorTab.vue";
 // ─── Default mock helpers ──────────────────────────────────────────────────
 
 function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
-  return {
+  const merged = {
     hasSpanError: false,
     hasExceptionEvents: [] as any[],
     spanStatusCode: null as string | null,
@@ -58,6 +65,19 @@ function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
     errorBannerMessage: "" as string,
     statusCodeTitle: "" as string,
     ...overrides,
+  };
+
+  return {
+    hasSpanError: ref(merged.hasSpanError),
+    hasExceptionEvents: ref(merged.hasExceptionEvents),
+    spanStatusCode: ref(merged.spanStatusCode),
+    spanGrpcStatusCode: ref(merged.spanGrpcStatusCode),
+    spanErrorType: ref(merged.spanErrorType),
+    spanDbResponseStatusCode: ref(merged.spanDbResponseStatusCode),
+    spanProcessExitCode: ref(merged.spanProcessExitCode),
+    errorBannerTitle: ref(merged.errorBannerTitle),
+    errorBannerMessage: ref(merged.errorBannerMessage),
+    statusCodeTitle: ref(merged.statusCodeTitle),
   };
 }
 
@@ -686,10 +706,10 @@ describe("TraceErrorTab", () => {
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockNotify).toHaveBeenCalledWith(
+        expect(mockToast).toHaveBeenCalledWith(
           expect.objectContaining({
             message: "Stacktrace copied to clipboard",
-            color: "positive",
+            variant: "success",
           }),
         );
       });

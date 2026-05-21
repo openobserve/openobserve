@@ -195,7 +195,7 @@ describe("Nodes", () => {
     it("should render the nodes table", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find(".q-table").exists()).toBe(true);
+      expect(wrapper.find('[data-test="nodes-main-table"]').exists()).toBe(true);
     });
   });
 
@@ -381,12 +381,12 @@ describe("Nodes", () => {
     });
   });
 
-  describe("computedColumns", () => {
+  describe("computedOTableColumns", () => {
     it("should include region column when super_cluster_enabled", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const names = wrapper.vm.computedColumns.map((c: any) => c.name);
-      expect(names).toContain("region");
+      const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
+      expect(ids).toContain("region");
     });
 
     it("should exclude region column when super_cluster_enabled=false", async () => {
@@ -419,20 +419,8 @@ describe("Nodes", () => {
         },
       });
       await flushPromises();
-      const names = wrapper.vm.computedColumns.map((c: any) => c.name);
-      expect(names).not.toContain("region");
-    });
-  });
-
-  describe("changePagination", () => {
-    it("should update selectedPerPage and pagination.rowsPerPage", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // mock qTable.setPagination
-      wrapper.vm.qTable = { setPagination: vi.fn() };
-      wrapper.vm.changePagination({ label: "50", value: 50 });
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+      const ids = wrapper.vm.computedOTableColumns.map((c: any) => c.id);
+      expect(ids).not.toContain("region");
     });
   });
 

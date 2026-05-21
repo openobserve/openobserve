@@ -90,17 +90,13 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-                QSeparator: {
-          template: "<div data-test-stub='q-separator' :class='$attrs.class'></div>",
-          props: ["class"],
-        },
-        QSplitter: {
-          template: `<div data-test-stub='q-splitter'>
+                OSplitter: {
+          template: `<div data-test-stub='o-splitter'>
             <slot name='before'></slot>
             <slot name='separator'></slot>
             <slot name='after'></slot>
           </div>`,
-          props: ["modelValue", "limits", "unit", "style"],
+          props: ["modelValue", "limits", "unit", "style", "class"],
           emits: ["update:modelValue"],
         },
         QTabs: {
@@ -206,7 +202,7 @@ describe("SettingsIndex", () => {
 
     it("should render management splitter", () => {
       const wrapper = createWrapper();
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       expect(splitter.exists()).toBe(true);
     });
   });
@@ -506,7 +502,7 @@ describe("SettingsIndex", () => {
       // Verify the wrapper exists and has expected structure
       expect(wrapper.exists()).toBe(true);
       // The component uses management layout with splitter
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       expect(splitter.exists()).toBe(true);
     });
 
@@ -514,13 +510,13 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       // The component no longer uses q-separator
       // Verify the component has splitter instead
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       expect(splitter.exists()).toBe(true);
     });
 
     it("should have proper splitter configuration", () => {
       const wrapper = createWrapper();
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       
       // Check if splitter has expected attributes or verify it exists
       if (splitter.attributes("unit")) {

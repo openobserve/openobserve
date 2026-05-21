@@ -286,7 +286,7 @@ describe("SpanRenderer", () => {
     it("should have correct template structure", () => {
       const spanRenderer = wrapper.find("[data-test='span-renderer']");
       expect(spanRenderer.exists()).toBe(true);
-      expect(spanRenderer.classes()).toContain("q-pt-sm");
+      expect(spanRenderer.classes()).toContain("tw:pt-2");
     });
   });
 });

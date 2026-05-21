@@ -69,6 +69,8 @@ vi.mock('vue-i18n', async () => {
   };
 });
 
+import RegexPatternList from './RegexPatternList.vue';
+
 // Mock Blob
 class MockBlob {
   content: any;
@@ -1158,12 +1160,6 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   const mountComponent = async (
     overrides: { isAiChatEnabled?: boolean } = {},
   ) => {
-    // Import lazily so the vue-router / vue-i18n mocks defined above are
-    // applied before the component module is evaluated.
-    const { default: RegexPatternList } = await import(
-      '@/components/settings/RegexPatternList.vue'
-    );
-
     const store = buildStore(overrides);
 
     const wrapper = mount(RegexPatternList as any, {
@@ -1194,10 +1190,12 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
           QTd: { template: '<td><slot /></td>' },
           QTh: { template: '<th><slot /></th>' },
           QCheckbox: { template: '<input type="checkbox" />' },
+          OTable: { template: '<div><slot /></div>' },
+          OIcon: { template: '<span />' },
+          OInput: { template: '<input />', methods: { focus() {} } },
         },
       },
     });
-    await flushPromises();
     return { wrapper, store };
   };
 

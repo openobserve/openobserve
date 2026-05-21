@@ -18,7 +18,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// ─── Quasar mock — intercept copyToClipboard ────────────────────────────────
+// ─── Clipboard mock — intercept copyToClipboard ────────────────────────────────
 // vi.mock is hoisted by Vitest, so the factory runs before any const declarations.
 // Use vi.hoisted() to create the spy in the hoisted scope so it's available
 // both inside the factory and in test assertions.
@@ -34,11 +34,13 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
     columnDef: { meta: { disableCellAction: false } },
   },
 }));
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockQCopyToClipboard,
+}));
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    copyToClipboard: mockQCopyToClipboard,
     useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
   };
 });

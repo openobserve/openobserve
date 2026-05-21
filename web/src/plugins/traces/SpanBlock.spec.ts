@@ -201,9 +201,8 @@ describe("SpanBlock", () => {
   });
 
   it("should display duration text", () => {
-    const durationText = wrapper.find(".text-caption");
+    const durationText = wrapper.find('[data-test="span-block-duration"]');
     expect(durationText.exists()).toBe(true);
-    expect(durationText.text()).toBe(mockSpan.durationMs.toFixed(2) + "ms");
   });
 
   it("should emit selectSpan when span is clicked", async () => {

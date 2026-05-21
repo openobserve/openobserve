@@ -345,7 +345,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should return correct status icons", () => {
-      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
+      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass-empty");
       expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
       expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
