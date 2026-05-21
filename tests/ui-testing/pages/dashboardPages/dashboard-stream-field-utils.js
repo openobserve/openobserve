@@ -39,12 +39,13 @@ export async function selectStreamType(page, streamType) {
 export async function selectStreamFromDropdown(page, streamNameOrVar) {
   const isVariable = streamNameOrVar.startsWith("$");
   const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+  // Search input lives inside the popover (OSelect searchable pattern)
+  const streamInput = page.locator('[data-test="dashboard-variable-stream-select-popover"] input');
   await streamSelect.click();
 
-  // Clear existing value and fill with new value
-  await streamSelect.fill("");
-  await page.waitForTimeout(300);
-  await streamSelect.fill(streamNameOrVar);
+  // Wait for popover search input to be visible, then fill
+  await streamInput.waitFor({ state: "visible", timeout: 5000 });
+  await streamInput.fill(streamNameOrVar);
 
   // For variables, wait longer for the dropdown to filter and show variable options
   // Increased wait time especially for edit mode where variables need to load
@@ -148,8 +149,10 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
 export async function selectFieldFromDropdown(page, fieldNameOrVar) {
   const isVariable = fieldNameOrVar.startsWith("$");
   const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+  const fieldInput = page.locator('[data-test="dashboard-variable-field-select-popover"] input');
   await fieldSelect.click();
-  await fieldSelect.fill(fieldNameOrVar);
+  await fieldInput.waitFor({ state: "visible", timeout: 5000 });
+  await fieldInput.fill(fieldNameOrVar);
 
   // Wait for dropdown options to appear
   const hasOptions = await page
