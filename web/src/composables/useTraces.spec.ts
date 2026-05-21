@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick } from "vue";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -54,14 +53,12 @@ vi.mock("vuex", async (importOriginal) => {
   };
 });
 
-const { mockCopyToClipboard, mockNotify } = vi.hoisted(() => ({
-  mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
-  mockNotify: vi.fn(),
+const { mockCopyToClipboard } = vi.hoisted(() => ({
+  mockCopyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("quasar", () => ({
+vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
-  useQuasar: vi.fn(() => ({ notify: mockNotify })),
 }));
 
 // useLocalTraceFilterField behaves like a ref: called with no args it returns the
@@ -535,7 +532,7 @@ describe("useTraces", () => {
   // copyTracesUrl
   // -------------------------------------------------------------------------
   describe("copyTracesUrl", () => {
-    it("calls copyToClipboard with a URL string", async () => {
+    it("calls copyToClipboard with a URL string", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.data.datetime = {
@@ -545,15 +542,15 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
+      copyTracesUrl();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(
         expect.stringContaining("http"),
+        expect.objectContaining({ successMessage: expect.any(String) }),
       );
     });
 
-    it("shows positive notification after successful copy", async () => {
-      mockCopyToClipboard.mockResolvedValue(undefined);
+    it("passes successMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.data.datetime = {
@@ -563,17 +560,18 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
-      // Give microtasks a chance to run
-      await nextTick();
+      copyTracesUrl();
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          successMessage: "Link Copied Successfully!",
+          timeout: 5000,
+        }),
       );
     });
 
-    it("shows negative notification on copy failure", async () => {
-      mockCopyToClipboard.mockRejectedValue(new Error("denied"));
+    it("passes errorMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.data.datetime = {
@@ -583,11 +581,13 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
-      await nextTick();
+      copyTracesUrl();
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          errorMessage: "Error while copy link.",
+        }),
       );
     });
 
