@@ -27,7 +27,7 @@
     @click:neutral="addcolorBySeries"
     @click:primary="applycolorBySeries"
   >
-    <div data-test="dashboard-color-by-series-popup" :style="containerStyle">
+    <div data-test="dashboard-color-by-series-popup">
       <draggable
         v-model="editColorBySeries"
         :options="dragOptions"
@@ -47,35 +47,14 @@
             />
           </div>
           <div class="draggable-content tw:flex tw:items-center tw:gap-x-3">
-            <div
-              class="input-container tw:flex-1"
-              @focusin="focusedSeriesIndex = index"
-              @focusout="focusedSeriesIndex = -1"
-            >
-              <CommonAutoComplete
+            <div class="input-container tw:flex-1">
+              <OCombobox
                 v-model="series.value"
                 :items="seriesDataItems"
-                searchRegex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
+                search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                 label="Select Series"
-                color="input-border"
-                bg-color="input-bg"
-                stack-label
-                borderless
-                label-slot
-                style="
-                  top: none !important;
-                  margin-top: none !important;
-                  padding-top: 1px !important;
-                  width: auto !important;
-                "
                 :value-replace-fn="selectColorBySeriesOption"
-              >
-                <template v-slot:label>
-                  <div class="tw:flex tw:items-center all-pointer-events">
-                    Select series
-                  </div>
-                </template>
-              </CommonAutoComplete>
+              />
             </div>
 
             <!-- Color Picker -->
@@ -118,12 +97,12 @@
   </ODialog>
 </template>
 <script lang="ts">
-import { computed, ref, nextTick } from "vue";
+import { computed, ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import CommonAutoComplete from "./CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -134,7 +113,7 @@ export default defineComponent({
   name: "colorBySeriesPopUp",
   components: {
     draggable: VueDraggableNext as any,
-    CommonAutoComplete,
+    OCombobox,
     OButton,
     ODialog,
     OColor,
@@ -157,25 +136,6 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
-
-    // Tracks which row's "Select series" input is focused so we can
-    // grow the container to prevent the absolutely-positioned dropdown
-    // from being clipped by the dialog body's overflow-y:auto.
-    // Row height ≈ 56 px; dropdown top offset = 42 px; dropdown max-height = 100 px.
-    const focusedSeriesIndex = ref(-1);
-    const containerStyle = computed(() => {
-      if (focusedSeriesIndex.value < 0) return undefined;
-      // bottom of dropdown = rows above focused row + dropdownOffset + dropdownMaxHeight
-      // The focused row itself is already in the natural flow, so only index * ROW_HEIGHT is needed.
-      const ROW_HEIGHT = 46;
-      const DROPDOWN_OFFSET = 42;
-      const DROPDOWN_MAX_HEIGHT = 100;
-      const minH =
-        focusedSeriesIndex.value * ROW_HEIGHT +
-        DROPDOWN_OFFSET +
-        DROPDOWN_MAX_HEIGHT;
-      return { minHeight: `${minH}px` };
-    });
 
     // editColorBySeries is populated by the watch below (on every open)
     const editColorBySeries = ref<any[]>([]);
@@ -301,8 +261,6 @@ export default defineComponent({
 
     return {
       t,
-      focusedSeriesIndex,
-      containerStyle,
       addcolorBySeries,
       removecolorBySeriesByIndex,
       dragOptions,

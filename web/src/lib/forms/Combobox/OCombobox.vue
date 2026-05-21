@@ -140,9 +140,10 @@ const hasLabel = computed(
 
     <ComboboxRoot
       :model-value="internalValue"
-      :filter-function="() => filteredOptions.map((o) => o.value)"
+      :ignore-filter="true"
+      :open-on-click="true"
+      :open-on-focus="true"
       :disabled="disabled"
-      ignore-diacritics
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="tw:relative tw:flex tw:items-center tw:w-full">
