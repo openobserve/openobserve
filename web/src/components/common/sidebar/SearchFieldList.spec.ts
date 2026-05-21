@@ -695,8 +695,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const fields = [{ name: "fts_field", ftsKey: true, showValues: false }];
       wrapper = createWrapper({ fields });
 
-      // The field should render with field-container class
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // The field should render with field-type-container class
+      expect(wrapper.find(".field-type-container").exists()).toBe(true);
     });
 
     it("should render expansion item for non-fts fields with showValues", () => {
