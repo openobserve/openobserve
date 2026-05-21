@@ -1,16 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import {
-  QTable,
-  QBtn,
-  QInput,
-  QExpansionItem,
-  QCard,
-  QCardSection,
-  QList,
-  QItem,
-  QIcon,
-} from "quasar";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
@@ -88,17 +77,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     formatLargeNumber: vi.fn((num) => num.toString()),
     getImageURL: vi.fn(() => "test-image-url"),
-  };
-});
-
-// Mock quasar
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
   };
 });
 

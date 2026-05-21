@@ -28,8 +28,11 @@ vi.mock('@/services/reodotdev_analytics', () => ({
   }),
 }));
 
-const mockDismiss = vi.fn();
-const mockToast = vi.fn(() => mockDismiss);
+const { mockToast, mockDismiss } = vi.hoisted(() => {
+  const dismiss = vi.fn();
+  const toast = vi.fn(() => dismiss);
+  return { mockToast: toast, mockDismiss: dismiss };
+});
 
 vi.mock('@/lib/feedback/Toast/useToast', () => ({
   toast: mockToast,

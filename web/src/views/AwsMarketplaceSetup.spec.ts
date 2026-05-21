@@ -177,9 +177,9 @@ describe("AwsMarketplaceSetup", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toContain("Subscription Activated");
-    const icon = wrapper.findComponent({ name: "QIcon" });
+    const icon = wrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
-    expect(icon.props("name")).toBe("check_circle");
+    expect(icon.props("name")).toBe("check-circle");
   });
 
   it("should display error state with message", async () => {
@@ -194,7 +194,7 @@ describe("AwsMarketplaceSetup", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toContain("Test error message");
-    const icon = wrapper.findComponent({ name: "QIcon" });
+    const icon = wrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
     expect(icon.props("name")).toBe("error");
   });

@@ -470,8 +470,8 @@ describe("IdentityAccessManagement.vue Component", () => {
       expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 
-    it("should render q-splitter", () => {
-      expect(wrapper.find(".q-splitter").exists()).toBe(true);
+    it("should render page content", () => {
+      expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 
     it("should conditionally render sidebar based on showSidebar", async () => {

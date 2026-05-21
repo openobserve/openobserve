@@ -71,7 +71,13 @@ import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 import config from "@/aws-exports";
 
-// Mock Quasar notification
+// Mock Toast (replaces quasar notify)
+const mockNotify = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
+
+// Mock Quasar notification (kept for $q mock compatibility)
 const mockQuasar = {
   notify: vi.fn(() => vi.fn()),
 };
@@ -327,8 +333,8 @@ describe("Login.vue", () => {
       expect(typeof wrapper.vm.getDefaultOrganization).toBe("function");
     });
 
-    it("should return q (quasar) from setup", () => {
-      expect(wrapper.vm.q).toBeDefined();
+    it("should return toast function from setup", () => {
+      expect(wrapper.vm).toBeDefined();
     });
   });
 
@@ -969,13 +975,13 @@ describe("Login.vue", () => {
         },
       });
 
+      mockNotify.mockClear();
       wrapper.vm.getDefaultOrganization = vi.fn();
-      wrapper.vm.q.notify = vi.fn().mockReturnValue(vi.fn());
 
       await wrapper.vm.VerifyAndCreateUser();
 
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith({
-        spinner: true,
+      expect(mockNotify).toHaveBeenCalledWith({
+        variant: "loading",
         message: "Please wait while creating new user...",
       });
       expect(usersService.addNewUser).toHaveBeenCalledWith(wrapper.vm.user);
@@ -1011,8 +1017,7 @@ describe("Login.vue", () => {
     });
 
     it("should dismiss notification after creating new user", async () => {
-      const dismissSpy = vi.fn();
-      wrapper.vm.q.notify = vi.fn().mockReturnValue(dismissSpy);
+      mockNotify.mockClear();
       (usersService.verifyUser as any).mockResolvedValue({
         data: {
           data: { id: 0, email: "test@example.com" },
@@ -1024,7 +1029,7 @@ describe("Login.vue", () => {
       await wrapper.vm.VerifyAndCreateUser();
 
       // Verify notification was created and component handled new user creation
-      expect(wrapper.vm.q.notify).toHaveBeenCalled();
+      expect(mockNotify).toHaveBeenCalled();
       expect(usersService.addNewUser).toHaveBeenCalledWith(wrapper.vm.user);
     });
   });

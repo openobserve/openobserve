@@ -376,28 +376,14 @@ describe('TestFunction.vue Branch Coverage', () => {
 
       const vm = wrapper.vm as any;
       const options = ['stream1', 'stream2', 'test_stream'];
-      const mockUpdate = vi.fn();
-      
-      // Branch: val === "" (line 496)
-      vm.filterColumns(options, '', mockUpdate);
-      expect(mockUpdate).toHaveBeenCalled();
-      
-      // Simulate the empty filter branch
-      let filteredOptions: any[] = [];
-      if ('' === '') {
-        filteredOptions = [...options];
-      }
-      expect(filteredOptions).toEqual(options);
 
-      // Branch: val !== "" (line 502-507)  
-      const filterValue = 'test';
-      if (filterValue !== '') {
-        const value = filterValue.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
-        );
-      }
-      expect(filteredOptions).toEqual(['test_stream']);
+      // Branch: val === "" returns all options
+      const emptyResult = vm.filterColumns(options, '');
+      expect(emptyResult).toEqual(options);
+
+      // Branch: val !== "" filters options
+      const filteredResult = vm.filterColumns(options, 'test');
+      expect(filteredResult).toEqual(['test_stream']);
     });
 
     it('should cover error handling branches', async () => {

@@ -150,7 +150,8 @@ describe('Functions.vue', () => {
       wrapper = await createWrapper();
 
       expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
-      expect(wrapper.find('.q-splitter').exists()).toBe(true);
+      // Verify a known tab renders — functions-page data-test doesn't exist on this component
+      expect(wrapper.find('[data-test="stream-pipelines-tab"]').exists()).toBe(true);
       // The tabs now use 'card-container' class instead of 'functions-tabs'
       expect(wrapper.find('.card-container').exists()).toBe(true);
     });

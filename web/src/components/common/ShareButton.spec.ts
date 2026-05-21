@@ -15,21 +15,18 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { copyToClipboard } from "quasar";
 import ShareButton from "./ShareButton.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import shortURLService from "@/services/short_url";
 
 
-// Mock copyToClipboard
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn(() => Promise.resolve()),
-  };
-});
+// Mock copyToClipboard — migrated from quasar to @/utils/clipboard
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(() => Promise.resolve()),
+}));
+
+import { copyToClipboard } from "@/utils/clipboard";
 
 // Mock short URL service
 vi.mock("@/services/short_url", () => ({
