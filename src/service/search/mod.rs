@@ -31,7 +31,7 @@ use config::{
         function::RESULT_ARRAY,
         search::{self},
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, TableReferenceExt, resolve_stream_names},
+        sql::{OrderBy, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     utils::{
@@ -46,10 +46,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache::stats,
     cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes},
-    schema::unwrap_stream_settings,
 };
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -86,10 +84,7 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::utils::{
-        functions::{get_all_transform_keys, init_vrl_runtime},
-        stream::get_settings_max_query_range,
-    },
+    common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -706,15 +701,9 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct && is_http_req;
 
     #[cfg(feature = "enterprise")]
-    let org_settings = crate::service::db::organization::get_org_setting(org_id)
-        .await
-        .unwrap_or_default();
-
-    #[cfg(feature = "enterprise")]
     let mut is_streaming_aggregate = ts_column.is_none()
         && is_cachable_aggs
         && cfg.common.feature_query_streaming_aggs
-        && org_settings.streaming_aggregation_enabled
         && !is_http_distinct;
 
     #[cfg(not(feature = "enterprise"))]
@@ -730,95 +719,21 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    let mut files = Vec::with_capacity(sql.schemas.len() * 10);
-
-    let mut step_factor = 1;
-
-    let mut max_query_range = 0;
-    let mut max_query_range_in_hour = 0;
-    let mut index_size = 0;
-    let mut original_size = 0;
-    for (stream, schema) in sql.schemas.iter() {
-        let stream_type = stream.get_stream_type(stream_type);
-        let stream_name = stream.stream_name();
-        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
-        let use_stream_stats_for_partition =
-            if stream_settings == config::meta::stream::StreamSettings::default() {
-                cfg.common.use_stream_settings_for_partitions_enabled
-            } else {
-                stream_settings.approx_partition
-            };
-
-        if !skip_get_file_list && !use_stream_stats_for_partition {
-            let stream_files = crate::service::file_list::query_ids(
-                trace_id,
-                &sql.org_id,
-                stream_type,
-                &stream_name,
-                sql.time_range.unwrap_or_default(),
-            )
-            .await?;
-            max_query_range = max(
-                max_query_range,
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await
-                    * 3600
-                    * 1_000_000,
-            );
-            max_query_range_in_hour = max(
-                max_query_range_in_hour,
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await,
-            );
-            files.extend(stream_files);
-        } else {
-            // data retention should be either from stream settings or global data retension
-            let data_retention = if stream_settings.data_retention > 0 {
-                stream_settings.data_retention
-            } else {
-                cfg.compact.data_retention_days
-            };
-            let mut data_retention = data_retention * 24 * 60 * 60;
-            // data duration in seconds
-            let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
-
-            // if stats.doc_time_max is 0, handle the case by using current time
-            let data_end_time = if stats.doc_time_max == 0 {
-                Utc::now().timestamp_micros()
-            } else {
-                std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max)
-            };
-
-            let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
-
-            if data_retention_based_on_stats > 0 {
-                data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
-            };
-            if data_retention == 0 {
-                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
-                data_retention = 1;
-            }
-            let records = (stats.doc_num as i64 / data_retention) * query_duration;
-            let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
-            log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size}, data_retention in seconds: {data_retention}",
-            );
-            files.push(infra::file_list::FileId {
-                id: Utc::now().timestamp_micros(),
-                records,
-                original_size,
-                deleted: false,
-            });
-        }
-        index_size = max(index_size, stats.index_size as i64);
-        original_size = max(original_size, stats.storage_size as i64);
-        if index_size > 0 {
-            step_factor = max(step_factor, original_size / index_size);
-        } else {
-            step_factor = 1;
-        }
-    }
+    let query_duration_secs = (req.end_time - req.start_time) / 1000 / 1000;
+    let stream_files = partition::stream_files::collect_stream_files(
+        trace_id,
+        org_id,
+        user_id,
+        stream_type,
+        &sql.schemas,
+        sql.time_range,
+        query_duration_secs,
+        skip_get_file_list,
+    )
+    .await?;
+    let files = stream_files.files;
+    let max_query_range = stream_files.max_query_range;
+    let max_query_range_in_hour = stream_files.max_query_range_in_hour;
     log::info!(
         "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
         max_query_range,
