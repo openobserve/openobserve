@@ -5502,14 +5502,7 @@ export default defineComponent({
               // if query does not contain where clause then add where clause before filter
               if (query.toLowerCase().includes("where")) {
                 // Replace an existing condition for this field, or append if none.
-                // In append mode (SearchResult include/exclude), skip the
-                // field-level replace so multiple values for the same field
-                // coexist with AND.
-                const appendOnlySQL =
-                  this.searchObj.data.stream.addToFilterMode === "append";
-                const fieldNameSQL = appendOnlySQL
-                  ? null
-                  : getFieldFromExpression(filter);
+                const fieldNameSQL = getFieldFromExpression(filter);
                 if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
                   query = replaceExistingFieldCondition(
                     query,
@@ -5590,11 +5583,7 @@ export default defineComponent({
               }
               currentQuery[0] = query;
             } else {
-              const appendOnly =
-                this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldName = appendOnly
-                ? null
-                : getFieldFromExpression(filter);
+              const fieldName = getFieldFromExpression(filter);
               if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
                 currentQuery[0] = replaceExistingFieldCondition(
                   currentQuery[0],
@@ -5619,7 +5608,6 @@ export default defineComponent({
           }
           this.searchObj.data.editorValue = this.searchObj.data.query;
           this.searchObj.data.stream.addToFilter = "";
-          this.searchObj.data.stream.addToFilterMode = "replace";
           if (this.queryEditorRef?.setValue)
             this.queryEditorRef.setValue(this.searchObj.data.query);
           if (

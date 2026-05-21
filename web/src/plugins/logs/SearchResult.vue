@@ -584,6 +584,7 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import { extractFieldConditions } from "@/plugins/logs/filterUtils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
@@ -1390,17 +1391,66 @@ export default defineComponent({
       field_value: string | number | boolean,
       action: string,
     ) => {
-      const searchExpression = getFilterExpressionByFieldType(
+      const newExpression = getFilterExpressionByFieldType(
         field,
         field_value,
         action,
       );
-      // Clicks on log-row include/exclude should always append (AND) to the
-      // existing query, never replace an existing condition for the same field
-      // — unlike the field-sidebar checkboxes which represent the full set of
-      // selected values for that field.
-      searchObj.data.stream.addToFilterMode = "append";
-      searchObj.data.stream.addToFilter = searchExpression;
+
+      // Operator-aware merge so the log-row include/exclude click behaves like
+      // the field-sidebar multi-select:
+      //   - include + existing includes for same field → merge into OR group
+      //   - exclude + existing excludes for same field → merge into AND group
+      //   - same field + same op + same value → no-op
+      //   - opposite operator → replace (last action wins)
+      //   - different field → append (handled by the watcher's default path)
+      const fieldName = String(field);
+      const existing = extractFieldConditions(
+        searchObj.data.query,
+        fieldName,
+      );
+      const incomingOp = action === "include" ? "=" : "!=";
+      const incomingValue = String(field_value);
+
+      const sameOpExisting = existing.filter((c) => c.op === incomingOp);
+      const oppositeOpExisting = existing.filter(
+        (c) => c.op !== incomingOp && (c.op === "=" || c.op === "!="),
+      );
+
+      if (
+        sameOpExisting.some((c) => String(c.value) === incomingValue)
+      ) {
+        // Identical filter already applied — nothing to do.
+        return;
+      }
+
+      if (sameOpExisting.length > 0 && oppositeOpExisting.length === 0) {
+        // Merge with existing same-operator conditions into a multi-value
+        // group. Use OR for include (=) and AND for exclude (!=).
+        const joinOperator = action === "include" ? " OR " : " AND ";
+        const allValues = [
+          ...sameOpExisting.map((c) => c.value),
+          incomingValue,
+        ];
+        const expressions = allValues
+          .map((v) =>
+            getFilterExpressionByFieldType(field, v, action),
+          )
+          .filter(Boolean);
+        const combined =
+          expressions.length > 1
+            ? `(${expressions.join(joinOperator)})`
+            : expressions[0];
+        // The watcher's default "replace" mode will swap the existing
+        // condition for this field with the new merged expression.
+        searchObj.data.stream.addToFilter = combined;
+        return;
+      }
+
+      // No existing condition for this field, OR an opposite-op condition
+      // exists (treat last action as the winner, replacing it). In both
+      // cases just set the single expression and let the watcher handle it.
+      searchObj.data.stream.addToFilter = newExpression;
     };
 
     const removeSearchTerm = (term: string) => {
