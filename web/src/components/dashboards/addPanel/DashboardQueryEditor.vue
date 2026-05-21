@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'var(--o2-header-menu-bg)'
             : 'var(--color-primary-100)',
       }"
-      @click.stop="onDropDownClick"
+      @click.stop
     >
       <div
         class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
@@ -118,14 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
         </OSwitch>
-        <QueryTypeSelector></QueryTypeSelector>
+        <QueryTypeSelector @click.stop></QueryTypeSelector>
       </div>
     </div>
   </div>
   <div
-    class="tw:flex tw:flex-col"
+    class="tw:flex tw:flex-col tw:flex-1"
     :style="
-      !dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'
+      !dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''
     "
     style="overflow: hidden"
     data-test="dashboard-query"
@@ -179,8 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div style="height: 100%; width: 100%">
-                <div style="height: calc(100% - 40px); width: 100%">
+              <div style="display: flex; flex-direction: column; height: 100%; width: 100%">
+                <div style="flex: 1; min-height: 0; width: 100%">
                   <UnifiedQueryEditor
                     v-if="
                       !promqlMode && dashboardPanelData.layout.vrlFunctionToggle
@@ -207,8 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @generation-success="handleVrlGenerationSuccess"
                   />
                 </div>
-                <div style="height: 40px; width: 100%">
-                  <div style="display: flex; height: 40px">
+                <div style="flex-shrink: 0; width: 100%">
+                  <div style="display: flex;">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
