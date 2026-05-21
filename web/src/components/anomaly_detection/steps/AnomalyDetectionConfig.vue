@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div class="step-content tw:px-3 tw:py-4">
-      <OForm ref="formRef" @submit.prevent>
+      <OForm ref="formRef">
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
           <OToggleGroup

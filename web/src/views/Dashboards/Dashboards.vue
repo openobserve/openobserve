@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="selectedIds.length > 0"
-                    variant="outline"
+                    variant="outline-destructive"
                     size="sm"
                     class="tw:mr-2 tw:h-9"
                     icon-left="delete"

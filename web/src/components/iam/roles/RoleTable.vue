@@ -106,7 +106,7 @@ const columns: OTableColumnDef[] = [
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"
-        variant="outline"
+        variant="outline-destructive"
         size="sm"
         @click="emit('bulk-delete')"
       >
