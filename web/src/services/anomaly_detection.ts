@@ -85,10 +85,13 @@ const anomaly_detection = {
     org_identifier: string,
     anomaly_id: string,
     limit: number = 100,
+    folder_id?: any,
   ) => {
-    return http().get(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`,
-    );
+    let url = `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`;
+    if (folder_id) {
+      url += `&folder=${folder_id}`;
+    }
+    return http().get(url);
   },
 };
 
