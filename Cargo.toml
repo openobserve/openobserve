@@ -482,3 +482,12 @@ vrl = { version = "0.31", features = [
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 zip = "8.0"
 zstd = "0.13"
+
+# Patch object_store with an opt-in `with_disable_stream_delete(true)` builder
+# method so `delete_stream` (and therefore `store.delete(path)`, which routes
+# through it in 0.13) can fall back to single-object `DELETE /key` requests.
+# Required for S3-compatible providers that do not implement the bulk
+# DeleteObjects API (e.g. Alibaba Cloud OSS). Enable via ZO_S3_FEATURE_BULK_DELETE.
+# Remove once upstream lands an equivalent option.
+[patch.crates-io]
+object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }

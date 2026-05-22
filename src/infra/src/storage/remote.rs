@@ -245,7 +245,8 @@ fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
-        .with_virtual_hosted_style_request(force_hosted_style);
+        .with_virtual_hosted_style_request(force_hosted_style)
+        .with_disable_stream_delete(!cfg.s3.feature_bulk_delete);
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(&config.server_url);
     }
