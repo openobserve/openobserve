@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item tw:w-full tw:rounded-[0.375rem] tw:overflow-hidden"
+    class="field-expansion-item tw:w-full tw:rounded tw:overflow-hidden"
     trigger-class="tw:px-0! tw:py-0!"
   >
     <template #trigger>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
           variant="ghost-neutral"
-          class="tw:gap-0! tw:mr-[0.25rem]"
+          class="tw:gap-0! tw:mr-1"
           :title="
             field.isInterestingField
               ? 'Remove from interesting fields'

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="filter-values-container tw:py-[0.325rem]">
+  <div class="filter-values-container tw:py-2">
     <!-- Value search input — only when fetched count hits the limit -->
     <div v-if="showValueSearch" class="value-search-container tw:mb-1">
       <div class="value-search-input-wrap">
@@ -39,15 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="tw:flex tw:items-center tw:gap-[0.25rem] ">
+      <div class="tw:flex tw:items-center tw:gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count tw:text-[0.8rem]!"
+          class="selection-count tw:text-3!"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  tw:text-[0.8rem]!">Select to filter</span>
+        <span v-else class="selection-hint  tw:text-3!">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
         data-test="field-values-panel-values-list"
       >
-        <li v-for="value in displayValues" :key="value.key" class="tw:py-[0.2rem]">
+        <li v-for="value in displayValues" :key="value.key" class="tw:py-1">
           <label
             class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
@@ -142,21 +142,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div
-              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0 tw:pl-[0.2rem]"
+              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0 tw:pl-1"
               :style="
                 showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
               "
             >
               <div
                 :title="value.key"
-                class="tw:truncate tw:pr-1 tw:text-field-list-label-text tw:text-[0.8rem]!"
+                class="tw:truncate tw:pr-1 tw:text-field-list-label-text tw:text-3!"
                 style="width: calc(100% - 3.125rem)"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 :title="String(value.count)"
-                class="tw:truncate tw:text-right tw:pr-0 tw:text-[0.75rem]!"
+                class="tw:truncate tw:text-right tw:pr-0 tw:text-3!"
                 style="display: contents"
                 :style="showMultiSelect ? 'width: 3.125rem' : ''"
               >
