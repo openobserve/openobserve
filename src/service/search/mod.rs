@@ -66,7 +66,7 @@ use crate::{
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
-            cpu_cores::get_cpu_cores, settings::calculate_partition_settings,
+            cpu_cores::estimated_secs, settings::calculate_partition_settings,
             stream_files::collect_stream_files,
         },
     },
@@ -708,12 +708,8 @@ pub async fn search_partition(
         non_ts_order_by_cols: vec![],
     };
 
-    // Calculate original step with all factors considered
-    let cpu_cores = get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
-    let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
-    if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
-        total_secs += 1;
-    }
+    // calculate estimated seconds for run query
+    let total_secs = estimated_secs(trace_id, &sql, is_http_req, resp.original_size).await?;
 
     if use_single_partition
         || (is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
