@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator v-if="shouldMoveSavedViewToMenu" />
 
           <!-- Syntax Guide -->
-          <ODropdownItem>
+          <ODropdownItem @select.prevent>
             <syntax-guide
               data-test="logs-search-bar-sql-mode-toggle-btn"
               :sqlmode="searchObj.meta.sqlMode"
