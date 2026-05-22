@@ -474,7 +474,6 @@ pub async fn get_partitions(
         &search_partition_req,
         false,
         false,
-        false,
         req.use_cache,
     )
     .instrument(tracing::info_span!(

@@ -56,10 +56,9 @@ use crate::{
             functions,
             http::{
                 get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_enable_align_histogram_from_request, get_fallback_order_by_col_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
+                get_fallback_order_by_col_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -711,7 +710,6 @@ pub async fn search_multi(
     description = "Executes search queries across partitioned data in multiple log streams",
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
         content = inline(search::MultiSearchPartitionRequest),
@@ -776,8 +774,6 @@ pub async fn _search_partition_multi(
 
     let user_id = &user_email.user_id;
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
-
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
@@ -805,14 +801,8 @@ pub async fn _search_partition_multi(
         }
     }
 
-    let search_fut = SearchService::search_partition_multi(
-        &trace_id,
-        &org_id,
-        user_id,
-        stream_type,
-        &req,
-        enable_align_histogram,
-    );
+    let search_fut =
+        SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
     let search_res = if cfg.common.should_create_span() {
         search_fut.instrument(http_span).await
     } else {

@@ -105,23 +105,6 @@ impl Sql {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
     }
 
-    pub fn get_first_stream_key(&self) -> String {
-        self.stream_names
-            .first()
-            .map(|s| {
-                format!(
-                    "{}/{}",
-                    s.get_stream_type(self.stream_type),
-                    s.stream_name()
-                )
-            })
-            // For multi-stream / cross-index queries there is no single stream
-            // name.  Fall back to the stream-type prefix so select_nodes always
-            // receives a non-empty, deterministic key (rather than "" which
-            // would silently select all nodes and defeat org/stream affinity).
-            .unwrap_or_else(|| format!("{}/", self.stream_type))
-    }
-
     pub async fn new_with_options(
         query: &SearchQuery,
         org_id: &str,
@@ -257,17 +240,19 @@ impl Sql {
         if let Some(error) = histogram_interval_visitor.error {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
         }
-        let mut histogram_interval = if query.histogram_interval > 0 {
-            Some(validate_and_adjust_histogram_interval(
-                query.histogram_interval,
-                (query.start_time, query.end_time),
-            ))
-        } else {
-            histogram_interval_visitor.interval
-        };
-        if !histogram_interval_visitor.is_histogram {
-            histogram_interval = None;
-        }
+        let histogram_interval = histogram_interval_visitor
+            .is_histogram
+            .then(|| {
+                if query.histogram_interval > 0 {
+                    Some(validate_and_adjust_histogram_interval(
+                        query.histogram_interval,
+                        (query.start_time, query.end_time),
+                    ))
+                } else {
+                    histogram_interval_visitor.interval
+                }
+            })
+            .flatten();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -311,6 +296,23 @@ impl Sql {
                 extract_patterns,
             ),
         })
+    }
+
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
     }
 }
 
