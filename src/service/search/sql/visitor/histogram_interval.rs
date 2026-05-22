@@ -22,12 +22,12 @@ use sqlparser::ast::{Expr, FunctionArguments, VisitorMut};
 pub struct HistogramIntervalVisitor {
     pub is_histogram: bool,
     pub interval: Option<i64>,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
     pub error: Option<String>,
 }
 
 impl HistogramIntervalVisitor {
-    pub fn new(time_range: Option<(i64, i64)>) -> Self {
+    pub fn new(time_range: (i64, i64)) -> Self {
         Self {
             is_histogram: false,
             interval: None,
@@ -89,10 +89,8 @@ macro_rules! intervals {
     (@unit m) => { chrono::Duration::minutes };
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> &'static str {
-    let Some((start, end)) = time_range else {
-        return "1 hour";
-    };
+pub fn generate_histogram_interval(time_range: (i64, i64)) -> &'static str {
+    let (start, end) = time_range;
     if (start, end).eq(&(0, 0)) {
         return "1 hour";
     }
@@ -161,7 +159,7 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
 /// - 5 hours → 6 hours (not valid, rounds up to nearest factor)
 pub fn validate_and_adjust_histogram_interval(
     interval_seconds: i64,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> i64 {
     const TWENTY_FOUR_HOURS_SECONDS: i64 = 24 * 60 * 60; // 86400 seconds
 
@@ -353,40 +351,49 @@ mod tests {
     #[test]
     fn test_validate_and_adjust_histogram_interval() {
         // Test valid intervals that don't need adjustment (factors of 24 hours)
-        assert_eq!(validate_and_adjust_histogram_interval(3600, None), 3600); // 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(7200, None), 7200); // 2 hours
-        assert_eq!(validate_and_adjust_histogram_interval(21600, None), 21600); // 6 hours
-        assert_eq!(validate_and_adjust_histogram_interval(86400, None), 86400); // 1 day
+        assert_eq!(validate_and_adjust_histogram_interval(3600, (0, 0)), 3600); // 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(7200, (0, 0)), 7200); // 2 hours
+        assert_eq!(validate_and_adjust_histogram_interval(21600, (0, 0)), 21600); // 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(86400, (0, 0)), 86400); // 1 day
 
         // Test intervals that need adjustment (example from TODO: 5 hours -> 6 hours)
-        assert_eq!(validate_and_adjust_histogram_interval(18000, None), 21600); // 5 hours -> 6 hours
-        assert_eq!(validate_and_adjust_histogram_interval(10000, None), 14400); // ~2.8 hours -> 4 hours
-        assert_eq!(validate_and_adjust_histogram_interval(5000, None), 7200); // ~1.4 hours -> 2 hours
+        assert_eq!(validate_and_adjust_histogram_interval(18000, (0, 0)), 21600); // 5 hours -> 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(10000, (0, 0)), 14400); // ~2.8 hours -> 4 hours
+        assert_eq!(validate_and_adjust_histogram_interval(5000, (0, 0)), 7200); // ~1.4 hours -> 2 hours
 
         // Test edge cases
-        assert_eq!(validate_and_adjust_histogram_interval(0, None), 3600); // 0 -> default 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(-100, None), 3600); // negative -> default 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(1, None), 1); // 1 second is valid
+        assert_eq!(validate_and_adjust_histogram_interval(0, (0, 0)), 3600); // 0 -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(-100, (0, 0)), 3600); // negative -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(1, (0, 0)), 1); // 1 second is valid
     }
 
     #[test]
     fn test_validate_and_adjust_histogram_interval_multiples_of_24h() {
         // Test intervals that are multiples of 24 hours (2 days, 7 days, 30 days, etc.)
         // These should be returned as-is, not adjusted
-        assert_eq!(validate_and_adjust_histogram_interval(86400, None), 86400); // 1 day
-        assert_eq!(validate_and_adjust_histogram_interval(172800, None), 172800); // 2 days
-        assert_eq!(validate_and_adjust_histogram_interval(259200, None), 259200); // 3 days
-        assert_eq!(validate_and_adjust_histogram_interval(604800, None), 604800); // 7 days
+        assert_eq!(validate_and_adjust_histogram_interval(86400, (0, 0)), 86400); // 1 day
         assert_eq!(
-            validate_and_adjust_histogram_interval(1209600, None),
+            validate_and_adjust_histogram_interval(172800, (0, 0)),
+            172800
+        ); // 2 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(259200, (0, 0)),
+            259200
+        ); // 3 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(604800, (0, 0)),
+            604800
+        ); // 7 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(1209600, (0, 0)),
             1209600
         ); // 14 days
         assert_eq!(
-            validate_and_adjust_histogram_interval(2592000, None),
+            validate_and_adjust_histogram_interval(2592000, (0, 0)),
             2592000
         ); // 30 days
         assert_eq!(
-            validate_and_adjust_histogram_interval(7776000, None),
+            validate_and_adjust_histogram_interval(7776000, (0, 0)),
             7776000
         ); // 90 days
     }
@@ -397,15 +404,15 @@ mod tests {
         // These get capped at 1 day (86400 sec) which is the current behavior
 
         // 25 hours (90000 sec) - not a multiple of 24h, gets capped at 1 day
-        let result = validate_and_adjust_histogram_interval(90000, None);
+        let result = validate_and_adjust_histogram_interval(90000, (0, 0));
         assert_eq!(result, 86400); // Currently returns 1 day (86400)
 
         // 1.5 days (129600 sec) - not a multiple of 24h, gets capped at 1 day
-        let result = validate_and_adjust_histogram_interval(129600, None);
+        let result = validate_and_adjust_histogram_interval(129600, (0, 0));
         assert_eq!(result, 86400); // Currently returns 1 day (86400)
 
         // 1.9 days (164160 sec) - not a multiple of 24h, gets capped at 1 day
-        let result = validate_and_adjust_histogram_interval(164160, None);
+        let result = validate_and_adjust_histogram_interval(164160, (0, 0));
         assert_eq!(result, 86400); // Currently returns 1 day (86400)
     }
 
@@ -430,7 +437,7 @@ mod tests {
         const TWENTY_FOUR_HOURS: i64 = 24 * 60 * 60; // 86400 seconds
 
         for &interval in &test_intervals {
-            let adjusted = validate_and_adjust_histogram_interval(interval, None);
+            let adjusted = validate_and_adjust_histogram_interval(interval, (0, 0));
             // Verify that the adjusted interval can divide 24 hours evenly
             assert_eq!(
                 TWENTY_FOUR_HOURS % adjusted,
@@ -454,7 +461,7 @@ mod tests {
             .pop()
             .unwrap();
 
-        let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
+        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
         let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
         let _ = statement.visit(&mut histogram_interval_visitor);
 
@@ -471,7 +478,7 @@ mod tests {
             .pop()
             .unwrap();
 
-        let time_range = Some((0, 0));
+        let time_range = (0, 0);
         let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
         let _ = statement.visit(&mut histogram_interval_visitor);
 
@@ -487,7 +494,7 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut visitor = HistogramIntervalVisitor::new(None);
+        let mut visitor = HistogramIntervalVisitor::new((0, 0));
         let _ = statement.visit(&mut visitor);
         assert!(visitor.is_histogram);
         assert!(
@@ -505,7 +512,7 @@ mod tests {
     #[test]
     fn test_generate_histogram_interval_none_time_range() {
         // None time_range → default "1 hour"
-        let result = generate_histogram_interval(None);
+        let result = generate_histogram_interval((0, 0));
         assert_eq!(result, "1 hour");
     }
 
@@ -514,30 +521,15 @@ mod tests {
         let hour = 3600 * 1_000_000_i64;
         let minute = 60 * 1_000_000_i64;
         // > 24*60h → "1 day"
-        assert_eq!(
-            generate_histogram_interval(Some((0, 24 * 61 * hour))),
-            "1 day"
-        );
+        assert_eq!(generate_histogram_interval((0, 24 * 61 * hour)), "1 day");
         // > 24*30h but <= 24*60h → "12 hour"
-        assert_eq!(
-            generate_histogram_interval(Some((0, 24 * 31 * hour))),
-            "12 hour"
-        );
+        assert_eq!(generate_histogram_interval((0, 24 * 31 * hour)), "12 hour");
         // > 24*28h but <= 24*30h → "6 hour"
-        assert_eq!(
-            generate_histogram_interval(Some((0, 24 * 29 * hour))),
-            "6 hour"
-        );
+        assert_eq!(generate_histogram_interval((0, 24 * 29 * hour)), "6 hour");
         // duration < 15 min → falls through all checks → "10 second"
-        assert_eq!(
-            generate_histogram_interval(Some((0, 10 * minute))),
-            "10 second"
-        );
+        assert_eq!(generate_histogram_interval((0, 10 * minute)), "10 second");
         // duration >= 30 min → "15 second"
-        assert_eq!(
-            generate_histogram_interval(Some((0, 31 * minute))),
-            "15 second"
-        );
+        assert_eq!(generate_histogram_interval((0, 31 * minute)), "15 second");
     }
 
     #[test]

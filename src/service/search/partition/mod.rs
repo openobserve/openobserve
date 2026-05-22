@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub(crate) mod aggregate;
+pub(crate) mod cpu_cores;
+pub(crate) mod settings;
 pub(crate) mod stream_files;
 
 use std::cmp::max;
@@ -48,7 +51,7 @@ impl PartitionGenerator {
     /// * `end_time` - End time in microseconds
     /// * `step` - Regular partition step size in microseconds
     /// * `order_by` - Sort order for partitions
-    /// * `is_aggregate` - Whether this is an aggregate query
+    /// * `is_complex_query` - Whether this query requires complex search handling
     /// * `add_mini_partition` - Whether to add a mini partition for faster initial results
     /// * `cache_strategy` - Optional cache-aware partition strategy
     ///
@@ -61,15 +64,13 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
-        is_aggregate: bool,
+        is_complex_query: bool,
         add_mini_partition: bool,
-        #[cfg(feature = "enterprise")] streaming_aggs_cache_strategy: Option<
-            StreamingAggsPartitionStrategy,
-        >,
+        #[cfg(feature = "enterprise")] cache_strategy: Option<StreamingAggsPartitionStrategy>,
     ) -> Vec<[i64; 2]> {
         // If cache-aware strategy is provided, use it
         #[cfg(feature = "enterprise")]
-        if let Some(strategy) = streaming_aggs_cache_strategy {
+        if let Some(strategy) = cache_strategy {
             return strategy.to_time_partitions(order_by);
         }
 
@@ -82,7 +83,7 @@ impl PartitionGenerator {
                 order_by,
                 add_mini_partition,
             )
-        } else if is_aggregate {
+        } else if is_complex_query {
             vec![[start_time, end_time]]
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
