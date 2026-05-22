@@ -59,8 +59,10 @@ export default class DashboardVariables {
       const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
       await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
       await filterNameSelector.click();
-      await filterNameSelector.fill(filterConfig.filterName);
-      
+      const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
+      await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
+      await filterNameSearch.fill(filterConfig.filterName);
+
       // Wait for and select the filter name option
       const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
       await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
@@ -75,17 +77,11 @@ export default class DashboardVariables {
       const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
-      
-      // Wait for and interact with value input
-      const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
-      await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-      await autoComplete.click();
-      await autoComplete.fill(filterConfig.value);
-      
-      // await this.page
-      //   .locator('[data-test="common-auto-complete-option"]')
-      //   .getByText(filterConfig.value, { exact: true })
-      //   .click();
+
+      // Wait for and interact with value input (OCombobox)
+      const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+      await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
+      await filterValueInput.fill(filterConfig.value);
     }
 
     // Toggle show multiple values based on parameter
@@ -135,26 +131,19 @@ export default class DashboardVariables {
   // Usage: this function is used for select the variable value from dropdown
   // Dynamically fill input and select the same value from dropdown
   async selectValueFromVariableDropDown(label, value) {
-    const input = this.page.locator(`[data-test="variable-selector-${label}"]`);
-    await input.waitFor({ state: "visible", timeout: 10000 });
+    const trigger = this.page.locator(`[data-test="variable-selector-${label}-inner-trigger"]`);
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for _values_stream API call when clicking on the dropdown
-    // Start listening before the action to ensure we capture the stream
     const valuesStreamPromise = waitForValuesStreamComplete(this.page);
-
-    await input.click();
-
-    // Wait for the values stream to complete (waits for 'data: [[DONE]]' marker)
+    await trigger.click();
     await valuesStreamPromise;
 
-    // Wait for _values_stream API call when filling/searching
-    // Start listening before filling to capture the search stream
-    // const searchStreamPromise = waitForValuesStreamComplete(this.page);
-
-    await input.fill(value);
-
-    // // Wait for search stream to complete (waits for 'data: [[DONE]]' marker)
-    // await searchStreamPromise;
+    const searchInput = this.page.locator(`[data-test="variable-selector-${label}-inner-search"]`);
+    const hasSearch = await searchInput.count() > 0;
+    if (hasSearch) {
+      await searchInput.waitFor({ state: "visible", timeout: 5000 });
+      await searchInput.fill(value);
+    }
 
     const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
     await option.waitFor({ state: "visible", timeout: 10000 });

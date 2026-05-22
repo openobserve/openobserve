@@ -106,7 +106,7 @@ test.describe(
 
       // --- A1: Verify $streamVar appears in stream dropdown with (variable) label ---
       await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-      await page.locator(SELECTORS.VARIABLE_NAME).fill("child");
+      await page.locator('[data-test="dashboard-variable-name-field"]').fill("child");
       await selectStreamType(page, "logs");
 
       const streamResult = await scopedVars.verifyStreamDropdownContainsVariable("streamVar");
@@ -174,7 +174,7 @@ test.describe(
 
       // --- B1: Verify $fieldVar appears in field dropdown with (variable) label ---
       await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-      await page.locator(SELECTORS.VARIABLE_NAME).fill("child");
+      await page.locator('[data-test="dashboard-variable-name-field"]').fill("child");
       await selectStreamType(page, "logs");
       await scopedVars.selectStream("e2e_automate");
 
@@ -765,7 +765,7 @@ test.describe(
       await scopedVars.editVariable("var1");
       await scopedVars.changeVariableType("Constant");
       await page
-        .locator('[data-test="dashboard-variable-constant-value"]')
+        .locator('[data-test="dashboard-variable-constant-value-field"]')
         .fill("some_value");
       await scopedVars.clickSaveButton();
 

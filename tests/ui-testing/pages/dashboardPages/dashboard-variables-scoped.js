@@ -118,17 +118,16 @@ export default class DashboardVariablesScoped {
       apiMonitor = monitorVariableAPICalls(this.page, { expectedCount: expectedApiCalls, timeout: 15000 });
     }
 
-    // Wait for variable dropdown to be visible and ready
-    // Use data-test selector — getByLabel cannot reliably find OSelect triggers post-migration
-    const varDropdown = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
-    await varDropdown.waitFor({ state: "visible", timeout });
+    // Wait for variable dropdown trigger to be visible and ready
+    const varTrigger = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
+    await varTrigger.waitFor({ state: "visible", timeout });
 
     // Ensure network is idle before clicking
     try {
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch { /* acceptable if timeout */ }
 
-    await varDropdown.click();
+    await varTrigger.click();
 
     // Wait for the variable's own inner popover to open
     const popoverSelector = `[data-test="variable-selector-${variableName}-inner-popover"]`;
@@ -152,7 +151,7 @@ export default class DashboardVariablesScoped {
       // Close by pressing Escape, then reopen
       await this.page.keyboard.press('Escape');
       await this.waitForMenuHidden({ timeout: 3000 });
-      await varDropdown.click();
+      await varTrigger.click();
       await this.page.locator(popoverSelector).waitFor({ state: "visible", timeout });
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
     }
@@ -823,12 +822,12 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>} - Returns true if API was called successfully
    */
   async selectValueFromVariableDropDown(label, value) {
-    const input = this.page.locator(`[data-test="variable-selector-${label}"]`);
-    await input.waitFor({ state: "visible", timeout: 10000 });
+    const trigger = this.page.locator(`[data-test="variable-selector-${label}-inner-trigger"]`);
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
 
     // Monitor API call when clicking dropdown
     const valuesStreamPromise = waitForValuesStreamComplete(this.page);
-    await input.click();
+    await trigger.click();
 
     try {
       await valuesStreamPromise;
@@ -836,7 +835,12 @@ export default class DashboardVariablesScoped {
       throw new Error(`Failed to load variable values API for ${label}: ${error.message}`);
     }
 
-    await input.fill(value);
+    const searchInput = this.page.locator(`[data-test="variable-selector-${label}-inner-search"]`);
+    const hasSearch = await searchInput.count() > 0;
+    if (hasSearch) {
+      await searchInput.waitFor({ state: "visible", timeout: 5000 });
+      await searchInput.fill(value);
+    }
 
     const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
     await option.waitFor({ state: "visible", timeout: 10000 });
@@ -1072,8 +1076,8 @@ export default class DashboardVariablesScoped {
     // Dynamic import to avoid circular dependencies
     const { monitorVariableAPICalls } = await import('../../playwright-tests/utils/variable-helpers.js');
 
-    // Wait for variable dropdown to be visible and ready
-    const varDropdown = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
+    // Wait for variable dropdown trigger to be visible and ready
+    const varDropdown = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
     await varDropdown.waitFor({ state: "visible", timeout: 10000 });
 
     // Ensure network is idle before clicking
@@ -1089,7 +1093,7 @@ export default class DashboardVariablesScoped {
       timeout: timeout
     });
 
-    // Click dropdown to open menu
+    // Click dropdown trigger to open menu
     await varDropdown.click();
 
     // Wait for the values stream to complete loading options
@@ -1105,7 +1109,7 @@ export default class DashboardVariablesScoped {
     // a `variable-selector-<name>-inner-*` prefix.
     const selectorDataTest = `variable-selector-${variableName}-inner`;
     const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
-    await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+    await dropdownMenu.waitFor({ state: "visible", timeout });
 
     // Wait for options to be present in the dropdown
     const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
@@ -1128,8 +1132,8 @@ export default class DashboardVariablesScoped {
     // Wait for any dependent variable API calls to complete
     const apiResult = await apiMonitor;
 
-    // Verify the value actually changed by checking the input value
-    const currentValue = await varDropdown.inputValue().catch(() => '');
+    // Verify the value actually changed by checking the trigger's selected value
+    const currentValue = await varDropdown.getAttribute('data-test-selected-value').catch(() => '');
 
     return {
       ...apiResult,
@@ -1603,8 +1607,8 @@ export default class DashboardVariablesScoped {
   async verifyVariableHasOptions(variableName, options = {}) {
     const { timeout = 10000 } = options;
 
-    // Open variable dropdown
-    const selector = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
+    // Open variable dropdown via the OSelect trigger
+    const selector = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
     await selector.click();
 
     // Wait for dropdown menu
