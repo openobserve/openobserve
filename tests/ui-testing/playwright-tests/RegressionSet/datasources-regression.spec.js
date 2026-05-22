@@ -65,15 +65,15 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     // Verify credentials are still present (they should not disappear)
     const credentialCountAfter = await credentialFields.count();
 
-    // If there are no credential fields at all, check for any content that shouldn't disappear
-    const pageContent = await page.locator('main, .q-page').first().textContent().catch(() => '');
-    const contentLengthAfter = pageContent.length;
+    // Verify the AI Integration tab panel is still visible (not blank/disappeared)
+    const tabPanelContent = page.locator('.q-tab-panels .q-tab-panel, [role="tabpanel"]').first();
+    const contentLengthAfter = (await tabPanelContent.textContent().catch(() => '')).length;
 
-    testLogger.info(`Content length after re-click: ${contentLengthAfter}`);
+    testLogger.info(`Tab panel content length after re-click: ${contentLengthAfter}`);
 
-    // The key assertion: page should still have content after re-clicking the tab
+    // The key assertion: the tab panel should still have content after re-clicking
     expect(contentLengthAfter,
-      'Bug #11682: Page content should not disappear when re-clicking AI Integration tab'
+      'Bug #11682: AI Integration panel should not go blank when re-clicking its tab'
     ).toBeGreaterThan(0);
 
     // If credential fields exist, verify they persist after re-click

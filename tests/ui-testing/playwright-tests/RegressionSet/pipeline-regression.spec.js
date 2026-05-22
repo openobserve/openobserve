@@ -545,7 +545,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
       await page.waitForTimeout(3000);
     }
 
-    // Count success notifications after save
+    // Wait for notification to appear, then count
+    await page.waitForSelector('.q-notification.bg-positive, div[role="alert"].positive, .q-notification__message', { state: 'visible', timeout: 5000 }).catch(() => {});
     const successNotifications = page.locator('.q-notification.bg-positive, div[role="alert"].positive, .q-notification__message');
     const successCount = await successNotifications.count();
 
@@ -590,8 +591,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     const hasIcon = await tabIcon.isVisible({ timeout: 2000 }).catch(() => false);
     testLogger.info(`Tab has icon: ${hasIcon}`);
 
-    // Check 2: Refresh button should be present
-    const refreshButton = page.locator('[data-test*="refresh"], [data-test*="evaluation-template-refresh"], button').filter({ hasText: /refresh|reload/i }).first();
+    // Check 2: Refresh button should be present on evaluation template page
+    const refreshButton = page.locator('[data-test*="evaluation-template"] [data-test*="refresh"], [data-test*="evaluation-template-refresh"]').first();
     const hasRefreshButton = await refreshButton.isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Refresh button visible: ${hasRefreshButton}`);
 

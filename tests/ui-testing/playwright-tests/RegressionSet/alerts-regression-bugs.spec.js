@@ -260,8 +260,8 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('✓ Navigated to alerts page');
 
-    // Look for import button
-    const importButton = page.locator('[data-test*="import-alert"], [data-test*="alert-import"], [role="button"]').filter({ hasText: /Import|import/i }).first();
+    // Look for import button using data-test attribute
+    const importButton = page.locator('[data-test*="import-alert"], [data-test*="alert-import"]').filter({ hasText: /Import|import/i }).first();
     await expect(importButton, 'Alert import button should be visible').toBeVisible({ timeout: 5000 });
 
     testLogger.info('✓ Found alert import button');
@@ -384,6 +384,20 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(500);
     await page.keyboard.type('default', { delay: 50 });
     await page.waitForTimeout(1000);
+
+    // Verify the editor accepted the input
+    const editorContent = await sqlEditor.textContent().catch(() => '');
+    testLogger.info(`SQL editor content after typing: "${editorContent}"`);
+
+    // Monaco adds "default" to the editor. If textContent doesn't reflect it,
+    // check innerText or aria-label as fallback.
+    const editorHasContent = editorContent.includes('default') ||
+      (await sqlEditor.getAttribute('aria-label').catch(() => '') || '').includes('default');
+
+    expect(editorHasContent,
+      'Bug #4288: "default" should be accepted in the SQL editor without error'
+    ).toBeTruthy();
+
     testLogger.info('✓ Typed "default" in SQL editor without quotes');
 
     // The bug was that "default" without quotes caused errors
