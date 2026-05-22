@@ -83,6 +83,17 @@ class EnrichmentPage {
         this.urlErrorMsg = page.locator('[data-test="add-enrichment-table-url-error"]');
 
         // ────────────────────────────────────────────────────────────────────
+        // Date-time picker locators (used after `dateTimeBtn` opens the dropdown)
+        // ────────────────────────────────────────────────────────────────────
+        this.dateTimeAbsoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+        this.dateTimeStartTimeInput = page.locator('[data-test="datetime-start-time"]');
+
+        // ────────────────────────────────────────────────────────────────────
+        // VRL editor toggle (rendered as nth(1) on the logs search bar)
+        // ────────────────────────────────────────────────────────────────────
+        this.showQueryToggleBtnLocator = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+
+        // ────────────────────────────────────────────────────────────────────
         // Toast notifications (OToast)
         // ────────────────────────────────────────────────────────────────────
         this.toastError = page.locator('[data-test="o-toast-error"]');
@@ -292,8 +303,16 @@ class EnrichmentPage {
         if (isCloudEnvironment()) {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         }
+        // Listen for the enrichment_tables list API call so we know the list is
+        // populated when waitFor resolves (avoids race when the list table is
+        // visible but rows haven't streamed in yet).
+        const listResponse = this.page.waitForResponse(
+            (resp) => /\/api\/[^/]+\/streams\?type=enrichment_tables/.test(resp.url()) && resp.request().method() === 'GET',
+            { timeout: 30000 },
+        ).catch(() => null);
         await this.pipelineMenuItem.click();
         await this.enrichmentTableTab.click();
+        await listResponse;
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for the enrichment tables list page to be visible
         await this.listPage.waitFor({ state: 'visible', timeout: 10000 });
@@ -315,11 +334,14 @@ class EnrichmentPage {
         // Click on 'Save' and wait for the enrichment_tables POST to complete.
         // After a successful POST, the parent emits `update:list` → refreshList()
         // toggles showAddJSTransformDialog = false and the add form unmounts.
+        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
+        // fire on a forced click, leaving the form untouched. Let Playwright
+        // wait for actionability instead.
         const saveResponse = this.page.waitForResponse(
             (resp) => /\/api\/[^/]+\/enrichment_tables\//.test(resp.url()) && resp.request().method() === 'POST',
             { timeout: 30000 },
         ).catch(() => null);
-        await this.addSaveBtn.click({ force: true });
+        await this.addSaveBtn.click();
         const response = await saveResponse;
         if (response) {
             testLogger.debug(`uploadEnrichmentFile: POST status=${response.status()} url=${response.url()}`);
@@ -365,10 +387,12 @@ class EnrichmentPage {
     }
 
     async verifyStartTimeVisible() {
-        // Date-time start-time cell is rendered by the date-time picker. Use the
-        // date-time popover's data-test for the input we care about.
-        const startTimeInput = this.page.locator('[data-test="datetime-startfield"]');
-        await expect(startTimeInput.first()).toBeVisible();
+        // After clicking the date-time-btn, the ODropdown opens with a Relative
+        // tab visible by default. Click the Absolute tab to surface the
+        // start/end time fields, then assert the start-time input is visible.
+        await this.dateTimeAbsoluteTab.waitFor({ state: 'visible', timeout: 10000 });
+        await this.dateTimeAbsoluteTab.click();
+        await expect(this.dateTimeStartTimeInput.first()).toBeVisible({ timeout: 10000 });
     }
 
     // VRL Query Methods
@@ -443,26 +467,32 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async waitForVRLEditorReady() {
         // Critical wait: VRL editor needs time to initialize backend connection after query fill
         // Without this wait, VRL query execution fails silently on first attempt
-        // This addresses the race condition between visual editor readiness and processing readiness
-        await this.page.waitForTimeout(3000);
-        
+        // This addresses the race condition between visual editor readiness and processing readiness.
+        // Poll the Monaco editor's window object for readiness rather than a fixed sleep.
+        await this.page.waitForFunction(() => {
+            const w = /** @type {any} */ (window);
+            return !!(w.monaco && w.monaco.editor && w.monaco.editor.getEditors && w.monaco.editor.getEditors().length > 0);
+        }, { timeout: 15000 }).catch(() => {});
+
         // Ensure DOM is stable after editor initialization
         await this.page.waitForLoadState('domcontentloaded');
     }
 
     async applyQueryMultipleClicks() {
-        // Click run query button multiple times to ensure it registers (VRL test specific)
+        // Click run query button multiple times to ensure it registers (VRL test specific).
+        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
+        // fire on a forced click (Reka Primitive expects a real bubble path).
         const refreshButton = this.page.locator(this.refreshButton);
         await refreshButton.waitFor({ state: 'visible' });
-        
+
         for (let i = 0; i < 4; i++) {
-            await refreshButton.click({ force: true });
-            if (i < 3) { // Wait between clicks except after last click
+            await refreshButton.click();
+            if (i < 3) {
                 await this.page.waitForLoadState('domcontentloaded');
                 await this.page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
             }
         }
-        
+
         // Wait for query execution to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
@@ -477,27 +507,26 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async expandFirstLogRow() {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
 
-        // Additional run query clicks to ensure VRL enrichment is fully processed
+        // Additional run query clicks to ensure VRL enrichment is fully processed.
+        // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
         const refreshButton = this.page.locator(this.refreshButton);
         if (await refreshButton.isVisible()) {
             for (let i = 0; i < 3; i++) {
-                await refreshButton.click({ force: true });
+                await refreshButton.click();
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForTimeout(2000);
                 await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             }
         }
-        
+
         // Wait for timestamp column to be visible and stable
-        await this.page.waitForSelector(this.timestampColumn, { state: 'visible' });
-        const expandButton = this.page.locator(this.timestampColumn).locator(this.expandMenu);
+        await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
+        const expandButton = this.timestampColumn.first().locator(this.expandMenu);
         await expandButton.waitFor({ state: 'visible' });
-        
+
         await expandButton.click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+
         // Wait for expand panel to load and stabilize
         await this.page.waitForSelector(this.protocolKeywordText, { state: 'visible', timeout: 15000 });
     }
@@ -671,8 +700,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.warn('VRL editor not visible, clicking show query toggle button');
 
             // Click the show query toggle button to reveal the VRL editor
-            await this.page.locator(this.showQueryToggleBtn).nth(1).click({ force: true });
-            await this.page.waitForTimeout(1000);
+            await this.showQueryToggleBtnLocator.nth(1).click();
 
             // Retry waiting for VRL editor
             await this.page.waitForSelector(this.vrlEditor, {
@@ -681,13 +709,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
             });
             testLogger.debug('VRL editor visible after clicking toggle button');
         }
-        
+
         const vrlEditorExists = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
 
         // Wait for enrichment table to be fully indexed and available for querying
         testLogger.debug('Waiting for enrichment table to be ready for VRL queries');
-        await this.page.waitForTimeout(5000);
 
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);
@@ -698,28 +725,31 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Apply query with multiple clicks for VRL test reliability
         await this.applyQueryMultipleClicks();
 
-        // Wait for query results to load
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
-
-        // Check if error occurred and retry with additional wait
+        // Wait for query results to load — either the timestamp column appears
+        // (success) or the error-details button appears (failure).
+        const timestampCol = this.timestampColumn.first();
         const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
-        if (await errorDetailsBtn.isVisible()) {
+        await Promise.race([
+            timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+        ]);
+
+        // Check if error occurred and retry — the enrichment table may need
+        // additional time to be queryable on the backend after creation.
+        if (await errorDetailsBtn.isVisible({ timeout: 500 }).catch(() => false)) {
             testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
 
-            // Wait additional 5 seconds for enrichment table to be fully ready
-            await this.page.waitForTimeout(5000);
-
-            // Retry the query
+            // Retry the query — the backend may need a moment to index the new table
             await this.applyQueryMultipleClicks();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
+            await Promise.race([
+                timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+                errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            ]);
 
             // Check again if error persists
-            if (await errorDetailsBtn.isVisible()) {
+            if (await errorDetailsBtn.isVisible({ timeout: 500 }).catch(() => false)) {
                 testLogger.error('Error persists after retry, capturing details');
                 await errorDetailsBtn.click();
-                await this.page.waitForTimeout(1000);
                 await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
                 testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
                 throw new Error('VRL query execution failed after retry - check test-results/error-details-vrl-enrichment.png for details');
@@ -864,14 +894,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.searchInputField.fill(tableName);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Wait until either the matching row is visible or the empty state is
-        // shown (search filter is client-side — no network round trip needed).
+        // The filter is client-side — poll until either the matching row appears
+        // (success) or the input value is stable AND a known empty-state row
+        // count of zero is established. We give the OTable's filter pipeline
+        // time to recompute by polling the row's type-cell visibility.
         await expect.poll(async () => {
-            const rowVisible = await this.getRowTypeCell(tableName).isVisible({ timeout: 500 }).catch(() => false);
-            if (rowVisible) return 'row';
-            const tableVisible = await this.listTable.isVisible({ timeout: 500 }).catch(() => false);
-            return tableVisible ? 'table' : 'pending';
-        }, { timeout: 10000, intervals: [200, 500, 1000] }).not.toBe('pending');
+            return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
+        }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
     }
 
     async verifyTableVisibleInList(tableName) {

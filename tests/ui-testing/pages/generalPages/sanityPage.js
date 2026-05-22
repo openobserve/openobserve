@@ -100,9 +100,9 @@ export class SanityPage {
         this.streamNameInputField = page.locator('[data-test="add-stream-name-input-field"]');
         this.streamTypeDropdown = page.locator('[data-test="add-stream-type-input"]');
         this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
-        // AddStream.vue uses ODrawer's primary footer button as Save —
-        // legacy "save-stream-btn" was removed during the migration.
-        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        // AddStream.vue uses an inline OButton inside its OForm — not the ODrawer
+        // built-in primary footer button — so it exposes its own `add-stream-save-btn`.
+        this.saveStreamButton = page.locator('[data-test="add-stream-save-btn"]');
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
@@ -377,15 +377,89 @@ export class SanityPage {
         await this.addFunctionNameInputField.click();
         await this.addFunctionNameInputField.fill(uniqueFunctionName);
 
-        await this.fnEditor.first().click();
-        await this.page.keyboard.press('Control+A');
-        await this.page.keyboard.type('.sanity=1');
+        // Drive the Monaco VRL editor via keyboard input — Monaco's setValue does not
+        // always propagate through the unified-query-editor's debounced @update:query
+        // pipeline (the parent's formData.function stays empty), so click → type instead.
+        await this.fnEditor.first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForFunction(() => {
+            return typeof window !== 'undefined'
+                && window.monaco
+                && window.monaco.editor
+                && window.monaco.editor.getEditors().length > 0;
+        }, { timeout: 15000 });
+        await this.page.waitForFunction(() => {
+            const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
+            if (!vrlContainer) return false;
+            const editors = window.monaco.editor.getEditors();
+            return editors.some(ed => vrlContainer.contains(ed.getDomNode()));
+        }, { timeout: 15000 });
+        // Drive the VRL editor via window.monaco's executeEdits API — this guarantees
+        // an onDidChangeModelContent firing path that mirrors a real user typing each
+        // character. Setting via setValue alone doesn't reliably trigger the parent's
+        // debounced @update:query handler on this dev build.
+        await this.page.evaluate(() => {
+            const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
+            const editors = window.monaco.editor.getEditors();
+            const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
+            if (!targetEditor) return;
+            targetEditor.focus();
+            const range = targetEditor.getModel().getFullModelRange();
+            targetEditor.executeEdits('test-helper', [
+                { range, text: '.sanity=1', forceMoveMarkers: true },
+            ]);
+        });
+        // Wait for the editor model to actually contain the typed text.
+        await this.page.waitForFunction(() => {
+            const editors = window.monaco.editor.getEditors();
+            const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
+            const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
+            return targetEditor && targetEditor.getValue().includes('.sanity=1');
+        }, { timeout: 5000 });
+        // The CodeQueryEditor debounces `update:query` by 500ms. The keyboard.type call
+        // queues per-char events; the debounced emit fires 500ms after the LAST char.
+        // To make this deterministic, poll the time-since-last-mutation against the
+        // debounce window: wait until the editor value has been stable for >600ms.
+        await this.page.waitForFunction(async () => {
+            const editors = window.monaco.editor.getEditors();
+            const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
+            const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
+            if (!targetEditor) return false;
+            // Cache initial value + timestamp on the window object for the polling helper.
+            const v = targetEditor.getValue();
+            const w = /** @type {any} */ (window);
+            if (w.__vrlLastValue !== v) {
+                w.__vrlLastValue = v;
+                w.__vrlLastChangedAt = Date.now();
+                return false;
+            }
+            return Date.now() - w.__vrlLastChangedAt > 600;
+        }, { timeout: 5000 });
 
         // Use the specific data-test selector for the save button to avoid
         // ambiguity with other "Save" labelled buttons on the page.
+        const apiResponsePromise = this.page.waitForResponse(
+            resp => resp.url().includes('/api/') && resp.url().endsWith('/functions') && resp.request().method() === 'POST',
+            { timeout: 30000 }
+        ).catch((err) => { testLogger.info(`createFunctionViaFunctionsPage: POST never settled: ${err.message}`); return null; });
         await this.addFunctionSaveBtn.click();
+        const apiResp = await apiResponsePromise;
+        if (apiResp) {
+            testLogger.info(`createFunctionViaFunctionsPage: POST status=${apiResp.status()}, url=${apiResp.url()}`);
+            try {
+                const reqBody = apiResp.request().postData();
+                testLogger.info(`createFunctionViaFunctionsPage: POST body=${reqBody}`);
+                const respBody = await apiResp.text();
+                testLogger.info(`createFunctionViaFunctionsPage: POST resp=${respBody.substring(0, 500)}`);
+            } catch (e) {
+                testLogger.info(`createFunctionViaFunctionsPage: could not read body: ${e.message}`);
+            }
+        } else {
+            testLogger.info('createFunctionViaFunctionsPage: POST not detected');
+        }
 
-        await this.functionListSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the search input on the function list to be back in view, indicating
+        // we navigated back from the AddFunction form to the list.
+        await this.functionListSearchInputField.waitFor({ state: 'visible', timeout: 30000 });
         await this.functionListSearchInputField.fill(uniqueFunctionName);
 
         // Wait for the matching row to appear before clicking delete.
@@ -425,7 +499,11 @@ export class SanityPage {
         );
         await folderMoreIcon.click();
         await this.deleteFolderIcon.click({ force: true });
-        await this.confirmDialogPrimary.click();
+        // ConfirmDialog renders an ODialog with data-test="confirm-dialog"; its primary
+        // footer button surfaces as "o-dialog-primary-btn" inside the open dialog.
+        // Use the generic locator to avoid timing issues with the scoped ancestor query.
+        await this.openDialogPrimary.waitFor({ state: 'visible', timeout: 15000 });
+        await this.openDialogPrimary.click();
 
         await expect(this.toastSuccess.first()).toBeVisible({ timeout: 10000 });
     }
@@ -488,16 +566,13 @@ export class SanityPage {
         await this.streamDeleteDialogPrimary.waitFor({ state: 'visible', timeout: 10000 });
         await this.streamDeleteDialogPrimary.click();
 
+        // Wait for the confirm dialog to close (deterministic post-delete settle).
+        await this.streamDeleteDialogPrimary.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Verify stream was deleted - clear and re-search; the stream cell should not be visible.
-        await this.searchStreamInputField.clear();
-        await this.searchStreamInputField.fill(uniqueStreamName);
-
-        const streamStillExists = await streamNameCell.isVisible({ timeout: 3000 }).catch(() => false);
-        if (streamStillExists) {
-            throw new Error(`Stream ${uniqueStreamName} was not deleted successfully`);
-        }
+        // Verify stream was deleted - the stream cell should disappear from the table.
+        // OInput uses a 300ms debounce on the filter; poll for absence instead of one-shot check.
+        await expect(streamNameCell).toBeHidden({ timeout: 15000 });
     }
 
     // ================================================================

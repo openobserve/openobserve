@@ -37,9 +37,12 @@ export class ReportFoldersPage {
       '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
 
-    // Move dialog — MoveAcrossFolders renders an ODrawer with data-test="move-across-folders-dialog".
+    // Move dialog — MoveAcrossFolders renders an ODrawer; the outer consumer
+    // (<MoveAcrossFolders data-test="report-move-to-another-folder-dialog">)
+    // overrides the inner ODrawer's data-test via Vue attr inheritance, so
+    // the resolved data-test on the dialog content is the consumer's slug.
     // Primary = Move, Secondary = Cancel (forwarded via ODrawer parentDataTest pattern).
-    this.moveDialog = page.locator('[data-test="move-across-folders-dialog"]');
+    this.moveDialog = page.locator('[data-test="report-move-to-another-folder-dialog"]');
     // OSelect inside MoveAcrossFolders (via SelectFolderDropDown) carries the
     // `reports-index-dropdown-stream_type` parent data-test.
     this.moveFolderSelectTrigger = page.locator('[data-test="reports-index-dropdown-stream_type"]');
@@ -47,10 +50,10 @@ export class ReportFoldersPage {
       '[data-test="reports-index-dropdown-stream_type-popover"]'
     );
     this.moveSubmitBtn = page.locator(
-      '[data-test="move-across-folders-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]'
     );
     this.moveCancelBtn = page.locator(
-      '[data-test="move-across-folders-dialog"] [data-test="o-drawer-secondary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
     );
 
     // Report list

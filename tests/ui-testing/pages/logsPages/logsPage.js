@@ -27,12 +27,21 @@ export class LogsPage {
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+        // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
+        // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
+        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
         this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
+        // OSwitch renders the wrapper data-test on a div and the state on an inner
+        // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling
+        // OTooltip grace-area span also carries `data-state="closed"`, so we filter on the
+        // OSwitch states explicitly to avoid the strict-mode collision.
+        this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
+        this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
         this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
         this.resultText = '[data-test="logs-search-search-result"]';
@@ -106,7 +115,12 @@ export class LogsPage {
         this.colAutoButton = '.col-auto button';
         this.exploreTitle = '[title="Explore"]';
         this.streamsSearchStreamInput = '[data-test="streams-search-stream-input"]';
-        this.logSearchIndexListFieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
+        // Post-OFieldList migration the IndexList search box renders via OInput with
+        // data-test="o-field-list-search" (wrapper) and "-field" (inner native input).
+        // Fill the -field variant so input events fire correctly. Scope under the
+        // logs index list so we don't collide with the panel-editor-container's own
+        // OFieldList search input (visible from Visualize-tab panel layouts).
+        this.logSearchIndexListFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.expandCode = 'Expand "code"';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
         this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
@@ -174,6 +188,11 @@ export class LogsPage {
         this.xAxisItemRemove = (alias) => `[data-test="dashboard-x-item-${alias}-remove"]`;
         this.yAxisItemRemove = (alias) => `[data-test="dashboard-y-item-${alias}-remove"]`;
         this.breakdownItemRemove = (alias) => `[data-test="dashboard-b-item-${alias}-remove"]`;
+        // Collective axis-item selectors used to detect "any items present" — data-test prefix
+        // matches dashboard-x-item-{alias}, *-drag, *-menu, *-remove suffixes alike (count is
+        // 4x inflated, callers check >=1 so that's acceptable).
+        this.xAxisItemsAny = `${this.xAxisLayout} [data-test^="dashboard-x-item-"]`;
+        this.yAxisItemsAny = `${this.yAxisLayout} [data-test^="dashboard-y-item-"]`;
 
         // Field list for builder
         this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
@@ -182,7 +201,12 @@ export class LogsPage {
         this.addToYAxis = '[data-test="dashboard-add-y-data"]';
         this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
         this.addToFilter = '[data-test="dashboard-add-filter-data"]';
-        this.fieldListSearchInput = '[data-test="index-field-search-input"]';
+        // PanelFieldList uses OFieldList which renders an OInput with data-test="o-field-list-search".
+        // OInput convention: wrapper carries data-test, inner native <input> carries `-field` suffix.
+        this.fieldListSearchInput = '[data-test="o-field-list-search-field"]';
+        this.fieldListSearchInputWrapper = '[data-test="o-field-list-search"]';
+        // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
+        this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
@@ -201,6 +225,8 @@ export class LogsPage {
         this.chartRenderer = '[data-test="chart-renderer"]';
         this.noDataMessage = '[data-test="no-data"]';
         this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
+        // Composite: any of the three indicates the build/visualize tab finished initial render.
+        this.buildInitIndicator = `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`;
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -723,8 +749,12 @@ export class LogsPage {
         // OSelect's PopoverTrigger is an inner element — clicking the outer wrapper div does
         // not always reach it. Prefer the explicit `-trigger` data-test (added on OSelect.vue
         // PopoverTrigger). Fall back to the wrapper for environments that pre-date that attr.
-        const selectTrigger = this.page.locator(`${this.indexDropDown}-trigger`);
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
         const popoverNode = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+        // OSelect virtualises the option list. When the streamList is large (e.g. pentest
+        // env with 1000+ streams) the target option is not rendered initially. Typing into
+        // the popover's filter narrows the list so the option becomes the only renderable row.
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-search"]');
 
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`,
@@ -734,17 +764,21 @@ export class LogsPage {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
 
             try {
-                const triggerCount = await selectTrigger.count();
-                testLogger.info(`selectStream: Clicking OSelect (triggerCount=${triggerCount}) to open stream popover`);
+                testLogger.info(`selectStream: Clicking OSelect wrapper to open stream popover`);
                 // Click the inner PopoverTrigger when available; fall back to the wrapper.
-                if (triggerCount > 0) {
+                if (await selectTrigger.count() > 0) {
                     await selectTrigger.first().click();
                 } else {
                     await selectWrapper.click();
                 }
                 // Wait for the popover to actually open (deterministic — no timeout).
-                const popoverOpened = await popoverNode.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
-                testLogger.info(`selectStream: popover opened = ${popoverOpened}`);
+                await popoverNode.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+                // OSelect popover renders a search/filter input; type the stream name to
+                // narrow the virtualised option list to just the target row.
+                if (await popoverSearch.count() > 0) {
+                    await popoverSearch.fill(stream).catch(() => {});
+                }
 
                 testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
                 const visible = await option
@@ -1007,22 +1041,20 @@ export class LogsPage {
 
     async clearAndFillQueryEditor(query) {
         // Wait for query editor to be ready
-        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(1000);
+        const editor = this.page.locator(this.queryEditor);
+        await editor.waitFor({ state: 'visible', timeout: 10000 });
 
         // Click to focus the editor
-        await this.page.locator(this.queryEditor).click();
-        await this.page.waitForTimeout(500);
-
-        // Select all existing content
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.waitForTimeout(300);
+        await editor.click();
 
         // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
         // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
         // The .fill() method will replace the selected content
-        const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
+        const inputArea = editor.locator('.inputarea');
         await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Select all existing content
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await inputArea.fill(query);
     }
 
@@ -1346,8 +1378,8 @@ export class LogsPage {
 
     async verifyHistogramState() {
         // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-        const isChecked = await this.page.locator(this.histogramToggle).getAttribute('aria-checked');
-        expect(isChecked).toBe('false');
+        // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
+        await expect(this.page.locator(this.histogramToggleUncheckedBtn)).toBeVisible({ timeout: 5000 });
     }
 
     // Error handling methods
@@ -2039,7 +2071,25 @@ export class LogsPage {
     }
 
     async clickQueryEditor() {
-        return await this.page.locator(this.queryEditor).click();
+        // Dismiss any lingering Reka popper / tooltip / dropdown content that could
+        // intercept pointer events.
+        await this.page.keyboard.press('Escape').catch(() => {});
+
+        // Focus the Monaco editor through its public API. Clicking the outer wrapper
+        // doesn't reliably focus the editor's hidden inputarea — focus() does.
+        const focused = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            ed.focus();
+            return true;
+        }, this.queryEditor).catch(() => false);
+
+        if (!focused) {
+            // Fallback when Monaco isn't ready yet — click the wrapper directly.
+            await this.page.locator(this.queryEditor).click({ force: true });
+        }
     }
 
     async clickQueryEditorTextbox() {
@@ -2071,6 +2121,23 @@ export class LogsPage {
      */
     async runQueryAndWaitForResults(timeout = 60000) {
         const btn = this.page.locator(this.queryButton);
+
+        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
+        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
+        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                if (!el) return false;
+                const text = (el.textContent || '').trim();
+                const title = (el.getAttribute('title') || '').trim();
+                return !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
+            },
+            this.queryButton,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, continuing');
+        });
 
         // Click Run query
         await btn.click({ force: true });
@@ -2183,7 +2250,12 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        return await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').first().click();
+        // SearchBar.vue:97 / 501 emits an OSwitch with data-test="logs-search-bar-sql-mode-toggle-btn"
+        // (either on the toolbar or inside the utilities menu depending on viewport).
+        // Click the wrapper directly — OSwitch handles toggle on the wrapper click.
+        const toggle = this.page.locator(this.sqlModeToggle).first();
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        return await toggle.click({ force: true });
     }
 
     async clickShowQueryToggle() {
@@ -2442,9 +2514,19 @@ export class LogsPage {
     }
 
     async getQueryEditorText() {
+        // Drive value via window.monaco.editor.getEditors() (AGENT_RULES §5)
+        // Falls back to null when monaco hasn't loaded yet
         return await this.page.evaluate((selector) => {
-            const editor = document.querySelector(selector).querySelector('.monaco-editor').querySelector('.view-lines');
-            return editor ? editor.textContent : null;
+            const host = document.querySelector(selector);
+            if (!host) return null;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const domNode = ed.getDomNode?.();
+                if (domNode && host.contains(domNode)) {
+                    return ed.getValue();
+                }
+            }
+            return null;
         }, this.queryEditor);
     }
 
@@ -2932,7 +3014,9 @@ export class LogsPage {
             await inputLocator.click({ clickCount: 3, force: true });
             await inputLocator.pressSequentially(text, { delay: 30 });
         }
-        await this.page.waitForTimeout(500);
+        // Wait deterministically for the input value to reflect the typed text —
+        // this confirms Quasar's debounced model-value chain has settled.
+        await expect(inputLocator).toHaveValue(text || '', { timeout: 5000 });
     }
 
     async clickExpandLabel(label) {
@@ -3265,7 +3349,8 @@ export class LogsPage {
             await inputLocator.fill('');
             await inputLocator.click({ force: true });
             await inputLocator.pressSequentially(field, { delay: 30 });
-            await this.page.waitForTimeout(500);
+            // Wait deterministically for the debounced filter to reflect the typed value
+            await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
         await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
         await btnLocator.click({ force: true });
@@ -3766,7 +3851,24 @@ export class LogsPage {
     }
 
     async clickAllFieldsButton() {
-        await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+        // FieldListPagination.vue renders one of two toggle groups:
+        //  - When user-defined-schema toggle is shown: per-slot data-tests like
+        //    "logs-user-defined-fields-btn-all_fields_slot".
+        //  - When only Quick Mode is on: data-test="logs-all-fields-btn" directly on
+        //    the "all_fields" OToggleGroupItem.
+        // Try the dedicated all-fields button first, then the user-defined "all_fields_slot".
+        const allFieldsBtn = this.page.locator('[data-test="logs-all-fields-btn"]').first();
+        const userDefAllFieldsBtn = this.page
+            .locator('[data-test="logs-user-defined-fields-btn-all_fields_slot"]')
+            .first();
+        if (await allFieldsBtn.isVisible().catch(() => false)) {
+            await allFieldsBtn.click();
+        } else if (await userDefAllFieldsBtn.isVisible().catch(() => false)) {
+            await userDefAllFieldsBtn.click();
+        } else {
+            // Neither toggle exposes "all_fields" — the field list is already in the
+            // default state; nothing to click.
+        }
         // Wait for interesting field items to populate (cloud may load slowly)
         await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
@@ -3834,6 +3936,10 @@ export class LogsPage {
             throw new Error('Quick Mode could not be enabled after 3 attempts');
         }
 
+        // Wait for the utilities dropdown portal to actually close — otherwise its
+        // popper still intercepts pointer events on the page (query editor clicks fail).
+        await quickModeItem.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+
         // Wait deterministically for either field-list branch to surface in the sidebar.
         await Promise.any([
             quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }),
@@ -3842,8 +3948,10 @@ export class LogsPage {
     }
 
     async clickTimestampField() {
-        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
-        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // Post-OFieldList migration the field row is data-test="logs-field-list-item-<field>"
+        // (FieldRow.vue:22). Click the row directly — it dispatches the field-click event.
+        const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
+        await field.waitFor({ state: 'visible', timeout: 10000 });
         return await field.click({ force: true });
     }
 
@@ -3868,8 +3976,9 @@ export class LogsPage {
     }
 
     async expectTimestampFieldVisible() {
-        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
-        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
+        const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
+        await field.waitFor({ state: 'visible', timeout: 10000 });
         return await expect(field).toBeVisible();
     }
 
@@ -4230,10 +4339,13 @@ export class LogsPage {
 
     async expectQuickModeToggleVisible() {
         // Quick mode is now inside the utilities hamburger menu
+        const toggle = this.page.locator(this.quickModeToggle);
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        // Wait deterministically for the toggle to surface in the open menu
+        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(toggle).toBeVisible();
+        // Dismiss the popover with Escape to avoid `body` locator usage
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async waitForUI(timeout = 500) {
@@ -6309,13 +6421,39 @@ export class LogsPage {
      * @param {string} query - The SQL query to set
      */
     async setQueryEditorContent(query) {
-        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
-        // Use .first() to avoid strict mode violations when multiple monaco instances exist
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea').first();
-        await inputArea.click({ force: true });
-        await inputArea.fill(query);
-        // Wait for Monaco to render the new content in the view-line
-        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        // Drive value via window.monaco.editor (AGENT_RULES §5) — no class scraping
+        // Wait for the editor host AND the monaco model to be available
+        await this.page.locator(this.queryEditor).first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            return editors.some(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+        }, this.queryEditor, { timeout: 10000 });
+        // Set value via the monaco model so undo history is preserved and Vue v-model fires
+        await this.page.evaluate(({ selector, value }) => {
+            const host = document.querySelector(selector);
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            const target = editors.find(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+            if (!target) throw new Error('Monaco editor not found for selector');
+            target.focus();
+            const model = target.getModel();
+            const fullRange = model.getFullModelRange();
+            target.executeEdits('setQueryEditorContent', [
+                { range: fullRange, text: value, forceMoveMarkers: true },
+            ]);
+            target.setSelection(model.getFullModelRange());
+        }, { selector: this.queryEditor, value: query });
+        // Verify via getValue() that the model now reflects the value (handles empty string too)
+        await expect.poll(async () => {
+            return await this.getQueryEditorText();
+        }, { timeout: 5000 }).toBe(query);
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
     }
 
@@ -6324,12 +6462,15 @@ export class LogsPage {
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
     async enableSqlModeIfNeeded() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        if (isChecked !== 'true') {
+        // Use .first() to dodge strict-mode violations when SearchBar duplicates this data-test
+        // (toolbar OSwitch + collapsed-menu syntax-guide may co-exist in the DOM).
+        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        const isOn = await this.isSqlModeOn();
+        if (!isOn) {
             await sqlModeToggle.click();
-            // Wait for the toggle to actually switch ON
-            await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+            // Wait for the toggle to actually switch ON (inner <button role="switch"> exposes data-state)
+            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -6341,11 +6482,12 @@ export class LogsPage {
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
     async disableSqlModeIfNeeded() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        if (isChecked === 'true') {
+        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        const isOn = await this.isSqlModeOn();
+        if (isOn) {
             await sqlModeToggle.click();
-            await this.page.waitForTimeout(1000);
+            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(false);
             testLogger.info('SQL mode disabled');
         } else {
             testLogger.info('SQL mode already disabled');
@@ -6898,10 +7040,12 @@ export class LogsPage {
     /**
      * Expect Custom SQL mode to be active
      */
-    async expectCustomModeActive() {
+    async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
-        await expect(customTypeBtn).toBeVisible();
-        testLogger.info('Custom SQL mode is available');
+        await expect(customTypeBtn).toBeVisible({ timeout });
+        // Verify "Custom" button is active (OToggleGroupItem uses data-state="on")
+        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        testLogger.info('Custom SQL mode is active');
     }
 
     /**
@@ -6924,7 +7068,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        await this.page.waitForTimeout(500);
+        // Wait for the toggle group to reflect the Custom selection (OToggleGroupItem data-state="on")
+        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 
@@ -7122,9 +7267,26 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode is ON
      */
     async isSqlModeOn() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        return isChecked === 'true';
+        // OSwitch wrapper carries data-test; inner <button role="switch"> exposes data-state="checked|unchecked".
+        // The wrapper may exist twice (toolbar OSwitch + collapsed-menu syntax-guide which forwards the
+        // same data-test). Scope to the visible OSwitch wrapper and read its inner data-state via evaluate
+        // so we never match the syntax-guide root.
+        const state = await this.page.evaluate((selector) => {
+            const wrappers = Array.from(document.querySelectorAll(selector));
+            for (const w of wrappers) {
+                // Prefer the visible wrapper (toolbar OSwitch is always in layout flow)
+                if (!/** @type {HTMLElement} */ (w).offsetParent) continue;
+                const inner = w.querySelector('[data-state]');
+                if (inner) return inner.getAttribute('data-state');
+            }
+            // Fallback: first wrapper that contains a [data-state] (works even when offsetParent is null in some layouts)
+            for (const w of wrappers) {
+                const inner = w.querySelector('[data-state]');
+                if (inner) return inner.getAttribute('data-state');
+            }
+            return null;
+        }, this.sqlModeToggle);
+        return state === 'checked';
     }
 
     /**
@@ -7158,11 +7320,11 @@ export class LogsPage {
      */
     async searchFieldInBuilder(fieldName) {
         const input = this.page.locator(this.fieldListSearchInput).first();
-        // Quasar's q-field__native input resolves in the DOM but is considered hidden
-        // by Playwright's visibility algorithm — use force to interact directly.
+        // OInput's inner native <input> is the `-field` variant per AGENT_RULES §4.
         await input.waitFor({ state: 'attached', timeout: 10000 });
         await input.fill(fieldName, { force: true });
-        await this.page.waitForTimeout(500);
+        // Confirm the input reflected the value (deterministic — fill+rerender complete)
+        await expect(input).toHaveValue(fieldName, { timeout: 5000 });
         testLogger.info(`Searched for field: ${fieldName}`);
     }
 
@@ -7181,7 +7343,18 @@ export class LogsPage {
     }
 
     async expectMonacoEditorAreaVisible(timeout = 10000) {
-        await expect(this.page.locator(`${this.logsSearchBarQueryEditor} .monaco-editor`).first()).toBeVisible({ timeout });
+        // The editor wrapper carries the data-test; wait for monaco's model to be reachable
+        // via window.monaco (AGENT_RULES §5) instead of scraping .monaco-editor class.
+        await expect(this.page.locator(this.logsSearchBarQueryEditor).first()).toBeVisible({ timeout });
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            return editors.some(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+        }, this.logsSearchBarQueryEditor, { timeout });
         testLogger.info('Monaco editor area visible');
     }
 
@@ -7236,7 +7409,7 @@ export class LogsPage {
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
             const initIndicator = this.page
-                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
+                .locator(this.buildInitIndicator)
                 .filter({ visible: true })
                 .first();
             await initIndicator.waitFor({ state: 'visible', timeout });
@@ -7354,9 +7527,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode matches expected state
      */
     async verifySqlModePreservedOnBuild(expectedState) {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        const actualState = isChecked === 'true';
+        const actualState = await this.isSqlModeOn();
         if (actualState === expectedState) {
             testLogger.info(`SQL mode preserved on Build tab: expected=${expectedState}, actual=${actualState}`);
             return true;
@@ -7371,7 +7542,7 @@ export class LogsPage {
      * Checks that at least one item exists inside the X-axis layout.
      */
     async expectXAxisHasItems() {
-        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        const xItems = this.page.locator(this.xAxisItemsAny);
         await expect(xItems.first()).toBeVisible({ timeout: 15000 });
         const count = await xItems.count();
         testLogger.info(`X-axis has ${count} item(s)`);
@@ -7383,7 +7554,7 @@ export class LogsPage {
      * Checks that at least one item exists inside the Y-axis layout.
      */
     async expectYAxisHasItems() {
-        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        const yItems = this.page.locator(this.yAxisItemsAny);
         await expect(yItems.first()).toBeVisible({ timeout: 15000 });
         const count = await yItems.count();
         testLogger.info(`Y-axis has ${count} item(s)`);
@@ -7394,8 +7565,8 @@ export class LogsPage {
      * Expect X-axis and Y-axis are empty (no items)
      */
     async expectAxesEmpty() {
-        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
-        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        const xItems = this.page.locator(this.xAxisItemsAny);
+        const yItems = this.page.locator(this.yAxisItemsAny);
         await expect(xItems).toHaveCount(0, { timeout: 5000 });
         await expect(yItems).toHaveCount(0, { timeout: 5000 });
         testLogger.info('X and Y axes are empty');
@@ -7409,15 +7580,11 @@ export class LogsPage {
      */
     async getFilterConditionCount() {
         // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
-        // Retry for up to 10s to allow builder filter parsing to complete (CI may be slower)
-        const deadline = Date.now() + 10000;
-        let count = 0;
-        while (Date.now() < deadline) {
-            count = await filterItems.count();
-            if (count > 0) break;
-            await this.page.waitForTimeout(200);
-        }
+        const filterItems = this.page.locator(this.filterConditionLabelItems);
+        // Wait for the builder filter parsing to attach at least one condition (deterministic).
+        // Some queries genuinely have zero filters — fall through to 0 after a short check.
+        await filterItems.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+        const count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
         return count;
     }

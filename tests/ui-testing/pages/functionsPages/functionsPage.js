@@ -245,10 +245,26 @@ class FunctionsPage {
     // run-test trigger — it invokes the TestFunction component's testFunction()
     // via ref and POSTs to /api/{org}/functions/test, populating the output editor.
     if (await this.testButton.isVisible({ timeout: 2000 })) {
+      // The spec calls clickTestButton() (which already fires a test request with the
+      // pre-existing default events) BEFORE entering the custom test event and then
+      // calls clickRunTestButton() to fire a SECOND request. The output editor still
+      // holds the first request's payload, so we can't just poll on length > 10 —
+      // we'd resolve on the stale value before the second response lands and overwrites
+      // it (e.g. with "Error in testing function" on a backend reject). Tie the click
+      // to a fresh `/functions/test` response via Promise.all + page.waitForResponse so
+      // we read the model only after THIS click's request resolves on the client.
+      const testApiResponse = this.page.waitForResponse(
+        (response) =>
+          response.url().includes('/functions/test') && response.request().method() === 'POST',
+        { timeout: 15000 },
+      );
       // force: true needed — button can be obscured by overlapping editor chrome
-      await this.testButton.click({ force: true });
-      // Poll the Monaco model directly (read via getTestOutput) so we don't
-      // rely on .view-line DOM scraping — read returns >10 chars once API resolves.
+      await Promise.all([testApiResponse, this.testButton.click({ force: true })]);
+      // After the network call returns, TestFunction.vue runs the success/error
+      // handler synchronously (then() or catch()) and sets outputEvents.value;
+      // Monaco's v-model debounce (500 ms) then flushes that into the model.
+      // Poll the model for the post-debounce value (>10 chars distinguishes real
+      // content / error text from an empty editor).
       await expect
         .poll(async () => (await this.getTestOutput()).length, {
           timeout: 15000,

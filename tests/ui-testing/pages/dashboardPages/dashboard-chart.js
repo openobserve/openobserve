@@ -498,9 +498,27 @@ export default class ChartTypeSelector {
         { timeout: 60000 },
       )
       .toBeGreaterThan(0);
-    await this.jsonFieldRenderer
-      .first()
-      .waitFor({ state: 'visible', timeout: 30000 });
+    // TenstackTable virtualises rows — the FIRST renderer in DOM order may be
+    // a buffered (off-viewport) row reporting `hidden` per Playwright's
+    // visibility test even though it's mounted and laid out. Poll for ANY
+    // attached `json-field-renderer` to have a non-zero bounding box, which
+    // matches the spec's downstream `verifyJsonContainsKey/Value` calls that
+    // succeed when even one renderer has rendered content.
+    await expect
+      .poll(
+        async () =>
+          await this.page.evaluate(() => {
+            const nodes = document.querySelectorAll(
+              '[data-test="json-field-renderer"]',
+            );
+            return Array.from(nodes).some((n) => {
+              const r = n.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            });
+          }),
+        { timeout: 30000 },
+      )
+      .toBe(true);
   }
 
   /**

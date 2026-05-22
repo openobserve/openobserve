@@ -750,9 +750,19 @@ export class PipelinesPage {
         await this.enrichmentSearchField.clear();
         await this.enrichmentSearchField.fill(fileName);
 
-        // Wait until the row for the target table is visible (client-side filter)
+        // Poll for the row's type-cell — the list may still be loading from
+        // the backend, especially after a navigation. The OTable filter is
+        // client-side so once the row arrives, the filter shows it immediately.
         const typeCell = this.getEnrichmentRowTypeCell(fileName);
-        const visible = await typeCell.isVisible({ timeout: 10000 }).catch(() => false);
+        let visible = false;
+        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
+            visible = await typeCell.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!visible) {
+                // Re-issue the search; the list may have just hydrated
+                await this.enrichmentSearchField.clear();
+                await this.enrichmentSearchField.fill(fileName);
+            }
+        }
         if (!visible) {
             throw new Error(
               `Uploaded file "${fileName}" not found in the enrichment table.`

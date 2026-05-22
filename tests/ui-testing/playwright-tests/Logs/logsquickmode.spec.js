@@ -124,21 +124,20 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@errorHandlingHistogramModeLogs', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing error handling with random text in histogram mode');
-    
-    // Strategic 1000ms wait for page stabilization - this is functionally necessary
-    await page.waitForTimeout(1000);
+
+    // Wait deterministically for the Monaco editor textbox before clicking
+    await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor("oooo");
-    
-    // Strategic 500ms wait for query editor input processing - this is functionally necessary
-    await page.waitForTimeout(500);
+
+    // Wait for the editor to actually contain the typed value before refreshing
+    await pm.logsPage.expectQueryEditorContainsText("oooo");
     await pm.logsPage.waitForSearchBarRefreshButton();
     await pm.logsPage.clickSearchBarRefreshButton();
-    
-    // Strategic 2000ms wait for error message rendering - this is functionally necessary
-    await page.waitForTimeout(2000);
+
+    // expectErrorMessageVisible auto-waits via expect().toBeVisible()
     await pm.logsPage.expectErrorMessageVisible();
-    
+
     testLogger.info('Error handling histogram mode test completed');
   });
 
