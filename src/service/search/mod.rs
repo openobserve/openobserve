@@ -633,7 +633,6 @@ pub async fn search_partition(
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -643,24 +642,13 @@ pub async fn search_partition(
     };
     let sql = Sql::new(&query, org_id, stream_type, None).await?;
 
-    // check for vrl
-    let apply_over_hits = match req.query_fn.as_ref() {
-        None => false,
-        Some(v) => {
-            if v.is_empty() {
-                false
-            } else {
-                let v = base64::decode_url(v).unwrap_or(v.to_string());
-                RESULT_ARRAY.is_match(&v)
-            }
-        }
-    };
-
-    // if there is no _timestamp field or EXPLAIN in the query, return single partitions
     let is_explain_query = is_explain_query(&req.sql);
     let is_complex_query = is_complex_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).map(|(v, _)| v);
+    let apply_over_hits = req.query_fn.as_ref().is_some_and(|v| {
+        !v.is_empty() && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or(v.to_string()))
+    });
     let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
         &req.sql,
         ts_column.as_deref(),
