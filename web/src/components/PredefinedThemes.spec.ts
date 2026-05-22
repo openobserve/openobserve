@@ -19,9 +19,19 @@ import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
+// Use vi.hoisted so these variables are available inside vi.mock() factory functions
+// (vi.mock calls are hoisted to the top of the file before variable declarations)
+const { mockToast, mockNotify } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+  mockNotify: vi.fn(() => vi.fn()),
+}));
+
+// Mock toast — resetToDefaultTheme calls toast(), not useQuasar().notify
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn());
 vi.mock("quasar", async () => {
   const actual = await vi.importActual("quasar");
   return {
@@ -193,6 +203,7 @@ const createWrapper = (props = {}, options = {}) => {
 describe("PredefinedThemes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockToast.mockReturnValue(vi.fn());
     mockLocalStorage.getItem.mockImplementation((key: string) => {
       if (key === 'appliedLightTheme') return null;
       if (key === 'appliedDarkTheme') return null;
@@ -385,7 +396,8 @@ describe("PredefinedThemes", () => {
       vm.resetToDefaultTheme();
       await nextTick();
 
-      expect(mockNotify).toHaveBeenCalled();
+      // resetToDefaultTheme calls toast() from @/lib/feedback/Toast/useToast, not useQuasar().notify
+      expect(mockToast).toHaveBeenCalled();
     });
   });
 

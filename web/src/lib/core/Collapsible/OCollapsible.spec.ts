@@ -25,7 +25,9 @@ describe("OCollapsible", () => {
     const wrapper = mount(OCollapsible, {
       props: { label: "Test", icon: "settings" },
     });
-    expect(wrapper.html()).toContain("settings");
+    // The "settings" icon is in the OIcon registry and renders as an SVG element.
+    // The icon name text does not appear in the HTML; the SVG path does.
+    expect(wrapper.find("svg").exists()).toBe(true);
   });
 
   it("is closed by default", () => {
@@ -110,30 +112,34 @@ describe("OCollapsible", () => {
 
   describe("group accordion", () => {
     it("closes other items in the same group when one opens", async () => {
+      // Use a unique group name per test run to avoid module-level state leakage
+      // from useCollapsibleGroup's shared Map.
+      const groupName = `test-group-${Date.now()}`;
       const GroupTest = defineComponent({
         components: { OCollapsible },
         template: `
           <div>
-            <OCollapsible label="Item 1" group="test-group" data-test="item1" />
-            <OCollapsible label="Item 2" group="test-group" data-test="item2" />
+            <OCollapsible label="Item 1" :group="group" data-test="item1" />
+            <OCollapsible label="Item 2" :group="group" data-test="item2" />
           </div>
         `,
+        props: { group: String },
       });
 
-      const wrapper = mount(GroupTest);
+      const wrapper = mount(GroupTest, { props: { group: groupName } });
       const [btn1, btn2] = wrapper.findAll("button");
 
-      // Open first
+      // Open first — query the specific collapsible root divs via data-test
       await btn1.trigger("click");
-      let roots = wrapper.findAll("[data-state]");
-      expect(roots[0].attributes("data-state")).toBe("open");
-      expect(roots[1].attributes("data-state")).toBe("closed");
+      const item1 = wrapper.find('[data-test="item1"]');
+      const item2 = wrapper.find('[data-test="item2"]');
+      expect(item1.attributes("data-state")).toBe("open");
+      expect(item2.attributes("data-state")).toBe("closed");
 
-      // Open second ΓÇö first should close
+      // Open second — first should close (accordion behavior)
       await btn2.trigger("click");
-      roots = wrapper.findAll("[data-state]");
-      expect(roots[0].attributes("data-state")).toBe("closed");
-      expect(roots[1].attributes("data-state")).toBe("open");
+      expect(item1.attributes("data-state")).toBe("closed");
+      expect(item2.attributes("data-state")).toBe("open");
     });
   });
 });

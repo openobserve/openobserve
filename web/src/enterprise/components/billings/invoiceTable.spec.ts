@@ -21,22 +21,27 @@ import router from "@/test/unit/helpers/router";
 import BillingService from "@/services/billings";
 import InvoiceTable from "./invoiceTable.vue";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Mock child components
-vi.mock("@/components/shared/grid/NoData.vue", () => ({
-  default: { name: "NoData", template: "<div data-testid='no-data'>No Data</div>" },
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()), // Returns dismiss function
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  useToast: () => ({
+    toast: mockToast,
+    toasts: [],
+  }),
 }));
 
-vi.mock("@/components/shared/grid/Pagination.vue", () => ({
-  default: { 
-    name: "QTablePagination", 
-    template: "<div data-testid='pagination'>Pagination</div>",
-    props: ["scope", "resultTotal", "perPageOptions", "position"],
-    emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
+// Mock child components
+vi.mock("@/components/shared/grid/NoData.vue", () => ({
+  default: {
+    name: "NoData",
+    template: '<div data-testid="no-data">No Data</div>',
   },
 }));
 
@@ -44,27 +49,24 @@ vi.mock("@/components/shared/grid/Pagination.vue", () => ({
 vi.mock("@/services/billings", () => ({
   default: {
     list_invoice_history: vi.fn().mockResolvedValue({
-      data: {
-        invoices: []
-      }
+      data: { invoices: [] },
     }),
   },
 }));
 
-// Mock getImageURL utility and other zincutils functions
+// Mock getImageURL
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     getImageURL: vi.fn(() => "test-image-url"),
-    mergeRoutes: vi.fn((base, additional) => [...base, ...additional]),
+    mergeRoutes: vi.fn((base: any, additional: any) => [...base, ...additional]),
   };
 });
 
 describe("InvoiceTable Component", () => {
   let wrapper: any;
-  const mockNotify = vi.fn();
-  
+
   const mockInvoiceData = {
     data: {
       invoices: [
@@ -96,31 +98,15 @@ describe("InvoiceTable Component", () => {
     },
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
-    
-    // Reset BillingService mock with default empty response
-    BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-      data: { invoices: [] }
+
+    // Default: return empty invoices
+    vi.mocked(BillingService.list_invoice_history).mockResolvedValue({
+      data: { invoices: [] },
     });
-    
-    wrapper = mount(InvoiceTable, {
-      attachTo: "#app",
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-        mocks: {
-          $q: {
-            notify: mockNotify,
-          },
-        },
-      },
-    });
-    
-    await flushPromises();
+
+    mockToast.mockImplementation(() => vi.fn());
   });
 
   afterEach(() => {
@@ -130,540 +116,266 @@ describe("InvoiceTable Component", () => {
     vi.restoreAllMocks();
   });
 
-  describe("Component Initialization", () => {
-    it("should render the component successfully", () => {
+  function mountInvoiceTable() {
+    return mount(InvoiceTable, {
+      attachTo: "#app",
+      global: {
+        provide: {
+          store: store,
+        },
+        plugins: [i18n, router],
+        mocks: {
+          $q: {
+            notify: vi.fn(),
+          },
+        },
+      },
+    });
+  }
+
+  describe("Component Rendering", () => {
+    it("renders the component successfully", () => {
+      wrapper = mountInvoiceTable();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("InvoiceHistory");
-    });
-
-    it("should initialize with default pagination settings", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-    });
-
-    it("should initialize with empty invoice history", () => {
-      expect(wrapper.vm.invoiceHistory).toEqual([]);
-    });
-
-    it("should initialize with result total as 0", () => {
-      expect(wrapper.vm.resultTotal).toBe(0);
-    });
-
-    it("should render q-table component", () => {
+    it("renders a table element", () => {
+      wrapper = mountInvoiceTable();
       expect(wrapper.find("table").exists()).toBe(true);
     });
 
-    it("should have correct per page options", () => {
-      const expectedOptions = [
-        { label: "5", value: 5 },
-        { label: "10", value: 10 },
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-      ];
-      expect(wrapper.vm.perPageOptions).toEqual(expectedOptions);
+    it("shows NoData component when there are no invoices", async () => {
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+      expect(wrapper.find('[data-testid="no-data"]').exists()).toBe(true);
+    });
+
+    it("renders invoice rows when data is available", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(mockInvoiceData);
+
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+
+      // Wait for the data to be processed and rendered
+      await wrapper.vm.$nextTick();
+
+      // Check that the table body rows are rendered
+      const rows = wrapper.findAll("tbody tr");
+      expect(rows.length).toBe(2);
     });
   });
 
-  describe("Column Configuration", () => {
-    it("should have all required columns", () => {
-      const columnNames = wrapper.vm.columns.map((col: any) => col.name);
-      expect(columnNames).toEqual([
-        "id",
-        "amount",
-        "paid",
-        "start_date",
-        "end_date",
-        "status",
-        "actions",
-      ]);
+  describe("Service Integration", () => {
+    it("calls BillingService.list_invoice_history on mount", () => {
+      wrapper = mountInvoiceTable();
+      expect(BillingService.list_invoice_history).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier
+      );
     });
 
-    it("should have correct column properties for id", () => {
-      const idColumn = wrapper.vm.columns.find((col: any) => col.name === "id");
-      expect(idColumn).toEqual({
-        name: "id",
-        field: "id",
-        label: "#",
-        align: "left",
-        sortable: true,
-      });
-    });
+    it("calls BillingService with the correct organization identifier", () => {
+      const testOrgId = "test-org";
+      store.state.selectedOrganization.identifier = testOrgId;
 
-    it("should have correct column properties for amount", () => {
-      const amountColumn = wrapper.vm.columns.find((col: any) => col.name === "amount");
-      expect(amountColumn).toEqual({
-        name: "amount",
-        field: "amount",
-        label: expect.any(String),
-        align: "left",
-        sortable: true,
-      });
-    });
-
-    it("should have correct column properties for actions", () => {
-      const actionsColumn = wrapper.vm.columns.find((col: any) => col.name === "actions");
-      expect(actionsColumn).toEqual({
-        name: "actions",
-        field: "actions",
-        label: expect.any(String),
-        align: "center",
-        classes: "actions-column",
-      });
-    });
-  });
-
-  describe("Service Integration Tests", () => {
-    it("should call BillingService on mount", async () => {
-      expect(BillingService.list_invoice_history).toHaveBeenCalledWith("default");
-    });
-
-    it("should handle service response correctly", async () => {
-      // Mock BillingService to return test data
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue(mockInvoiceData);
-      
-      // Create a clean wrapper to avoid VNode issues
-      const cleanWrapper = mount(InvoiceTable, {
+      wrapper = mount(InvoiceTable, {
         attachTo: "#app",
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          mocks: { $q: { notify: mockNotify } },
+          mocks: { $q: { notify: vi.fn() } },
         },
       });
-      
-      // Call the actual component method
-      await cleanWrapper.vm.getInvoiceHistory();
-      
-      expect(cleanWrapper.vm.invoiceHistory).toHaveLength(2);
-      expect(cleanWrapper.vm.invoiceHistory[0].id).toBe(1);
-      expect(cleanWrapper.vm.invoiceHistory[0].paid).toBe("Yes");
-      expect(cleanWrapper.vm.invoiceHistory[0].amount).toBe("100 USD");
-      expect(cleanWrapper.vm.resultTotal).toBe(2);
-      
-      cleanWrapper.unmount();
+
+      expect(BillingService.list_invoice_history).toHaveBeenCalledWith(testOrgId);
     });
 
-    it("should format invoice data correctly", async () => {
-      // Test individual formatting functions
+    it("shows loading toast on mount", () => {
+      wrapper = mountInvoiceTable();
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "loading",
+        message: "Please wait while loading invoice history...",
+      });
+    });
+
+    it("shows error toast when API fails", async () => {
+      const testError = new Error("API Error");
+      vi.mocked(BillingService.list_invoice_history).mockRejectedValue(testError);
+
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "API Error",
+        timeout: 5000,
+      });
+    });
+
+    it("renders invoice data with correct formatted values when service succeeds", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(mockInvoiceData);
+
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      const tableHtml = wrapper.html();
+      // Check formatted currency values
+      expect(tableHtml).toContain("100 USD");
+      expect(tableHtml).toContain("150 EUR");
+    });
+  });
+
+  describe("Invoice Data Formatting", () => {
+    it("formats currency as total + currency uppercase", () => {
       const formatCurrency = (total: number, currency: string) => {
         return total + " " + currency.toUpperCase();
       };
-      
-      const formatPaidStatus = (paid: boolean) => {
-        return paid ? "Yes" : "No";
-      };
-      
+
       expect(formatCurrency(100, "usd")).toBe("100 USD");
       expect(formatCurrency(150, "eur")).toBe("150 EUR");
+      expect(formatCurrency(0, "gbp")).toBe("0 GBP");
+    });
+
+    it("formats paid status correctly", () => {
+      const formatPaidStatus = (paid: boolean) => (paid ? "Yes" : "No");
+
       expect(formatPaidStatus(true)).toBe("Yes");
       expect(formatPaidStatus(false)).toBe("No");
     });
 
-    it("should handle API errors gracefully", async () => {
-      // Test the error handling logic without creating a full component
-      const testError = new Error("API Error");
-      const mockDismiss = vi.fn();
-      const mockNotifyFunc = vi.fn(() => mockDismiss);
-      
-      // Simulate the error handling that would happen in the component
-      const simulateErrorHandling = () => {
-        const dismiss = mockNotifyFunc({
-          spinner: true,
-          message: "Please wait while loading invoice history...",
-        });
-        
-        // Simulate the catch block
-        dismiss();
-        mockNotifyFunc({
-          type: "negative",
-          message: testError.message,
-          timeout: 5000,
-        });
-      };
-      
-      simulateErrorHandling();
-      
-      // Verify error notification was called with correct parameters
-      expect(mockNotifyFunc).toHaveBeenCalledWith({
-        type: "negative",
-        message: "API Error",
-        timeout: 5000,
-      });
-      
-      // Verify invoice history remains empty after error
-      expect(wrapper.vm.invoiceHistory).toEqual([]);
-      expect(wrapper.vm.resultTotal).toBe(0);
-    });
-
-    it("should show loading notification", async () => {
-      // Test loading notification parameters
-      const expectedLoadingNotification = {
-        spinner: true,
-        message: "Please wait while loading invoice history...",
-      };
-      
-      expect(expectedLoadingNotification.spinner).toBe(true);
-      expect(expectedLoadingNotification.message).toBe("Please wait while loading invoice history...");
-      expect(typeof expectedLoadingNotification.message).toBe("string");
-    });
-  });
-
-  describe("changePagination Function", () => {
-    beforeEach(async () => {
-      // Mock the qTable ref
-      wrapper.vm.qTable = {
-        setPagination: vi.fn(),
-      };
-    });
-
-    it("should update pagination rowsPerPage correctly", () => {
-      const newPagination = { label: "10", value: 10 };
-      
-      wrapper.vm.changePagination(newPagination);
-      
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
-    });
-
-    it("should call qTable.setPagination with updated pagination", () => {
-      const newPagination = { label: "20", value: 20 };
-      const setPaginationSpy = vi.spyOn(wrapper.vm.qTable, 'setPagination');
-      
-      wrapper.vm.changePagination(newPagination);
-      
-      expect(setPaginationSpy).toHaveBeenCalledWith(wrapper.vm.pagination);
-    });
-
-    it("should handle different pagination values", () => {
-      const testCases = [
-        { label: "5", value: 5 },
-        { label: "50", value: 50 },
-        { label: "All", value: 0 },
-      ];
-      
-      testCases.forEach((testCase) => {
-        wrapper.vm.changePagination(testCase);
-        expect(wrapper.vm.pagination.rowsPerPage).toBe(testCase.value);
-      });
-    });
-
-    it("should preserve other pagination properties", () => {
-      wrapper.vm.pagination.page = 2;
-      wrapper.vm.pagination.sortBy = "amount";
-      
-      wrapper.vm.changePagination({ label: "10", value: 10 });
-      
-      expect(wrapper.vm.pagination.page).toBe(2);
-      expect(wrapper.vm.pagination.sortBy).toBe("amount");
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
-    });
-  });
-
-  describe("changeMaxRecordToReturn Function", () => {
-    it("should exist and be callable", () => {
-      expect(typeof wrapper.vm.changeMaxRecordToReturn).toBe("function");
-    });
-
-    it("should accept any value without errors", () => {
-      expect(() => wrapper.vm.changeMaxRecordToReturn(100)).not.toThrow();
-      expect(() => wrapper.vm.changeMaxRecordToReturn("test")).not.toThrow();
-      expect(() => wrapper.vm.changeMaxRecordToReturn(null)).not.toThrow();
-    });
-
-    it("should handle different parameter types", () => {
-      const testValues = [100, "50", null, undefined, {}];
-      
-      testValues.forEach((value) => {
-        expect(() => wrapper.vm.changeMaxRecordToReturn(value)).not.toThrow();
-      });
-    });
-  });
-
-  describe("Template Rendering", () => {
-    it("should render NoData component when no invoices", () => {
-      expect(wrapper.find('[data-testid="no-data"]').exists()).toBe(true);
-    });
-
-    it("should render QTablePagination component", () => {
-      // Check that the template includes pagination slot
-      const templateHTML = wrapper.html();
-      const hasPaginationSlot = templateHTML.includes('template') || templateHTML.includes('pagination');
-      
-      // As a fallback, check if the component is set up to use pagination
-      const hasPaginationConfig = wrapper.vm.perPageOptions && wrapper.vm.resultTotal !== undefined;
-      
-      expect(hasPaginationConfig).toBe(true);
-    });
-
-    it("should pass correct props to QTablePagination", () => {
-      // Test that pagination properties are correctly configured in the component
-      expect(wrapper.vm.resultTotal).toBe(0);
-      expect(wrapper.vm.perPageOptions).toHaveLength(5);
-      expect(wrapper.vm.perPageOptions[0]).toEqual({ label: "5", value: 5 });
-      
-      // Test that pagination functions exist and work
-      expect(typeof wrapper.vm.changePagination).toBe('function');
-      expect(typeof wrapper.vm.changeMaxRecordToReturn).toBe('function');
-      
-      // Verify template structure includes pagination-related elements
-      const templateHTML = wrapper.html();
-      expect(templateHTML).toContain('q-table');
-    });
-
-    it("should emit pagination events correctly", async () => {
-      // Test the actual pagination event handlers directly
-      const changePaginationSpy = vi.spyOn(wrapper.vm, 'changePagination');
-      const changeMaxRecordSpy = vi.spyOn(wrapper.vm, 'changeMaxRecordToReturn');
-      
-      // Call the methods directly to test their behavior
-      wrapper.vm.changePagination({ label: "10", value: 10 });
-      wrapper.vm.changeMaxRecordToReturn(100);
-      
-      expect(changePaginationSpy).toHaveBeenCalledWith({ label: "10", value: 10 });
-      expect(changeMaxRecordSpy).toHaveBeenCalledWith(100);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
-    });
-  });
-
-  describe("Data Processing Logic", () => {
-    it("should process invoice currency formatting", () => {
-      const testInvoice = {
-        total: 100,
-        currency: "usd",
-      };
-      
-      const expectedAmount = "100 USD";
-      expect(`${testInvoice.total} ${testInvoice.currency.toUpperCase()}`).toBe(expectedAmount);
-    });
-
-    it("should convert paid status correctly", () => {
-      expect(true ? "Yes" : "No").toBe("Yes");
-      expect(false ? "Yes" : "No").toBe("No");
-    });
-
-    it("should increment IDs correctly", () => {
-      const testInvoices = [{ name: "invoice1" }, { name: "invoice2" }];
-      const processedInvoices = testInvoices.map((invoice, index) => ({
-        ...invoice,
+    it("increments IDs starting from 1", () => {
+      const invoices = [{ name: "a" }, { name: "b" }];
+      const processed = invoices.map((inv, index) => ({
+        ...inv,
         id: ++index,
       }));
-      
-      expect(processedInvoices[0].id).toBe(1);
-      expect(processedInvoices[1].id).toBe(2);
-    });
-  });
 
-  describe("Component Props and Configuration", () => {
-    it("should have empty props configuration", () => {
-      expect(wrapper.vm.$props).toEqual({});
+      expect(processed[0].id).toBe(1);
+      expect(processed[1].id).toBe(2);
     });
 
-    it("should expose all required properties in return statement", () => {
-      const exposedProps = Object.keys(wrapper.vm);
-      const expectedProps = [
-        "t",
-        "store", 
-        "qTable",
-        "columns",
-        "resultTotal",
-        "invoiceHistory",
-        "pagination",
-        "changePagination",
-        "changeMaxRecordToReturn",
-        "perPageOptions",
-        "getInvoiceHistory",
-        "getImageURL",
+    it("handles multiple currency formats", () => {
+      const testCases = [
+        { total: 100, currency: "usd", expected: "100 USD" },
+        { total: 50.5, currency: "eur", expected: "50.5 EUR" },
+        { total: 0, currency: "gbp", expected: "0 GBP" },
       ];
-      
-      expectedProps.forEach((prop) => {
-        expect(exposedProps).toContain(prop);
-      });
-    });
 
-    it("should have correct component setup", () => {
-      expect(wrapper.vm.t).toBeDefined();
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.columns).toBeDefined();
+      testCases.forEach((tc) => {
+        expect(`${tc.total} ${tc.currency.toUpperCase()}`).toBe(tc.expected);
+      });
     });
   });
 
   describe("Error Handling", () => {
-    it("should handle network timeout errors", async () => {
-      // Test timeout error structure
+    it("handles network timeout errors", () => {
       const timeoutError = new Error("Network timeout");
       timeoutError.name = "TimeoutError";
-      
+
       expect(timeoutError.message).toBe("Network timeout");
       expect(timeoutError.name).toBe("TimeoutError");
-      
-      const expectedErrorNotification = {
-        type: "negative",
-        message: timeoutError.message,
-        timeout: 5000,
-      };
-      
-      expect(expectedErrorNotification.type).toBe("negative");
-      expect(expectedErrorNotification.timeout).toBe(5000);
     });
 
-    it("should handle malformed response data", async () => {
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-        data: null
-      });
-      
-      const testWrapper = mount(InvoiceTable, {
-        attachTo: "#app",
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-          mocks: { $q: { notify: mockNotify } },
-        },
-      });
-      
+    it("handles malformed response data without crashing", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue({
+        data: null,
+      } as any);
+
+      wrapper = mountInvoiceTable();
       await flushPromises();
-      
-      // Should not crash, just handle gracefully
-      expect(testWrapper.exists()).toBe(true);
-      
-      testWrapper.unmount();
+
+      // Component should still render without crashing
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle missing invoice properties gracefully", async () => {
-      const incompleteInvoiceData = {
+    it("handles missing invoice properties gracefully", async () => {
+      const incompleteData = {
         data: {
           invoices: [
             {
               period_start: "2023-01-01",
               // Missing other properties
-            }
+            },
           ],
         },
       };
-      
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue(incompleteInvoiceData);
-      
-      const testWrapper = mount(InvoiceTable, {
-        attachTo: "#app",
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-          mocks: { $q: { notify: mockNotify } },
-        },
-      });
-      
+
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(incompleteData as any);
+
+      wrapper = mountInvoiceTable();
       await flushPromises();
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (testWrapper.vm.invoiceHistory.length > 0) {
-        const invoice = testWrapper.vm.invoiceHistory[0];
-        expect(invoice.id).toBe(1);
-        expect(invoice.start_date).toBe("2023-01-01");
-      }
-      
-      testWrapper.unmount();
-    });
-  });
+      await wrapper.vm.$nextTick();
 
-  describe("Reactive Data Updates", () => {
-    it("should maintain reactivity", () => {
-      const initialTotal = wrapper.vm.resultTotal;
-      expect(typeof initialTotal).toBe("number");
-    });
-
-    it("should handle state changes correctly", () => {
-      const initialHistory = wrapper.vm.invoiceHistory;
-      expect(Array.isArray(initialHistory)).toBe(true);
-    });
-  });
-
-  describe("Integration Tests", () => {
-    it("should handle complete user workflow", async () => {
-      // Mock qTable
-      wrapper.vm.qTable = {
-        setPagination: vi.fn(),
-      };
-      
-      // Change pagination
-      wrapper.vm.changePagination({ label: "10", value: 10 });
-      
-      // Verify final state
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
-      expect(wrapper.vm.resultTotal).toBe(0);
-    });
-
-    it("should maintain component integrity", () => {
+      // Should render without crashing
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.columns).toHaveLength(7);
-      expect(wrapper.vm.perPageOptions).toHaveLength(5);
     });
   });
 
-  describe("Additional Edge Cases", () => {
-    it("should handle component destruction gracefully", () => {
+  describe("Component Lifecycle", () => {
+    it("handles component unmounting gracefully", () => {
+      wrapper = mountInvoiceTable();
       expect(wrapper.exists()).toBe(true);
-      
-      // Create a test wrapper specifically for testing unmounting
-      const testWrapper = mount(InvoiceTable, {
-        attachTo: "#app",
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-          mocks: { $q: { notify: mockNotify } },
-        },
-      });
-      
-      expect(testWrapper.exists()).toBe(true);
-      testWrapper.unmount();
-      
-      // After unmounting, the wrapper should no longer exist
-      expect(testWrapper.exists()).toBe(false);
+      expect(() => wrapper.unmount()).not.toThrow();
+      expect(wrapper.exists()).toBe(false);
     });
 
-    it("should validate column field mappings", () => {
-      const columns = wrapper.vm.columns;
-      columns.forEach((column: any) => {
-        expect(column.name).toBe(column.field);
-        expect(column.label).toBeDefined();
-        expect(['left', 'right', 'center']).toContain(column.align);
-      });
+    it("handles multiple mounts without issues", () => {
+      const wrapper1 = mountInvoiceTable();
+      expect(wrapper1.exists()).toBe(true);
+      wrapper1.unmount();
+
+      const wrapper2 = mountInvoiceTable();
+      expect(wrapper2.exists()).toBe(true);
+      wrapper2.unmount();
+    });
+  });
+
+  describe("Column Configuration (data processing)", () => {
+    it("has columns with id, header, accessorKey structure", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(mockInvoiceData);
+
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Verify table headers are rendered
+      const tableHeaders = wrapper.findAll("thead th");
+      // The OTable should render headers for all columns
+      expect(tableHeaders.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("should handle empty BillingService response", async () => {
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-        data: { invoices: [] }
-      });
-      
-      // Component already mounted with empty response in beforeEach
-      expect(wrapper.vm.invoiceHistory).toEqual([]);
-      expect(wrapper.vm.resultTotal).toBe(0);
+    it("has action column with download button for each invoice", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(mockInvoiceData);
+
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Each invoice row should have a download link
+      const downloadLinks = wrapper.findAll('a[href*="invoice"]');
+      expect(downloadLinks.length).toBe(2);
+      expect(downloadLinks[0].attributes("href")).toBe("https://example.com/invoice.pdf");
+      expect(downloadLinks[1].attributes("href")).toBe("https://example.com/invoice2.pdf");
+    });
+  });
+
+  describe("Accessibility", () => {
+    it("renders a table with accessible structure", () => {
+      wrapper = mountInvoiceTable();
+      expect(wrapper.find("table").exists()).toBe(true);
+      expect(wrapper.find("thead").exists()).toBe(true);
     });
 
-    it("should verify all component methods exist", () => {
-      const requiredMethods = ['getInvoiceHistory', 'changePagination', 'changeMaxRecordToReturn'];
-      requiredMethods.forEach(method => {
-        expect(typeof wrapper.vm[method]).toBe('function');
-      });
-    });
+    it("has download buttons with appropriate attributes", async () => {
+      vi.mocked(BillingService.list_invoice_history).mockResolvedValue(mockInvoiceData);
 
-    it("should validate pagination configuration", () => {
-      const pagination = wrapper.vm.pagination;
-      expect(pagination).toHaveProperty('rowsPerPage');
-      expect(typeof pagination.rowsPerPage).toBe('number');
-      expect(pagination.rowsPerPage).toBeGreaterThan(0);
-    });
+      wrapper = mountInvoiceTable();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
 
-    it("should handle multiple currency formats", () => {
-      const testCases = [
-        { total: 100, currency: 'usd', expected: '100 USD' },
-        { total: 50.50, currency: 'eur', expected: '50.5 EUR' },
-        { total: 0, currency: 'gbp', expected: '0 GBP' },
-      ];
-      
-      testCases.forEach(testCase => {
-        const result = `${testCase.total} ${testCase.currency.toUpperCase()}`;
-        expect(result).toBe(testCase.expected);
+      const downloadButtons = wrapper.findAll("a");
+      downloadButtons.forEach((btn: any) => {
+        expect(btn.attributes("target")).toBe("_blank");
       });
     });
   });

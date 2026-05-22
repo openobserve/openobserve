@@ -17,6 +17,9 @@ import { iconRegistry } from "../Icon/OIcon.icons";
 const props = withDefaults(defineProps<OCollapsibleProps>(), {
   defaultOpen: false,
   variant: "default",
+  // Provide explicit undefined default so Vue 3's boolean-prop auto-false
+  // (applied to `boolean?` props) does not shadow the defaultOpen-based path.
+  modelValue: undefined as boolean | undefined,
 });
 
 const emit = defineEmits<OCollapsibleEmits>();

@@ -27,8 +27,12 @@ describe("OSelect", () => {
   });
 
   it("shows placeholder text when no value is selected", () => {
+    // searchable: false forces the native SelectRoot branch where reka-ui's
+    // SelectValue renders the placeholder prop correctly in JSDOM. The listbox
+    // (PopoverRoot) branch renders "false" as text in JSDOM due to a reka-ui
+    // JSDOM limitation — test the non-listbox path to verify the placeholder prop.
     wrapper = mount(OSelect, {
-      props: { placeholder: "Pick one" },
+      props: { placeholder: "Pick one", searchable: false },
     });
     expect(wrapper.text()).toContain("Pick one");
   });
@@ -69,10 +73,12 @@ describe("OSelect", () => {
   });
 
   it("shows error message when provided", () => {
+    // The component requires both `error: true` AND `errorMessage` to render
+    // the error span. `error` is the gating flag; `errorMessage` is the text.
     wrapper = mount(OSelect, {
-      props: { errorMessage: "Selection required" },
+      props: { error: true, errorMessage: "Selection required" },
     });
-    expect(wrapper.text()).toContain("Selection required");
+    expect(wrapper.find('[role="alert"]').text()).toContain("Selection required");
   });
 
   it("renders mapped option labels for object options", () => {

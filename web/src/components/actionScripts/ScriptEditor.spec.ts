@@ -46,12 +46,17 @@ describe('ScriptEditor.vue', () => {
             props: ['editorId', 'language', 'query']
           },
           'OIcon': {
-            template: '<div class="icon"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
+            template: '<div class="icon" :data-name="name"><slot></slot></div>',
             props: ['name', 'size']
           },
-          'q-tooltip': {
-            template: '<div class="tooltip"><slot></slot></div>',
-            props: ['anchor', 'self', 'offset']
+          // The source uses OTooltip (O2 lib), not q-tooltip.
+          'OTooltip': {
+            template: '<div class="o-tooltip" :data-content="content"><slot></slot></div>',
+            props: ['side', 'align', 'sideOffset', 'content']
+          },
+          'OSpinner': {
+            template: '<div data-test="script-editor-loading-indicator"></div>',
+            props: ['size']
           }
         }
       }
@@ -187,8 +192,9 @@ describe('ScriptEditor.vue', () => {
     it('shows error tooltip with correct message', () => {
       const errorMessage = 'Test error message';
       wrapper = createWrapper({ error: errorMessage });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip" and data-content attribute
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
 
@@ -201,8 +207,9 @@ describe('ScriptEditor.vue', () => {
 
     it('configures tooltip positioning correctly', () => {
       wrapper = createWrapper({ error: 'Error' });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip"
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
   });
@@ -373,8 +380,9 @@ describe('ScriptEditor.vue', () => {
     it('handles very long error messages', () => {
       const longError = 'A very long error message that might cause layout issues. '.repeat(10);
       wrapper = createWrapper({ error: longError });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip"
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
   });

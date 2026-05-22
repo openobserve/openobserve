@@ -63,7 +63,10 @@ const pageSizeSelectOptions = computed(() =>
 
     <!-- Right: controls -->
     <div class="tw:flex tw:items-center tw:gap-3">
-      <span class="tw:text-primary tw:text-xs">
+      <span
+        class="tw:text-primary tw:text-xs"
+        data-test="o2-table-pagination-info"
+      >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
       </span>
       <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" v-if="pageSizeOptions.length > 0" />

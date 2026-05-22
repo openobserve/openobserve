@@ -53,16 +53,10 @@ vi.mock("@/composables/iam/usePermissions", () => ({
   }),
 }));
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const mockToast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 vi.mock("@/components/AppTable.vue", () => ({
   default: {
@@ -141,7 +135,7 @@ describe("AppGroups Component", () => {
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] .q-input');
+      const searchInput = wrapper.find('[data-test="iam-groups-search-input"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -162,7 +156,7 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.columns).toBeDefined();
       expect(wrapper.vm.columns).toHaveLength(3);
       
-      const columnNames = wrapper.vm.columns.map((col: any) => col.name);
+      const columnNames = wrapper.vm.columns.map((col: any) => col.id);
       expect(columnNames).toContain("#");
       expect(columnNames).toContain("group_name");
       expect(columnNames).toContain("actions");
@@ -205,39 +199,24 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.filterQuery).toBe("admin");
     });
 
-    it("filters groups correctly", () => {
-      const testRows = [
-        { group_name: "admin" },
-        { group_name: "developers" },
-        { group_name: "users" },
-      ];
+    it("sets filter query when searching via input", async () => {
+      // Filtering is delegated to OTable's client-side filter-mode via global-filter prop.
+      // Test that the filterQuery ref is wired correctly to OInput.
+      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
+      await searchInput.setValue("admin");
 
-      const filteredResults = wrapper.vm.filterGroups(testRows, "admin");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].group_name).toBe("admin");
+      expect(wrapper.vm.filterQuery).toBe("admin");
     });
 
-    it("filters groups case-insensitively", () => {
-      const testRows = [
-        { group_name: "Admin" },
-        { group_name: "developers" },
-        { group_name: "Users" },
-      ];
+    it("clears filter query when search input is emptied", async () => {
+      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
+      await searchInput.setValue("admin");
 
-      const filteredResults = wrapper.vm.filterGroups(testRows, "ADMIN");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].group_name).toBe("Admin");
-    });
+      expect(wrapper.vm.filterQuery).toBe("admin");
 
-    it("returns all groups when search term is empty", () => {
-      const testRows = [
-        { group_name: "admin" },
-        { group_name: "developers" },
-        { group_name: "users" },
-      ];
+      await searchInput.setValue("");
 
-      const filteredResults = wrapper.vm.filterGroups(testRows, "");
-      expect(filteredResults).toHaveLength(3);
+      expect(wrapper.vm.filterQuery).toBe("");
     });
   });
 
@@ -291,9 +270,11 @@ describe("AppGroups Component", () => {
 
   describe("Group Actions", () => {
     it("renders edit and delete icons for each group", () => {
-      const editIcon = wrapper.find('[data-test="iam-groups-edit-test-group-role-icon"]');
-      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-test-group-role-icon"]');
-      
+      // Group data is [{ group_name: "admin" }, { group_name: "developers" }, { group_name: "users" }]
+      // Data-test attributes use row.group_name: iam-groups-edit-<group_name>-role-icon
+      const editIcon = wrapper.find('[data-test="iam-groups-edit-admin-role-icon"]');
+      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-admin-role-icon"]');
+
       expect(editIcon.exists()).toBe(true);
       expect(deleteIcon.exists()).toBe(true);
     });
@@ -327,25 +308,25 @@ describe("AppGroups Component", () => {
 
   describe("Group Deletion", () => {
     beforeEach(() => {
-      mockNotify.mockClear();
+      mockToast.mockClear();
     });
 
     it("deletes group successfully", async () => {
       const { deleteGroup } = await import("@/services/iam");
       vi.mocked(deleteGroup).mockResolvedValue({});
-      
+
       const testGroup = { group_name: "test-group" };
-      
-      await wrapper.vm.deleteUserGroup(testGroup);
-      
+
+      wrapper.vm.deleteUserGroup(testGroup);
+      await flushPromises();
+
       expect(deleteGroup).toHaveBeenCalledWith(
         "test-group",
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Group deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     });
 
@@ -353,22 +334,15 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 500 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
-      try {
-        await wrapper.vm.deleteUserGroup(testGroup);
-      } catch (error) {
-        // Error should be caught by component
-      }
-      
-      // Give time for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockNotify).toHaveBeenCalledWith({
+
+      wrapper.vm.deleteUserGroup(testGroup);
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error while deleting group!",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     });
 
@@ -376,12 +350,13 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 403 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
-      await wrapper.vm.deleteUserGroup(testGroup);
-      
-      expect(mockNotify).not.toHaveBeenCalled();
+
+      wrapper.vm.deleteUserGroup(testGroup);
+      await flushPromises();
+
+      expect(mockToast).not.toHaveBeenCalled();
     });
 
     it("executes deletion through confirm dialog", async () => {
@@ -497,24 +472,20 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.rows).toHaveLength(0);
     });
 
-    it("handles undefined group data", () => {
-      // Modify the function to handle undefined input
-      const filterGroupsSafe = (rows: any, terms: any) => {
-        if (!rows || !terms) return [];
-        return wrapper.vm.filterGroups(rows, terms);
-      };
-      const result = filterGroupsSafe(undefined, "test");
-      expect(result).toEqual([]);
+    it("handles empty search term gracefully", () => {
+      // Filtering is delegated to OTable's client-side filter-mode.
+      // An empty filterQuery means OTable shows all rows.
+      expect(wrapper.vm.filterQuery).toBe("");
+      expect(wrapper.vm.rows).toHaveLength(3);
     });
 
-    it("handles null search term", () => {
-      const testRows = [{ group_name: "admin" }];
-      const filterGroupsSafe = (rows: any, terms: any) => {
-        if (!rows || terms === null) return [];
-        return wrapper.vm.filterGroups(rows, terms);
-      };
-      const result = filterGroupsSafe(testRows, null);
-      expect(result).toEqual([]);
+    it("handles search term that matches no groups", async () => {
+      // When filterQuery is set to a non-matching value, OTable filters rows internally.
+      // Test that filterQuery is set correctly via the search input.
+      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
+      await searchInput.setValue("nonexistent");
+
+      expect(wrapper.vm.filterQuery).toBe("nonexistent");
     });
   });
 });

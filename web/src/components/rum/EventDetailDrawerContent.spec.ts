@@ -285,8 +285,9 @@ describe("EventDetailDrawerContent", () => {
     });
 
     it("renders close button when drawer is open", () => {
-      // Arrange & Assert
-      expect(findByTestId(wrapper, "close-drawer-btn").exists()).toBe(true);
+      // The close button is handled by ODrawer component, which is stubbed
+      // This test verifies the drawer stub is rendered
+      expect(findByTestId(wrapper, "event-detail-drawer-stub").exists()).toBe(true);
     });
   });
 
@@ -792,7 +793,7 @@ describe("EventDetailDrawerContent", () => {
   describe("Drawer close functionality", () => {
     it("emits update:open with false when close button is clicked", async () => {
       // Arrange
-      const closeBtn = findByTestId(wrapper, "close-drawer-btn");
+      const closeBtn = findByTestId(wrapper, "event-detail-drawer-update-open-false");
 
       // Act
       await closeBtn.trigger("click");
