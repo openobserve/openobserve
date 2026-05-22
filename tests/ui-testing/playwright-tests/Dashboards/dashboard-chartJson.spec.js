@@ -68,23 +68,29 @@ test.describe("dashboard UI testcases", () => {
       ""
     );
 
-    await page.locator('[data-test="dashboard-x-item-x_axis_1"]').click();
-    await page.getByRole('checkbox', { name: 'Render Data as JSON / Array' }).click();
-
-    // Close the field options popover so it doesn't block Apply
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
-
-    // Set date-time and timezone for table chart
+    // Set date-time and apply once so the panel renders with data before
+    // we toggle JSON rendering on the field — mirrors test 4's pattern,
+    // which avoids the race between the v-model toggle on
+    // `fields.showFieldAsJson` and the first panel-schema build.
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify the table chart is visible
+    await pm.chartTypeSelector.openFieldPropertyPopup("x_axis_1", "x");
+    await pm.chartTypeSelector.toggleShowFieldAsJson();
+
+    // Close the field options popover so it doesn't block Apply
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
+
+    // Re-apply with showFieldAsJson now set — this triggers a fresh schema
+    // build that includes the JSON-renderer column meta.
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify JSON data is rendered in the table
-    await expect(page.locator('.json-field-renderer').first()).toBeVisible({ timeout: 30000 });
-    await expect(page.locator('.json-key:has-text("domain")').first()).toBeVisible();
-    await expect(page.locator('.json-value:has-text("service.local")').first()).toBeVisible();
+    await pm.chartTypeSelector.verifyJsonRendererVisible();
+    await pm.chartTypeSelector.verifyJsonContainsKey("domain");
+    await pm.chartTypeSelector.verifyJsonContainsValue("service.local");
 
     // Edit the panel name
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -154,7 +160,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Non-timestamp checkbox is visible and toggleable in custom mode');
 
     // Close the popup
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -211,7 +217,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('JSON/Array checkbox is visible and toggleable in custom mode');
 
     // Close the popup
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -258,22 +264,16 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.chartTypeSelector.toggleShowFieldAsJson();
 
     // Close the popup before applying. The popup is an ODropdown portaled outside the
-    // axis-item button; click outside to dismiss it before clicking Apply — otherwise
+    // axis-item button; press Escape to dismiss it before clicking Apply — otherwise
     // CI runs occasionally see Apply intercepted by the still-mounted menu.
     // Wait for the JSON-toggle checkbox (which only renders inside the open popup)
     // to detach before continuing, so the menu is guaranteed gone.
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
-    await page
-      .locator('[data-test="dynamic-function-popup-show-field-as-json"]')
-      .waitFor({ state: 'hidden', timeout: 5000 })
-      .catch(() => {});
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify JSON data is rendered in the table (element may be in overflow, check DOM presence)
-    const jsonRenderers = page.locator('.json-field-renderer');
-    await jsonRenderers.first().waitFor({ state: 'attached', timeout: 30000 });
-    const jsonCount = await jsonRenderers.count();
+    const jsonCount = await pm.chartTypeSelector.getJsonRendererCount();
     expect(jsonCount).toBeGreaterThan(0);
 
     testLogger.info('JSON data rendered successfully in custom query mode', { jsonCount });
@@ -331,7 +331,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Build/Raw tabs hidden, checkboxes visible in custom mode');
 
     // Close the popup
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -399,7 +399,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Both checkboxes enabled simultaneously in custom mode');
 
     // Close the popup
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.chartTypeSelector.dismissFieldPropertyPopup();
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);

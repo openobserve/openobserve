@@ -11,8 +11,11 @@
 
 const LOGIN_SELECTORS = Object.freeze({
   internalUserLink: '[data-test="login-as-internal-user"]',
-  userIdInput: '[data-test="login-user-id"]',
-  passwordInput: '[data-test="login-password"]',
+  // OInput's wrapper carries data-test="<name>"; the inner <input> element
+  // carries data-test="<name>-field". Playwright's fill() needs the input,
+  // so we target the -field suffix.
+  userIdInput: '[data-test="login-user-id-field"]',
+  passwordInput: '[data-test="login-password-field"]',
   signInButton: '[data-test="login-sign-in"]',
 });
 

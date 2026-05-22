@@ -52,8 +52,8 @@ test.describe("dashboard folder testcases", () => {
     await pm.dashboardFolder.createFolder(folderName);
     // Search to confirm it exists
     await pm.dashboardFolder.searchFolder(folderName);
-    await pm.alertsPage.verifyFolderCreated(folderName);
-    await pm.alertsPage.navigateToFolder(folderName);
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
+    await pm.dashboardFolder.openFolderByName(folderName);
     await page.waitForTimeout(2000);
 
     await pm.dashboardCreate.createDashboard(randomDashboardName);
@@ -62,16 +62,16 @@ test.describe("dashboard folder testcases", () => {
     await page.waitForTimeout(1000);
     // Click on folder name in breadcrumbs to go back to folder view.
     // Use the explicit data-test on the breadcrumb span (ViewDashboard.vue) —
-    // a bare getByText(folderName) is ambiguous in CI when the folder name
-    // also appears in toast notifications, history, or auto-completion popups,
-    // and Playwright's strict mode throws when multiple elements match.
+    // resolving by data-test prevents strict-mode collisions with toast
+    // notifications, history popups, and auto-completion lists that may also
+    // contain the folder name as text.
     await page.locator('[data-test="dashboard-view-folder-breadcrumb"]').click();
     await page.waitForTimeout(1000);
     await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
 
     // Delete folder
     await pm.dashboardFolder.deleteFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
+    await pm.dashboardFolder.verifyFolderNotPresent(folderName);
   });
 
   test("should create and edit folder name and verify it's updated", async ({
@@ -90,14 +90,14 @@ test.describe("dashboard folder testcases", () => {
 
     // Search to confirm it exists
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
 
     const updatedName = folderName + "_updated";
     await pm.dashboardFolder.editFolderName(folderName, updatedName);
     await pm.dashboardFolder.searchFolder(updatedName);
-    await expect(page.locator(`text=${updatedName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(updatedName);
 
     await pm.dashboardFolder.deleteFolder(updatedName);
-    await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
+    await pm.dashboardFolder.verifyFolderNotPresent(folderName);
   });
 });

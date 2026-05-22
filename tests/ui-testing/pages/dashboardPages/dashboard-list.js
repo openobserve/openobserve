@@ -62,19 +62,37 @@ export default class DashboardListPage {
     await this.page.locator('[data-test="dashboard-folder-move"]').click();
   }
 
-  // Menu Items
+  // Menu Items — menu-link data-test contains a literal "/" (route prefix);
+  // CSS attribute selectors accept "/" verbatim, no escape needed.
   async menuItem(item) {
-    const MenuItem = this.page.locator(`[data-test="menu-link-\\/${item}"]`);
-    await MenuItem.click();
+    const menuItem = this.page.locator(`[data-test="menu-link-/${item}"]`);
+    await menuItem.click();
   }
 
-  // Click on a dashboard by name to open it
+  // Click on a dashboard by name to open it. The dashboard list table
+  // exposes `data-test="dashboard-name-cell-<name>"` on each name cell
+  // (Dashboards.vue), so we resolve the target via that data-test directly
+  // — no XPath, no element selectors, no title-attribute matching.
+  //
+  // The list is paginated (20 per page) with no default newest-first sort,
+  // so a freshly-created dashboard can land on page 2+ and not be visible.
+  // Type into the dashboard-search input first to narrow the table to the
+  // single matching row before clicking.
   async clickOnDashboard(dashboardName) {
-    // Find the dashboard row by title and click on it
-    const dashboardRow = this.page.locator(`//tr[.//div[@title="${dashboardName}"]]`);
-    await dashboardRow.waitFor({ state: "visible", timeout: 10000 });
-    // Click on the dashboard name/title area to open it
-    const dashboardTitle = dashboardRow.locator(`div[title="${dashboardName}"]`);
-    await dashboardTitle.click();
+    const nameCell = this.page.locator(
+      `[data-test="dashboard-name-cell-${dashboardName}"]`,
+    );
+    if (!(await nameCell.isVisible().catch(() => false))) {
+      // OInput exposes its inner native input as `<parent>-field`.
+      const searchInput = this.page.locator(
+        '[data-test="dashboard-search-field"]',
+      );
+      if (await searchInput.count()) {
+        await searchInput.first().fill(dashboardName);
+        await this.page.waitForTimeout(800);
+      }
+    }
+    await nameCell.waitFor({ state: "visible", timeout: 15000 });
+    await nameCell.click();
   }
 }

@@ -60,6 +60,7 @@
                   <button
                     type="button"
                     :aria-label="`Remove ${field.name}`"
+                    :data-test="`cross-link-field-chip-remove-${idx}`"
                     class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
                     @click="form.fields.splice(idx, 1)"
                   >
@@ -68,36 +69,23 @@
                 </template>
               </OBadge>
             </div>
-            <div class="tw:flex tw:gap-2 tw:items-center">
-              <OSelect
-                ref="fieldSelectRef"
-                v-if="availableFields.length > 0"
-                v-model="newFieldName"
-                :options="filteredFieldOptions"
-                use-input
-                fill-input
-                hide-selected
-                input-debounce="0"
-                @filter="filterFieldOptions"
-                @input-value="onFieldInputValue"
-                @update:model-value="onFieldSelected"
-                @keyup.enter="addField"
-                class="tw:flex-1"
-                :placeholder="t('crossLinks.fieldSearchPlaceholder')"
-                data-test="cross-link-field-input"
-              >
-                <template v-slot:no-option>
-                  <div class="tw:px-3 tw:py-2 tw:text-xs tw:text-muted-foreground">
-                    {{ t("crossLinks.noMatchingFields") }}
-                  </div>
-                </template>
-              </OSelect>
-              <OInput
-                v-else
+            <div
+              class="tw:flex tw:gap-2 tw:items-center"
+              @keydown="onFieldKeydown"
+            >
+              <!--
+                OCombobox provides suggestions from `availableFields` while
+                still allowing custom (free-text) field names. Enter on the
+                input adds the current value (whether it came from a listbox
+                pick or was typed manually), so cross-links remain valid even
+                when the stream schema doesn't list a given field yet.
+              -->
+              <OCombobox
                 v-model="newFieldName"
                 class="tw:flex-1"
+                :items="availableFieldOptions"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
-                @keyup.enter="addField"
+                @select="onFieldSelect"
                 data-test="cross-link-field-input"
               />
               <OButton
@@ -105,7 +93,7 @@
                 size="icon-sm"
                 icon-left="add"
                 @click="addField"
-                :disabled="!newFieldName && !fieldInputValue"
+                :disabled="!newFieldName"
                 data-test="cross-link-add-field-btn"
               />
             </div>
@@ -124,7 +112,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 
 export interface CrossLink {
   name: string;
@@ -134,7 +122,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OBadge, OButton, ODialog, OIcon, OInput, OSelect },
+  components: { CrossLinkUserGuide, OBadge, OButton, OCombobox, ODialog, OIcon, OInput },
   props: {
     modelValue: {
       type: Boolean,
@@ -162,17 +150,6 @@ export default defineComponent({
     const urlError = ref("");
     const isEditing = computed(() => !!props.link?.name);
     const newFieldName = ref("");
-    const fieldSelectRef = ref<any>(null);
-    const filteredFieldOptions = ref<string[]>([]);
-
-    function filterFieldOptions(val: string, update: Function) {
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredFieldOptions.value = props.availableFields.filter(
-          (f) => f.toLowerCase().includes(needle),
-        );
-      });
-    }
 
     const form = ref({
       name: "",
@@ -180,40 +157,46 @@ export default defineComponent({
       fields: [] as Array<{ name: string }>,
     });
 
-    // Track the raw input value from q-select (since v-model only updates on selection)
-    const fieldInputValue = ref("");
-
-    function onFieldInputValue(val: string) {
-      fieldInputValue.value = val;
-    }
-
     function clearFieldInput() {
       newFieldName.value = "";
-      fieldInputValue.value = "";
-      // Clear q-select's internal input text (use-input + fill-input caches it)
-      if (fieldSelectRef.value?.updateInputValue) {
-        fieldSelectRef.value.updateInputValue("", true);
-      }
-    }
-
-    function onFieldSelected(val: string) {
-      // When user selects from dropdown, auto-add immediately
-      if (val) {
-        const name = val.trim();
-        if (name && !form.value.fields.some((f) => f.name === name)) {
-          form.value.fields.push({ name });
-        }
-        clearFieldInput();
-      }
     }
 
     function addField() {
-      // Use fieldInputValue (raw typed text) if available, otherwise fall back to model
-      const name = (fieldInputValue.value || newFieldName.value || "").trim();
+      const name = (newFieldName.value || "").trim();
       if (name && !form.value.fields.some((f) => f.name === name)) {
         form.value.fields.push({ name });
       }
       clearFieldInput();
+    }
+
+    // Suggestion options shown by the OCombobox. We filter out fields that
+    // have already been added so the dropdown only suggests remaining
+    // schema columns; custom (free-text) values are still accepted via the
+    // OCombobox input + Enter / Add button.
+    const availableFieldOptions = computed(() => {
+      const added = new Set(form.value.fields.map((f) => f.name));
+      return (props.availableFields || [])
+        .filter((name) => !added.has(name))
+        .map((name) => ({ label: name, value: name }));
+    });
+
+    function onFieldSelect(value: string) {
+      // Selecting from the suggestions list should commit the field
+      // immediately; the typed value is already synced via v-model.
+      newFieldName.value = value;
+      addField();
+    }
+
+    // Enter on the wrapper bubbles up from OCombobox's internal input.
+    // reka-ui's Combobox handles Enter to commit the highlighted item to
+    // v-model first; by the time this fires `newFieldName.value` is the
+    // selected / typed text, so addField() picks up the correct value.
+    function onFieldKeydown(event: KeyboardEvent) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      // Defer to the next microtask so reka-ui's update:model-value has
+      // a chance to land before we read newFieldName.value.
+      queueMicrotask(() => addField());
     }
 
     // Reset form when dialog opens
@@ -260,13 +243,10 @@ export default defineComponent({
       urlError,
       form,
       newFieldName,
-      fieldInputValue,
-      fieldSelectRef,
-      filteredFieldOptions,
-      filterFieldOptions,
-      onFieldInputValue,
-      onFieldSelected,
+      availableFieldOptions,
       addField,
+      onFieldSelect,
+      onFieldKeydown,
       onSubmit,
       onCancel,
     };

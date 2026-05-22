@@ -196,6 +196,7 @@ const wrapperClasses = computed(() => [
         :id="inputId"
         ref="inputRef"
         type="file"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : 'o-file-field'"
         :name="name"
         :multiple="multiple"
         :accept="accept"

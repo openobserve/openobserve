@@ -218,6 +218,7 @@ size="xs" class="warning" />{{
             <OButton
               variant="ghost"
               size="sm"
+              data-test="navbar-organizations-select-trigger"
               style="max-width: 250px"
               class="org-selector-trigger tw:text-ellipsis tw:overflow-hidden"
             >
@@ -272,11 +273,14 @@ size="xs" class="warning" />{{
                 </div>
               </template>
 
-              <!-- Organization list item -->
+              <!-- Organization list item — both a generic data-test (kept for
+                   legacy specs) and a per-identifier data-test so e2e can pick
+                   an exact org without text/role matching. -->
               <template #cell-label="{ row, value }">
                 <div
                   class="org-menu-item"
                   data-test="organization-menu-item-label-item-label"
+                  :data-test-org-identifier="row.identifier"
                   :class="{
                     'org-menu-item--active':
                       row.identifier === userClickedOrg?.identifier,

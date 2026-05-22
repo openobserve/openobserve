@@ -1065,6 +1065,9 @@ const fieldWidthClass = computed(() => {
                             ? `${parentDataTest}-option`
                             : undefined
                         "
+                        :data-test-value="
+                          toRekaString(filteredOptions[vRow.index].value)
+                        "
                         :class="[
                           'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
                           'tw:ps-3 tw:pe-3 tw:text-sm',

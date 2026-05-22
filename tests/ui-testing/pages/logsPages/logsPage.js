@@ -535,52 +535,81 @@ export class LogsPage {
         });
         await this.page.waitForTimeout(2000);
 
-        // Open dropdown
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        // Open dropdown — OSelect wrapper carries the data-test; clicking the
+        // wrapper hits the inner PopoverTrigger button.
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').first();
         await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
         await selectTrigger.click();
         await this.page.waitForTimeout(2000);
 
-        // Use search box to filter for first stream (much faster than scrolling)
-        const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
-        const searchVisible = await searchInput.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+        // Use the popover's ListboxFilter input to filter for the first stream.
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-popover"] input').first();
+        const searchVisible = await popoverSearch
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        // Helper: click the option in the OSelect popover whose label matches the
+        // given stream name. OSelect renders every option with the SAME
+        // `${parentDataTest}-option` data-test, so we must walk those options and
+        // click the one whose visible text matches. This is the approved
+        // page.evaluate pattern from the audit (`json-field-renderer` etc).
+        const selectOptionByLabel = async (streamName) => {
+            await this.page.waitForFunction(
+                (name) => {
+                    const opts = document.querySelectorAll(
+                        '[data-test="log-search-index-list-select-stream-popover"] [data-test="log-search-index-list-select-stream-option"]'
+                    );
+                    return Array.from(opts).some(
+                        (el) => (el.textContent || '').trim() === name
+                    );
+                },
+                streamName,
+                { timeout: 20000 }
+            );
+            await this.page.evaluate((name) => {
+                const opts = document.querySelectorAll(
+                    '[data-test="log-search-index-list-select-stream-popover"] [data-test="log-search-index-list-select-stream-option"]'
+                );
+                for (const el of opts) {
+                    if ((el.textContent || '').trim() === name) {
+                        el.click();
+                        return;
+                    }
+                }
+            }, streamName);
+        };
 
         // Select first stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamA}`);
-            await searchInput.click();
-            await searchInput.fill(streamA);
+            await popoverSearch.click();
+            await popoverSearch.fill(streamA);
+            await this.page.waitForTimeout(800);
         }
 
-        const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
-        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
-        const streamAToggle = this.page.locator(streamASelector).first();
-        await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
-        await streamAToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selecting option for stream ${streamA}`);
+        await selectOptionByLabel(streamA);
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
         await this.page.waitForTimeout(2000);
 
         // Clear search and filter for second stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
-            await searchInput.click();
+            await popoverSearch.click();
             await this.page.waitForTimeout(500);
-            await searchInput.fill('');
+            await popoverSearch.fill('');
             await this.page.waitForTimeout(500);
-            await searchInput.fill(streamB);
+            await popoverSearch.fill(streamB);
             await this.page.waitForTimeout(1000);
         }
 
-        // Select second stream
-        const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
-        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
-        const streamBToggle = this.page.locator(streamBSelector).first();
-        await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
-        await streamBToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selecting option for stream ${streamB}`);
+        await selectOptionByLabel(streamB);
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
         await this.page.waitForTimeout(2000);
 
-        // Close dropdown
+        // Close dropdown — click the wrapper trigger again
         await selectTrigger.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }

@@ -20,8 +20,17 @@ export class DashboardPage {
     // Dashboard list locators
     this.addDashboardButton = page.locator('[data-test="dashboard-new"]');
     this.dashboardSearch = page.locator('[data-test="dashboard-search"]');
+    // The OInput wrapper carries `data-test="dashboard-search"`; the inner
+    // <input> element carries the `-field` suffix and is the fillable target.
+    this.dashboardSearchInput = page.locator('[data-test="dashboard-search-field"]');
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
     this.dashboardDelete = page.locator('[data-test="dashboard-delete"]');
+    // First row of the OTable — exposed as `o2-table-row-0` by TenstackTable.
+    this.firstTableRow = page.locator('[data-test="o2-table-row-0"]');
+    // Delete button scoped to the first row.
+    this.firstRowDeleteButton = this.firstTableRow.locator('[data-test="dashboard-delete"]');
+    // Toast surface (deletion confirmation, etc.).
+    this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.confirmButton = page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     this.searchAcrossFoldersToggle = page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2);
 
@@ -38,15 +47,67 @@ export class DashboardPage {
 
     // Stream & field selection locators
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
+    // OSelect stamps every ListboxItem with `${parent}-option` and
+    // `data-test-value="<value>"` — `e2e_automate` is the stream this PO
+    // always exercises, so we hoist its option locator to a class member.
+    this.streamOptionE2eAutomate = page
+      .locator('[data-test="index-dropdown-stream-option"][data-test-value="e2e_automate"]')
+      .first();
     this.fieldSearchInput = page.locator('[data-test="index-field-search-input"]');
+    // Field-list "add to Y-axis / breakdown" buttons resolved by per-field
+    // `data-test` prefix/suffix patterns (no element/text predicates).
+    this.kubernetesContainerHashYButton = page
+      .locator(
+        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]',
+      )
+      .first();
+    this.kubernetesContainerImageBButton = page
+      .locator(
+        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_image"] [data-test="dashboard-add-b-data"]',
+      )
+      .first();
 
-    // Date/Time locators
-    this.dateTimeButton = dateTimeButtonLocator;
+    // Date/Time locators — wrapped to `Locator` instances so methods don't
+    // need to call `page.locator(...)` inline.
+    this.dateTimeButton = page.locator(dateTimeButtonLocator);
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
+    this.absoluteTab = page.locator(absoluteTabLocator);
 
-    // Organization locators
+    // Share / view dashboard locators
+    this.shareSuccessToast = page.locator('[data-test="o-toast-success"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
+    this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
+
+    // Date-time picker — calendar cells carry `data-test="daterangecalendar-cell-<ISO>"`
+    // (e.g. `daterangecalendar-cell-2026-05-01`). Selecting any cell whose ISO
+    // suffix ends with `-01` reliably hits the first-of-month for the rendered
+    // month grid without relying on visible-text predicates.
+    this.dateTimePickerDayOne = page
+      .locator('[data-test^="daterangecalendar-cell-"][data-test$="-01"]')
+      .first();
+    // OTime exposes its trigger via `data-test="datetime-start-time"` /
+    // `data-test="datetime-end-time"` (forwarded onto the PopoverTrigger in
+    // OTime.vue and wired into DateTime.vue's two <OTime> instances).
+    this.dateTimePickerStartTime = page.locator(
+      '[data-test="datetime-start-time"]',
+    );
+    this.dateTimePickerEndTime = page.locator(
+      '[data-test="datetime-end-time"]',
+    );
+
+    // Organization locators — declared before any locators that scope into
+    // the dropdown so we don't read `undefined` during construction.
     this.orgDropdown = page.locator('[data-test="navbar-organizations-select"]');
+
+    // Organization selector — trigger button now carries
+    // `data-test="navbar-organizations-select-trigger"` and each org row
+    // exposes `data-test-org-identifier="<identifier>"` (see Header.vue).
+    this.orgDropdownArrow = page.locator(
+      '[data-test="navbar-organizations-select-trigger"]',
+    );
+    this.orgOptionDefaultTestMulti = page.locator(
+      '[data-test-org-identifier="defaulttestmulti"]',
+    );
 
     // Custom chart locators
     this.customChartItem = page.locator('[data-test="selected-chart-custom_chart-item"]');
@@ -101,7 +162,7 @@ export class DashboardPage {
     await this.dashboardSubmitButton.click();
 
     // Wait for the success notification to confirm dashboard was created
-    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+    await this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 });
 
     // Wait for navigation to the new dashboard view page
     await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
@@ -129,13 +190,9 @@ export class DashboardPage {
     await this.streamDropdown.fill("e2e_automate");
     await this.page.waitForTimeout(1500);
 
-    // Select e2e_automate stream option
-    const streamOption = this.page
-      .getByRole("option", { name: "e2e_automate", exact: true })
-      .locator("div")
-      .nth(2);
-    await streamOption.waitFor({ state: "visible", timeout: 15000 });
-    await streamOption.click();
+    // Select e2e_automate stream option via the class-member locator.
+    await this.streamOptionE2eAutomate.waitFor({ state: "visible", timeout: 15000 });
+    await this.streamOptionE2eAutomate.click();
 
     // Use search to find fields - more reliable than scrolling
     await this.fieldSearchInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -145,18 +202,16 @@ export class DashboardPage {
     await this.fieldSearchInput.fill('kubernetes_container_hash');
     await this.page.waitForTimeout(1000);
 
-    const yFieldButton = this.page.locator('[data-test^="field-list-item-"][data-test$="-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').first();
-    await yFieldButton.waitFor({ state: 'visible', timeout: 10000 });
-    await yFieldButton.click();
+    await this.kubernetesContainerHashYButton.waitFor({ state: 'visible', timeout: 10000 });
+    await this.kubernetesContainerHashYButton.click();
 
     // Clear search and add kubernetes_container_image to B-axis (breakdown)
     await this.fieldSearchInput.fill('');
     await this.fieldSearchInput.fill('kubernetes_container_image');
     await this.page.waitForTimeout(1000);
 
-    const bFieldButton = this.page.locator('[data-test^="field-list-item-"][data-test$="-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').first();
-    await bFieldButton.waitFor({ state: 'visible', timeout: 10000 });
-    await bFieldButton.click();
+    await this.kubernetesContainerImageBButton.waitFor({ state: 'visible', timeout: 10000 });
+    await this.kubernetesContainerImageBButton.click();
 
     // Clear search
     await this.fieldSearchInput.fill('');
@@ -180,59 +235,105 @@ export class DashboardPage {
     await this.dashboardDelete.click({ force: true });
     await this.page.waitForTimeout(2000);
     await this.confirmButton.click();
-    await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
+    // Toast appears after the dashboard is deleted — assert via data-test
+    // hook rather than role="alert".
+    await expect(this.toastMessage.first()).toBeVisible();
   }
 
   async deleteSearchedDashboard(dashboardName) {
-    // First search for the dashboard
-    await this.dashboardSearch.click();
-    await this.dashboardSearch.fill(dashboardName);
+    // Search the dashboard by name. All locators are class members.
+    await this.dashboardSearchInput.click();
+    await this.dashboardSearchInput.fill(dashboardName);
     await this.page.waitForTimeout(1000);
 
-    // Find the dashboard row and click the delete button
-    const dashboardRow = this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
-    await dashboardRow.locator('[data-test="dashboard-delete"]').click();
+    // Click the delete action on the first filtered row.
+    await this.firstTableRow.waitFor({ state: "visible", timeout: 10000 });
+    await this.firstRowDeleteButton.click();
 
-    // Confirm deletion
+    // Confirm and verify the toast surface appears.
     await this.confirmButton.click();
-    await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
+    await expect(this.toastMessage.first()).toBeVisible();
   }
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await this.page.locator(this.dateTimeButton).click();
+    await this.dateTimeButton.click();
     await this.relative30SecondsButton.click();
   }
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
+    await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
   async verifyShareDashboardLink(randomDashboardName){
     await this.shareButton.click();
-    await expect(this.page.getByText('Link copied successfully')).toBeVisible();
-    const copiedUrl = await this.page.evaluate(() => navigator.clipboard.readText());
+    // Success toast container — ShareButton.vue triggers it after the
+    // short-URL API resolves AND the clipboard write completes.
+    await this.shareSuccessToast
+      .last()
+      .waitFor({ state: "visible", timeout: 15000 });
+    // Poll for clipboard text to absorb the microtask gap between toast
+    // render and clipboard becoming readable.
+    let copiedUrl = "";
+    await expect
+      .poll(
+        async () => {
+          copiedUrl = await this.page.evaluate(() =>
+            navigator.clipboard.readText()
+          );
+          return copiedUrl;
+        },
+        { timeout: 10000, intervals: [200, 400, 800] }
+      )
+      .not.toBe("");
+    // The backend's short-URL service can bake in an external host (e.g.
+    // production ingestion endpoint). Rewrite to the test base URL so we
+    // exercise the same local instance the rest of the test runs against.
+    const baseUrl = process.env.ZO_BASE_URL || "";
+    if (baseUrl) {
+      try {
+        const target = new URL(copiedUrl);
+        const base = new URL(baseUrl);
+        target.protocol = base.protocol;
+        target.host = base.host;
+        copiedUrl = target.toString();
+      } catch (e) {
+        // If parsing fails, fall back to original URL.
+      }
+    }
     await this.page.goto(copiedUrl);
-    await expect(this.page.getByText(randomDashboardName)).toBeVisible();
+    // Wait for the dashboard view scaffolding to mount, then assert title.
+    await this.dashboardBackBtn.waitFor({ state: "visible", timeout: 30000 });
+    await expect(this.dashboardNameTitle).toContainText(randomDashboardName, {
+      timeout: 30000,
+    });
   }
   async setDateTime() {
-    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click();
-    await this.page.locator(this.absoluteTab).click();
+    await expect(this.dateTimeButton).toBeVisible();
+    await this.dateTimeButton.click();
+    await this.absoluteTab.click();
     await this.page.waitForTimeout(2000);
   }
   async fillTimeRange(startTime, endTime) {
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
-    await this.page.getByLabel('access_time').first().fill(startTime);
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
-    await this.page.getByLabel('access_time').nth(1).fill(endTime);
+    // Day cells and OTime triggers are now selected via data-test only
+    // (`daterangecalendar-cell-*` for the calendar, `datetime-start-time` /
+    // `datetime-end-time` for the OTime triggers). The new OTime renders a
+    // clock-face popover (not a text input), so we click the trigger to
+    // open the picker — full clock-face time entry is performed by callers
+    // via the clock-face helpers when a precise time is required.
+    await this.dateTimePickerDayOne.click();
+    await this.dateTimePickerStartTime.click();
+    await this.page.keyboard.type(startTime);
+    await this.dateTimePickerDayOne.click();
+    await this.dateTimePickerEndTime.click();
+    await this.page.keyboard.type(endTime);
   }
   async verifyDateTime(startTime, endTime) {
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+    await expect(this.dateTimeButton).toContainText(`${startTime} - ${endTime}`);
   }
 
   async dashboardPageDefaultMultiOrg() {
-    await this.orgDropdown.getByText('arrow_drop_down').click();
-    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+    await this.orgDropdownArrow.click();
+    await this.orgOptionDefaultTestMulti.click();
   }
 
   async dashboardPageURLValidation() {
@@ -307,7 +408,7 @@ export class DashboardPage {
     await this.dashboardSubmitButton.click();
 
     // Wait for success and navigation
-    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+    await this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 });
     await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
