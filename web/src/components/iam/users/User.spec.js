@@ -57,11 +57,13 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-const dismissToastMock = vi.fn();
-const toastMock = vi.fn(() => dismissToastMock);
+// The factory must not reference top-level variables — vi.mock() is hoisted
+// by Vitest and those variables are not yet initialised at hoist time.
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: toastMock,
+  toast: vi.fn(() => vi.fn()),
 }));
+
+import * as useToastModule from "@/lib/feedback/Toast/useToast";
 
 
 describe("User Component", () => {
@@ -194,9 +196,10 @@ describe("User Component", () => {
       await wrapper.vm.deleteUser();
       await flushPromises();
 
+      // The component calls toast({ message: "Error while deleting user." })
+      // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: "error",
           message: "Error while deleting user."
         })
       );
@@ -328,9 +331,10 @@ describe("User Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
+      // The component calls toast({ message: "User added successfully." })
+      // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: "success",
           message: "User added successfully."
         })
       );

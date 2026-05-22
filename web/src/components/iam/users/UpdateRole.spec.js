@@ -37,11 +37,13 @@ vi.mock("vue-i18n", async (importOriginal) => {
   };
 });
 
-const dismissToastMock = vi.fn();
-const toastMock = vi.fn(() => dismissToastMock);
+// The factory must not reference top-level variables — vi.mock() is hoisted
+// by Vitest and those variables are not yet initialised at hoist time.
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: toastMock,
+  toast: vi.fn(() => vi.fn()),
 }));
+
+import * as useToastModule from "@/lib/feedback/Toast/useToast";
 
 
 // ODrawer stub: exposes the migrated props (open/title/size/persistent) and

@@ -17,7 +17,11 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from 'vue';
 
-// Mock services
+// vi.mock() is hoisted to the top of the file by Vitest's transform. The
+// factory function MUST NOT reference any top-level variables declared outside
+// it — those variables are not yet initialised at hoist time and will throw
+// "Cannot access 'X' before initialization". All vi.fn() instances are
+// created inline inside each factory.
 vi.mock("@/services/organizations", () => ({
   default: {
     add_members: vi.fn()
@@ -36,10 +40,8 @@ vi.mock("@/services/segment_analytics", () => ({
   }
 }));
 
-const dismissToastMock = vi.fn();
-const toastMock = vi.fn(() => dismissToastMock);
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: toastMock,
+  toast: vi.fn(() => vi.fn()),
 }));
 
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
@@ -48,6 +50,7 @@ import store from "@/test/unit/helpers/store";
 import organizationsService from "@/services/organizations";
 import usersService from "@/services/users";
 import segment from "@/services/segment_analytics";
+import * as useToastModule from "@/lib/feedback/Toast/useToast";
 
 // Create platform mock
 const platform = {
@@ -107,8 +110,7 @@ describe("MemberInvitation Component", () => {
     await flushPromises();
 
     // Reset toast mock for clean assertions per test
-    toastMock.mockClear();
-    dismissToastMock.mockClear();
+    vi.mocked(useToastModule.toast).mockClear();
   });
 
   afterEach(() => {
@@ -150,10 +152,10 @@ describe("MemberInvitation Component", () => {
       expect(emailInput.exists()).toBe(true);
       
       await emailInput.setValue("invalid-email");
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
           message: "Please enter correct email id."
@@ -166,10 +168,10 @@ describe("MemberInvitation Component", () => {
       expect(emailInput.exists()).toBe(true);
       
       await emailInput.setValue("test1@example.com; invalid-email, test2@example.com");
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
           message: "Please enter correct email id."
@@ -191,7 +193,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -218,10 +220,10 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "success",
           message: "Invitations sent successfully",
@@ -245,10 +247,10 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
           message: "Error while member invitation: test@example.com",
@@ -270,7 +272,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(segment.track).toHaveBeenCalledWith(
@@ -289,22 +291,24 @@ describe("MemberInvitation Component", () => {
     it("disables invite button when email is empty", async () => {
       const emailInput = wrapper.find('input');
       expect(emailInput.exists()).toBe(true);
-      
+
       await emailInput.setValue("");
       await nextTick();
-      
-      const inviteButton = wrapper.find('button');
+
+      // Use [data-o2-btn] to target the OButton element specifically rather
+      // than any internal button rendered by OSelect's dropdown trigger.
+      const inviteButton = wrapper.find('button[data-o2-btn]');
       expect(inviteButton.attributes('disabled')).toBeDefined();
     });
 
     it("enables invite button when email is provided", async () => {
       const emailInput = wrapper.find('input');
       expect(emailInput.exists()).toBe(true);
-      
+
       await emailInput.setValue("test@example.com");
       await nextTick();
-      
-      const inviteButton = wrapper.find('button');
+
+      const inviteButton = wrapper.find('button[data-o2-btn]');
       expect(inviteButton.attributes('disabled')).toBeUndefined();
     });
 
@@ -327,10 +331,10 @@ describe("MemberInvitation Component", () => {
       const error = new Error("Network error");
       vi.mocked(organizationsService.add_members).mockRejectedValue(error);
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
           message: error.message,
@@ -365,7 +369,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -390,7 +394,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -410,7 +414,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -450,9 +454,9 @@ describe("MemberInvitation Component", () => {
         new Promise(resolve => setTimeout(() => resolve({ data: { data: {}, message: "Success" } }), 100))
       );
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(vi.mocked(useToastModule.toast)).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "loading",
           message: "Please wait...",
@@ -466,13 +470,13 @@ describe("MemberInvitation Component", () => {
       await emailInput.setValue("test@example.com");
 
       const dismissMock = vi.fn();
-      vi.mocked(toastMock).mockReturnValue(dismissMock);
+      vi.mocked(useToastModule.toast).mockReturnValue(dismissMock);
 
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(dismissMock).toHaveBeenCalled();
@@ -569,7 +573,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('button').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.userEmail).toBe("");

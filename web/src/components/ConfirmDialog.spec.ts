@@ -73,15 +73,13 @@ const ODialogStub = {
   `,
 };
 
-const QBannerStub = {
-  name: "QBanner",
-  template: `<div data-test="q-banner" :class="$attrs.class"><slot name="avatar" /><slot /></div>`,
-};
-
-const QIconStub = {
-  name: "QIcon",
-  props: ["name", "size"],
-  template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
+// Stub OBanner — the component ConfirmDialog uses OBanner (not q-banner).
+// Render it with role="alert" (matching OBanner's warning variant behaviour)
+// so tests can locate it semantically via role query.
+const OBannerStub = {
+  name: "OBanner",
+  props: ["variant", "icon", "content", "dense", "inlineActions", "dataTest"],
+  template: `<div role="alert" data-test="o-banner-stub"><slot>{{ content }}</slot></div>`,
 };
 
 function buildWrapper(props: Record<string, any> = {}) {
@@ -96,8 +94,7 @@ function buildWrapper(props: Record<string, any> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODialog: ODialogStub,
-        "q-banner": QBannerStub,
-        "OIcon": QIconStub,
+        OBanner: OBannerStub,
       },
     },
   });
@@ -157,33 +154,39 @@ describe("ConfirmDialog", () => {
   });
 
   it("does not render the warning banner when warningMessage is empty", () => {
-    expect(wrapper.find('[data-test="q-banner"]').exists()).toBe(false);
+    // No warningMessage → OBanner should not be rendered at all.
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 
   it("renders the warning banner with its message when warningMessage is provided", () => {
     wrapper.unmount();
     wrapper = buildWrapper({ warningMessage: "Be careful" });
-    const banner = wrapper.find('[data-test="q-banner"]');
+    // OBanner renders with role="alert" for the warning variant.
+    const banner = wrapper.find('[role="alert"]');
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("Be careful");
   });
 
-  it("applies dark-theme banner classes when store theme is dark", () => {
+  it("renders the warning banner when warningMessage is provided (dark theme)", () => {
+    // CSS class assertions are forbidden — verify the banner is present and
+    // contains the message. Visual styling is covered by visual-regression tests.
     store.state.theme = "dark";
     wrapper.unmount();
     wrapper = buildWrapper({ warningMessage: "Be careful" });
-    const banner = wrapper.find('[data-test="q-banner"]');
-    expect(banner.classes().join(" ")).toContain("tw:bg-gray-800/60");
-    expect(banner.classes().join(" ")).toContain("tw:border-yellow-600/70");
+    const banner = wrapper.find('[role="alert"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain("Be careful");
   });
 
-  it("applies light-theme banner classes when store theme is light", () => {
+  it("renders the warning banner when warningMessage is provided (light theme)", () => {
+    // CSS class assertions are forbidden — verify the banner is present and
+    // contains the message. Visual styling is covered by visual-regression tests.
     store.state.theme = "light";
     wrapper.unmount();
     wrapper = buildWrapper({ warningMessage: "Be careful" });
-    const banner = wrapper.find('[data-test="q-banner"]');
-    expect(banner.classes().join(" ")).toContain("tw:bg-orange-50");
-    expect(banner.classes().join(" ")).toContain("tw:border-orange-400");
+    const banner = wrapper.find('[role="alert"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain("Be careful");
   });
 
   it("emits update:ok and closes (update:modelValue=false) when primary is clicked", async () => {
@@ -238,8 +241,7 @@ describe("ConfirmDialog", () => {
         plugins: [i18n, store],
         stubs: {
           ODialog: ODialogStub,
-          "q-banner": QBannerStub,
-          "OIcon": QIconStub,
+          OBanner: OBannerStub,
         },
       },
     });
