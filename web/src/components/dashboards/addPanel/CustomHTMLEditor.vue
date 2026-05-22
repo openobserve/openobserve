@@ -49,8 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <div class="splitter-vertical splitter-enabled"></div>
           <div
-            class="tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
-            style="top: 10px; left: 3.5px"
+            class="tw:absolute! tw:bg-button-primary tw:text-button-primary-foreground tw:flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+            style="top: 10px; left: 50%; transform: translateX(-50%); z-index: 100"
             data-test="dashboard-html-editor-drag-indicator"
           >
             <OIcon name="drag-indicator" size="xs" />
@@ -141,13 +141,13 @@ export default defineComponent({
   height: 100%;
 }
 .splitter-enabled {
-  background-color: #ffffff00;
+  background-color: var(--o2-border, #e5e7eb);
   transition: 0.3s;
   transition-delay: 0.2s;
 }
 
 .splitter-enabled:hover {
-  background-color: orange;
+  background-color: var(--o2-primary, orange);
 }
 
 :deep(.query-editor-splitter .q-splitter__separator) {
