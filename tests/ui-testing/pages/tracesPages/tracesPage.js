@@ -1528,8 +1528,16 @@ export class TracesPage {
     await this.page.reload();
     await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    // After SPA hydrates, wait for the traces search bar to mount.
-    await this.page.locator(this.searchBar).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    // After SPA hydrates, wait for any traces page anchor (search bar, error,
+    // or the stream selector) to mount. The traces SPA can land on the
+    // `/traces` route even if the layout has not fully mounted yet.
+    await Promise.any([
+      this.page.locator(this.searchBar).waitFor({ state: 'visible', timeout: 20000 }),
+      this.page.locator(this.streamSelect).waitFor({ state: 'visible', timeout: 20000 }),
+      this.page.locator('[data-test="traces-search-mode-spans-btn"]').waitFor({ state: 'visible', timeout: 20000 }),
+    ]).catch(() => {});
+    // Give Vue a tick to render the rest of the layout.
+    await this.page.waitForTimeout(500);
   }
 
   /**
