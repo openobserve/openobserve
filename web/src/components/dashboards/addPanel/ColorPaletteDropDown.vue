@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="showLabelOnTop"
         @update:model-value="onColorModeChange"
         style="width: 100%"
-        :dropdownStyle="{ height: '300px', width: '200px' }"
+        :dropdownStyle="{ width: '240px' }"
       />
 
       <!-- color picker for fixed and shades typed color mode -->
@@ -100,9 +100,12 @@ export default defineComponent({
 
     const store = useStore();
 
+    /** Strip HTML tags from i18n strings (e.g. "<b>By Series</b>" → "By Series") */
+    const stripHtml = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+
     const colorOptions = [
       {
-        label: t("dashboard.colorBySeries"),
+        label: stripHtml(t("dashboard.colorBySeries")),
         header: true,
       },
       {
@@ -142,7 +145,7 @@ export default defineComponent({
         value: "shades",
       },
       {
-        label: t("dashboard.colorByValue"),
+        label: stripHtml(t("dashboard.colorByValue")),
         header: true,
       },
       {
