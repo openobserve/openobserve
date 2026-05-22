@@ -963,14 +963,8 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Desc,
-            true,
-            None,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true, None);
 
         let mut expected_partitions = vec![
             [1748527200000000, 1748528100000000], // 14:00 - 14:15
@@ -981,14 +975,8 @@ mod enterprise_tests {
         ];
         assert_eq!(partitions, expected_partitions);
 
-        let partitions_asc = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Asc,
-            true,
-            None,
-        );
+        let partitions_asc =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true, None);
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
     }
@@ -1006,14 +994,8 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Desc,
-            true,
-            None,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true, None);
 
         // Verify no empty partitions exist
         for [start, end] in &partitions {
