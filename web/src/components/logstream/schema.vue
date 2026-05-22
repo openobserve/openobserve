@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #cell-name="{ row }">
                         <div class="tw:flex tw:items-center">
-                          <span class="field-name-text">
+                          <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
                             <OTooltip
                               v-if="row.name.length > 30"
