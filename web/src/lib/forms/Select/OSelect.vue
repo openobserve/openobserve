@@ -261,7 +261,15 @@ const listboxModeEnabled = computed(
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   if (Array.isArray(props.modelValue)) return props.modelValue;
-  if (props.modelValue === undefined) return [];
+  // Treat null/undefined/'' as "no selection" — otherwise the clear (X)
+  // button appears even when nothing is selected.
+  if (
+    props.modelValue === undefined ||
+    props.modelValue === null ||
+    props.modelValue === ""
+  ) {
+    return [];
+  }
   return [props.modelValue];
 });
 
