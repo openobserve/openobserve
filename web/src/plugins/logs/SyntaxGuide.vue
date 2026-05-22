@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:h-4.5!"
         >
           <OIcon name="help" size="sm" />
-          <span v-if="label" class="tw:ml-2">{{ label }}</span>
+          <span v-if="label">{{ label }}</span>
           <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
           </OButton>
