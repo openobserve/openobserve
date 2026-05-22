@@ -68,12 +68,12 @@ describe("Networking Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
+          'OSplitter': {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
-          'q-input': true,
-          'q-tabs': true,
-          'q-route-tab': true,
+          'OInput': true,
+          'OTabs': true,
+          'ORouteTab': true,
           'router-view': true
         }
       },
@@ -105,12 +105,12 @@ describe("Networking Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -155,12 +155,12 @@ describe("Networking Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -180,12 +180,12 @@ describe("Networking Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -503,12 +503,12 @@ describe("Networking Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
+              'OSplitter': {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
+              'OInput': true,
+              'OTabs': true,
+              'ORouteTab': true,
               'router-view': true
             }
           },
@@ -532,12 +532,12 @@ describe("Networking Component", () => {
             plugins: [i18n],
             provide: { store: mockStoreWithMissingData },
             stubs: {
-              'q-splitter': {
+              'OSplitter': {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
+              'OInput': true,
+              'OTabs': true,
+              'ORouteTab': true,
               'router-view': true
             }
           },
@@ -548,7 +548,7 @@ describe("Networking Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render q-splitter with correct props", () => {
+    it("should render OSplitter with correct props", () => {
       expect(wrapper.html()).toContain('div');
     });
 
@@ -558,7 +558,7 @@ describe("Networking Component", () => {
     });
 
     it("should render search input with correct attributes", () => {
-      const input = wrapper.findComponent({ name: 'q-input' });
+      const input = wrapper.findComponent({ name: 'OInput' });
       expect(input.exists()).toBe(true);
     });
   });
@@ -618,12 +618,12 @@ describe("Networking Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },
@@ -640,12 +640,12 @@ describe("Networking Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
             'router-view': true
           }
         },

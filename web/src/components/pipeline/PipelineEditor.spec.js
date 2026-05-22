@@ -24,6 +24,10 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
+
 
 const mockAddNode = vi.fn();
 
@@ -507,16 +511,18 @@ describe("PipelineEditor", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("savePipeline Validations", () => {
-    beforeEach(() => {
-      const dismissMock = vi.fn();
-      wrapper.vm.q.notify = vi.fn().mockReturnValue(dismissMock);
+    beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
+      wrapper.vm.pipelineNameInputRef = { focus: vi.fn() };
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
     });
 
     it("shows error notification when pipeline name is empty", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "";
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringContaining("required") })
       );
     });
@@ -533,7 +539,8 @@ describe("PipelineEditor", () => {
         { io_type: "output", data: { node_type: "stream" } },
       ];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });
@@ -544,7 +551,8 @@ describe("PipelineEditor", () => {
         { io_type: "input", data: { node_type: "stream" } },
       ];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });
@@ -557,7 +565,8 @@ describe("PipelineEditor", () => {
       ];
       mockPipelineObj.currentSelectedPipeline.edges = [];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });

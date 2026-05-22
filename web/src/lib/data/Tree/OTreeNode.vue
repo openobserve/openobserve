@@ -198,6 +198,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         class="tw:list-none tw:m-0 tw:p-0 tw:pl-5 tw:overflow-hidden tw:min-h-0"
       >
         <OTreeNode
+          v-if="isExpanded"
           v-for="child in node.children"
           :key="child[ctx.nodeKey] as TreeNodeKey"
           :node="child"

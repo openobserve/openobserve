@@ -1,6 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useQuasar } from "quasar";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -8,23 +7,9 @@ import ScheduledPipeline from "./ScheduledPipeline.vue";
 import searchService from "@/services/search";
 import { nextTick } from 'vue';
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  let isFullscreenActive = false;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(() => vi.fn()),
-      fullscreen: {
-        get isActive() { return isFullscreenActive; },
-        toggle: vi.fn(() => {
-          isFullscreenActive = !isFullscreenActive;
-        }),
-      }
-    })
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 
 // Mock services and composables
@@ -493,12 +478,15 @@ describe("ScheduledPipeline Component", () => {
 
       // Mock the previewPromqlQueryRef
       const mockRefreshData = vi.fn();
+
+      // Simulate run query button click
+      wrapper.vm.expandState.output = true;
+      await nextTick();
+      // Set the template ref after expandState re-render
       wrapper.vm.previewPromqlQueryRef = {
         refreshData: mockRefreshData
       };
 
-      // Simulate run query button click
-      wrapper.vm.expandState.output = true;
       await wrapper.vm.runQuery();
 
       // Wait for nextTick to complete

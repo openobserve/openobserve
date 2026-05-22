@@ -189,7 +189,7 @@ describe("FileBeat.vue", () => {
 
   describe("Template Rendering", () => {
     it("should render main container with correct class", () => {
-      const container = wrapper.find(".q-pa-sm");
+      const container = wrapper.find(".tw\\:p-2");
       expect(container.exists()).toBe(true);
     });
 

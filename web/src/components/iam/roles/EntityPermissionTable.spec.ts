@@ -41,14 +41,19 @@ async function mountComponent(props = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        AppTable: {
-          props: ['rows', 'columns', 'filter', 'hideHeader', 'style'],
-          template: `<div data-test="app-table-stub">
-            <div v-for="row in rows" :key="row.name" :data-test="'entity-row-'+row.name">
-              <slot name="permission" :column="{row}" columnName="AllowAll" />
+        OTable: {
+          props: ['data', 'columns', 'globalFilter', 'hideHeader', 'style'],
+          template: `<div data-test="o-table-stub" :data-global-filter="globalFilter">
+            <div v-for="row in data" :key="row.name" :data-test="'entity-row-'+row.name">
+              <slot :name="'cell-AllowAll'" :row="row" />
             </div>
           </div>`,
         },
+        OCheckbox: {
+          props: ['modelValue', 'value'],
+          template: '<input type="checkbox" :data-test="\'checkbox-\'+value" :checked="modelValue" />',
+        },
+        NoData: true,
       },
     },
     props: {
@@ -73,9 +78,9 @@ describe('EntityPermissionTable - rendering', () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it('renders AppTable with entity rows when resource is expanded', async () => {
+  it('renders OTable with entity rows when resource is expanded', async () => {
     const wrapper = await mountComponent({ resource: makeResource(true) });
-    expect(wrapper.find('[data-test="app-table-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-table-stub"]').exists()).toBe(true);
   });
 
   it('does NOT populate rows when resource.expand is false initially', async () => {
@@ -144,46 +149,49 @@ describe('EntityPermissionTable - showSelected prop', () => {
   });
 });
 
-// 4. filterEntities
-describe('EntityPermissionTable - filterEntities', () => {
-  it('filters entities by name substring (case-insensitive)', async () => {
-    const wrapper = await mountComponent({ resource: makeResource(true) });
-    const rows = [
-      makeEntity('app-logs'),
-      makeEntity('sys-logs'),
-      makeEntity('infra-metrics'),
-    ];
-    const result = (wrapper.vm as any).filterEntities(rows, 'logs');
-    expect(result).toHaveLength(2);
+// 4. searchKey / filtering
+// Filtering is delegated entirely to OTable via its global-filter prop.
+// These tests verify that searchKey is forwarded to OTable and that rows
+// are fully populated before OTable applies its own client-side filter.
+describe('EntityPermissionTable - searchKey prop forwarding', () => {
+  it('passes empty searchKey to OTable global-filter by default', async () => {
+    const wrapper = await mountComponent({ resource: makeResource(true), searchKey: '' });
+
+    const tableStub = wrapper.find('[data-test="o-table-stub"]');
+    expect(tableStub.attributes('data-global-filter')).toBe('');
   });
 
-  it('returns all entities when searchKey matches all', async () => {
-    const wrapper = await mountComponent({ resource: makeResource(true) });
-    const rows = [makeEntity('app'), makeEntity('sys')];
-    const result = (wrapper.vm as any).filterEntities(rows, '');
-    expect(result).toHaveLength(2);
+  it('passes a non-empty searchKey to OTable global-filter', async () => {
+    const wrapper = await mountComponent({ resource: makeResource(true), searchKey: 'logs' });
+
+    const tableStub = wrapper.find('[data-test="o-table-stub"]');
+    expect(tableStub.attributes('data-global-filter')).toBe('logs');
   });
 
-  it('returns empty array when no entity name matches', async () => {
-    const wrapper = await mountComponent({ resource: makeResource(true) });
-    const rows = [makeEntity('app-logs'), makeEntity('sys-logs')];
-    const result = (wrapper.vm as any).filterEntities(rows, 'zzz');
-    expect(result).toHaveLength(0);
+  it('updates OTable global-filter when searchKey prop changes', async () => {
+    const wrapper = await mountComponent({ resource: makeResource(true), searchKey: '' });
+
+    await wrapper.setProps({ searchKey: 'sys' });
+
+    const tableStub = wrapper.find('[data-test="o-table-stub"]');
+    expect(tableStub.attributes('data-global-filter')).toBe('sys');
   });
 
-  it('is case-insensitive', async () => {
-    const wrapper = await mountComponent({ resource: makeResource(true) });
-    const rows = [makeEntity('AppLogs')];
-    expect((wrapper.vm as any).filterEntities(rows, 'APPLOGS')).toHaveLength(1);
-    expect((wrapper.vm as any).filterEntities(rows, 'applogs')).toHaveLength(1);
+  it('populates all rows regardless of searchKey (filtering is OTable responsibility)', async () => {
+    // Rows should always reflect the full entity list so OTable can filter them client-side.
+    const wrapper = await mountComponent({ resource: makeResource(true), searchKey: 'logs' });
+
+    expect((wrapper.vm as any).rows.length).toBe(3);
   });
 
-  it('matches by partial substring', async () => {
-    const wrapper = await mountComponent({ resource: makeResource(true) });
-    const rows = [makeEntity('application-logs'), makeEntity('sys-logs')];
-    const result = (wrapper.vm as any).filterEntities(rows, 'app');
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('application-logs');
+  it('passes updated searchKey to OTable after prop change without altering rows count', async () => {
+    const wrapper = await mountComponent({ resource: makeResource(true), searchKey: 'app' });
+
+    await wrapper.setProps({ searchKey: 'zzz-no-match' });
+
+    // rows is unaffected — OTable does the actual filtering
+    expect((wrapper.vm as any).rows.length).toBe(3);
+    expect(wrapper.find('[data-test="o-table-stub"]').attributes('data-global-filter')).toBe('zzz-no-match');
   });
 });
 

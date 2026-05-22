@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="tw:w-full tw:h-full tw:p-[0.375rem]!">
     <OFieldList
       ref="fieldListRef"
       :fields="flattenGroupedFields"
@@ -22,7 +22,6 @@
     >
       <!-- Stream selectors -->
       <template #before-list>
-        <div class="tw:mx-[0.625rem]">
           <OSelect
             v-if="dashboardPanelDataPageKey !== 'metrics'"
             :model-value="currentStreamType"
@@ -58,102 +57,71 @@
               />
             </template>
           </OSelect>
-        </div>
       </template>
 
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="field-group-header tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:py-[0.125rem] tw:pl-2 tw:pr-1"
+          class="field-group-header tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:pl-2 tw:pr-1"
           :title="row.groupName"
+          :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
         >
           <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
         </div>
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row, draggable, isDragEnabled }">
-        <OIcon
-          v-if="draggable"
-          name="drag-indicator"
-          size="sm"
-          :class="[
-            'o-field-list__drag-icon',
-            isDragEnabled
-              ? 'o-field-list__drag-icon--enabled'
-              : 'o-field-list__drag-icon--disabled',
-          ]"
-          data-test="o-field-list-drag-indicator"
-        />
-        <OIcon
-          :name="getTypeIcon(row.type)"
-          size="xs"
-          class="o-field-list__type-icon tw:opacity-60"
-        />
-        <span class="o-field-list__field-name">{{ row.name }}</span>
-      </template>
+      <template #field-row="{ row, index, draggable, isDragEnabled }">
+        <OFieldRow>
+          <OIcon
+            v-if="draggable"
+            name="drag-indicator"
+            size="sm"
+            :class="[
+              'o-field-list__drag-icon tw:text-field-list-drag-icon',
+              isDragEnabled
+                ? 'o-field-list__drag-icon--enabled'
+                : 'o-field-list__drag-icon--disabled',
+            ]"
+            data-test="o-field-list-drag-indicator"
+          />
+          <OFieldLabel :field="row" :show-type-icon="true" />
 
-      <!-- Loading state -->
-      <template #loading>
-        <div class="tw:flex tw:flex-col">
-          <div
-            v-for="i in 6"
-            :key="i"
-            class="tw:flex tw:items-center tw:gap-2 tw:py-[0.25rem]"
-          >
-            <OSkeleton
-              type="rect"
-              class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
-            />
-            <OSkeleton type="text" class="tw:flex-1" />
-          </div>
-        </div>
-      </template>
 
-      <!-- Empty state -->
-      <template #empty>
-        <div
-          class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
-        >
-          <OIcon name="info" size="xs" />
-          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
-        </div>
-      </template>
-
-      <!-- Field actions -->
-      <template #field-actions="{ row, index }">
-        <!-- Standard chart actions -->
-        <div
-          v-if="showStandardActions(row, index)"
-          class="field_icons"
-        >
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="isAddXAxisNotAllowed"
-            data-test="dashboard-add-x-data"
-            @click.stop="addXAxisItem(row)"
-          >
-            {{ dashboardPanelData.data.type != 'h-bar' ? '+X' : '+Y' }}
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="isAddYAxisNotAllowed"
-            data-test="dashboard-add-y-data"
-            @click.stop="addYAxisItem(row)"
-          >
-            {{ dashboardPanelData.data.type != 'h-bar' ? '+Y' : '+X' }}
-          </OButton>
-          <OButton
-            v-if="dashboardPanelData.data.type == 'table'"
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="isAddBreakdownNotAllowed"
-            data-test="dashboard-add-p-data"
-            @click.stop="addBreakDownAxisItem(row)"
-          >
-            +P
+          <!-- Field actions -->
+          <template #actions>
+            <!-- Standard chart actions -->
+            <div
+              v-if="showStandardActions(row, index)"
+              class="field_icons"
+            >
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="isAddXAxisNotAllowed"
+                data-test="dashboard-add-x-data"
+                @click.stop="addXAxisItem(row)"
+              >
+                {{ dashboardPanelData.data.type != 'h-bar' ? '+X' : '+Y' }}
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="isAddYAxisNotAllowed"
+                data-test="dashboard-add-y-data"
+                @click.stop="addYAxisItem(row)"
+              >
+                {{ dashboardPanelData.data.type != 'h-bar' ? '+Y' : '+X' }}
+              </OButton>
+              <OButton
+                v-if="dashboardPanelData.data.type == 'table'"
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="isAddBreakdownNotAllowed"
+                data-test="dashboard-add-p-data"
+                @click.stop="addBreakDownAxisItem(row)"
+              >
+                +P
           </OButton>
           <OButton
             v-if="
@@ -372,7 +340,37 @@
             +F
           </OButton>
         </div>
+          </template>
+        </OFieldRow>
       </template>
+
+      <!-- Loading state -->
+      <template #loading>
+        <div class="tw:flex tw:flex-col">
+          <div
+            v-for="i in 6"
+            :key="i"
+            class="tw:flex tw:items-center tw:gap-2 tw:py-[0.25rem]"
+          >
+            <OSkeleton
+              type="rect"
+              class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
+            />
+            <OSkeleton type="text" class="tw:flex-1" />
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty state -->
+      <template #empty>
+        <div
+          class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
+        >
+          <OIcon name="info" size="xs" />
+          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+        </div>
+      </template>
+
 
       <!-- After list: pagination -->
       <template #after-list="bottomProps">
@@ -440,6 +438,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 
@@ -989,15 +989,6 @@ function showSankeyActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "sankey";
 }
 
-// ── Type icon helper ───────────────────────────────────────────────────
-
-function getTypeIcon(type: string | undefined): string {
-  if (!type) return "tag";
-  if (type === "Utf8") return "text-fields";
-  if (type === "Boolean") return "toggle-off";
-  return "tag";
-}
-
 // ── Stream list fetch ──────────────────────────────────────────────────
 
 const getStreamList = async (stream_type: any) => {
@@ -1051,7 +1042,6 @@ defineExpose({ fieldListRef });
   font-size: 0.75rem;
   cursor: default;
   user-select: none;
-  background-color: var(--o2-hover-accent);
   color: var(--o2-text-primary);
 }
 </style>

@@ -330,7 +330,7 @@ size="md" />
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-              class="tw:pb-[0.75rem]!"
+              class="tw:pb-2.5!"
             >
             </VisualizeLogsQuery>
           </div>
@@ -347,7 +347,7 @@ size="md" />
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
               :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
-              class="tw:pb-[0.75rem]!"
+              class="tw:pb-2.5!"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"

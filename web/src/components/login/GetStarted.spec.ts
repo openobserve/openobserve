@@ -11,15 +11,10 @@ vi.mock('@/services/billings', () => ({
   },
 }));
 
-// Mock useQuasar
-const mockNotify = vi.fn();
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+// Mock toast function
+vi.mock('@/lib/feedback/Toast/useToast', () => {
   return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
+    toast: vi.fn(),
   };
 });
 
@@ -41,12 +36,15 @@ const mockI18n = createI18n({
   messages: { en: {} },
 });
 
-
 describe('GetStarted.vue', () => {
   let wrapper: VueWrapper;
+  let mockToast: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const toastModule = await import('@/lib/feedback/Toast/useToast');
+    mockToast = vi.mocked(toastModule.toast);
+    mockToast.mockClear();
   });
 
   afterEach(() => {
@@ -194,9 +192,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Please fill all the fields',
-        color: 'negative',
       });
     });
 
@@ -266,9 +263,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
-        color: 'positive',
       });
     });
 
@@ -314,9 +310,8 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
-        color: 'negative',
       });
     });
 

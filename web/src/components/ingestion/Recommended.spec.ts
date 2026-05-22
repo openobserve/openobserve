@@ -79,7 +79,7 @@ describe("Recommended", () => {
       },
     });
 
-    const splitter = wrapper.findComponent({ name: "QSplitter" });
+    const splitter = wrapper.findComponent({ name: "OSplitter" });
     expect(splitter.exists()).toBe(true);
   });
 

@@ -65,8 +65,9 @@ describe("FileItem.vue", () => {
       const editButton = buttons[0];
       const deleteButton = buttons[1];
 
-      expect(editButton.find("OIcon-stub").attributes("name")).toBe("edit");
-      expect(deleteButton.find("OIcon-stub").attributes("name")).toBe(
+      // When stubs: { OIcon: true }, Vue renders the stub as <o-icon-stub> (lowercase kebab)
+      expect(editButton.find("o-icon-stub").attributes("name")).toBe("edit");
+      expect(deleteButton.find("o-icon-stub").attributes("name")).toBe(
         "delete",
       );
     });

@@ -121,6 +121,10 @@ function createWrapper(props: Record<string, unknown> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODrawer: ODrawerStub,
+        OCollapsible: {
+          template: '<div><slot /></div>',
+          props: ["modelValue", "icon", "label"],
+        },
       },
     },
   });

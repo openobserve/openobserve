@@ -30,6 +30,7 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 }));
 
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -203,11 +204,9 @@ describe("NodeSidebar - node label and icon", () => {
   });
 
   it("node icon is rendered with the correct name", () => {
-    // OIcon renders as <i class="OIcon ...">icon_name</i> in tests
-    const icon = wrapper.find(".OIcon");
+    const icon = wrapper.findComponent(OIcon);
     expect(icon.exists()).toBe(true);
-    // The icon name appears as text content inside OIcon stubs
-    expect(icon.text()).toContain("functions");
+    expect(icon.props("name")).toBe("functions");
   });
 });
 

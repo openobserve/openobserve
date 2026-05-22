@@ -24,6 +24,7 @@ beforeAll(() => {
 });
 
 import OTable from "./OTable.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
 
 interface TestRow {
@@ -159,9 +160,12 @@ describe("OTable", () => {
         },
       });
 
-      await wrapper
-        .find('[data-test="o2-table-page-size-select"]')
-        .setValue("50");
+      // Find the OSelect inside the pagination footer and trigger a value change
+      const select = wrapper.findComponent(OSelect);
+      expect(select.exists()).toBe(true);
+
+      // Programmatically change the page size to 50
+      select.vm.$emit("update:modelValue", 50);
       await flushPromises();
 
       expect(wrapper.emitted("update:pageSize")).toBeTruthy();
@@ -513,7 +517,7 @@ describe("OTable", () => {
   // ── Dense / Bordered / Striped ─────────────────────────────
 
   describe("display variants", () => {
-    it("applies dense class when dense is true", () => {
+    it("uses dense row height when dense is true", () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(3),
@@ -521,8 +525,9 @@ describe("OTable", () => {
           dense: true,
         },
       });
-      const cell = wrapper.find('[data-test="o2-table-cell-id"]');
-      expect(cell.classes()).toContain("tw:py-1");
+      // dense mode sets row height to 2.25rem via CSS variable on the table
+      const tableEl = wrapper.find('[data-test="o2-table"]');
+      expect(tableEl.attributes("style")).toContain("2.25rem");
     });
   });
 
@@ -944,36 +949,51 @@ describe("OTable", () => {
   // ── Footer Totals ───────────────────────────────────────────
 
   describe("footer totals", () => {
-    it("renders footer when columns have aggregate functions", () => {
+    it("renders footer when columns have aggregate and footer configured", () => {
       const cols: OTableColumnDef<TestRow>[] = [
-        { id: "id", header: "ID", accessorKey: "id", aggregate: "count" },
+        {
+          id: "id",
+          header: "ID",
+          accessorKey: "id",
+          aggregate: "count",
+          footer: () => "Count",
+        },
         { id: "name", header: "Name", accessorKey: "name" },
       ];
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: cols },
       });
+      // Footer renders when at least one column has a footer renderer
       expect(wrapper.find('[data-test="o2-table-footer"]').exists()).toBe(true);
     });
 
-    it("renders footer element when aggregate functions are configured on columns", () => {
+    it("renders footer cell for the column with footer configured", () => {
       const cols: OTableColumnDef<TestRow>[] = [
-        { id: "id", header: "ID", accessorKey: "id", aggregate: "count" },
+        {
+          id: "id",
+          header: "ID",
+          accessorKey: "id",
+          aggregate: "count",
+          footer: () => "5",
+        },
         { id: "name", header: "Name", accessorKey: "name" },
       ];
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: cols },
       });
-      // Footer element exists when columns have aggregate configured
-      expect(wrapper.find('[data-test="o2-table-footer"]').exists()).toBe(true);
+      const footerCells = wrapper.findAll(
+        '[data-test^="o2-table-footer-cell-"]',
+      );
+      expect(footerCells.length).toBeGreaterThan(0);
     });
 
-    it("renders footer element for any table instance with columns", () => {
+    it("does not render footer when no column has footer configured", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: makeColumns() },
       });
-      // TanStack creates footer groups even without explicit aggregates
-      const footerCells = wrapper.findAll('[data-test^="o2-table-footer-cell-"]');
-      expect(footerCells.length).toBeGreaterThan(0);
+      expect(
+        wrapper.find('[data-test="o2-table-footer"]').exists(),
+      ).toBe(false);
     });
   });
 

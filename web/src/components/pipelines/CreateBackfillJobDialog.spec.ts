@@ -20,17 +20,9 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-      dialog: vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() })),
-      dark: { isActive: false },
-    })),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 vi.mock("@/services/backfill", () => ({
   default: {
@@ -51,6 +43,7 @@ vi.mock("@/components/DateTime.vue", () => ({
 
 import CreateBackfillJobDialog from "./CreateBackfillJobDialog.vue";
 import backfillService from "@/services/backfill";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const DEFAULT_PROPS = {
   modelValue: false,
@@ -374,49 +367,40 @@ describe("CreateBackfillJobDialog – estimatedInfo computed", () => {
 // --------------------------------------------------------------------------
 
 describe("CreateBackfillJobDialog – onSubmit validation", () => {
-  let notifyMock: ReturnType<typeof vi.fn>;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    notifyMock = vi.fn();
-    const quasar = await import("quasar");
-    vi.mocked(quasar.useQuasar).mockReturnValue({
-      notify: notifyMock,
-      dialog: vi.fn(() => ({ onOk: vi.fn(), onCancel: vi.fn() })),
-      dark: { isActive: false },
-    } as any);
   });
 
-  it("calls notify with 'negative' when startTimeMicros <= 0", async () => {
+  it("calls toast with 'error' variant when startTimeMicros <= 0", async () => {
     const wrapper = createWrapper();
     (wrapper.vm as any).formData.startTimeMicros = 0;
     (wrapper.vm as any).formData.endTimeMicros = 1_700_003_600_000_000;
     await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
     await flushPromises();
-    expect(notifyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" })
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: "Please select a valid time range" })
     );
   });
 
-  it("calls notify with 'negative' when endTimeMicros <= 0", async () => {
+  it("calls toast with 'error' variant when endTimeMicros <= 0", async () => {
     const wrapper = createWrapper();
     (wrapper.vm as any).formData.startTimeMicros = 1_700_000_000_000_000;
     (wrapper.vm as any).formData.endTimeMicros = 0;
     await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
     await flushPromises();
-    expect(notifyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" })
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: "Please select a valid time range" })
     );
   });
 
-  it("calls notify with 'negative' when startTime >= endTime", async () => {
+  it("calls toast with 'error' variant when startTime >= endTime", async () => {
     const wrapper = createWrapper();
     (wrapper.vm as any).formData.startTimeMicros = 1_700_003_600_000_000;
     (wrapper.vm as any).formData.endTimeMicros = 1_700_000_000_000_000;
     await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
     await flushPromises();
-    expect(notifyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" })
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: "Start time must be before end time" })
     );
   });
 

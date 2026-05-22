@@ -161,7 +161,6 @@ describe("AWSConfig", () => {
     if (wrapper) {
       wrapper.unmount();
     }
-    mockConsoleError.mockRestore();
   });
 
   // Test 1: Component mounting
@@ -265,14 +264,14 @@ describe("AWSConfig", () => {
 
   // Test 16: Template section heading
   it("should display AWS Integrations heading", () => {
-    const heading = wrapper.find('h6');
+    const heading = wrapper.find('.page-title');
     expect(heading.exists()).toBe(true);
     expect(heading.text()).toBe('AWS Integrations');
   });
 
   // Test 17: Template description text
   it("should display integration description", () => {
-    const description = wrapper.find('p');
+    const description = wrapper.find('.page-description');
     expect(description.exists()).toBe(true);
     expect(description.text()).toContain('Set up AWS monitoring in one click');
   });
@@ -297,7 +296,7 @@ describe("AWSConfig", () => {
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
     expect(wrapper.find('.aws-config-page').exists()).toBe(true);
   });
 
@@ -465,7 +464,7 @@ describe("AWSConfig", () => {
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.q-ma-md').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
     expect(wrapper.find('h6').exists()).toBe(true);
   });
 });
