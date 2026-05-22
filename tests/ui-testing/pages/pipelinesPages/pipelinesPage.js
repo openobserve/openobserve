@@ -88,9 +88,11 @@ export class PipelinesPage {
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab =
-          '[data-test="function-enrichment-table-tab"] .o-tab__label';
-        this.addEnrichmentTableButton = page.getByRole('button', { name: 'New enrichment table' });
+        this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        // Added data-test "enrichment-tables-add-btn" on the New Enrichment
+        // Table OButton — prefer the data-test locator; fall back to the
+        // legacy getByRole locator for older specs still using the old PO copy.
+        this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -119,7 +121,7 @@ export class PipelinesPage {
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
-        this.addEnrichmentTableText = page.getByRole('button', { name: 'New enrichment table' });
+        this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);

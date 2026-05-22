@@ -42,6 +42,15 @@ export default class DashboardFilter {
     // Step 1: Click on the filter condition button
     // The label might have changed from previous edits, so we use a more flexible selector
     if (initialFieldName || newFieldName || operator || value) {
+      // Ensure any previously open filter popover is fully closed before re-opening.
+      // Reka UI portals leave stale condition-tab elements in DOM mid-transition,
+      // causing "element not stable / detached" failures on subsequent edits.
+      await this.page.keyboard.press("Escape").catch(() => {});
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator-popover"]')
+        .waitFor({ state: "hidden", timeout: 2000 })
+        .catch(() => {});
+
       // Try to find by the exact label first (for new filters)
       const exactLabelButton = this.page.locator(
         `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
@@ -63,6 +72,13 @@ export default class DashboardFilter {
           throw new Error(`Could not find filter condition button at index ${idx}`);
         }
       }
+      // Wait for popover to fully open and tabs to mount — deterministically
+      // wait on the condition-tab itself becoming visible (the dependent step).
+      await this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 2: Select the new field from dropdown
@@ -75,11 +91,23 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-      await conditionLocator.waitFor({ state: "visible" });
-      await conditionLocator.click(); // double click for stability
+      // Use .last() to target the most recently opened portal — when a filter
+      // condition is re-edited, the tab from the previous popover may still
+      // exist in the DOM mid-transition.
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
+      await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
+      // Reka UI tabs may re-mount during portal transition; retry click with force
+      // to bypass detached-element instability.
+      await conditionLocator.click({ force: true, timeout: 10000 });
+      // Wait deterministically for the operator dropdown (Step 4's target) to
+      // appear instead of a fixed-ms buffer.
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator"]')
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 4: Operator dropdown
@@ -100,24 +128,38 @@ export default class DashboardFilter {
       // Options render in portal with data-test="${parent}-popover"
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
-      // Wait for virtualizer to render items inside the popover
-      await this.page.waitForTimeout(600);
+      // Wait deterministically for the virtualizer's first option to mount inside the popover.
+      await operatorPopover
+        .locator('[data-test="dashboard-add-condition-operator-option"]')
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
       // The virtualizer renders items asynchronously; search then select
       // Type into the search filter to narrow results, then click
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"], input').first();
+      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
-        await this.page.waitForTimeout(300);
+        // After typing, wait for the filtered option to be visible — the
+        // option's `data-test-value` mirrors the typed operator text.
+        await operatorPopover
+          .locator(`[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`)
+          .first()
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
       }
-      // Click option by text — items are ListboxItem elements within the popover
-      const optionInPopover = this.page.locator('[data-test="dashboard-add-condition-operator-option"]').first();
-      const optionVisible = await optionInPopover.isVisible().catch(() => false);
-      if (optionVisible) {
-        await optionInPopover.click();
+      // Pick the option by its data-test-value (OSelect option convention).
+      const optionByValue = operatorPopover.locator(
+        `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`,
+      ).first();
+      if (await optionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await optionByValue.click();
       } else {
-        // Fallback: getByText anywhere on page (portal renders at body)
-        await this.page.getByText(operator, { exact: true }).last().click();
+        // Fallback to first visible option in the popover (post-filter only one should remain).
+        await operatorPopover
+          .locator('[data-test="dashboard-add-condition-operator-option"]')
+          .first()
+          .click();
       }
       // Wait for the operator dropdown portal to fully close before step 5.
       await operatorPopover

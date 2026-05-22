@@ -55,6 +55,7 @@ export class TracesPage {
     this.traceDetailsToggleTimelineButton = '[data-test="trace-details-toggle-timeline-btn"]';
     this.traceDetailsViewLogsButton = '[data-test="trace-details-view-logs-btn"]';
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
+    this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
 
     // Service Graph (Enterprise)
@@ -80,6 +81,8 @@ export class TracesPage {
     this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
     this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
     this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+    // OInput inner native <input> — fill the -field variant per §4 OInput convention
+    this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
     // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
     this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
     // Analysis dashboard card (container) — alias to the drawer slug for backwards-compat
@@ -344,7 +347,9 @@ export class TracesPage {
   }
 
   async searchWithinTrace(searchText) {
-    await this.page.fill(this.traceDetailsSearchInput, searchText);
+    const searchField = this.page.locator(this.traceDetailsSearchInputField);
+    await searchField.waitFor({ state: 'visible' });
+    await searchField.fill(searchText);
     await this.page.keyboard.press('Enter');
   }
 
@@ -1826,10 +1831,20 @@ export class TracesPage {
    * @param {string} searchText - text to type in dimension search
    */
   async searchDimension(searchText) {
-    const input = this.page.locator(this.dimensionSearchInput);
+    // OInput: fill the -field native <input>, not the wrapper <div>
+    const input = this.page.locator(this.dimensionSearchInputField);
     await input.click();
     await input.fill(searchText);
-    await this.page.waitForTimeout(500);
+    // Deterministic wait: matching checkbox must be visible AND the visible checkbox
+    // count must converge (debounced filter has settled).
+    await this.page.locator(`[data-test="dimension-checkbox-${searchText}"]`).waitFor({ state: 'visible', timeout: 5000 });
+    let lastCount = -1;
+    await expect.poll(async () => {
+      const current = await this.page.locator('[data-test^="dimension-checkbox-"]').count();
+      const stable = current === lastCount;
+      lastCount = current;
+      return stable;
+    }, { intervals: [100, 150, 200, 250], timeout: 5000 }).toBe(true);
   }
 
   /**

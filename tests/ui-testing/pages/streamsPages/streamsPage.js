@@ -311,8 +311,12 @@ export class StreamsPage {
     }
 
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput exposes the fillable inner <input> via `${parent}-field`. The
+        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
+        // which page.fill() rejects.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     async selectFullTextSearch() {
@@ -1000,8 +1004,11 @@ export class StreamsPage {
      * Search for a specific field in the schema view
      */
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput convention: the fillable inner <input> is auto-derived at
+        // `${parent}-field`. Filling the wrapper data-test (a <div>) throws.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     /**

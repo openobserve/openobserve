@@ -55,13 +55,13 @@
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
           <ORadioGroup v-model="selectedTransType" class="tw:flex tw:items-center tw:gap-4">
-            <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
-              <ORadio value="0" />
+            <div class="tw:flex tw:items-center tw:gap-1">
+              <ORadio value="0" data-test="function-transform-type-vrl-radio" />
               <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
-            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
-              <ORadio value="1" />
+            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1">
+              <ORadio value="1" data-test="function-transform-type-js-radio" />
               <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </ORadioGroup>

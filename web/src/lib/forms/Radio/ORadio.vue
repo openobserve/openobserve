@@ -13,7 +13,19 @@
 import type { RadioProps, RadioSlots } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
-import { computed, inject, watchEffect } from "vue";
+import { computed, inject, useAttrs, watchEffect } from "vue";
+
+defineOptions({ inheritAttrs: false });
+
+// Forward the consumer's `data-test` from <ORadio data-test="…"> onto the
+// inner RadioGroupItem (the ARIA-focusable radio button). This lets e2e
+// tests target the actual interactive element via [data-test="…"] without
+// relying on element-tag/class selectors. Mirrors OInput / OFile patterns.
+// Also forward `data-test-value` so consumers that render N radios from a
+// list can target each option by its value (audit pattern shared with OSelect).
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+const parentDataTestValue = computed(() => $attrs["data-test-value"] as string | undefined);
 
 const props = withDefaults(defineProps<RadioProps>(), {
   size: "md",
@@ -77,6 +89,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       :id="props.id"
       :value="String(resolvedValue ?? '')"
       :disabled="props.disabled"
+      :data-test="parentDataTest"
+      :data-test-value="parentDataTestValue"
       :class="[
         'tw:shrink-0 tw:rounded-full tw:border-2 tw:flex tw:items-center tw:justify-center',
         'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',

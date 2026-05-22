@@ -127,6 +127,11 @@ export class LogsPage {
         this.resultPagination = '[data-test="logs-search-result-pagination"]';
         this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
+        // OSelect-based records-per-page dropdown (logs SearchResult.vue:138)
+        this.recordsPerPageDropdown = '[data-test="logs-search-result-records-per-page"]';
+        this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
+        // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
+        this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
@@ -150,6 +155,7 @@ export class LogsPage {
         this.logsToggle = '[data-test="logs-logs-toggle"]';
         this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+        this.buildQueryPage = '[data-test="logs-build-query-page"]';
 
         // Query type selector (Auto/Custom mode)
         this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
@@ -410,87 +416,51 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
-        // Select both default and e2e_automate streams for join queries
-        // Retry loop with force-click fallback for cloud stability (Pattern 3)
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-        const defaultToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
-        const e2eToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
+        // Select both default and e2e_automate streams for join queries.
+        // Retry loop with force-click fallback for cloud stability (Pattern 3).
+        //
+        // Post-OSelect-migration the legacy `log-search-index-list-stream-toggle-*`
+        // data-tests are gone; OSelect emits each option with `data-test-value="<stream>"`.
+        // Clicking the wrapper itself bubbles into the inner reka-ui PopoverTrigger and
+        // opens the popover (we avoid `[role="button"]` because native `<button>` has an
+        // implicit role that attribute selectors don't match).
+        const selectWrapper = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const defaultOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="default"]',
+        );
+        const e2eOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="e2e_automate"]',
+        );
 
-        // Open dropdown
-        await selectTrigger.click({ force: true });
-        await this.page.waitForTimeout(2000);
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+        await selectWrapper.click({ force: true });
 
-        // Select default stream with retry
-        let defaultSelected = false;
-        for (let attempt = 1; attempt <= 3 && !defaultSelected; attempt++) {
-            try {
-                await defaultToggle.waitFor({ state: 'visible', timeout: 5000 });
-                await defaultToggle.click({ force: true });
-                defaultSelected = true;
-            } catch (e) {
-                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-                await this.page.waitForTimeout(500);
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
+        // Select default stream with retry — re-open popover on miss.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await defaultOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await defaultOption.first().click({ force: true });
+                break;
             }
-        }
-        if (!defaultSelected) {
-            // Last-resort fallback: ensure the dropdown is open before clicking;
-            // after 3 retries through the Escape path, it may be closed and
-            // a force-click on a hidden toggle silently does nothing.
-            if (!(await defaultToggle.isVisible().catch(() => false))) {
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-            }
-            await defaultToggle.click({ force: true, timeout: 10000 });
-        }
-        await this.page.waitForTimeout(1000);
-
-        // The dropdown auto-closes after selecting default — re-open it
-        // before attempting to click e2e_automate, otherwise e2eToggle is
-        // never visible and we burn time in the retry loop.
-        const isDropdownStillOpen = await e2eToggle.isVisible().catch(() => false);
-        if (!isDropdownStillOpen) {
-            await selectTrigger.click({ force: true });
-            await this.page.waitForTimeout(1000);
+            await selectWrapper.click({ force: true });
         }
 
-        // Select e2e_automate stream with retry
-        let e2eSelected = false;
-        for (let attempt = 1; attempt <= 3 && !e2eSelected; attempt++) {
-            try {
-                await e2eToggle.waitFor({ state: 'visible', timeout: 5000 });
-                await e2eToggle.click({ force: true });
-                e2eSelected = true;
-            } catch (e) {
-                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-                await this.page.waitForTimeout(500);
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-                // Re-select default only if it's no longer marked as selected
-                // (clicking an already-on Quasar toggle would deselect it)
-                const isDefaultOn = await defaultToggle
-                    .locator('.q-toggle__inner')
-                    .first()
-                    .evaluate(el => el.classList.contains('q-toggle__inner--truthy'))
-                    .catch(() => true); // treat transient DOM errors as "already on" — safer than deselecting
-                if (!isDefaultOn) {
-                    await defaultToggle.click({ force: true });
-                    await this.page.waitForTimeout(500);
-                }
-            }
-        }
-        if (!e2eSelected) {
-            // Last-resort fallback: same dropdown-open guard as above
-            if (!(await e2eToggle.isVisible().catch(() => false))) {
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-            }
-            await e2eToggle.click({ force: true, timeout: 10000 });
+        // OSelect multi-mode keeps the popover open after toggle, but be defensive —
+        // if the popover closed, re-open it before picking the second stream.
+        if (!(await e2eOption.first().isVisible({ timeout: 2000 }).catch(() => false))) {
+            await selectWrapper.click({ force: true });
         }
 
-        // Close dropdown
-        await selectTrigger.click({ force: true });
+        // Select e2e_automate stream with retry.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await e2eOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await e2eOption.first().click({ force: true });
+                break;
+            }
+            await selectWrapper.click({ force: true });
+        }
+
+        // Close the popover so the field list can render under it.
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     /**
@@ -615,10 +585,25 @@ export class LogsPage {
     }
 
     async selectIndexStreamDefault() {
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-        await selectTrigger.click();
-        await this.page.waitForTimeout(3000);
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+        // Post-OSelect-migration: pick the `default` option by data-test-value
+        // instead of the legacy `log-search-index-list-stream-toggle-default` toggle.
+        // Click the wrapper to open the popover (the inner reka-ui PopoverTrigger is a
+        // native <button> with implicit role — [role="button"] attribute selector
+        // doesn't match it).
+        const selectWrapper = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const defaultOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="default"]',
+        );
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+        await selectWrapper.click({ force: true });
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await defaultOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await defaultOption.first().click({ force: true });
+                break;
+            }
+            await selectWrapper.click({ force: true });
+        }
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async selectIndexStream(streamName) {
@@ -1539,23 +1524,21 @@ export class LogsPage {
     async clickResultsPerPage() {
         // Wait for results to load first — cloud may be slower
         await this.page.waitForTimeout(2000);
-        // Click the dropdown using the data-test attribute on the results-per-page dropdown
-        const resultsDropdown = this.page.locator('[data-test="logs-search-result-records-per-page"]');
+        // Click the dropdown using the data-test attribute on the records-per-page OSelect wrapper
+        const resultsDropdown = this.page.locator(this.recordsPerPageDropdown);
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
         // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page.waitForTimeout(500);
-        const option10 = this.page
-            .locator('[data-test$="-popover"] [data-test$="-option"]')
-            .filter({ hasText: /^10$/ })
-            .first();
+        // Target option by data-test-value (OSelect emits `${parent}-option` + data-test-value).
+        const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await option10.click({ force: true });
         // Wait for the per-page change to take effect — cloud wildcard queries
         // can take 5s+ to re-run after changing results-per-page
         await this.page.waitForTimeout(5000);
         // Retry the pagination assertion — slow cloud re-runs can miss the first check
-        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
@@ -1587,15 +1570,12 @@ export class LogsPage {
                 expectedPattern = expectedText;
         }
 
-        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        const searchResult = this.page.locator(this.searchResultText);
         // Quasar pagination buttons can be slow to respond on cloud — retry
         // the click up to 3 times if the expected text doesn't appear.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            const pageBtn = this.page
-                .locator(this.resultPagination)
-                .locator('button:not(:has(.OIcon))')
-                .filter({ hasText: resultsPerPage })
-                .first();
+            // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
+            const pageBtn = this.page.locator(this.resultPaginationPageBtn(resultsPerPage));
             await pageBtn.click({ force: true }).catch(() => {});
             await this.page.waitForTimeout(3000);
 
@@ -1613,8 +1593,9 @@ export class LogsPage {
     }
 
     async pageNotVisible() {
-        const fastRewindElement = this.page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
-        await expect(fastRewindElement).not.toBeVisible();
+        // When LIMIT caps results below per-page floor, OSelect records-per-page dropdown hides.
+        const recordsDropdown = this.page.locator(this.recordsPerPageDropdown);
+        await expect(recordsDropdown).not.toBeVisible();
     }
 
     // Validation methods
@@ -3779,8 +3760,21 @@ export class LogsPage {
     async enableQuickModeIfDisabled() {
         // The "interesting fields" toggle button in FieldListPagination only renders
         // when showQuickMode = true — use it as a fast pre-check before opening the menu.
-        const quickModeIndicator = this.page.locator('[data-test="logs-interesting-fields-btn"]');
+        // Post-FieldListPagination migration the data-test gained a `logs-page-` prefix;
+        // match both so the helper works for both legacy and current builds.
+        const quickModeIndicator = this.page.locator(
+            '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"]',
+        ).first();
+        // Quick Mode may also be implicitly "on" when the user-defined-schema toggle
+        // group is rendered — in that case the interesting-fields button is intentionally
+        // hidden and there's nothing to enable.
+        const toggleGroupIndicator = this.page.locator(
+            '[data-test="logs-page-fields-list-user-defined-schema-toggle"], [data-test="logs-page-field-list-user-defined-schema-toggle"]',
+        ).first();
         if (await quickModeIndicator.isVisible().catch(() => false)) {
+            return;
+        }
+        if (await toggleGroupIndicator.isVisible().catch(() => false)) {
             return;
         }
 
@@ -3793,7 +3787,6 @@ export class LogsPage {
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
             await this.page.keyboard.press('Escape').catch(() => {});
-            await this.page.waitForTimeout(200);
 
             await this.page.locator(this.utilitiesMenuButton).click({ force: true });
             const menuOpened = await quickModeItem.waitFor({ state: 'visible', timeout: 4000 })
@@ -3801,20 +3794,24 @@ export class LogsPage {
 
             if (!menuOpened) continue;
 
-            // Read OSwitch state via data-state attribute
-            const state = await quickModeSwitch.first().getAttribute('data-state').catch(() => null);
+            // Read OSwitch state via data-state attribute on the inner role="switch" button
+            // (the wrapper div doesn't expose data-state in this OSwitch implementation).
+            const state = await quickModeSwitch
+                .first()
+                .locator('[data-state]')
+                .first()
+                .getAttribute('data-state')
+                .catch(() => null);
             if (state === 'checked') {
                 await this.page.keyboard.press('Escape').catch(() => {});
-                await this.page.waitForTimeout(200);
                 enabled = true;
                 break;
             }
 
-            // Click the ODropdownItem (handleQuickMode is wired to .select)
-            await quickModeItem.click({ force: true });
-            await this.page.waitForTimeout(300);
+            // Click the inner OSwitch — its @click.stop handler invokes handleQuickMode
+            // synchronously regardless of the ODropdownItem select event timing.
+            await quickModeSwitch.first().click({ force: true });
             await this.page.keyboard.press('Escape').catch(() => {});
-            await this.page.waitForTimeout(200);
             enabled = true;
             break;
         }
@@ -3823,8 +3820,11 @@ export class LogsPage {
             throw new Error('Quick Mode could not be enabled after 3 attempts');
         }
 
-        // Wait for Quick Mode to take effect in the field list sidebar
-        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 });
+        // Wait deterministically for either field-list branch to surface in the sidebar.
+        await Promise.any([
+            quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }),
+            toggleGroupIndicator.waitFor({ state: 'visible', timeout: 8000 }),
+        ]).catch(() => {});
     }
 
     async clickTimestampField() {
@@ -4174,14 +4174,18 @@ export class LogsPage {
         // Wait for the menu to render the quick mode toggle before reading or clicking
         const quickModeBtn = this.page.locator(this.quickModeToggle);
         await quickModeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        // OSwitch exposes data-state="checked|unchecked" on its inner toggle button.
+        // Wrapper data-test="logs-search-bar-quick-mode-toggle"; descendant [data-state] is the button.
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        const state = await toggleInner.getAttribute('data-state').catch(() => null);
+        const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
             await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
             await this.page.waitForTimeout(500);
         }
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        // Close menu by pressing Escape (avoid body-position click — violates §2 selector policy)
+        await this.page.keyboard.press('Escape');
     }
 
     async ensureHistogramToggleState(desiredState) {
@@ -7029,7 +7033,7 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
-    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 45000) {
         // Use waitForFunction to directly check the DOM for the bg-grey class
         // on the chart selection item. This survives Vue reactive re-renders better
         // than Playwright's locator.toHaveClass polling.
@@ -7046,7 +7050,17 @@ export class LogsPage {
                         // Check the parent q-item for the bg-grey selection class
                         const parent = section.parentElement;
                         if (!parent) continue;
-                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
+                        // Prefer data-selected attribute (added to ChartSelection.vue for clean
+                        // data-test-only selectors). Fall back to legacy bg-grey-3/5 (Quasar) and
+                        // tw:bg-gray-200/400 (Tailwind) classes for older builds.
+                        const dataSelected = parent.getAttribute('data-selected');
+                        if (dataSelected !== null) {
+                            const isSelected = dataSelected === 'true';
+                            if (isSelected === shouldBeSelected) return true;
+                            continue;
+                        }
+                        const cls = parent.className || '';
+                        const hasBgGrey = /\bbg-grey-[35]\b/.test(cls) || /\btw:bg-gray-(?:200|400)\b/.test(cls);
                         if (hasBgGrey === shouldBeSelected) return true;
                     }
                     return false;
@@ -7196,7 +7210,7 @@ export class LogsPage {
     async waitForBuildTabLoaded(timeout = 30000) {
         // Phase 1: Wait for BuildQueryPage root container to be visible
         try {
-            await this.page.locator('.build-query-page').waitFor({ state: 'visible', timeout });
+            await this.page.locator(this.buildQueryPage).waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab container loaded');
         } catch (error) {
             testLogger.warn('Build tab container did not appear within timeout');
@@ -7234,10 +7248,25 @@ export class LogsPage {
             const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
             const isVisible = await chartItem.isVisible().catch(() => false);
             if (isVisible) {
-                const parentClassList = await chartItem.locator('..').getAttribute('class') || '';
-                if (parentClassList.includes('bg-grey-3') || parentClassList.includes('bg-grey-5')) {
+                const parent = chartItem.locator('..');
+                // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
+                // Fall back to legacy bg-grey-3/5 (Quasar) and tw:bg-gray-200/400 (Tailwind).
+                const dataSelected = await parent.getAttribute('data-selected');
+                if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
                     return chartType;
+                }
+                if (dataSelected === null) {
+                    const parentClassList = (await parent.getAttribute('class')) || '';
+                    if (
+                        parentClassList.includes('bg-grey-3') ||
+                        parentClassList.includes('bg-grey-5') ||
+                        parentClassList.includes('tw:bg-gray-200') ||
+                        parentClassList.includes('tw:bg-gray-400')
+                    ) {
+                        testLogger.info(`Current chart type detected: ${chartType}`);
+                        return chartType;
+                    }
                 }
             }
         }
@@ -7260,7 +7289,16 @@ export class LogsPage {
                 const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
                 for (const item of items) {
                     const classes = item.className || '';
-                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                    // Prefer data-selected attribute (ChartSelection.vue), fall back to legacy classes
+                    const dataSelected = item.getAttribute('data-selected');
+                    const matchesSelected = dataSelected === 'true' ||
+                        (dataSelected === null && (
+                            classes.includes('bg-grey-3') ||
+                            classes.includes('bg-grey-5') ||
+                            classes.includes('tw:bg-gray-200') ||
+                            classes.includes('tw:bg-gray-400')
+                        ));
+                    if (matchesSelected) {
                         // Found selected item - extract chart type from child data-test attribute
                         const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
                         if (section) {

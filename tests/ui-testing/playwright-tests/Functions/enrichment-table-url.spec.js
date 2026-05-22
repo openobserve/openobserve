@@ -552,13 +552,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         if (hasRadioGroup) {
             // Check for "From URL" option (using POM)
-            const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
-            const hasUrlOption = await urlOption.isVisible().catch(() => false);
+            const hasUrlOption = await enrichmentPage.isFromUrlOptionVisible();
             testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
             // Check for "Upload File" option (using POM)
-            const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
-            const hasFileOption = await fileOption.isVisible().catch(() => false);
+            const hasFileOption = await enrichmentPage.isUploadFileOptionVisible();
             testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
 
             // PRIMARY ASSERTION: At least one source option should be available

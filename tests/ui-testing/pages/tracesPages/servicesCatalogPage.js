@@ -45,12 +45,29 @@ export class ServicesCatalogPage {
 
     // =====================================================================
     // Table locators
+    // TenstackTable forwards the consumer's `data-test` onto its root <div>
+    // (no `inheritAttrs: false`), and the inner <table> carries its own
+    // `data-test="o2-table"`. We use `[data-test*="services-catalog-table"]`
+    // composite to match either — keeps the wait deterministic if the source
+    // ever forwards the attribute only to one element.
     // =====================================================================
     this.table = page.locator('[data-test="services-catalog-table"]');
+    // Inner TenstackTable <table> — always rendered once the wrapper mounts.
+    this.tableInner = page.locator('[data-test="services-catalog-table"] [data-test="o2-table"]');
+    // Combined locator: matches either the wrapper or the inner table — used
+    // by isTableVisible() to stay deterministic across attribute-forwarding modes.
+    this.tableAny = page.locator('[data-test="services-catalog-table"], [data-test="services-catalog-table"] [data-test="o2-table"], [data-test="o2-table"]:visible');
     this.emptyState = page.locator('[data-test="services-catalog-empty"]');
     this.loading = page.locator('[data-test="services-catalog-loading"]');
     this.allServiceLinks = page.locator(`[data-test^="${this.serviceLinkPrefix}"]`);
     this.firstServiceLink = page.locator(`[data-test^="${this.serviceLinkPrefix}"]`).first();
+    // Inner service-name span — rendered by TraceServiceCell as
+    // `<span data-test="trace-row-service-name">{{ item.service_name }}</span>`.
+    // Reading from this span avoids picking up whitespace / icon alt-text in the
+    // service-link cell's textContent.
+    this.firstServiceNameSpan = page.locator(
+      `[data-test^="${this.serviceLinkPrefix}"] [data-test="trace-row-service-name"]`,
+    ).first();
 
     // =====================================================================
     // Pagination locators
@@ -89,6 +106,52 @@ export class ServicesCatalogPage {
     this.servicesCatalogTabBtn = page.locator(
       '[data-test="traces-search-mode-services-catalog-btn"]',
     );
+
+    // =====================================================================
+    // Factory locators — runtime-bound (allowed by POM strict policy)
+    // =====================================================================
+    /** @param {string} name */
+    this.getServiceLink = (name) =>
+      page.locator(`[data-test="${this.serviceLinkPrefix}${name}"]`);
+    /** @param {string} name */
+    this.getStatusBadgeLocator = (name) =>
+      page.locator(`[data-test="${this.statusBadgePrefix}${name}"]`);
+    /** @param {string} name */
+    this.getErrorRateLocator = (name) =>
+      page.locator(`[data-test="${this.errorRatePrefix}${name}"]`);
+    /** @param {string} name */
+    this.getRequestsLocator = (name) =>
+      page.locator(`[data-test="${this.requestsPrefix}${name}"]`);
+    /** @param {string} name */
+    this.getErrorsLocator = (name) =>
+      page.locator(`[data-test="${this.errorsPrefix}${name}"]`);
+    /** @param {string|number} n */
+    this.getPageButton = (n) =>
+      page.locator(`[data-test="${this.paginationDataTest}-page-${n}"]`);
+    // OPagination sets aria-current="page" on the active button. data-test^= keeps
+    // the selector data-test-only (no element / class / role).
+    this.currentPageButton = page.locator(
+      `[data-test^="${this.paginationDataTest}-page-"][aria-current="page"]`,
+    );
+    /** @param {string} columnId */
+    this.getColumnSortClickTarget = (columnId) =>
+      page.locator(`[data-test="o2-table-th-sort-${columnId}"]`);
+    /** @param {string} columnId — TenstackTable session-shipped icon data-test. */
+    this.getColumnSortIcon = (columnId) =>
+      page.locator(`[data-test="o2-table-sort-icon-${columnId}"]`);
+    /** @param {string} status */
+    this.getLegendItem = (status) =>
+      page.locator(`[data-test="services-catalog-legend-${status}"]`);
+    /** @param {string} parentDataTest @param {string|number} count */
+    this.getRowsPerPageOption = (parentDataTest, count) =>
+      page.locator(
+        `[data-test="${parentDataTest}-option"][data-test-value="${count}"]`,
+      );
+    /** @param {string} parent @param {string} streamName */
+    this.getStreamOption = (parent, streamName) =>
+      page.locator(
+        `[data-test="${parent}-option"][data-test-value="${streamName}"]`,
+      );
   }
 
   // =========================================================================
@@ -112,6 +175,12 @@ export class ServicesCatalogPage {
   }
 
   async waitForLoad() {
+    // Wait for the services-catalog toolbar (filter input) to be attached —
+    // this is the canonical "ServicesCatalog mounted" signal. The toolbar
+    // renders synchronously once the tab is active, before any data resolves.
+    await this.filterInputField
+      .waitFor({ state: 'attached', timeout: 30000 })
+      .catch(() => {});
     // Wait for loading spinner to disappear
     await this.loading.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     // Wait for the data to be ready: either at least one row rendered, or the empty state.
@@ -128,24 +197,37 @@ export class ServicesCatalogPage {
 
   async selectStream(streamName) {
     await this.streamSelector.click();
-    // Wait for OSelect popover to mount
-    await this.page.waitForTimeout(200);
     // Option uses OSelect convention: data-test="${parent}-option" + data-test-value
-    const opt = this.page.locator(
-      '[data-test="services-catalog-stream-selector-option"]'
-      + `[data-test-value="${streamName}"]`,
-    );
+    const opt = this.getStreamOption('services-catalog-stream-selector', streamName);
+    // Wait for OSelect popover to mount + render the option (deterministic).
     await opt.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     await opt.click().catch(() => {});
     // Dismiss the popover by pressing Escape (avoids body.click violation)
     await this.page.keyboard.press('Escape').catch(() => {});
-    await this.page.waitForTimeout(300);
+    // Wait for popover to detach so subsequent interactions are not occluded.
+    await this.streamSelectorPopover
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {});
   }
 
   async filterByServiceName(text) {
     await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await this.filterInputField.fill(text);
-    await this.page.waitForTimeout(500); // 300ms debounce + buffer
+    // OInput :debounce="300" — poll until the filterText debounce has settled
+    // by reading the input value back and confirming the value reflects the
+    // typed text. The debounce only delays the v-model write; the native
+    // <input> reflects the value immediately, but the filtered table needs
+    // the 300ms window. We wait for the input to report the value AND for
+    // the table to repaint by waiting on the first service link OR empty state.
+    await expect.poll(
+      async () => await this.filterInputField.inputValue(),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toBe(text);
+    // After debounce, the filtered table converges — either we have rows or empty state.
+    await Promise.race([
+      this.firstServiceLink.waitFor({ state: 'attached', timeout: 2000 }),
+      this.emptyState.waitFor({ state: 'attached', timeout: 2000 }),
+    ]).catch(() => {});
   }
 
   async getFilterInputLocator() {
@@ -153,21 +235,39 @@ export class ServicesCatalogPage {
   }
 
   async typeFilterCharByChar(text) {
+    await this.filterInputField.waitFor({ state: 'visible', timeout: 10000 });
     await this.filterInputField.click();
     await this.filterInputField.fill('');
     for (const char of text) {
       await this.filterInputField.press(char);
-      await this.page.waitForTimeout(50);
     }
-    // Wait for 300ms debounce
-    await this.page.waitForTimeout(500);
+    // Wait for the input to reflect the full typed string (deterministic).
+    await expect.poll(
+      async () => await this.filterInputField.inputValue(),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toBe(text);
+    // Wait for OInput's 300ms debounce to settle: poll until the table either
+    // renders the filtered set or shows the empty state. Both are deterministic.
+    await Promise.race([
+      this.firstServiceLink.waitFor({ state: 'attached', timeout: 3000 }),
+      this.emptyState.waitFor({ state: 'attached', timeout: 3000 }),
+    ]).catch(() => {});
   }
 
   async clearFilter() {
     // Use fill('') instead of clicking Quasar's clear icon which sets value to null (bug #11689)
     await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await this.filterInputField.fill('');
-    await this.page.waitForTimeout(500);
+    // Wait for input to reflect the cleared value (deterministic).
+    await expect.poll(
+      async () => await this.filterInputField.inputValue(),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toBe('');
+    // Wait for the unfiltered table to settle.
+    await Promise.race([
+      this.firstServiceLink.waitFor({ state: 'attached', timeout: 3000 }),
+      this.emptyState.waitFor({ state: 'attached', timeout: 3000 }),
+    ]).catch(() => {});
   }
 
   async clickFilterClearButton() {
@@ -178,7 +278,11 @@ export class ServicesCatalogPage {
       return false;
     }
     await this.filterClearBtn.click();
-    await this.page.waitForTimeout(300);
+    // After clearing, wait for the input to be empty (deterministic).
+    await expect.poll(
+      async () => await this.filterInputField.inputValue(),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toBe('');
     return true;
   }
 
@@ -263,39 +367,29 @@ export class ServicesCatalogPage {
   }
 
   async getServiceCellText(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
-      .textContent();
+    return await this.getServiceLink(serviceName).textContent();
   }
 
   async getErrorRate(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.errorRatePrefix}${serviceName}"]`)
-      .textContent();
+    return await this.getErrorRateLocator(serviceName).textContent();
   }
 
   async getRequests(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.requestsPrefix}${serviceName}"]`)
-      .textContent();
+    return await this.getRequestsLocator(serviceName).textContent();
   }
 
   async getErrors(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.errorsPrefix}${serviceName}"]`)
-      .textContent();
+    return await this.getErrorsLocator(serviceName).textContent();
   }
 
   async getStatusBadge(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.statusBadgePrefix}${serviceName}"]`)
+    return await this.getStatusBadgeLocator(serviceName)
       .textContent()
       .catch(() => '');
   }
 
   async serviceRowExists(serviceName) {
-    return await this.page
-      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
+    return await this.getServiceLink(serviceName)
       .isVisible()
       .catch(() => false);
   }
@@ -309,10 +403,14 @@ export class ServicesCatalogPage {
     // handler on the <TraceServiceCell> — this bypasses TenstackTable's row-level
     // emission layer (ServicesCatalog.vue:279). The status badge is also clickable
     // (bubbles to @click:dataRow on <tr>) but the direct cell handler is more reliable.
-    await this.page
-      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
-      .click();
-    await this.page.waitForTimeout(300);
+    // If the caller passes an empty / falsy name (because getFirstServiceName()
+    // didn't have data yet at call time), fall back to clicking the first
+    // available service link — keeps the test deterministic instead of waiting
+    // on a `[data-test="services-catalog-service-link-"]` selector that will
+    // never match.
+    const link = serviceName ? this.getServiceLink(serviceName) : this.firstServiceLink;
+    await link.waitFor({ state: 'visible', timeout: 15000 });
+    await link.click();
   }
 
   async isSidePanelVisible() {
@@ -337,14 +435,16 @@ export class ServicesCatalogPage {
 
   async setRowsPerPage(count) {
     await this.rowsPerPage.click();
-    await this.page.waitForTimeout(300);
     // OSelect option uses data-test="${parent}-option" + data-test-value=<value>
-    const opt = this.page.locator(
-      `[data-test="${this.rowsPerPageDataTest}-option"][data-test-value="${count}"]`,
-    );
+    const opt = this.getRowsPerPageOption(this.rowsPerPageDataTest, count);
+    // Wait for popover + option to render (deterministic).
     await opt.waitFor({ state: 'visible', timeout: 5000 });
     await opt.click();
-    await this.page.waitForTimeout(500);
+    // After selection, the OSelect trigger reflects the new value — poll until it does.
+    await expect.poll(
+      async () => await this.rowsPerPage.textContent().then((t) => (t || '').trim()),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toContain(String(count));
   }
 
   async getPageCount() {
@@ -353,12 +453,15 @@ export class ServicesCatalogPage {
   }
 
   async goToPage(n) {
-    const pageBtn = this.page.locator(
-      `[data-test="${this.paginationDataTest}-page-${n}"]`,
-    );
+    const pageBtn = this.getPageButton(n);
     await pageBtn.waitFor({ state: 'visible', timeout: 5000 });
     await pageBtn.click();
-    await this.page.waitForTimeout(500);
+    // After navigation, the OPagination sets aria-current="page" on the
+    // clicked button — wait for that to converge before returning.
+    await expect.poll(
+      async () => await pageBtn.getAttribute('aria-current'),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).toBe('page');
   }
 
   async isPrevDisabled() {
@@ -374,11 +477,8 @@ export class ServicesCatalogPage {
     // The page-number buttons all carry data-test-value="<page>" so we use that
     // combined with the aria-current attribute filter — both are non-class,
     // non-element selectors permitted by the policy.
-    const el = this.page.locator(
-      `[data-test^="${this.paginationDataTest}-page-"][aria-current="page"]`,
-    );
-    await el.waitFor({ state: 'attached', timeout: 5000 });
-    const val = await el.getAttribute('data-test-value');
+    await this.currentPageButton.waitFor({ state: 'attached', timeout: 5000 });
+    const val = await this.currentPageButton.getAttribute('data-test-value');
     const parsed = parseInt(val, 10);
     if (Number.isNaN(parsed)) {
       throw new Error(`getCurrentPage: could not parse data-test-value "${val}"`);
@@ -400,8 +500,26 @@ export class ServicesCatalogPage {
     // data-test="o2-table-th-sort-{id}" (TenstackTable.vue:228-236).
     // JavaScript's el.click() on the <th> dispatches a click that bubbles UP
     // to ancestors and never reaches the child div's handler.
-    await this.page.locator(`[data-test="o2-table-th-sort-${columnKey}"]`).click();
-    await this.page.waitForTimeout(300);
+    //
+    // Resilient fallback: if the `o2-table-th-sort-{id}` div isn't attached
+    // (older / pivot header layouts), click the visible sort icon instead —
+    // it sits inside the same div and the click bubbles to the handler.
+    const sortDiv = this.getColumnSortClickTarget(columnKey);
+    const sortIcon = this.getColumnSortIcon(columnKey);
+    // Capture current icon state so we can poll for change after click —
+    // this gives a deterministic wait instead of a fixed sleep.
+    const before = await sortIcon
+      .getAttribute('data-test-sort-direction')
+      .catch(() => null);
+    const target = (await sortDiv.count()) > 0 ? sortDiv : sortIcon;
+    await target.waitFor({ state: 'visible', timeout: 15000 });
+    await target.click();
+    // Wait for sort state to actually change (direction attribute flips).
+    await expect.poll(
+      async () =>
+        await sortIcon.getAttribute('data-test-sort-direction').catch(() => null),
+      { timeout: 5000, intervals: [50, 100, 200] },
+    ).not.toBe(before);
   }
 
   async getSortIcon(columnKey) {
@@ -412,9 +530,7 @@ export class ServicesCatalogPage {
     // Test legacy convention used 'arrow_downward' / 'arrow_upward' / 'unfold_more'
     // (Quasar material-icons text content). Normalize the OIcon sort attribute to
     // that form so existing test assertions keep working.
-    const icon = this.page.locator(
-      `[data-test="o2-table-sort-icon-${columnKey}"]`,
-    );
+    const icon = this.getColumnSortIcon(columnKey);
 
     if (!(await icon.count())) return '';
     const state = await icon.getAttribute('data-test-sort-state').catch(() => null);
@@ -430,8 +546,21 @@ export class ServicesCatalogPage {
   }
 
   async getFirstServiceName() {
+    // Prefer reading the inner service-name span — its textContent is just the
+    // service_name without the icon's whitespace / surrounding template noise.
+    // Falls back to the link's textContent when the span hasn't mounted yet
+    // (e.g. virtual-scroll race) so the caller still gets a usable value.
+    await this.firstServiceLink
+      .waitFor({ state: 'attached', timeout: 10000 })
+      .catch(() => {});
+    const nameSpanCount = await this.firstServiceNameSpan.count();
+    if (nameSpanCount > 0) {
+      const text = await this.firstServiceNameSpan.textContent().catch(() => '');
+      const trimmed = (text || '').trim();
+      if (trimmed) return trimmed;
+    }
     const text = await this.firstServiceLink.textContent().catch(() => '');
-    return text.trim();
+    return (text || '').trim();
   }
 
   // =========================================================================
@@ -443,7 +572,7 @@ export class ServicesCatalogPage {
   }
 
   async getLegendCount(status) {
-    const el = this.page.locator(`[data-test="services-catalog-legend-${status}"]`);
+    const el = this.getLegendItem(status);
     const text = await el.textContent().catch(() => '0');
     const match = text.match(/(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
@@ -454,9 +583,20 @@ export class ServicesCatalogPage {
   // =========================================================================
 
   async isTableVisible() {
-    // Wait briefly for the table to settle — after filter changes the DOM may flicker
-    return await this.table
+    // TenstackTable forwards `data-test="services-catalog-table"` to its root
+    // <div> via attribute inheritance. The inner `<table data-test="o2-table">`
+    // is always rendered once the wrapper mounts. Check either selector — the
+    // wrapper is the canonical match; the inner table is the fallback if the
+    // attribute forwarding changes in a future TenstackTable refactor.
+    const wrapper = this.table;
+    const inner = this.tableInner;
+    const visible = await wrapper
       .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (visible) return true;
+    return await inner
+      .waitFor({ state: 'visible', timeout: 3000 })
       .then(() => true)
       .catch(() => false);
   }

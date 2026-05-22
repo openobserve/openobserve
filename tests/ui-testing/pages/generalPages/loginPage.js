@@ -4,8 +4,9 @@ const { isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.
 export class LoginPage {
   constructor(page) {
     this.page = page;
-    this.userIdInput = page.locator('[data-test="login-user-id-input"]');
-    this.passwordInput = page.locator('[data-test="login-password-input"]');
+    // OInput wrapper has data-test="<name>"; the inner native input is "<name>-field"
+    this.userIdInput = page.locator('[data-test="login-user-id-field"]');
+    this.passwordInput = page.locator('[data-test="login-password-field"]');
     this.loginButton = page.locator('[data-test="login-sign-in"]');
   }
   async gotoLoginPage() {
