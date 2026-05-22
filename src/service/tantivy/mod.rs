@@ -27,7 +27,7 @@ use arrow::array::{
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
+    INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
         parquet::RecordBatchStream,
@@ -99,6 +99,12 @@ pub(crate) async fn create_tantivy_index(
     if index.is_none() {
         return Ok(0);
     }
+    // Record the parquet row group size in effect at index build time so the
+    // reader can map doc_ids back to row groups even if the constant changes.
+    dir.set_property(
+        puffin_directory::PROP_ROW_GROUP_SIZE,
+        PARQUET_MAX_ROW_GROUP_SIZE.to_string(),
+    );
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 

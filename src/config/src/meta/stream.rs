@@ -281,6 +281,10 @@ pub struct FileKey {
     pub meta: FileMeta,
     pub deleted: bool,
     pub segment_ids: Option<Arc<BitVec>>,
+    /// Parquet row group size that was in effect when the tantivy index for
+    /// this file was built. Set together with `segment_ids` after tantivy
+    /// search runs locally; not serialized over gRPC.
+    pub row_group_size: Option<u32>,
 }
 
 impl FileKey {
@@ -292,6 +296,7 @@ impl FileKey {
             meta,
             deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 
@@ -303,11 +308,13 @@ impl FileKey {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 
-    pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
+    pub fn with_segment_ids(&mut self, segment_ids: BitVec, row_group_size: Option<u32>) {
         self.segment_ids = Some(Arc::new(segment_ids));
+        self.row_group_size = row_group_size;
     }
 }
 
@@ -672,6 +679,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 }
@@ -1896,8 +1904,9 @@ mod tests {
         let mut key = FileKey::from_file_name("files/k.parquet");
         assert!(key.segment_ids.is_none());
         let bv = BitVec::new();
-        key.with_segment_ids(bv);
+        key.with_segment_ids(bv, Some(1024));
         assert!(key.segment_ids.is_some());
+        assert_eq!(key.row_group_size, Some(1024));
     }
 
     #[test]

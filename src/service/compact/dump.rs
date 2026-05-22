@@ -480,6 +480,7 @@ pub async fn delete_by_time_range(
         .map(|mut f| {
             f.deleted = true;
             f.segment_ids = None;
+            f.row_group_size = None;
             f
         })
         .collect();
@@ -620,6 +621,7 @@ async fn generate_dump(
         meta,
         deleted: false,
         segment_ids: None,
+        row_group_size: None,
     };
 
     Ok(Some(dump_file))

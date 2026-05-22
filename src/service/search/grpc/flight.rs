@@ -282,7 +282,8 @@ pub async fn search(
                 Some(query_params.time_range),
                 req.search_info.histogram_interval,
                 &trace_id,
-            );
+            )
+            .await;
         }
 
         let storage_search_start = std::time::Instant::now();
@@ -591,8 +592,11 @@ fn optimizer_physical_plan(
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {
-        let index_optimizer_rule =
-            FollowerIndexOptimizerRule::new(time_range, index_optimizer_rule_ref.clone());
+        let index_optimizer_rule = FollowerIndexOptimizerRule::new(
+            time_range,
+            index_fields.clone(),
+            index_optimizer_rule_ref.clone(),
+        );
         let _ = index_optimizer_rule.optimize(original_plan, ctx.state().config_options())?;
     }
 
@@ -680,6 +684,7 @@ async fn handle_tantivy_optimize(
         idx_optimize_rule,
         Some(IndexOptimizeMode::SimpleCount)
             | Some(IndexOptimizeMode::SimpleHistogram(..))
+            | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
             | Some(IndexOptimizeMode::SimpleTopN(..))
             | Some(IndexOptimizeMode::SimpleDistinct(..))
     ) {
@@ -714,7 +719,10 @@ async fn update_index_updated_at(
     let ttv_timestamp_updated_at = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
     let index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
 
-    if matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleTopN(..))) {
+    if matches!(
+        idx_optimize_rule,
+        Some(IndexOptimizeMode::SimpleTopN(..)) | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
+    ) {
         let ttv_secondary_index_updated_at =
             db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
         return index_updated_at.max(ttv_secondary_index_updated_at);

@@ -132,7 +132,7 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
-    if cfg.limit.datafusion_file_stat_cache_max_entries > 0 {
+    if cfg.limit.datafusion_file_stat_cache_max_size > 0 {
         let cache_config = CacheManagerConfig::default();
         let cache_config = cache_config.with_files_statistics_cache(Some(
             super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
@@ -817,6 +817,7 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 segment_ids: None,
+                row_group_size: None,
             }];
 
             let result = register_metrics_table(&session, schema, "test_table", files).await;
@@ -856,6 +857,7 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 segment_ids: None,
+                row_group_size: None,
             }];
 
             let builder = TableBuilder::new().sorted_by_time(true);

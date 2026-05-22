@@ -67,7 +67,10 @@ pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
-pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
+// The current value is recorded in each tantivy index file (puffin `row_group_size`
+// property) so it can be changed safely without breaking row_id → row_group mapping
+// for older files.
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
@@ -1552,8 +1555,6 @@ pub struct Limit {
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
-    #[env_config(name = "ZO_QUERY_INDEX_THREAD_NUM", default = 0)]
-    pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
@@ -1767,11 +1768,11 @@ pub struct Limit {
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
-        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
+        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the file stat cache. Higher values allow caching more file statistics but increase memory usage."
     )]
-    pub datafusion_file_stat_cache_max_entries: usize,
+    pub datafusion_file_stat_cache_max_size: usize,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
         default = 10000,
@@ -2605,13 +2606,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.query_thread_num = cpu_num * 4;
         }
     }
-    if cfg.limit.query_index_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.query_index_thread_num = cpu_num;
-        } else {
-            cfg.limit.query_index_thread_num = cpu_num * 4;
-        }
-    }
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
@@ -3129,6 +3123,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
+        cfg.limit.datafusion_file_stat_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }

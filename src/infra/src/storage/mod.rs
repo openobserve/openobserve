@@ -21,7 +21,11 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, buf::Buf};
-use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
+use config::{
+    get_config, is_local_disk_storage,
+    meta::stream::{FileKey, FileMeta},
+    metrics,
+};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
@@ -326,6 +330,18 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn get_row_group_size(file: &FileKey) -> u32 {
+    if let Some(row_group_size) = file.row_group_size {
+        return row_group_size;
+    }
+    get_parquet_metadata(&file.account, &file.key)
+        .await
+        .ok()
+        .and_then(|(_, meta)| meta.row_groups().iter().map(|rg| rg.num_rows()).max())
+        .unwrap_or_default()
+        .max(config::PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32
 }
 
 pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {

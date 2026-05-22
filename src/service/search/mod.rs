@@ -13,44 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::max,
-    sync::{Arc, LazyLock as Lazy},
-};
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, TableReferenceExt, resolve_stream_names},
+        sql::{OrderBy, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{
-            is_aggregate_query, is_eligible_for_histogram, is_explain_query,
-            is_simple_distinct_query,
+            is_complex_query, is_eligible_for_histogram, is_explain_query, is_simple_distinct_query,
         },
         time::now_micros,
     },
 };
 use hashbrown::HashMap;
-use infra::{
-    cache::stats,
-    cluster::get_cached_online_querier_nodes,
-    errors::{Error, ErrorCodes},
-    schema::unwrap_stream_settings,
-};
+use infra::errors::{Error, ErrorCodes};
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;
@@ -58,27 +48,12 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::sql::visitor::group_by::get_group_by_fields,
-    config::{
-        META_ORG_ID,
-        meta::{
-            search::{CardinalityLevel, generate_aggregation_search_interval},
-            self_reporting::usage::USAGE_STREAM,
-        },
-        utils::sql::is_simple_aggregate_query,
-    },
+    crate::service::search::partition::aggregate::prepare_streaming_aggregate,
+    config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
-        search::{
-            TaskStatus,
-            cache::streaming_agg::{
-                create_aggregation_cache_file_path, discover_cache_for_query,
-                generate_optimal_partitions, get_aggregation_cache_key_from_request,
-            },
-            cache_aggs_util,
-            datafusion::distributed_plan::streaming_aggs_exec,
-        },
+        search::{TaskStatus, datafusion::distributed_plan::streaming_aggs_exec},
     },
     std::collections::HashSet,
     tracing::info_span,
@@ -86,15 +61,13 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::utils::{
-        functions::{get_all_transform_keys, init_vrl_runtime},
-        stream::get_settings_max_query_range,
-    },
+    common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::visitor::histogram_interval::{
-            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        partition::{
+            cpu_cores::get_cpu_cores, settings::calculate_partition_settings,
+            stream_files::collect_stream_files,
         },
     },
 };
@@ -631,15 +604,15 @@ pub async fn search_multi(
 /// must be used instead.
 ///
 /// Only the first ORDER BY column is evaluated; secondary columns are not compared.
-/// Aggregate and histogram queries always return false — their partitioning is not
+/// Complex and histogram queries always return false — their partitioning is not
 /// affected by non-ts ORDER BY.
 fn detect_non_ts_order_by(
     order_by: &[(String, config::meta::sql::OrderBy)],
     ts_column: Option<&str>,
-    is_aggregate: bool,
+    is_complex_query: bool,
     is_histogram: bool,
 ) -> bool {
-    if is_aggregate || is_histogram {
+    if is_complex_query || is_histogram {
         return false;
     }
     order_by
@@ -688,206 +661,37 @@ pub async fn search_partition(
 
     // if there is no _timestamp field or EXPLAIN in the query, return single partitions
     let is_explain_query = is_explain_query(&req.sql);
-    let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
-
-    #[cfg(feature = "enterprise")]
-    let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
-
-    #[cfg(feature = "enterprise")]
-    {
-        let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
-            cache_aggs_util::analyze_count_aggregation_pattern(&req.sql);
-        if let Ok(result) = res {
-            is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
-        }
-    }
-
-    let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
-    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
-    let is_http_distinct = is_simple_distinct && is_http_req;
-
-    #[cfg(feature = "enterprise")]
-    let org_settings = crate::service::db::organization::get_org_setting(org_id)
-        .await
-        .unwrap_or_default();
-
-    #[cfg(feature = "enterprise")]
-    let mut is_streaming_aggregate = ts_column.is_none()
-        && is_cachable_aggs
-        && cfg.common.feature_query_streaming_aggs
-        && org_settings.streaming_aggregation_enabled
-        && !is_http_distinct;
-
-    #[cfg(not(feature = "enterprise"))]
-    let is_streaming_aggregate = false;
-
-    // if need streaming output and is simple query, we shouldn't skip file list
-    if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
-        skip_get_file_list = false;
-    }
-
-    // if http distinct, we should skip file list
-    if is_http_distinct || is_explain_query {
-        skip_get_file_list = true;
-    }
-
-    let mut files = Vec::with_capacity(sql.schemas.len() * 10);
-
-    let mut step_factor = 1;
-
-    let mut max_query_range = 0;
-    let mut max_query_range_in_hour = 0;
-    let mut index_size = 0;
-    let mut original_size = 0;
-    for (stream, schema) in sql.schemas.iter() {
-        let stream_type = stream.get_stream_type(stream_type);
-        let stream_name = stream.stream_name();
-        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
-        let use_stream_stats_for_partition =
-            if stream_settings == config::meta::stream::StreamSettings::default() {
-                cfg.common.use_stream_settings_for_partitions_enabled
-            } else {
-                stream_settings.approx_partition
-            };
-
-        if !skip_get_file_list && !use_stream_stats_for_partition {
-            let stream_files = crate::service::file_list::query_ids(
-                trace_id,
-                &sql.org_id,
-                stream_type,
-                &stream_name,
-                sql.time_range.unwrap_or_default(),
-            )
-            .await?;
-            max_query_range = max(
-                max_query_range,
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await
-                    * 3600
-                    * 1_000_000,
-            );
-            max_query_range_in_hour = max(
-                max_query_range_in_hour,
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await,
-            );
-            files.extend(stream_files);
-        } else {
-            // data retention should be either from stream settings or global data retension
-            let data_retention = if stream_settings.data_retention > 0 {
-                stream_settings.data_retention
-            } else {
-                cfg.compact.data_retention_days
-            };
-            let mut data_retention = data_retention * 24 * 60 * 60;
-            // data duration in seconds
-            let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
-
-            // if stats.doc_time_max is 0, handle the case by using current time
-            let data_end_time = if stats.doc_time_max == 0 {
-                Utc::now().timestamp_micros()
-            } else {
-                std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max)
-            };
-
-            let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
-
-            if data_retention_based_on_stats > 0 {
-                data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
-            };
-            if data_retention == 0 {
-                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
-                data_retention = 1;
-            }
-            let records = (stats.doc_num as i64 / data_retention) * query_duration;
-            let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
-            log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size}, data_retention in seconds: {data_retention}",
-            );
-            files.push(infra::file_list::FileId {
-                id: Utc::now().timestamp_micros(),
-                records,
-                original_size,
-                deleted: false,
-            });
-        }
-        index_size = max(index_size, stats.index_size as i64);
-        original_size = max(original_size, stats.storage_size as i64);
-        if index_size > 0 {
-            step_factor = max(step_factor, original_size / index_size);
-        } else {
-            step_factor = 1;
-        }
-    }
-    log::info!(
-        "[trace_id {trace_id}] max_query_range: {}, max_query_range_in_hour: {}",
-        max_query_range,
-        max_query_range_in_hour
+    let is_complex_query = is_complex_query(&req.sql).unwrap_or(false);
+    let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
+    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).map(|(v, _)| v);
+    let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
+        &req.sql,
+        ts_column.as_deref(),
+        is_http_distinct,
     );
 
-    let file_list_took = start.elapsed().as_millis() as usize;
-    let (is_histogram_eligible, _) = is_eligible_for_histogram(
-        &req.sql, // `is_multi_stream_search` will always be false for search_partition
-        false,
-    )
-    .unwrap_or((false, false));
+    let use_single_partition = is_http_distinct
+        || is_explain_query
+        || ((ts_column.is_none() || apply_over_hits)
+            && !(req.streaming_output && is_streaming_aggregate));
 
+    let stream_files = collect_stream_files(trace_id, user_id, &sql, use_single_partition).await?;
+    let files = stream_files.files;
+    let max_query_range = stream_files.max_query_range;
+    let max_query_range_in_hour = stream_files.max_query_range_in_hour;
+    let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, max_query_range: {max_query_range}, max_query_range_in_hour: {max_query_range_in_hour}, took: {file_list_took} ms",
         (req.start_time, req.end_time),
         files.len(),
-        file_list_took,
     );
 
-    if skip_get_file_list {
-        let mut response = search::SearchPartitionResponse::default();
-        response.partitions.push([req.start_time, req.end_time]);
-        response.max_query_range = max_query_range_in_hour;
-        response.histogram_interval = sql.histogram_interval;
-        response.is_histogram_eligible = is_histogram_eligible;
-        log::info!("[trace_id {trace_id}] search_partition: returning single partition");
-        return Ok(response);
-    };
-
-    let role_group = if is_http_req {
-        Some(RoleGroup::Interactive)
-    } else {
-        Some(RoleGroup::Background)
-    };
-    let nodes = get_cached_online_querier_nodes(role_group)
-        .await
-        .unwrap_or_default();
-    if nodes.is_empty() {
-        log::error!("[trace_id {trace_id}] search_partition: no querier node online");
-        return Err(Error::Message("no querier node online".to_string()));
-    }
-
-    // Use the configured node selection strategy so cpu_cores reflects the
-    // actual nodes this query will fan out to — not the entire cluster.
-    // With "org" or "stream" strategies only a subset of nodes are used;
-    // summing all nodes' CPU would under-estimate total_secs and create too
-    // few partitions.
-    #[cfg(feature = "enterprise")]
-    let cpu_cores = {
-        let stream_key = sql.get_first_stream_key();
-        let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            org_id,
-            &stream_key,
-            nodes,
-            role_group,
-        )
-        .await;
-        selected.iter().map(|n| n.cpu_num).sum::<u64>() as usize
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
-
+    // `is_multi_stream_search` will always be false for search_partition
+    let (is_histogram_eligible, _) =
+        is_eligible_for_histogram(&req.sql, false).unwrap_or((false, false));
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
-
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -899,126 +703,70 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        // non enterprise - diabled
-        #[cfg(not(feature = "enterprise"))]
         streaming_output: false,
-        #[cfg(not(feature = "enterprise"))]
         streaming_aggs: false,
-        #[cfg(not(feature = "enterprise"))]
-        streaming_id: None,
-        // enterprise
-        #[cfg(feature = "enterprise")]
-        streaming_output: false,
-        #[cfg(feature = "enterprise")]
-        streaming_aggs: false,
-        #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
         non_ts_order_by_cols: vec![],
     };
 
-    let mut min_step = Duration::try_seconds(1)
-        .unwrap()
-        .num_microseconds()
-        .unwrap();
-    if (is_aggregate && ts_column.is_some()) || enable_align_histogram {
-        let hist_int = if let Some(hist_int) = sql.histogram_interval {
-            hist_int
-        } else {
-            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
-            match convert_histogram_interval_to_seconds(interval) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
-                    );
-                    10
-                }
-            }
-        };
-        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
-        if hist_int > 0 {
-            min_step *= hist_int;
-        }
-    }
-
     // Calculate original step with all factors considered
+    let cpu_cores = get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
 
-    // If total secs is <= aggs_min_num_partition_secs (default 3 seconds), then disable
-    // partitioning even if streaming aggs is true. This optimization avoids partition overhead
-    // for fast queries.
-    #[cfg(feature = "enterprise")]
-    if is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs {
+    if use_single_partition
+        || (is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
+    {
         log::info!(
-            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({}) <= aggs_min_num_partition_secs ({}), returning single partition",
-            total_secs,
+            "[trace_id {trace_id}] search_partition: return single partition because (using single partition {use_single_partition}) or (total_secs ({total_secs}) <= aggs_min_num_partition_secs ({})) is true",
             cfg.limit.aggs_min_num_partition_secs
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
-        resp.streaming_aggs = false;
-        resp.streaming_id = None;
         return Ok(resp);
     }
 
-    let mut part_num = max(1, total_secs / cfg.limit.query_partition_by_secs);
-    if part_num * cfg.limit.query_partition_by_secs < total_secs {
-        part_num += 1;
+    if detect_non_ts_order_by(
+        &sql.order_by,
+        ts_column.as_deref(),
+        is_complex_query,
+        sql.histogram_interval.is_some() || enable_align_histogram,
+    ) {
+        resp.non_ts_order_by_cols = sql
+            .order_by
+            .iter()
+            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
+            .collect();
+        if cfg.limit.disable_partitions_for_non_ts_order_by {
+            log::info!(
+                "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
+            );
+            resp.partitions = vec![[req.start_time, req.end_time]];
+            return Ok(resp);
+        }
     }
 
-    // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
-    let max_partition_num = cfg.limit.query_partition_max_num.max(1);
-    if part_num > max_partition_num {
-        part_num = max_partition_num;
-    }
-
-    log::info!(
-        "[trace_id {trace_id}] search_partition: \
-        original_size: {}, cpu_cores: {cpu_cores}, base_speed: {}, \
-        partition_secs: {}, part_num: {part_num}, \
-        is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
-        resp.original_size,
-        cfg.limit.query_group_base_speed,
-        cfg.limit.query_partition_by_secs,
+    let partition_settings = calculate_partition_settings(
+        trace_id,
+        total_secs,
+        &sql,
+        is_complex_query,
+        ts_column.is_some(),
+        enable_align_histogram,
+        skip_max_query_range,
+        max_query_range,
     );
 
-    // Calculate step with all constraints
-    let mut step = (req.end_time - req.start_time) / part_num as i64;
-    // step must be times of min_step
-    if step < min_step {
-        step = min_step;
-    }
-    // Align step with min_step to ensure partition boundaries match histogram intervals
-    if min_step > 0 && step % min_step > 0 {
-        // If step is not perfectly divisible by min_step, round it down to the nearest multiple
-        // Example: If min_step = 5 minutes  and step = 17 minutes
-        //   step % min_step = 17 % 5 = 2 (2 minutes)
-        //   step = 17 - 2 = 15 (15 minutes, which is divisible by 5)
-        step = step - step % min_step;
-    }
-    // this is to ensure we create partitions less than max_query_range
-    if !skip_max_query_range && max_query_range > 0 && step > max_query_range {
-        step = if min_step < max_query_range {
-            max_query_range - max_query_range % min_step
-        } else {
-            max_query_range
-        };
-    }
-
-    let mut is_histogram = sql.histogram_interval.is_some();
-    let mut add_mini_partition = false;
-    // Set this to true to generate partitions aligned with interval
-    // only for logs page when query is non-histogram
-    // and also with query param `align_histogram` is true,
-    // so that logs can reuse the same partitions
-    // for histogram query
-    if !is_histogram && enable_align_histogram {
-        is_histogram = true;
-        // add mini partition for the histogram aligned partitions in the UI search
-        add_mini_partition = true;
+    #[cfg(feature = "enterprise")]
+    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
+        prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
+    #[cfg(feature = "enterprise")]
+    {
+        resp.streaming_output = streaming_aggs;
+        resp.streaming_aggs = streaming_aggs;
+        resp.streaming_id = streaming_id.clone();
     }
 
     let sql_order_by = sql
@@ -1033,200 +781,21 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    let is_non_ts_order_by = detect_non_ts_order_by(
-        &sql.order_by,
-        ts_column.as_deref(),
-        is_aggregate,
-        is_histogram,
-    );
-
-    if is_non_ts_order_by {
-        resp.non_ts_order_by_cols = sql
-            .order_by
-            .iter()
-            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
-            .collect();
-    }
-
-    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
-        );
-        resp.partitions = vec![[req.start_time, req.end_time]];
-        return Ok(resp);
-    }
-
-    log::debug!(
-        "[trace_id {trace_id}] total_secs: {total_secs}, partition_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {}",
-        is_histogram || enable_align_histogram
-    );
-    // create a partition generator
+    // Add a mini partition only for histogram-aligned log searches. Actual
+    // histogram queries should keep their original interval-aligned partitions.
+    let is_histogram = sql.histogram_interval.is_some();
+    let add_mini_partition = !is_histogram && enable_align_histogram;
     let generator = partition::PartitionGenerator::new(
-        min_step,
+        partition_settings.min_step,
         cfg.limit.search_mini_partition_duration_secs,
         is_histogram || enable_align_histogram,
     );
-
-    #[cfg(feature = "enterprise")]
-    // check if we need to use streaming_output
-    let streaming_id = if req.streaming_output && is_streaming_aggregate && !skip_get_file_list {
-        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
-            // TODO: cache don't not support multiple stream names
-            Ok(v) => (v[0].clone(), v.join(",")),
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
-            }
-        };
-
-        // check cardinality for group by fields
-        let group_by_fields = get_group_by_fields(&sql).await?;
-        let cardinality_map = crate::service::search::cardinality::check_cardinality(
-            org_id,
-            stream_type,
-            &stream_name,
-            &group_by_fields,
-            query.end_time,
-        )
-        .await?;
-
-        let cardinality_value = cardinality_map.values().product::<f64>();
-        let cardinality_level = CardinalityLevel::from(cardinality_value);
-        let cache_interval = generate_aggregation_search_interval(
-            query.start_time,
-            query.end_time,
-            cardinality_level,
-        );
-
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output, group by fields: {cardinality_map:?}, cardinality level: {cardinality_level:?}, interval: {cache_interval:?}"
-        );
-
-        let cache_interval_mins = cache_interval.get_duration_minutes();
-        if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache,
-            // so we set is_streaming_aggregate to false and return None
-            is_streaming_aggregate = false;
-            // skip_get_file_list = true;
-            None
-        } else {
-            let streaming_id = ider::uuid();
-            let hashed_query = get_aggregation_cache_key_from_request(req);
-            let cache_file_path = create_aggregation_cache_file_path(
-                org_id,
-                &stream_type.to_string(),
-                &stream_name,
-                hashed_query,
-            );
-
-            // Discover existing cache files for this query
-            let cache_discovery_result = if !use_cache {
-                o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
-                    query.start_time,
-                    query.end_time,
-                )
-            } else {
-                match discover_cache_for_query(
-                    &cache_file_path,
-                    query.start_time,
-                    query.end_time,
-                    cache_interval,
-                )
-                .await
-                {
-                    Ok(result) => result,
-                    Err(e) => {
-                        log::warn!(
-                            "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
-                        );
-                        // Create empty discovery result to proceed without cache
-                        o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
-                            query.start_time,
-                            query.end_time,
-                        )
-                    }
-                }
-            };
-
-            log::info!(
-                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Cache discovery: coverage={:.2}%, cached_ranges={}, uncached_ranges={}",
-                cache_discovery_result.cache_coverage_ratio * 100.0,
-                cache_discovery_result.cached_ranges.len(),
-                cache_discovery_result.uncached_ranges.len()
-            );
-
-            // Generate optimal partitions based on cache discovery
-            let partition_strategy = generate_optimal_partitions(
-                cache_discovery_result,
-                query.start_time,
-                query.end_time,
-                cardinality_level,
-            );
-
-            log::info!(
-                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Partition strategy: {}, requires_execution={}, execution_partitions={}",
-                partition_strategy.strategy_name(),
-                partition_strategy.requires_execution(),
-                partition_strategy.execution_partition_count()
-            );
-
-            streaming_aggs_exec::init_cache(
-                &streaming_id,
-                query.start_time,
-                query.end_time,
-                &cache_file_path,
-                cache_interval_mins,
-            );
-
-            // Store partition strategy for use in do_partitioned_search
-            streaming_aggs_exec::set_partition_strategy(&streaming_id, partition_strategy);
-
-            log::info!(
-                "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
-            );
-            Some(streaming_id)
-        }
-    } else {
-        None
-    };
-    #[cfg(feature = "enterprise")]
-    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
-    #[cfg(feature = "enterprise")]
-    {
-        resp.streaming_output = streaming_aggs;
-        resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id.clone();
-    }
-
-    // Get cache strategy for streaming aggregates
-    #[cfg(feature = "enterprise")]
-    let stremaing_aggs_cache_strategy = if streaming_aggs
-        && let Some(streaming_id_ref) = streaming_id.as_deref()
-    {
-        match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
-            Some(strategy) => {
-                log::info!(
-                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] Using cache-aware partition strategy"
-                );
-                Some(strategy)
-            }
-            None => {
-                log::warn!(
-                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] No partition strategy found, using default generation"
-                );
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    // Generate partitions
     let partitions = generator.generate_partitions(
         req.start_time,
         req.end_time,
-        step,
+        partition_settings.step,
         sql_order_by,
-        is_aggregate,
+        is_complex_query,
         add_mini_partition,
         #[cfg(feature = "enterprise")]
         stremaing_aggs_cache_strategy,
@@ -1238,7 +807,7 @@ pub async fn search_partition(
 
     resp.partitions = partitions;
     if enable_align_histogram {
-        let min_step_secs = min_step / 1_000_000;
+        let min_step_secs = partition_settings.min_step / 1_000_000;
         resp.histogram_interval = Some(min_step_secs);
     }
     Ok(resp)
@@ -1865,7 +1434,7 @@ mod tests {
         assert!(detect_non_ts_order_by(&order_by, None, false, false));
     }
 
-    // ── SQL-parsing integration tests (via ColumnVisitor + is_aggregate_query) ──
+    // ── SQL-parsing integration tests (via ColumnVisitor + is_complex_query) ──
 
     #[test]
     fn test_detect_sql_multi_col_non_ts_primary() {
@@ -1899,35 +1468,53 @@ mod tests {
 
     #[test]
     fn test_detect_sql_aggregate_with_count_order() {
-        // is_aggregate_query returns true for GROUP BY → detect always false
+        // is_complex_query returns true for GROUP BY → detect always false
         let sql = "SELECT count(*), status FROM logs GROUP BY status ORDER BY count(*) DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "GROUP BY query must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(
+            is_complex_query,
+            "GROUP BY query must be detected as complex"
+        );
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
-    fn test_detect_sql_join_is_aggregate_short_circuits() {
-        // is_aggregate_query returns true for JOINs → detect always false regardless of ORDER BY
+    fn test_detect_sql_join_is_complex_short_circuits() {
+        // is_complex_query returns true for JOINs → detect always false regardless of ORDER BY
         let sql = "SELECT a.duration, b.name FROM logs a \
                    JOIN users b ON a.user_id = b.id \
                    ORDER BY duration DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "JOIN query must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(is_complex_query, "JOIN query must be detected as complex");
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
-    fn test_detect_sql_subquery_is_aggregate_short_circuits() {
-        // is_aggregate_query returns true for subqueries → detect always false
+    fn test_detect_sql_subquery_is_complex_short_circuits() {
+        // is_complex_query returns true for subqueries → detect always false
         let sql = "SELECT * FROM (SELECT * FROM logs WHERE status = 200) sub \
                    ORDER BY duration DESC";
-        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
-        assert!(is_agg, "subquery must be detected as aggregate");
+        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
+        assert!(is_complex_query, "subquery must be detected as complex");
         let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            None,
+            is_complex_query,
+            false
+        ));
     }
 
     #[test]
@@ -1943,8 +1530,8 @@ mod tests {
     #[test]
     fn test_detect_sql_cte_outer_non_ts_order_by() {
         // CTE: outer ORDER BY duration first → true
-        // Note: is_aggregate_query may return true for CTEs with subquery body;
-        // in that case the aggregate guard fires before this helper.
+        // Note: is_complex_query may return true for CTEs with subquery body;
+        // in that case the complex-query guard fires before this helper.
         let sql = "WITH t AS (SELECT * FROM logs ORDER BY _timestamp DESC) \
                    SELECT * FROM t ORDER BY duration DESC";
         let order_by = parse_order_by(sql);

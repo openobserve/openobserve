@@ -43,6 +43,10 @@ impl<W> PuffinBytesWriter<W> {
         }
     }
 
+    pub fn set_property(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.properties.insert(key.into(), value.into());
+    }
+
     fn build_blob_metadata(
         &self,
         blob_type: BlobTypes,
