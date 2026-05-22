@@ -53,6 +53,7 @@
                 :items="seriesDataItems"
                 search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                 label="Select Series"
+                label-position="inside"
                 :value-replace-fn="selectColorBySeriesOption"
               />
             </div>
@@ -311,6 +312,5 @@ export default defineComponent({
 .color-section {
   display: flex;
   align-items: center;
-  margin-top: 9px;
 }
 </style>

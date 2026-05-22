@@ -30,6 +30,7 @@ import {
 } from "reka-ui";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
+  type Ref,
   computed,
   inject,
   nextTick,
@@ -53,6 +54,10 @@ type NormalizedOption = {
   /** Pre-rendered Vue component (e.g. an inlined SVG) shown beside the option label.
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
+  /** Secondary description text shown below the label in the dropdown item. */
+  subLabel?: string;
+  /** Array of CSS color strings used to render a gradient swatch below the label. */
+  colorPalette?: string[];
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -159,6 +164,8 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   // Lets consumers like ConfigPanel pass `iconComponent: markRaw(MyIcon)` per option
   // when the icon isn't a string in the OIcon registry.
   const rawIconComponent = option["iconComponent"];
+  const rawSubLabel = option["subLabel"];
+  const rawColorPalette = option["colorPalette"];
   return {
     label:
       rawLabel === undefined || rawLabel === null
@@ -169,6 +176,10 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
+    subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    colorPalette: Array.isArray(rawColorPalette)
+      ? (rawColorPalette as string[])
+      : undefined,
   };
 }
 
@@ -543,10 +554,27 @@ const virtualizer = useVirtualizer(
   computed(() => ({
     count: filteredOptions.value.length,
     getScrollElement: () => listboxScrollEl.value,
-    estimateSize: () => 28,
+    estimateSize: (index: number) => {
+      const opt = filteredOptions.value[index];
+      if (!opt) return 28;
+      const hasSubLabel = !!opt.subLabel;
+      const hasPalette = !!(opt.colorPalette?.length);
+      // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) + gap(4) + gradient(6) = 84px
+      if (hasPalette && hasSubLabel) return 84;
+      // py-2(16) + label(20) + gap(4) + gradient(6) = 46px  — no subLabel
+      if (hasPalette) return 46;
+      // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) = 74px  — no palette
+      if (hasSubLabel) return 74;
+      return 28;
+    },
     overscan: 8,
   })),
 );
+
+/** Build a CSS linear-gradient string from an array of color stops. */
+function getPaletteGradient(colors: string[]): string {
+  return `linear-gradient(to right, ${colors.join(", ")})`;
+}
 
 // md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
@@ -587,6 +615,16 @@ onBeforeUnmount(() => {
     closeNestedRegistration = null;
   }
 });
+
+// Close when the sidebar scroll container scrolls, preventing the portal
+// from floating disconnected at the top of the screen.
+const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+if (sidebarScrollTick) {
+  watch(sidebarScrollTick, () => {
+    if (popoverOpen.value) popoverOpen.value = false;
+    if (selectOpen.value) selectOpen.value = false;
+  });
+}
 
 // ── Chip overflow (width-aware) ──────────────────────────────────────────
 // In multi-select mode, fit as many chips as the trigger width allows; the
@@ -916,16 +954,17 @@ const fieldWidthClass = computed(() => {
             align="start"
             :trap-focus="false"
             :disable-outside-pointer-events="false"
+            :hide-when-detached="true"
             :data-test="
               parentDataTest ? `${parentDataTest}-popover` : undefined
             "
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:max-h-72 tw:overflow-hidden',
+              'tw:overflow-hidden',
               'tw:rounded-md tw:shadow-lg',
               'tw:bg-select-content-bg',
             ]"
-            :style="dropdownStyle"
+            :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
             @pointerdown.stop
           >
@@ -1054,8 +1093,8 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
-                          'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-bold',
+                          'tw:text-select-item-text tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
                           'tw:select-none tw:pointer-events-none',
                         ]"
                       >
@@ -1073,11 +1112,15 @@ const fieldWidthClass = computed(() => {
                             : undefined
                         "
                         :class="[
-                          'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
+                          'tw:relative tw:flex tw:w-full tw:h-full tw:gap-2',
                           'tw:ps-3 tw:pe-3 tw:text-sm',
                           'tw:text-select-item-text tw:rounded-sm',
                           'tw:cursor-pointer tw:select-none tw:outline-none',
                           'tw:transition-colors tw:duration-100',
+                          // Use flex-col for rich items (subLabel / colorPalette), row otherwise
+                          filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length
+                            ? 'tw:flex-col tw:items-start tw:py-2'
+                            : 'tw:flex-row tw:items-center',
                           // highlightedIndex-based highlight — works with virtualised items.
                           // Reka's data-highlighted only fires for direct DOM children of
                           // ListboxRoot; virtual rows are not, so we track highlight ourselves.
@@ -1124,22 +1167,51 @@ const fieldWidthClass = computed(() => {
                           </span>
                         </template>
 
-                        <!-- Per-option icon: prefer a raw Vue component (iconComponent),
-                           fall back to a string name (icon) resolved via OIcon registry. -->
-                        <component
-                          v-if="filteredOptions[vRow.index].iconComponent"
-                          :is="filteredOptions[vRow.index].iconComponent"
-                          class="tw:shrink-0 tw:size-4"
-                        />
-                        <OIcon
-                          v-else-if="filteredOptions[vRow.index].icon"
-                          :name="filteredOptions[vRow.index].icon"
-                          size="xs"
-                          class="tw:shrink-0"
-                        />
-                        <span class="tw:truncate">{{
-                          filteredOptions[vRow.index].label
-                        }}</span>
+                        <!-- Rich item: label + optional subLabel + optional color palette swatch.
+                             Wrapped in a single div so ListboxItem's gap-2 does not
+                             add unexpected space between each child and overflow the fixed height. -->
+                        <template
+                          v-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length"
+                        >
+                          <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
+                            <span class="tw:truncate tw:w-full tw:leading-snug tw:font-medium">{{
+                              filteredOptions[vRow.index].label
+                            }}</span>
+                            <span
+                              v-if="filteredOptions[vRow.index].subLabel"
+                              class="tw:text-xs tw:text-select-placeholder tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"
+                            >{{ filteredOptions[vRow.index].subLabel }}</span>
+                            <div
+                              v-if="filteredOptions[vRow.index].colorPalette?.length"
+                              class="tw:h-1.5 tw:w-full tw:rounded-sm"
+                              :style="{
+                                background: getPaletteGradient(
+                                  filteredOptions[vRow.index].colorPalette!,
+                                ),
+                              }"
+                            />
+                          </div>
+                        </template>
+
+                        <!-- Simple item: optional icon + label -->
+                        <template v-else>
+                          <!-- Per-option icon: prefer a raw Vue component (iconComponent),
+                             fall back to a string name (icon) resolved via OIcon registry. -->
+                          <component
+                            v-if="filteredOptions[vRow.index].iconComponent"
+                            :is="filteredOptions[vRow.index].iconComponent"
+                            class="tw:shrink-0 tw:size-4"
+                          />
+                          <OIcon
+                            v-else-if="filteredOptions[vRow.index].icon"
+                            :name="filteredOptions[vRow.index].icon"
+                            size="xs"
+                            class="tw:shrink-0"
+                          />
+                          <span class="tw:truncate">{{
+                            filteredOptions[vRow.index].label
+                          }}</span>
+                        </template>
                       </ListboxItem>
                     </div>
                   </div>
@@ -1265,10 +1337,11 @@ const fieldWidthClass = computed(() => {
         <SelectContent
           position="popper"
           :side-offset="4"
+          :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
             'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
-            'tw:max-h-60 tw:overflow-hidden',
+            'tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-md',
             'tw:bg-select-content-bg tw:border-select-content-border',
             'tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out',
@@ -1277,7 +1350,7 @@ const fieldWidthClass = computed(() => {
             'tw:data-[side=bottom]:slide-in-from-top-2',
             'tw:data-[side=top]:slide-in-from-bottom-2',
           ]"
-          :style="dropdownStyle"
+          :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
           @click.stop
           @pointerdown.stop
         >

@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<ComboboxProps>(), {
   error: false,
   debounce: 0,
   valueReplaceFn: (option: ComboboxOption) => option.value,
+  labelPosition: "outside",
 });
 
 const emit = defineEmits<ComboboxEmits>();
@@ -98,9 +99,12 @@ function onSelect(optionValue: string) {
 }
 
 // ── Sizes ────────────────────────────────────────────────────────────────────
-const heightClass = computed(() =>
-  props.size === "sm" ? "tw:h-8 tw:text-sm" : "tw:h-8 tw:text-sm",
-);
+const heightClass = computed(() => {
+  if (props.labelPosition === "inside" && (props.label || slots.label)) {
+    return props.size === "sm" ? "tw:h-10 tw:text-sm tw:pt-4" : "tw:h-10 tw:text-sm tw:pt-4";
+  }
+  return props.size === "sm" ? "tw:h-8 tw:text-sm" : "tw:h-8 tw:text-sm";
+});
 
 // ── Error ────────────────────────────────────────────────────────────────────
 const effectiveError = computed(
@@ -111,6 +115,9 @@ const hasError = computed(() => !!effectiveError.value);
 const hasLabel = computed(
   () => Boolean(slots.label) || props.label !== undefined,
 );
+const hasInsideLabel = computed(
+  () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
+);
 </script>
 
 <template>
@@ -119,9 +126,9 @@ const hasLabel = computed(
     class="tw:flex tw:flex-col tw:gap-1 tw:w-full"
     :data-test="parentDataTest"
   >
-    <!-- Label -->
+    <!-- Label (outside) -->
     <label
-      v-if="hasLabel || $slots.tooltip"
+      v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
         'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
@@ -147,6 +154,13 @@ const hasLabel = computed(
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="tw:relative tw:flex tw:items-center tw:w-full">
+        <!-- Inside label -->
+        <span
+          v-if="hasInsideLabel"
+          class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:z-10"
+        >
+          <slot name="label">{{ label }}</slot>
+        </span>
         <ComboboxInput
           :id="inputId"
           :name="name"
@@ -175,7 +189,7 @@ const hasLabel = computed(
           position="popper"
           :side-offset="4"
           :class="[
-            'tw:z-[10001] tw:min-w-(--reka-combobox-trigger-width)',
+            'tw:z-10001 tw:min-w-(--reka-combobox-trigger-width) tw:max-w-(--reka-combobox-trigger-width) tw:w-(--reka-combobox-trigger-width)',
             'tw:max-h-60 tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-lg',
             'tw:bg-select-content-bg tw:border-select-content-border',
@@ -199,7 +213,7 @@ const hasLabel = computed(
               :key="option.value"
               :value="option.value"
               :class="[
-                'tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full',
+                'tw:relative tw:flex tw:items-start tw:gap-2 tw:w-full',
                 'tw:ps-3 tw:pe-8 tw:py-1.5 tw:text-sm',
                 'tw:text-select-item-text tw:rounded-sm',
                 'tw:cursor-pointer tw:select-none tw:outline-none',
@@ -210,7 +224,7 @@ const hasLabel = computed(
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="tw:flex-1 tw:truncate">{{ option.label }}</span>
+              <span class="tw:flex-1 tw:wrap-break-word tw:whitespace-normal tw:min-w-0">{{ option.label }}</span>
               <ComboboxItemIndicator
                 class="tw:absolute tw:end-2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
               >

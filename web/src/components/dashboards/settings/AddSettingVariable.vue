@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Value
               </div>
-              <div class="tw:w-12 tw:flex tw:flex-col tw:items-center">
+              <div class="tw:w-12 tw:flex tw:items-center tw:justify-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
                 <OCheckbox
                   v-if="variableData.multiSelect"
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                 </OCheckbox>
               </div>
-              <div class="tw:w-[2.62rem]"></div>
+              <div class="tw:w-6"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
