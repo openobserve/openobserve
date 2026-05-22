@@ -221,7 +221,7 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.$options.components.SortByBtnGrp).toBeDefined();
-      expect(wrapper.vm.$options.components.CommonAutoComplete).toBeDefined();
+      expect(wrapper.vm.$options.components.DynamicFunctionPopUp).toBeDefined();
       expect(
         wrapper.vm.$options.components.SanitizedHtmlRenderer,
       ).toBeDefined();

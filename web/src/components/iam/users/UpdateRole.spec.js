@@ -143,8 +143,8 @@ describe("UpdateRole Component", () => {
     };
 
     dismissMock = vi.fn();
-    notifyMock = toastMock;
-    vi.mocked(toastMock).mockReturnValue(dismissMock);
+    notifyMock = useToastModule.toast;
+    vi.mocked(useToastModule.toast).mockReturnValue(dismissMock);
 
     wrapper = mountUpdateRole();
   });

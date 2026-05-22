@@ -107,8 +107,8 @@ describe("User Component", () => {
 
     // Setup notify mock with dismiss function — use toast which is what source calls
     dismissMock = vi.fn();
-    notifyMock = toastMock;
-    vi.mocked(toastMock).mockReturnValue(dismissMock);
+    notifyMock = useToastModule.toast;
+    vi.mocked(useToastModule.toast).mockReturnValue(dismissMock);
 
     // Mock successful API responses
     vi.mocked(usersService.orgUsers).mockResolvedValue({
