@@ -767,6 +767,14 @@ const fieldWidthClass = computed(() => {
             :id="inputId"
             :name="name"
             :disabled="disabled"
+            :data-test-selected-value="
+              multiple
+                ? selectedValues.map((v) => String(v)).join(',')
+                : selectedValues[0] !== undefined
+                  ? String(selectedValues[0])
+                  : ''
+            "
+            :data-test-selected-label="triggerDisplayLabel"
             :class="[
               'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
               $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3',

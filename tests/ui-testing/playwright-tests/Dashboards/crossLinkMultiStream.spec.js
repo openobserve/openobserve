@@ -142,17 +142,37 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // result_schema (cross_linking=true) calls fired alongside the search.
         const crossLinkCapture = pm.crossLinkPage.captureCrossLinkResponses();
 
-        // Run query
-        await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(3000);
+        // Run query + retry if responses come back empty. The backend's
+        // result_schema cross-link merge is eventually-consistent — a query
+        // fired immediately after the schema-settings PUT can race the
+        // cross-link materialisation and return `stream_links: []` for both
+        // streams. Re-firing the query forces fresh result_schema calls, which
+        // pick up the now-persisted links. We cap at 3 attempts so a genuinely
+        // broken backend still fails fast.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            crossLinkCapture.reset();
+            await pm.logsPage.runQueryAndWaitForResults();
+            await page.waitForTimeout(3000);
 
-        // Wait for at least 2 cross_linking=true result_schema calls (one per
-        // selected stream) — cross-links won't appear in the dropdown until
-        // searchObj.data.crossLinks has been merged from both streams' responses.
-        const captured = await crossLinkCapture.waitForAtLeast(2, { timeout: 8000 });
-        testLogger.info('result_schema cross_linking responses captured', {
-            count: captured,
-        });
+            const captured = await crossLinkCapture.waitForAtLeast(2, { timeout: 8000 });
+            await page.waitForTimeout(500);
+
+            const nonEmpty = crossLinkCapture.getNonEmptyCount();
+            testLogger.info('result_schema cross_linking responses captured', {
+                attempt,
+                count: captured,
+                nonEmpty,
+            });
+
+            if (nonEmpty >= 1) break;
+
+            if (attempt < 3) {
+                testLogger.warn(
+                    `Attempt ${attempt}: both result_schema responses empty — re-firing query`,
+                );
+                await page.waitForTimeout(1500);
+            }
+        }
 
         // Step 4: Expand a log row to reveal JSON preview
         await pm.crossLinkPage.expandFirstLogRow();

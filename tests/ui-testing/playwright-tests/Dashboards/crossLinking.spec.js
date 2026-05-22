@@ -423,7 +423,7 @@ test.describe("Cross-Linking testcases", () => {
 
         testLogger.info('Cross-link created and saved');
 
-        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
@@ -860,22 +860,23 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickUpdateSettings();
         await page.waitForTimeout(2000);
 
-        // Navigate to logs
+        // Navigate to logs and select the stream via the shared logsPage helper.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
+
+        // Disable Quick Mode so all fields (including _timestamp /
+        // non-interesting fields) show inside the expanded JSON detail.
+        await pm.logsPage.ensureQuickModeState(false);
+        await page.waitForTimeout(1000);
+
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
-        // Open log detail
-        const firstLogRow = page.locator('[data-test="log-table-column-0-source"]');
-        await firstLogRow.waitFor({ state: 'visible', timeout: 15000 });
-        await firstLogRow.click();
-        await page.waitForTimeout(2000);
-        await page.locator('[data-test="dashboard-confirm-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
-
-        const jsonContent = page.locator('[data-test="log-detail-json-content"]');
-        await jsonContent.waitFor({ state: 'visible', timeout: 5000 });
+        // Expand the first log row inline (the new logs UI replaced the
+        // side-panel `dashboard-confirm-dialog` with an inline JsonPreview
+        // toggled by `table-row-expand-menu`, the same path test 10 uses).
+        await pm.crossLinkPage.expandFirstLogRow();
 
         // Check the configured field — cross-link SHOULD appear
         // Resolve the configured field row via PO/data-test (no class/text selectors)
@@ -1217,7 +1218,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickOrgSettingsSave();
         await page.waitForTimeout(2000);
 
-        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);

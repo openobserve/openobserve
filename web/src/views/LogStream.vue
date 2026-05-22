@@ -62,8 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div data-test="streams-search-stream-input">
+            <div>
               <OInput
+                data-test="streams-search-stream-input"
                 v-model="filterQuery"
                 class="tw:ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
@@ -123,6 +124,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'width: 100%'
             "
           >
+            <!--
+              Render the stream-name cell with a deterministic per-name data-test.
+              Tests can target a specific stream row via
+              `[data-test="log-stream-name-cell-<name>"]` and walk up to the OTable
+              row via `xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`
+              without needing element/text predicates. Mirrors the
+              `dashboard-name-cell-<name>` pattern in Dashboards.vue.
+            -->
+            <template #cell-name="{ row }">
+              <span :data-test="`log-stream-name-cell-${row.name}`">{{ row.name }}</span>
+            </template>
+
             <template #cell-actions="{ row }">
                <div class="tw:flex tw:items-center actions-container">
                 <OButton

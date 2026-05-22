@@ -255,14 +255,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'
                       "
-                      data-test="tenstack-table-sort-icon-active"
+                      :data-test="`o2-table-sort-icon-${header.id}`"
+                      data-test-sort-state="active"
+                      :data-test-sort-direction="sortOrder"
                       size="sm"
                       class="tw:text-[var(--o2-primary-color)]"
                     />
                     <OIcon
                       v-else
                       name="unfold-more"
-                      data-test="tenstack-table-sort-icon-inactive"
+                      :data-test="`o2-table-sort-icon-${header.id}`"
+                      data-test-sort-state="inactive"
+                      data-test-sort-direction="none"
                       size="sm"
                       class="tw:opacity-40"
                     />

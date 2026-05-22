@@ -518,15 +518,27 @@ export class CrossLinkPage {
      */
     captureCrossLinkResponses() {
         const captured = [];
+        const bodies = [];
         const handler = (resp) => {
             const url = resp.url();
             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
                 captured.push(resp);
+                // Eagerly read body so callers can inspect stream_links payloads
+                // without racing the GC; failures are swallowed because the body
+                // capture is purely diagnostic and must never break the test.
+                resp.json()
+                    .then((body) => {
+                        bodies.push({ url, body });
+                    })
+                    .catch(() => {
+                        bodies.push({ url, body: null });
+                    });
             }
         };
         this.page.on('response', handler);
-        return {
+        const handle = {
             getCount: () => captured.length,
+            getBodies: () => bodies.slice(),
             waitForAtLeast: async (n, opts = {}) => {
                 const timeout = opts.timeout ?? 8000;
                 const interval = opts.interval ?? 500;
@@ -536,8 +548,31 @@ export class CrossLinkPage {
                 }
                 return captured.length;
             },
+            /**
+             * Reset the captured buffers so the same handle can be reused after
+             * re-firing the query (e.g. when the initial result_schema responses
+             * return empty stream_links and the test wants a fresh attempt).
+             */
+            reset: () => {
+                captured.length = 0;
+                bodies.length = 0;
+            },
+            /**
+             * Count the number of captured response bodies whose
+             * `cross_links.stream_links` contains at least one entry. The
+             * result_schema endpoint returns the merged structure at the top
+             * level (NOT nested under `data`) — `data` is the axios layer in
+             * useSearchBar that we don't see here. Eventually-consistent:
+             * callers should await `waitForAtLeast(n)` before reading this to
+             * ensure bodies have been parsed.
+             */
+            getNonEmptyCount: () =>
+                bodies.filter(
+                    (b) => (b.body?.cross_links?.stream_links ?? []).length > 0,
+                ).length,
             stop: () => this.page.off('response', handler),
         };
+        return handle;
     }
 
     /**

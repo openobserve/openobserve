@@ -720,111 +720,67 @@ export class LogsPage {
             testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
         }
 
+        // Post-OSelect-migration IndexList contract (see web/src/plugins/logs/IndexList.vue):
+        //  - Wrapper: [data-test="log-search-index-list-select-stream"]   (OSelect outer div)
+        //  - Trigger: the inner native <button> that Reka UI's PopoverTrigger renders. A
+        //    `[role="button"]` attribute selector does NOT match a native <button> — the
+        //    role is implicit, not declared as an attribute — so we scope from the data-test
+        //    wrapper down to its single `button` child instead.
+        //  - Option:  [data-test="log-search-index-list-select-stream-option"]
+        //             [data-test-value="<stream>"]   (rendered into a portalled popover by OSelect).
+        // The legacy q-select `log-search-index-list-stream-toggle-*` data-test is no longer
+        // emitted, so we open the popover and pick the option directly. The retry loop
+        // re-opens the popover on miss to handle the case where the stream list streams in
+        // late after page navigation — matching the original 5-attempt retry semantic.
+        const selectWrapper = this.page.locator(this.indexDropDown);
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`,
+        );
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
 
             try {
-                // Click the OSelect trigger button to open the stream list
-                testLogger.info(`selectStream: Clicking OSelect trigger button`);
-                const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-                await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
-                await selectTrigger.click();
-                await this.page.waitForTimeout(2000);
+                testLogger.info(`selectStream: Clicking OSelect wrapper to open stream popover`);
+                await selectWrapper.click();
+                await this.page.waitForTimeout(1000);
 
-                // Use search box to filter streams for faster finding
-                const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
-                const searchVisible = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
-                if (searchVisible) {
-                    testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
-                    await searchInput.click();
-                    await searchInput.fill(''); // Clear any previous filter first
-                    await searchInput.fill(stream);
-                    await this.page.waitForTimeout(1500);
-                }
-
-                // Stream picker is OSelect (Reka Listbox) post-migration; legacy
-                // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
-                const dropdownMenu = this.page.locator('[data-test$="-popover"]').first();
-
-                // Try to click the stream toggle div directly first
-                const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
-                testLogger.info(`selectStream: Looking for: ${streamToggleSelector}`);
-
-                // Scroll through the dropdown to find the stream
-                let maxScrolls = 20;
-                let scrollAmount = 200;
-                let foundStream = false;
-
-                while (maxScrolls > 0 && !foundStream) {
-                    // Check if stream toggle is visible
-                    const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
-                    const toggleDivVisible = await streamToggleDiv.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleDivVisible) {
-                        await streamToggleDiv.click();
-                        testLogger.info(`selectStream: Selected stream: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Try the toggle itself
-                    const streamToggle = this.page.locator(streamToggleSelector);
-                    const toggleVisible = await streamToggle.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleVisible) {
-                        await streamToggle.click();
-                        testLogger.info(`selectStream: Selected stream via toggle: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Try by text
-                    const streamByText = this.page.locator('[data-test$="-option"]').getByText(stream, { exact: true }).first();
-                    const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (textVisible) {
-                        await streamByText.click();
-                        testLogger.info(`selectStream: Selected stream by text: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Scroll down in the dropdown if stream not found yet
-                    const menuVisible = await dropdownMenu.isVisible({ timeout: 500 }).catch(() => false);
-                    if (menuVisible) {
-                        try {
-                            await dropdownMenu.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                            testLogger.debug(`selectStream: Scrolled dropdown by ${scrollAmount}px`);
-                        } catch (scrollError) {
-                            testLogger.debug(`selectStream: Scroll failed: ${scrollError.message}`);
-                        }
-                    }
-
+                testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
+                const visible = await option
+                    .first()
+                    .isVisible({ timeout: 3000 })
+                    .catch(() => false);
+                if (visible) {
+                    await option.first().click();
+                    await this.page.waitForTimeout(500);
+                    // Dismiss the popover — OSelect in multi mode stays open after toggle.
+                    await this.page.keyboard.press('Escape').catch(() => {});
                     await this.page.waitForTimeout(300);
-                    maxScrolls--;
+                    testLogger.info(`selectStream: Selected stream: ${stream}`);
+                    return;
                 }
 
-                // Stream not found in this attempt, close dropdown and retry
-                testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
-                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-                await this.page.waitForTimeout(500);
+                testLogger.info(`selectStream: Stream ${stream} not visible on attempt ${attempt}, retrying`);
+                await this.page.keyboard.press('Escape').catch(() => {});
+                await this.page.waitForTimeout(1500);
 
-                if (attempt < maxRetries) {
-                    testLogger.debug(`selectStream: Waiting 10s before retry...`);
-                    await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
-
-                    // Navigate to logs page again to refresh stream list
+                if (attempt < maxRetries && !skipNavigation) {
+                    testLogger.debug(`selectStream: Reloading logs page to refresh stream list`);
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
+                } else if (attempt < maxRetries) {
+                    // skipNavigation: stay on the current page, just let the stream list catch up.
+                    await this.page.waitForTimeout(3000);
                 }
-
             } catch (e) {
-                testLogger.debug(`selectStream: Attempt ${attempt} failed with error: ${e.message}`);
-                await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
-
-                if (attempt < maxRetries) {
-                    await this.page.waitForTimeout(5000);
+                testLogger.debug(`selectStream: Attempt ${attempt} failed: ${e.message}`);
+                await this.page.keyboard.press('Escape').catch(() => {});
+                if (attempt < maxRetries && !skipNavigation) {
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                } else if (attempt < maxRetries) {
                     await this.page.waitForTimeout(3000);
                 }
             }
@@ -836,26 +792,38 @@ export class LogsPage {
 
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
+        // Legacy q-select used `log-search-index-list-stream-toggle-<name> div`;
+        // post-OSelect migration that data-test is gone. Pick the same option
+        // by `data-test-value` — toggling an already-selected option deselects
+        // it in OSelect's multi-mode (selectionBehavior=toggle).
         const streamDropdown = this.page.locator(this.indexDropDown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
-        if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await streamToggle.click();
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        );
+        if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+            await option.first().click();
             testLogger.info(`Deselected stream: ${streamName}`);
         }
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async addStreamToSelection(streamName) {
         testLogger.info(`Adding stream to selection: ${streamName}`);
+        // Legacy `log-search-index-list-stream-toggle-<name>` is gone post-OSelect
+        // migration. Click the wrapper to open the popover, then pick the option
+        // by data-test-value.
         const searchInput = this.page.locator(this.indexDropDown);
         await searchInput.click();
         await this.page.waitForTimeout(500);
         await searchInput.fill(streamName);
         await this.page.waitForTimeout(1000);
-        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
-        if (await streamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await streamToggle.click();
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        );
+        if (await option.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+            await option.first().click();
             testLogger.info(`Selected additional stream: ${streamName}`);
         }
     }
@@ -2418,6 +2386,23 @@ export class LogsPage {
         return await this.page.waitForSelector(`:text("${text}")`);
     }
 
+    /**
+     * Wait briefly for the success OToast after creating a saved view.
+     * Resolves true on toast visible, false on timeout. Non-throwing — toasts may
+     * have appeared and disappeared by the time we check.
+     */
+    async expectSavedViewCreatedToast(timeout = 3000) {
+        try {
+            await this.page
+                .locator('[data-test="o-toast-success"], [data-test="o-toast-message"]')
+                .first()
+                .waitFor({ state: 'visible', timeout });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
 
@@ -3798,15 +3783,16 @@ export class LogsPage {
             return;
         }
 
-        // Quick Mode is off — open the utilities menu and enable it.
-        // Retry up to 3 times: under parallel load on alpha1, the first click may
-        // toggle the menu closed (if it was already open) or the menu may open slowly.
+        // Quick Mode is off — open the utilities dropdown and enable the OSwitch.
+        // Post-migration: the trigger is an ODropdownItem (data-test="logs-search-bar-quick-mode-toggle-btn")
+        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-toggle"). The switch reads its state
+        // from data-state="checked|unchecked".
         const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
-            // Dismiss any open overlay first to avoid toggle-closing on the next click
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-            await this.page.waitForTimeout(100);
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.waitForTimeout(200);
 
             await this.page.locator(this.utilitiesMenuButton).click({ force: true });
             const menuOpened = await quickModeItem.waitFor({ state: 'visible', timeout: 4000 })
@@ -3814,22 +3800,19 @@ export class LogsPage {
 
             if (!menuOpened) continue;
 
-            // Check toggle state: Quasar adds --truthy class when toggle is ON
-            const toggleInner = quickModeItem.locator('.q-toggle__inner').first();
-            const isOn = await toggleInner.evaluate(
-                node => node.classList.contains('q-toggle__inner--truthy')
-            ).catch(() => false); // Assume off if check fails — safer to try enabling
-
-            if (isOn) {
-                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            // Read OSwitch state via data-state attribute
+            const state = await quickModeSwitch.first().getAttribute('data-state').catch(() => null);
+            if (state === 'checked') {
+                await this.page.keyboard.press('Escape').catch(() => {});
                 await this.page.waitForTimeout(200);
                 enabled = true;
                 break;
             }
 
+            // Click the ODropdownItem (handleQuickMode is wired to .select)
             await quickModeItem.click({ force: true });
             await this.page.waitForTimeout(300);
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            await this.page.keyboard.press('Escape').catch(() => {});
             await this.page.waitForTimeout(200);
             enabled = true;
             break;

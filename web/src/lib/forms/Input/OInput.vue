@@ -342,6 +342,7 @@ const wrapperClasses = computed(() => [
         type="button"
         tabindex="-1"
         aria-label="Clear"
+        :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
         class="tw:flex tw:items-center tw:pe-2 tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover tw:transition-colors"
         @click="handleClear"
       >

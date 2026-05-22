@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useAttrs } from "vue";
 import type { PaginationProps, PaginationEmits } from "./OPagination.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
+
+const $attrs = useAttrs();
+// Forward consumer's `data-test` so individual buttons can be addressed via
+// `${parent}-prev` / `${parent}-next` / `${parent}-page-{n}` selectors.
+const parentDataTest = computed(
+  () => $attrs["data-test"] as string | undefined,
+);
 
 const props = withDefaults(defineProps<PaginationProps>(), {
   disable: false,
@@ -66,6 +73,7 @@ const navigate = (page: number) => {
       ]"
       :disabled="isFirst || disable"
       aria-label="Previous page"
+      :data-test="parentDataTest ? `${parentDataTest}-prev` : undefined"
       @click="navigate(modelValue - 1)"
     >
       <OIcon name="fast-rewind" size="sm" />
@@ -87,6 +95,8 @@ const navigate = (page: number) => {
       :disabled="disable && page !== modelValue"
       :aria-label="`Page ${page}`"
       :aria-current="page === modelValue ? 'page' : undefined"
+      :data-test="parentDataTest ? `${parentDataTest}-page-${page}` : undefined"
+      :data-test-value="page"
       @click="navigate(page)"
     >
       {{ page }}
@@ -103,6 +113,7 @@ const navigate = (page: number) => {
       ]"
       :disabled="isLast || disable"
       aria-label="Next page"
+      :data-test="parentDataTest ? `${parentDataTest}-next` : undefined"
       @click="navigate(modelValue + 1)"
     >
       <OIcon name="fast-forward" size="sm" />

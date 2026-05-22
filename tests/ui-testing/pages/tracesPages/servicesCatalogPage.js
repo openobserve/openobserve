@@ -1,6 +1,13 @@
 // servicesCatalogPage.js
 // Page object for Service Catalog feature in Traces module
 // Selectors verified against: ServicesCatalog.vue
+//
+// Strict selector policy:
+//   - data-test only (no element/class/text/role/label locators)
+//   - All locators live in constructor as class members
+//   - OInput convention: wrapper "X", inner input "X-field" (auto-derived)
+//   - OSelect option convention: "X-option" + data-test-value="<value>"
+//   - OPagination convention: "X-prev", "X-next", "X-page-{n}" (parent forwards)
 
 import { expect } from '@playwright/test';
 
@@ -8,102 +15,148 @@ export class ServicesCatalogPage {
   constructor(page) {
     this.page = page;
 
-    // Toolbar
-    this.streamSelector = '[data-test="services-catalog-stream-selector"]';
-    this.filterInputWrapper = '[data-test="services-catalog-filter-input"]';
-    this.filterClearBtn = '[data-test="services-catalog-filter-input"] [aria-label="Clear"]';
-    this.filterInput = `${this.filterInputWrapper} input`;
-    this.statusPill = '[data-test="services-catalog-status-pill"]';
+    // =====================================================================
+    // Selector strings (kept for parameterized cell lookups)
+    // =====================================================================
+    this.serviceLinkPrefix = 'services-catalog-service-link-';
+    this.statusBadgePrefix = 'services-catalog-status-';
+    this.errorRatePrefix = 'services-catalog-error-rate-';
+    this.requestsPrefix = 'services-catalog-requests-';
+    this.errorsPrefix = 'services-catalog-errors-';
+    this.rowsPerPageDataTest = 'services-catalog-records-per-page';
+    this.paginationDataTest = 'services-catalog-pagination';
+    this.filterInputDataTest = 'services-catalog-filter-input';
+
+    // =====================================================================
+    // Toolbar locators
+    // =====================================================================
+    this.streamSelector = page.locator('[data-test="services-catalog-stream-selector"]');
+    this.streamSelectorPopover = page.locator('[data-test="services-catalog-stream-selector-popover"]');
+    // OInput convention: wrapper has data-test, inner native input has data-test-field
+    this.filterInputWrapper = page.locator(`[data-test="${this.filterInputDataTest}"]`);
+    this.filterInputField = page.locator(`[data-test="${this.filterInputDataTest}-field"]`);
+    this.filterClearBtn = page.locator(`[data-test="${this.filterInputDataTest}-clear"]`);
+    this.statusPill = page.locator('[data-test="services-catalog-status-pill"]');
 
     // Status chips
-    this.pillCritical = '[data-test="services-catalog-pill-critical"]';
-    this.pillWarning = '[data-test="services-catalog-pill-warning"]';
-    this.pillDegraded = '[data-test="services-catalog-pill-degraded"]';
+    this.pillCritical = page.locator('[data-test="services-catalog-pill-critical"]');
+    this.pillWarning = page.locator('[data-test="services-catalog-pill-warning"]');
+    this.pillDegraded = page.locator('[data-test="services-catalog-pill-degraded"]');
 
-    // Table
-    this.table = '[data-test="services-catalog-table"]';
-    this.emptyState = '[data-test="services-catalog-empty"]';
-    this.loading = '[data-test="services-catalog-loading"]';
+    // =====================================================================
+    // Table locators
+    // =====================================================================
+    this.table = page.locator('[data-test="services-catalog-table"]');
+    this.emptyState = page.locator('[data-test="services-catalog-empty"]');
+    this.loading = page.locator('[data-test="services-catalog-loading"]');
+    this.allServiceLinks = page.locator(`[data-test^="${this.serviceLinkPrefix}"]`);
+    this.firstServiceLink = page.locator(`[data-test^="${this.serviceLinkPrefix}"]`).first();
 
-    // Pagination
-    this.paginationBar = '[data-test="services-catalog-pagination-bar"]';
-    this.rowsPerPage = '[data-test="services-catalog-records-per-page"]';
-    this.pagination = '[data-test="services-catalog-pagination"]';
+    // =====================================================================
+    // Pagination locators
+    // =====================================================================
+    this.paginationBar = page.locator('[data-test="services-catalog-pagination-bar"]');
+    this.rowsPerPage = page.locator(`[data-test="${this.rowsPerPageDataTest}"]`);
+    this.rowsPerPagePopover = page.locator(`[data-test="${this.rowsPerPageDataTest}-popover"]`);
+    this.pagination = page.locator(`[data-test="${this.paginationDataTest}"]`);
+    this.prevPageBtn = page.locator(`[data-test="${this.paginationDataTest}-prev"]`);
+    this.nextPageBtn = page.locator(`[data-test="${this.paginationDataTest}-next"]`);
+    // All page-number buttons rendered inside the pagination component
+    this.pageNumberButtons = page.locator(
+      `[data-test^="${this.paginationDataTest}-page-"]`,
+    );
 
-    // Legend
-    this.legend = '[data-test="services-catalog-status-legend"]';
-    this.legendCritical = '[data-test="services-catalog-legend-critical"]';
-    this.legendWarning = '[data-test="services-catalog-legend-warning"]';
-    this.legendDegraded = '[data-test="services-catalog-legend-degraded"]';
-    this.legendHealthy = '[data-test="services-catalog-legend-healthy"]';
+    // =====================================================================
+    // Legend locators
+    // =====================================================================
+    this.legend = page.locator('[data-test="services-catalog-status-legend"]');
+    this.legendCritical = page.locator('[data-test="services-catalog-legend-critical"]');
+    this.legendWarning = page.locator('[data-test="services-catalog-legend-warning"]');
+    this.legendDegraded = page.locator('[data-test="services-catalog-legend-degraded"]');
+    this.legendHealthy = page.locator('[data-test="services-catalog-legend-healthy"]');
 
-    // Side panel (uses component's own data-test; parent's "services-catalog-node-side-panel"
-    // is overridden by Vue 3 attribute inheritance — the root <div> renders with
+    // =====================================================================
+    // Side panel — uses ServiceGraphNodeSidePanel.vue root data-test
+    // (parent's "services-catalog-node-side-panel" is overridden by Vue 3
+    // attribute inheritance — the root <div> renders with
     // data-test="service-graph-side-panel" from ServiceGraphNodeSidePanel.vue)
-    this.sidePanel = '[data-test="service-graph-side-panel"]';
+    // =====================================================================
+    this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
+
+    // =====================================================================
+    // Service-catalog tab (in traces module)
+    // =====================================================================
+    this.servicesCatalogTabBtn = page.locator(
+      '[data-test="traces-search-mode-services-catalog-btn"]',
+    );
   }
 
-  // ===== NAVIGATION =====
+  // =========================================================================
+  // NAVIGATION
+  // =========================================================================
 
   async navigate(period = '24h') {
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    await this.page.goto(`${baseUrl}/web/traces?tab=services-catalog&org_identifier=${org}&period=${period}`, {
-      timeout: 60000,
-    });
+    await this.page.goto(
+      `${baseUrl}/web/traces?tab=services-catalog&org_identifier=${org}&period=${period}`,
+      { timeout: 60000 },
+    );
     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
     await this.page.waitForLoadState('load', { timeout: 15000 });
   }
 
   async clickServiceCatalogTab() {
-    await this.page.locator('[data-test="traces-search-mode-services-catalog-btn"]').click();
+    await this.servicesCatalogTabBtn.click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async waitForLoad() {
     // Wait for loading spinner to disappear
-    await this.page.locator(this.loading)
-      .waitFor({ state: 'hidden', timeout: 15000 })
-      .catch(() => {});
+    await this.loading.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     // Wait for the data to be ready: either at least one row rendered, or the empty state.
     // The table data-test renders even while loading with 0 rows — waiting on it alone races the data.
     await Promise.race([
-      this.page.locator('[data-test^="services-catalog-service-link-"]').first()
-        .waitFor({ state: 'attached', timeout: 30000 }),
-      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 30000 }),
+      this.firstServiceLink.waitFor({ state: 'attached', timeout: 30000 }),
+      this.emptyState.waitFor({ state: 'visible', timeout: 30000 }),
     ]).catch(() => {});
   }
 
-  // ===== TOOLBAR =====
+  // =========================================================================
+  // TOOLBAR — stream selector / filter input
+  // =========================================================================
 
   async selectStream(streamName) {
-    await this.page.locator(this.streamSelector).click();
-    // Wait for the option to appear (stream may be newly created)
-    const option = this.page.getByRole('option', { name: streamName });
-    await option.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    await option.click().catch(() => {});
-    // Dismiss the dropdown to prevent portal interference with subsequent clicks
-    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+    await this.streamSelector.click();
+    // Wait for OSelect popover to mount
+    await this.page.waitForTimeout(200);
+    // Option uses OSelect convention: data-test="${parent}-option" + data-test-value
+    const opt = this.page.locator(
+      '[data-test="services-catalog-stream-selector-option"]'
+      + `[data-test-value="${streamName}"]`,
+    );
+    await opt.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await opt.click().catch(() => {});
+    // Dismiss the popover by pressing Escape (avoids body.click violation)
+    await this.page.keyboard.press('Escape').catch(() => {});
     await this.page.waitForTimeout(300);
   }
 
   async filterByServiceName(text) {
-    const input = this.page.locator(this.filterInput);
-    await input.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
-    await input.fill(text);
+    await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+    await this.filterInputField.fill(text);
     await this.page.waitForTimeout(500); // 300ms debounce + buffer
   }
 
   async getFilterInputLocator() {
-    return this.page.locator(this.filterInput);
+    return this.filterInputField;
   }
 
   async typeFilterCharByChar(text) {
-    const input = this.page.locator(this.filterInput);
-    await input.click();
-    await input.fill('');
+    await this.filterInputField.click();
+    await this.filterInputField.fill('');
     for (const char of text) {
-      await input.press(char);
+      await this.filterInputField.press(char);
       await this.page.waitForTimeout(50);
     }
     // Wait for 300ms debounce
@@ -112,33 +165,33 @@ export class ServicesCatalogPage {
 
   async clearFilter() {
     // Use fill('') instead of clicking Quasar's clear icon which sets value to null (bug #11689)
-    const input = this.page.locator(this.filterInput);
-    await input.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
-    await input.fill('');
+    await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+    await this.filterInputField.fill('');
     await this.page.waitForTimeout(500);
   }
 
   async clickFilterClearButton() {
-    const btn = this.page.locator(this.filterClearBtn);
-    const visible = await btn.isVisible().catch(() => false);
+    const visible = await this.filterClearBtn.isVisible().catch(() => false);
     if (!visible) {
       // Fallback: clear via fill('')
       await this.clearFilter();
       return false;
     }
-    await btn.click();
+    await this.filterClearBtn.click();
     await this.page.waitForTimeout(300);
     return true;
   }
 
   async getFilterInputValue() {
-    return await this.page.locator(this.filterInput).inputValue();
+    return await this.filterInputField.inputValue();
   }
 
-  // ===== STATUS PILLS =====
+  // =========================================================================
+  // STATUS PILLS
+  // =========================================================================
 
   async getServiceCount() {
-    const text = await this.page.locator(this.statusPill).textContent().catch(() => '0');
+    const text = await this.statusPill.textContent().catch(() => '0');
     // Match all numbers; return the last one (total in "N/M", "N of M", "N services", etc.)
     const matches = text.match(/\d+/g);
     if (!matches || matches.length === 0) return 0;
@@ -146,7 +199,7 @@ export class ServicesCatalogPage {
   }
 
   async getFilteredCount() {
-    const text = await this.page.locator(this.statusPill).textContent().catch(() => '0/0');
+    const text = await this.statusPill.textContent().catch(() => '0/0');
     // Match "N/M" (filtered) or just "N" (unfiltered total)
     const filteredMatch = text.match(/^(\d+)\//);
     if (filteredMatch) return parseInt(filteredMatch[1], 10);
@@ -156,183 +209,190 @@ export class ServicesCatalogPage {
   }
 
   async getCriticalCount() {
-    const text = await this.page.locator(this.pillCritical).textContent().catch(() => '0');
+    const text = await this.pillCritical.textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
   }
 
   async getWarningCount() {
-    const text = await this.page.locator(this.pillWarning).textContent().catch(() => '0');
+    const text = await this.pillWarning.textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
   }
 
   async getDegradedCount() {
-    const text = await this.page.locator(this.pillDegraded).textContent().catch(() => '0');
+    const text = await this.pillDegraded.textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
   }
 
   async isStatusPillVisible() {
     // Wait briefly for the pill to appear — it renders once services are loaded
-    return await this.page.locator(this.statusPill)
+    return await this.statusPill
       .waitFor({ state: 'visible', timeout: 8000 })
       .then(() => true)
       .catch(() => false);
   }
 
   async isCriticalPillVisible() {
-    return await this.page.locator(this.pillCritical).isVisible().catch(() => false);
+    return await this.pillCritical.isVisible().catch(() => false);
   }
 
   async isWarningPillVisible() {
-    return await this.page.locator(this.pillWarning).isVisible().catch(() => false);
+    return await this.pillWarning.isVisible().catch(() => false);
   }
 
   async isDegradedPillVisible() {
-    return await this.page.locator(this.pillDegraded).isVisible().catch(() => false);
+    return await this.pillDegraded.isVisible().catch(() => false);
   }
 
-  // ===== TABLE =====
+  // =========================================================================
+  // TABLE — row helpers
+  // =========================================================================
 
   async getRowCount() {
     // Count service-name links (one per row, scoped to TenstackTable body)
     // Uses service-link prefix to avoid matching status-pill / status-legend in the toolbar
     // Wait briefly for at least one row to render — virtual scrolling may delay row DOM
-    await this.page.locator('[data-test^="services-catalog-service-link-"]').first()
-      .waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
-    return await this.page.locator('[data-test^="services-catalog-service-link-"]').count();
+    await this.firstServiceLink.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+    return await this.allServiceLinks.count();
   }
 
   async getVisibleServiceNames() {
-    return await this.page.locator('[data-test^="services-catalog-service-link-"]').allTextContents();
+    return await this.allServiceLinks.allTextContents();
   }
 
   async getServiceCellText(serviceName) {
-    return await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).textContent();
+    return await this.page
+      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
+      .textContent();
   }
 
   async getErrorRate(serviceName) {
-    const text = await this.page.locator(`[data-test="services-catalog-error-rate-${serviceName}"]`).textContent();
-    return text;
+    return await this.page
+      .locator(`[data-test="${this.errorRatePrefix}${serviceName}"]`)
+      .textContent();
   }
 
   async getRequests(serviceName) {
-    const text = await this.page.locator(`[data-test="services-catalog-requests-${serviceName}"]`).textContent();
-    return text;
+    return await this.page
+      .locator(`[data-test="${this.requestsPrefix}${serviceName}"]`)
+      .textContent();
   }
 
   async getErrors(serviceName) {
-    const text = await this.page.locator(`[data-test="services-catalog-errors-${serviceName}"]`).textContent();
-    return text;
+    return await this.page
+      .locator(`[data-test="${this.errorsPrefix}${serviceName}"]`)
+      .textContent();
   }
 
   async getStatusBadge(serviceName) {
-    const el = this.page.locator(`[data-test="services-catalog-status-${serviceName}"]`);
-    return await el.textContent().catch(() => '');
+    return await this.page
+      .locator(`[data-test="${this.statusBadgePrefix}${serviceName}"]`)
+      .textContent()
+      .catch(() => '');
   }
 
   async serviceRowExists(serviceName) {
-    return await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`)
-      .isVisible().catch(() => false);
+    return await this.page
+      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
+      .isVisible()
+      .catch(() => false);
   }
 
-  // ===== ROW CLICK / SIDE PANEL =====
+  // =========================================================================
+  // ROW CLICK / SIDE PANEL
+  // =========================================================================
 
   async clickServiceRow(serviceName) {
     // Click the service name cell which has a direct @click.stop="handleRowClick(item)"
     // handler on the <TraceServiceCell> — this bypasses TenstackTable's row-level
     // emission layer (ServicesCatalog.vue:279). The status badge is also clickable
     // (bubbles to @click:dataRow on <tr>) but the direct cell handler is more reliable.
-    await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).click();
+    await this.page
+      .locator(`[data-test="${this.serviceLinkPrefix}${serviceName}"]`)
+      .click();
     await this.page.waitForTimeout(300);
   }
 
   async isSidePanelVisible() {
-    return await this.page.locator(this.sidePanel).isVisible({ timeout: 5000 }).catch(() => false);
+    return await this.sidePanel.isVisible({ timeout: 5000 }).catch(() => false);
   }
 
   async expectSidePanelVisible() {
-    await expect(this.page.locator(this.sidePanel)).toBeVisible({ timeout: 30000 });
+    await expect(this.sidePanel).toBeVisible({ timeout: 30000 });
   }
 
-  // ===== PAGINATION =====
+  // =========================================================================
+  // PAGINATION
+  // =========================================================================
 
   async getRowsPerPage() {
-    const el = this.page.locator(this.rowsPerPage);
-    await el.waitFor({ state: 'attached', timeout: 5000 });
-    const text = await el.textContent();
+    await this.rowsPerPage.waitFor({ state: 'attached', timeout: 5000 });
+    const text = await this.rowsPerPage.textContent();
     const val = parseInt(text, 10);
     if (Number.isNaN(val)) throw new Error(`getRowsPerPage: could not parse "${text}"`);
     return val;
   }
 
   async setRowsPerPage(count) {
-    await this.page.locator(this.rowsPerPage).click();
+    await this.rowsPerPage.click();
     await this.page.waitForTimeout(300);
-    // Use exact match to avoid "10" matching "100"
-    await this.page.getByRole('option', { name: String(count), exact: true }).click();
+    // OSelect option uses data-test="${parent}-option" + data-test-value=<value>
+    const opt = this.page.locator(
+      `[data-test="${this.rowsPerPageDataTest}-option"][data-test-value="${count}"]`,
+    );
+    await opt.waitFor({ state: 'visible', timeout: 5000 });
+    await opt.click();
     await this.page.waitForTimeout(500);
   }
 
   async getPageCount() {
-    const pageBtns = this.page.locator(`${this.pagination} button`);
-    const count = await pageBtns.count();
-    const texts = [];
-    for (let i = 0; i < count; i++) {
-      const t = (await pageBtns.nth(i).textContent() ?? '').trim();
-      texts.push(t);
-    }
-    return texts.filter(t => /^\d+$/.test(t)).length;
+    // Page-number buttons emitted by OPagination as parent-page-{n}
+    return await this.pageNumberButtons.count();
   }
 
   async goToPage(n) {
-    // Try aria-label first
-    const pageBtn = this.page.locator(`${this.pagination} button[aria-label="Page ${n}"]`);
-    if (await pageBtn.count() > 0) {
-      await pageBtn.click();
-      await this.page.waitForTimeout(500);
-      return;
-    }
-    // Fallback: click button whose trimmed text matches the page number exactly
-    const allBtns = this.page.locator(`${this.pagination} button`);
-    const btnCount = await allBtns.count();
-    for (let i = 0; i < btnCount; i++) {
-      const text = (await allBtns.nth(i).textContent() ?? '').trim();
-      if (text === String(n)) {
-        await allBtns.nth(i).click();
-        await this.page.waitForTimeout(500);
-        return;
-      }
-    }
-    throw new Error(`goToPage(${n}): could not find page button among ${btnCount} buttons`);
+    const pageBtn = this.page.locator(
+      `[data-test="${this.paginationDataTest}-page-${n}"]`,
+    );
+    await pageBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await pageBtn.click();
+    await this.page.waitForTimeout(500);
   }
 
   async isPrevDisabled() {
-    const prevBtn = this.page.locator(`${this.pagination} button[aria-label="Previous page"]`);
-    return await prevBtn.isDisabled().catch(() => true);
+    return await this.prevPageBtn.isDisabled().catch(() => true);
   }
 
   async isNextDisabled() {
-    const nextBtn = this.page.locator(`${this.pagination} button[aria-label="Next page"]`);
-    return await nextBtn.isDisabled().catch(() => true);
+    return await this.nextPageBtn.isDisabled().catch(() => true);
   }
 
   async getCurrentPage() {
-    // Quasar QPagination sets aria-current="true" on the active button
-    const el = this.page.locator(`${this.pagination} button[aria-current="true"]`);
+    // OPagination sets aria-current="page" on the active button.
+    // The page-number buttons all carry data-test-value="<page>" so we use that
+    // combined with the aria-current attribute filter — both are non-class,
+    // non-element selectors permitted by the policy.
+    const el = this.page.locator(
+      `[data-test^="${this.paginationDataTest}-page-"][aria-current="page"]`,
+    );
     await el.waitFor({ state: 'attached', timeout: 5000 });
-    const text = await el.textContent();
-    const val = parseInt(text, 10);
-    if (Number.isNaN(val)) throw new Error(`getCurrentPage: could not parse "${text}"`);
-    return val;
+    const val = await el.getAttribute('data-test-value');
+    const parsed = parseInt(val, 10);
+    if (Number.isNaN(parsed)) {
+      throw new Error(`getCurrentPage: could not parse data-test-value "${val}"`);
+    }
+    return parsed;
   }
 
   async isPaginationVisible() {
-    return await this.page.locator(this.paginationBar).isVisible().catch(() => false);
+    return await this.paginationBar.isVisible().catch(() => false);
   }
 
-  // ===== COLUMN SORTING =====
+  // =========================================================================
+  // COLUMN SORTING
+  // =========================================================================
 
   async sortByColumn(columnKey) {
     // Click the sortable inner div which has @click="handleHeaderSortClick",
@@ -345,23 +405,41 @@ export class ServicesCatalogPage {
   }
 
   async getSortIcon(columnKey) {
-    const th = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
-    // Use :visible + .first() to get only the visible sort icon (avoid hidden duplicates)
-    const icon = th.locator('.material-icons:visible, .OIcon:visible').first();
-    const text = await icon.textContent();
-    return text;
+    // TenstackTable renders one of two icons inside the column header,
+    // scoped per-column via `data-test="o2-table-sort-icon-{columnId}"`:
+    //   - data-test-sort-state="active"   with data-test-sort-direction "asc" | "desc"
+    //   - data-test-sort-state="inactive" with data-test-sort-direction "none"
+    // Test legacy convention used 'arrow_downward' / 'arrow_upward' / 'unfold_more'
+    // (Quasar material-icons text content). Normalize the OIcon sort attribute to
+    // that form so existing test assertions keep working.
+    const icon = this.page.locator(
+      `[data-test="o2-table-sort-icon-${columnKey}"]`,
+    );
+
+    if (!(await icon.count())) return '';
+    const state = await icon.getAttribute('data-test-sort-state').catch(() => null);
+    const dir = await icon.getAttribute('data-test-sort-direction').catch(() => null);
+
+    if (state === 'active') {
+      if (dir === 'desc') return 'arrow_downward';
+      if (dir === 'asc') return 'arrow_upward';
+      return 'arrow_unknown';
+    }
+    if (state === 'inactive') return 'unfold_more';
+    return '';
   }
 
   async getFirstServiceName() {
-    const firstCell = this.page.locator('[data-test^="services-catalog-service-link-"]').first();
-    const text = await firstCell.textContent().catch(() => '');
+    const text = await this.firstServiceLink.textContent().catch(() => '');
     return text.trim();
   }
 
-  // ===== LEGEND =====
+  // =========================================================================
+  // LEGEND
+  // =========================================================================
 
   async isLegendVisible() {
-    return await this.page.locator(this.legend).isVisible().catch(() => false);
+    return await this.legend.isVisible().catch(() => false);
   }
 
   async getLegendCount(status) {
@@ -371,18 +449,19 @@ export class ServicesCatalogPage {
     return match ? parseInt(match[1], 10) : 0;
   }
 
-  // ===== EMPTY STATE =====
+  // =========================================================================
+  // EMPTY STATE / TABLE VISIBILITY
+  // =========================================================================
 
   async isTableVisible() {
     // Wait briefly for the table to settle — after filter changes the DOM may flicker
-    return await this.page.locator(this.table)
+    return await this.table
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
   }
 
   async isEmptyStateVisible() {
-    return await this.page.locator(this.emptyState).isVisible().catch(() => false);
+    return await this.emptyState.isVisible().catch(() => false);
   }
-
 }

@@ -39,13 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Search input -->
-      <div data-test="services-catalog-filter-input">
+      <div>
         <OInput
           v-model="filterText"
           :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
           clearable
           :debounce="300"
           class="tw:w-[14rem]!"
+          data-test="services-catalog-filter-input"
         >
           <template #icon-left>
             <OIcon class="o2-search-input-icon" size="sm" name="search" />

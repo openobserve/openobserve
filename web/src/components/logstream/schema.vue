@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="schemaSettings"
                         icon="settings"
                         label="Schema Settings"
+                        data-test="schema-settings-tab"
                       />
 
                       <!-- Red Button Tab -->
@@ -321,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="redButton"
                         icon="backup"
                         label="Extended Retention"
+                        data-test="schema-extended-retention-tab"
                       />
 
                       <!-- Configuration Tab -->
@@ -328,6 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="configuration"
                         icon="tune"
                         label="Configuration"
+                        data-test="schema-configuration-tab"
                       />
                       <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
                       <OTab
@@ -613,6 +616,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span
                             class="tw:text-[#5960B2] tw:cursor-pointer"
+                            :data-test="`schema-field-${row.name}-pattern-action`"
                             @click="openPatternAssociationDialog(row.name)"
                           >
                             {{

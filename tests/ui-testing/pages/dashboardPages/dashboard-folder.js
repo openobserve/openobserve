@@ -8,6 +8,29 @@ export default class DashboardFolder {
     // <input> carries the auto-forwarded `-field` data-test. Target the input
     // so .fill() succeeds without resorting to body/element selectors.
     this.folderSearchInput = page.locator('[data-test="folder-search-field"]');
+    // Folder create / edit dialog locators — hoisted to class members so
+    // method bodies never call `page.locator(...)` inline (POM strict policy).
+    this.newFolderBtn = page.locator('[data-test="dashboard-new-folder-btn"]');
+    this.folderNameInput = page.locator(
+      '[data-test="dashboard-folder-add-name-field"]'
+    );
+    this.folderDialogSaveBtn = page.locator(
+      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
+    // More-icon and the post-menu actions live on the global page surface
+    // (rendered into a Reka portal in the menu case). The folder-card scoped
+    // more-icon is built via the per-folder factory helper to keep its scope
+    // tied to the row.
+    this.moreIconSelector = '[data-test="dashboard-more-icon"]';
+    this.deleteFolderIcon = page.locator(
+      '[data-test="dashboard-delete-folder-icon"]'
+    );
+    this.editFolderIcon = page.locator(
+      '[data-test="dashboard-edit-folder-icon"]'
+    );
+    this.confirmDeleteFolderBtn = page.locator(
+      '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
   }
   // Generate a unique folder name with a prefix
   generateUniqueFolderName(prefix = "u") {
@@ -55,27 +78,19 @@ export default class DashboardFolder {
 
   // Create folder
   async createFolder(folderName) {
-    const newFolderBtn = this.page.locator('[data-test="dashboard-new-folder-btn"]');
-    // OFormInput exposes data-test="<name>" on its wrapper; the real <input>
-    // carries the auto-forwarded `<name>-field` data-test (OInput.vue).
-    const nameInput = this.page.locator('[data-test="dashboard-folder-add-name-field"]');
-    const saveBtn = this.page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
+    await this.newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.newFolderBtn.click();
 
-    await newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
-    await newFolderBtn.click();
+    await this.folderNameInput.waitFor({ state: "visible", timeout: 5000 });
+    await this.folderNameInput.click();
+    await this.folderNameInput.fill(folderName);
 
-    await nameInput.waitFor({ state: "visible", timeout: 5000 });
-    await nameInput.click();
-    await nameInput.fill(folderName);
-
-    await saveBtn.waitFor({ state: "visible", timeout: 5000 });
-    await saveBtn.click();
+    await this.folderDialogSaveBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.folderDialogSaveBtn.click();
   }
 
   // Delete folder
   async deleteFolder(folderName) {
-    const { page } = this;
-
     // Re-search for the folder so the list is filtered to a deterministic
     // single-row state before we try to open its action menu.
     await this.searchFolder(folderName);
@@ -89,27 +104,19 @@ export default class DashboardFolder {
     await folderCard.hover();
 
     // The more icon lives inside a hover-only container. force-click bypasses
-    // the CSS visibility gate while still resolving by data-test.
-    const moreIcon = folderCard.locator('[data-test="dashboard-more-icon"]');
+    // the CSS visibility gate while still resolving by data-test. Scoping
+    // the icon to the row via the per-folder card keeps the action tied to
+    // the right folder.
+    const moreIcon = folderCard.locator(this.moreIconSelector);
     await moreIcon.click({ force: true });
 
-    // Click delete icon
-    const deleteIcon = page.locator(
-      '[data-test="dashboard-delete-folder-icon"]'
-    );
-    await deleteIcon.click();
-
-    // Confirm deletion
-    const confirmButton = page.locator(
-      '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
-    );
-    await confirmButton.click();
+    // Click delete icon and confirm via class-member locators.
+    await this.deleteFolderIcon.click();
+    await this.confirmDeleteFolderBtn.click();
   }
 
   // Edit folder name
   async editFolderName(oldName, newName) {
-    const { page } = this;
-
     // Re-search to filter the folder list down to this row before opening
     // its action menu — keeps the more-icon visibility deterministic.
     await this.searchFolder(oldName);
@@ -123,26 +130,23 @@ export default class DashboardFolder {
 
     // The more icon lives inside a hover-only container. force-click bypasses
     // the CSS visibility gate while still resolving by data-test.
-    const moreIcon = folderCard.locator('[data-test="dashboard-more-icon"]');
+    const moreIcon = folderCard.locator(this.moreIconSelector);
     await moreIcon.click({ force: true });
 
-    // Click edit folder
-    await page.locator('[data-test="dashboard-edit-folder-icon"]').click();
+    // Click edit folder via the class-member icon locator.
+    await this.editFolderIcon.click();
 
     // Clear existing name — target the actual <input> (data-test="...-field")
     // because the wrapper div carries the bare `dashboard-folder-add-name`.
-    const nameInput = page.locator(
-      '[data-test="dashboard-folder-add-name-field"]'
-    );
-    await nameInput.waitFor({ state: "visible", timeout: 5000 });
-    await nameInput.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
+    await this.folderNameInput.waitFor({ state: "visible", timeout: 5000 });
+    await this.folderNameInput.click();
+    await this.page.keyboard.press("Control+A");
+    await this.page.keyboard.press("Backspace");
 
-    await nameInput.fill(newName);
+    await this.folderNameInput.fill(newName);
 
-    // Save
-    await page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]').click();
+    // Save via the class-member dialog primary button.
+    await this.folderDialogSaveBtn.click();
   }
 }
 
