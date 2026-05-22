@@ -312,7 +312,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 220,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 3 },
       },
     ];
 

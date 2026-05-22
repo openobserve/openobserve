@@ -394,7 +394,7 @@ export default defineComponent({
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },
       { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: 150 },
-      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center" }, isAction: true },
+      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
     ];
 
     const selectedEnrichmentTableIds = computed(() =>

@@ -723,7 +723,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.actions"),
     sortable: false,
     isAction: true,
-    meta: { align: "center", cellClass: "actions-column" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
   };
 
   if (tab === "all") {

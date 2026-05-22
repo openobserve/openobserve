@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="organizations"
         :columns="columns"
         row-key="identifier"
+        :loading="loading"
         :global-filter="filterQuery"
         pagination="client"
         :page-size="20"
@@ -194,7 +195,7 @@ export default defineComponent({
       size: 80,
       minSize: 64,
       maxSize: 100,
-      meta: { align: "left" },
+      meta: { align: "left", actionCount: 1 },
     });
 
     watch(
@@ -232,11 +233,13 @@ export default defineComponent({
       }
     });
 
+    const loading = ref(false);
     const getOrganizations = () => {
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading organizations...",
       });
+      loading.value = true;
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
@@ -304,6 +307,8 @@ export default defineComponent({
         });
 
         dismiss();
+      }).finally(() => {
+        loading.value = false;
       });
     };
 
@@ -388,7 +393,7 @@ export default defineComponent({
       store,
       router,
       config,
-      loading: ref(false),
+      loading,
       organizations,
       organization,
       columns,

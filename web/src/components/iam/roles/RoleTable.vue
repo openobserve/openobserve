@@ -49,7 +49,7 @@ const columns: OTableColumnDef[] = [
     size: 80,
     minSize: 64,
     maxSize: 100,
-    meta: { align: "left" },
+    meta: { align: "left", actionCount: 2 },
   },
 ];
 </script>

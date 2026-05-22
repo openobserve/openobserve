@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RoleTable
         data-test="iam-roles-table-section"
         :data="rows"
+        :loading="loading"
         :global-filter="filterQuery"
         :selected-ids="selectedRoleNames"
         @update:selected-ids="onSelectionChange"
@@ -158,7 +159,9 @@ const editRole = (role: any) => {
   });
 };
 
+const loading = ref(false);
 const setupRoles = async () => {
+  loading.value = true;
   await getRoles(store.state.selectedOrganization.identifier)
     .then((res) => {
       rolesState.roles = res.data.map((role: string) => ({
@@ -168,6 +171,9 @@ const setupRoles = async () => {
     })
     .catch((err) => {
       console.log(err);
+    })
+    .finally(() => {
+      loading.value = false;
     });
 };
 

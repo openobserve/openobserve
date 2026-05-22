@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
             row-key="email"
+            :loading="loading"
             pagination="client"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
@@ -353,7 +354,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 130,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 3 },
       },
     ];
     const userEmail: any = ref("");
@@ -379,12 +380,14 @@ export default defineComponent({
       confirmDelete.value = true;
       deleteUserEmail = row.email;
     };
+    const loading = ref(false);
     const getServiceAccountsUsers = async () =>{
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading service accounts...",
       });
 
+      loading.value = true;
       return new Promise((resolve, reject) => {
         service_accounts
           .list(
@@ -414,6 +417,9 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             reject(false);
+          })
+          .finally(() => {
+            loading.value = false;
           });
       });
     }
@@ -647,6 +653,7 @@ export default defineComponent({
       config,
       serviceAccountsState,
       columns,
+      loading,
       orgData,
       confirmDelete,
       serviceAccounts,

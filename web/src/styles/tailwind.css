@@ -3,6 +3,7 @@
 @import "../lib/styles/tokens/_base.scss";
 @import "../lib/styles/tokens/_semantic.scss";
 @import "../lib/styles/tokens/_component.scss";
+@import "../lib/styles/tokens/_sdr-fields.scss";
 @import "../lib/styles/tokens/_dark.scss";
 
 @plugin "@tailwindcss/typography";

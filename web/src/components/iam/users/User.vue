@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :columns="columns"
           row-key="email"
+          :loading="loading"
           :selected-ids="selectedUserIds"
           :global-filter="filterQuery"
           pagination="client"
@@ -420,7 +421,7 @@ export default defineComponent({
         size: 120,
         minSize: 80,
         maxSize: 140,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2 },
       });
 
       return cols;
@@ -568,12 +569,14 @@ export default defineComponent({
       }
     };
 
+    const loading = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading users...",
       });
 
+      loading.value = true;
       return new Promise((resolve, reject) => {
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
@@ -697,6 +700,9 @@ export default defineComponent({
               timeout: 5000,
             });
             reject(false);
+          })
+          .finally(() => {
+            loading.value = false;
           });
       });
     };
@@ -1181,6 +1187,7 @@ export default defineComponent({
       toCamelCase,
       usersState,
       columns,
+      loading,
       orgData,
       confirmDelete,
       deleteUser,
