@@ -291,30 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               attachmentTypeOptions(dashboard.report_type)
                             "
                             :label="t('reports.attachmentType')"
-                            color="input-border"
                             class="showLabelOnTop"
                             style="min-width: 200px"
-                          >
-                            <template v-slot:option="scope">
-                              <div
-                                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-                                :class="{ 'tw:opacity-50 tw:pointer-events-none': scope.opt.disable }"
-                                @click="scope.toggleOption(scope.opt)"
-                              >
-                                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                                  <span class="tw:text-sm">{{
-                                    scope.opt.label
-                                  }}</span>
-                                  <span
-                                    v-if="scope.opt.disable"
-                                    class="tw:block tw:text-xs tw:text-muted-foreground tw:text-red-500"
-                                  >
-                                    Not supported for PDF
-                                  </span>
-                                </div>
-                              </div>
-                            </template>
-                          </OSelect>
+                          />
                         </div>
                       </div>
 

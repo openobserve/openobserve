@@ -22,7 +22,7 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="add-condition-dropdown tw:p-4">
+        <div class="add-condition-dropdown tw:p-4 tw:w-72">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
@@ -58,7 +58,7 @@
                 <div class="tw:h-full">
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
-                      <div class="tw:flex column" style="height: 220px">
+                      <div class="tw:flex column tw:gap-2" style="height: 220px">
                         <OSelect
                           v-model="condition.operator"
                           :options="operators"
@@ -286,10 +286,6 @@ export default defineComponent({
 }
 
 .add-condition-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
   :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }

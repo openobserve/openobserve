@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 isAnimating ? 'rotating-icon' : '',
                 isAnimating ? 'text-primary' : '',
+                'tw:mr-0.5',
               ]"
             />
             <div class="tw:text-center">{{ selectedLabel }}</div>

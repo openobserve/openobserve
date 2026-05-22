@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'tw:bg-gray-200'
               : '',
             isChartDisabled(item)
-              ? 'tw:opacity-50 tw:cursor-not-allowed tw:pointer-events-none'
+              ? 'tw:opacity-50 tw:cursor-not-allowed'
               : 'tw:cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"

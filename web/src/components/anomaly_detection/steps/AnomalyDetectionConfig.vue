@@ -61,19 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="filter.field"
                 :options="filteredStreamFields"
-                use-input
-                fill-input
-                hide-selected
-                input-debounce="200"
                 :placeholder="
                   filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')
                 "
                 class="alert-v3-select filter-field-select"
                 style="width: 200px"
                 :loading="loadingFields"
-                @filter="filterFieldOptions"
               >
-                <template #no-option>
+                <template #empty>
                   <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
                     {{
                       config.stream_name
@@ -216,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="alert-v3-select"
                 style="width: 140px"
               >
-                <template #no-option>
+                <template #empty>
                   <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
                     {{
                       config.stream_name
@@ -1244,8 +1239,6 @@ export default defineComponent({
       filteredStreamFields,
       filteredDetectionFields,
       loadingFields,
-      filterFieldOptions,
-      filterDetectionFieldOptions,
       onDetectionFunctionChange,
       addFilter,
       removeFilter,

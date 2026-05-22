@@ -10,7 +10,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
-import { computed, inject, onBeforeUnmount, provide, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
@@ -171,6 +171,15 @@ function handleFocusOutside(event: Event) {
     event.preventDefault();
   }
 }
+
+// Close this dropdown when the nearest sidebar scroll container scrolls,
+// preventing the portal from floating disconnected at the top of the screen.
+const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+if (sidebarScrollTick) {
+  watch(sidebarScrollTick, () => {
+    if (internalOpen.value) handleOpenChange(false);
+  });
+}
 </script>
 
 <template>
@@ -188,6 +197,7 @@ function handleFocusOutside(event: Event) {
         :side="side"
         :align="align"
         :side-offset="sideOffset"
+        :hide-when-detached="true"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[

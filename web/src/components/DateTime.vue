@@ -1164,6 +1164,8 @@ export default defineComponent({
 .date-time-dialog {
   width: 325px;
   z-index: 10001;
+  max-height: var(--reka-popper-available-height, 600px);
+  overflow-y: auto;
 
   .tab-button {
     &.q-btn {

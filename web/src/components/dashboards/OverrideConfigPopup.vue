@@ -83,7 +83,6 @@ import {
   computed,
   watch,
   PropType,
-  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -320,12 +319,29 @@ export default defineComponent({
       emit("close");
     };
 
-    onMounted(() => {
-      // if overrideconfig is empty, add default overrideconfig
-      if (overrideConfigs.value.length == 0) {
-        addOverrideConfig();
-      }
-    });
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          originalOverrideConfigs.value = JSON.parse(
+            JSON.stringify(props.overrideConfig.overrideConfigs || []),
+          );
+          const normalized = normalizeOverrideConfigs(
+            props.overrideConfig.overrideConfigs || [],
+          );
+          overrideConfigs.value =
+            normalized.length > 0
+              ? normalized
+              : [
+                  {
+                    field: { matchBy: "name", value: "" },
+                    config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
+                  },
+                ];
+        }
+      },
+      { immediate: true },
+    );
 
     watch(
       () =>
