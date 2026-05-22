@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
+            data-test="iam-add-service-account-email-input"
             class="showLabelOnTop tw:mt-2"
             :error="!!emailError"
             :error-message="emailError"
@@ -36,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-model="firstName"
             :label="t('user.description')"
+            data-test="iam-add-service-account-description-input"
             class="showLabelOnTop tw:mt-2"
           />
           <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
@@ -50,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm-action"
+              data-test="iam-add-service-account-save-btn"
               @click="onSubmit"
             >
               {{ t('user.save') }}
@@ -93,7 +96,7 @@ export default defineComponent({
     },
     modelValue: {
       type: Object,
-      default: () => defaultValue(),
+      default: /* v8 ignore next */ () => defaultValue(), // prop default only invoked by Vue internally when prop is absent
     },
     isUpdated: {
       type: Boolean,
@@ -118,6 +121,7 @@ export default defineComponent({
     const emailError = ref('');
 
     onActivated(() => {
+      /* v8 ignore next */ // only runs under Vue keep-alive, not reachable in jsdom unit tests
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
