@@ -3699,6 +3699,10 @@ export class LogsPage {
         return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').hover();
     }
 
+    async clickExplainQuery() {
+        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+    }
+
     async hoverDownloadResults() {
         return await this.page.getByText('keyboard_arrow_right').hover();
     }

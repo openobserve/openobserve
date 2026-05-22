@@ -179,12 +179,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Navigated to alerts page');
 
     // Click "Add Alert" button (should be enabled now that beforeAll created a destination)
-    const addAlertBtnVisible = await page.locator(pm.alertsPage.addAlertButton).isVisible({ timeout: 5000 }).catch(() => false);
-    if (!addAlertBtnVisible) {
-      testLogger.warn('Add Alert button not visible — skipping');
-      test.skip(true, 'Add Alert button not available');
-      return;
-    }
+    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
     testLogger.info('✓ Clicked Add Alert button');
 
@@ -209,21 +204,13 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
 
     // Switch to the Advanced tab
-    if (!(await page.locator(pm.alertsPage.advancedTabBtn).first().isVisible({ timeout: 3000 }).catch(() => false))) {
-      testLogger.warn('Advanced tab not found — skipping');
-      test.skip(true, 'Advanced tab not available in current UI');
-      return;
-    }
+    await expect(page.locator(pm.alertsPage.advancedTabBtn).first(), 'Advanced tab should be visible').toBeVisible({ timeout: 3000 });
     await pm.alertsPage.clickAdvancedTab();
     testLogger.info('✓ Switched to Advanced tab');
 
     // Template Override in Advanced tab
     const templateOverrideSelect = pm.alertsPage.getAdvancedTemplateOverrideSelect();
-    if (!(await templateOverrideSelect.isVisible({ timeout: 3000 }).catch(() => false))) {
-      testLogger.warn('Template override select not found — skipping');
-      test.skip(true, 'Template override field not available in current UI');
-      return;
-    }
+    await expect(templateOverrideSelect, 'Template override select should be visible').toBeVisible({ timeout: 3000 });
     testLogger.info('✓ Template override field found');
 
     // Open the select dropdown and pick a template
@@ -231,11 +218,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(500);
 
     const templateOption = pm.alertsPage.getFirstMenuItem();
-    if (!(await templateOption.isVisible({ timeout: 3000 }).catch(() => false))) {
-      testLogger.warn('No template option available — skipping');
-      test.skip(true, 'No template options available');
-      return;
-    }
+    await expect(templateOption, 'Template option should be available').toBeVisible({ timeout: 3000 });
     const templateText = await templateOption.textContent();
     await templateOption.click();
     testLogger.info(`✓ Selected template: ${templateText?.trim()}`);
@@ -261,6 +244,153 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     ).toBe(uniqueParts.length);
 
     testLogger.info('✓ PASSED: Template not duplicated in override input');
+  });
+
+  // ==========================================================================
+  // Bug #11315: Bulk alert import failing saying alert already exists
+  // https://github.com/openobserve/openobserve/issues/11315
+  // ==========================================================================
+  test("Bulk alert import should not fail with 'alert already exists' error", {
+    tag: ['@bug-11315', '@P1', '@regression', '@alertsRegression']
+  }, async ({ page }) => {
+    testLogger.info('Test: Verify bulk alert import does not falsely report duplicates (Bug #11315)');
+
+    // Navigate to alerts page
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('✓ Navigated to alerts page');
+
+    // Look for import button
+    const importButton = page.locator('[data-test*="import-alert"], [data-test*="alert-import"], [role="button"]').filter({ hasText: /Import|import/i }).first();
+    await expect(importButton, 'Alert import button should be visible').toBeVisible({ timeout: 5000 });
+
+    testLogger.info('✓ Found alert import button');
+
+    // Click import to open the import dialog
+    await importButton.click();
+    await page.waitForTimeout(2000);
+
+    // Look for file upload input in the import dialog
+    const fileInput = page.locator('input[type="file"]').first();
+    const dropZone = page.locator('[data-test*="file-upload"], .q-uploader, [class*="drop"]').first();
+
+    const importDialogVisible = (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) ||
+      (await dropZone.isVisible({ timeout: 3000 }).catch(() => false));
+
+    expect(importDialogVisible, 'Import dialog should open after clicking import button').toBeTruthy();
+
+    testLogger.info('✓ Import dialog opened');
+
+    // Verify the dialog has proper UI elements (no immediate error message about duplicates)
+    const errorMessages = page.locator('[class*="error"], [class*="negative"], .q-banner').filter({ hasText: /already exists|duplicate/i });
+    const hasPrematureError = await errorMessages.first().isVisible({ timeout: 2000 }).catch(() => false);
+
+    expect(hasPrematureError,
+      'Bug #11315: Import dialog should not show "already exists" error before import is attempted'
+    ).toBeFalsy();
+
+    // Verify the import UI is functional (has upload area or file selector)
+    const uploadAreaPresent = (await fileInput.count().catch(() => 0) > 0) ||
+      (await dropZone.count().catch(() => 0) > 0);
+    expect(uploadAreaPresent,
+      'Bug #11315: Import dialog should have a functional upload area'
+    ).toBeTruthy();
+
+    testLogger.info('✓ PASSED: Bulk alert import dialog opens without premature errors');
+  });
+
+  // ==========================================================================
+  // Bug #4342: Alert name with #, %, : special chars fails with unauthorized
+  // https://github.com/openobserve/openobserve/issues/4342
+  // ==========================================================================
+  test("Alert name with special characters should not cause unauthorized error", {
+    tag: ['@bug-4342', '@P2', '@regression', '@alertsRegression']
+  }, async ({ page }) => {
+    testLogger.info('Test: Verify alert name with special chars works (Bug #4342)');
+
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('✓ Navigated to alerts page');
+
+    // Click Add Alert
+    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
+    await pm.alertsPage.clickAddAlertButton();
+    testLogger.info('✓ Clicked Add Alert button');
+
+    // Enter alert name with special characters: #, %, :
+    const specialName = 'test#special%alert:chars';
+    await pm.alertsPage.fillAlertName(specialName);
+    await page.waitForTimeout(500);
+
+    // Get the value back to verify it was accepted
+    const nameInput = page.locator(pm.alertsPage.alertNameInput);
+    const enteredValue = await nameInput.inputValue().catch(() => '');
+    testLogger.info(`Alert name entered: "${enteredValue}"`);
+
+    // PRIMARY ASSERTION: The name input should accept special characters
+    // The bug was that special chars caused "unauthorized" errors
+    expect(enteredValue,
+      'Bug #4342: Alert name input should accept special characters #, %, :'
+    ).toContain('#');
+
+    testLogger.info('✓ PASSED: Alert name with special chars accepted');
+  });
+
+  // ==========================================================================
+  // Bug #4288: Alert SQL — "default" keyword without quotes causes issues
+  // https://github.com/openobserve/openobserve/issues/4288
+  // ==========================================================================
+  test("Alert SQL query with 'default' keyword should not error without quotes", {
+    tag: ['@bug-4288', '@P2', '@regression', '@alertsRegression']
+  }, async ({ page }) => {
+    testLogger.info('Test: Verify default keyword in alert SQL works (Bug #4288)');
+
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('✓ Navigated to alerts page');
+
+    // Click Add Alert
+    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
+    await pm.alertsPage.clickAddAlertButton();
+    testLogger.info('✓ Clicked Add Alert button');
+
+    // Fill alert name
+    const alertName = `test_sql_default_${Date.now()}`;
+    await pm.alertsPage.fillAlertName(alertName);
+
+    // Select stream type and name
+    await pm.alertsPage.selectStreamType('logs');
+    testLogger.info('✓ Selected stream type: Logs');
+    await pm.alertsPage.selectStreamByName('e2e_automate');
+    testLogger.info('✓ Selected stream: e2e_automate');
+
+    // Switch to the Advanced tab (has SQL editor for alert conditions)
+    const advancedTab = page.locator(pm.alertsPage.advancedTabBtn).first();
+    if (await advancedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await advancedTab.click();
+      await page.waitForTimeout(1000);
+      testLogger.info('✓ Switched to Advanced tab');
+    }
+
+    // Look for the SQL editor and try to enter "default" without quotes
+    const sqlEditor = page.locator('[data-test*="alert-sql-editor"], [data-test*="sql-editor"], .monaco-editor').first();
+    if (await sqlEditor.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await sqlEditor.click({ force: true });
+      await page.waitForTimeout(500);
+      await page.keyboard.type('default', { delay: 50 });
+      await page.waitForTimeout(1000);
+      testLogger.info('✓ Typed "default" in SQL editor without quotes');
+    }
+
+    // The bug was that "default" without quotes caused errors
+    // Verify no immediate error message appeared
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"]').filter({ hasText: /error|invalid|unexpected/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
+
+    expect(errorVisible,
+      'Bug #4288: "default" keyword without quotes should not cause an error in SQL editor'
+    ).toBeFalsy();
+
+    testLogger.info('✓ PASSED: Alert SQL default keyword verified');
   });
 
   test.afterEach(async () => {

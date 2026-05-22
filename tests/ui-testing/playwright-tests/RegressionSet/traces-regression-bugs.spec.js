@@ -41,26 +41,11 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await pm.tracesPage.navigateToTraces();
     await pm.tracesPage.isStreamSelectVisible();
 
-    // Try selecting the stream with retry
-    let streamSelected = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await pm.tracesPage.selectTraceStream('default');
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-      const noStreamBefore = await pm.tracesPage.isNoStreamSelectedVisible();
-      if (!noStreamBefore) {
-        streamSelected = true;
-        testLogger.info(`Stream selected on attempt ${attempt}`);
-        break;
-      }
-      testLogger.info(`Attempt ${attempt}: stream still not selected, retrying...`);
-    }
-
-    if (!streamSelected) {
-      testLogger.warn('Could not select stream on traces page — skipping navigation test');
-      test.skip(true, 'Stream selection not available on traces page');
-      return;
-    }
+    // Select the stream
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    const noStreamBefore = await pm.tracesPage.isNoStreamSelectedVisible();
+    expect(noStreamBefore, 'Stream should be selected on traces page').toBeFalsy();
 
     // Run a search to confirm stream is active
     await pm.tracesPage.runTraceSearch();
@@ -107,25 +92,17 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('✓ Navigated to metrics page');
 
-    // Try to select stream and PromQL mode if available
+    // Select PromQL mode
     const promqlTab = pm.tracesPage.getPromQLTab();
-    const promqlVisible = await promqlTab.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (promqlVisible) {
-      await promqlTab.click();
-      await page.waitForTimeout(500);
-      // Verify PromQL mode is actually active before navigating to logs
-      const promqlActive = await promqlTab.getAttribute('data-state').then(s => s === 'on').catch(() => false);
-      expect(promqlActive,
-        'Bug #11580: PromQL tab must be active after clicking (premise for switching test)'
-      ).toBe(true);
-      testLogger.info('✓ PromQL mode is verified active');
-      await page.waitForTimeout(500);
-    } else {
-      testLogger.warn('PromQL mode not available — cannot verify bug #11580 without PromQL state');
-      test.skip(true, 'PromQL mode not available in current environment');
-      return;
-    }
+    await expect(promqlTab, 'PromQL tab should be visible').toBeVisible({ timeout: 5000 });
+    await promqlTab.click();
+    await page.waitForTimeout(500);
+    const promqlActive = await promqlTab.getAttribute('data-state').then(s => s === 'on').catch(() => false);
+    expect(promqlActive,
+      'Bug #11580: PromQL tab must be active after clicking (premise for switching test)'
+    ).toBe(true);
+    testLogger.info('✓ PromQL mode is verified active');
+    await page.waitForTimeout(500);
 
     // Step 2: Switch to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -181,12 +158,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
 
     // Find the query editor using POM locator (.monaco-editor for traces)
     const queryEditor = page.locator(pm.tracesPage.queryEditor).first();
-
-    if (!(await queryEditor.isVisible({ timeout: 5000 }).catch(() => false))) {
-      testLogger.warn('Query editor not found — cannot verify bug #11217');
-      test.skip(true, 'SQL query editor not available in this environment');
-      return;
-    }
+    await expect(queryEditor, 'SQL query editor should be visible').toBeVisible({ timeout: 5000 });
 
     // Dismiss any open q-menu popups (e.g. from stream selection) that
     // would intercept pointer events on the Monaco editor
