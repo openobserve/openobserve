@@ -45,6 +45,7 @@
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
             row-key="trace_id"
+            :loading="isLoading"
             pagination="client"
             expansion="single"
             :expand-on-row-click="true"
@@ -209,14 +210,8 @@
               </div>
             </template>
             <template #empty>
-              <div v-if="!isLoading" class="tw:flex tw:mx-auto">
+              <div class="tw:flex tw:mx-auto">
                 <NoData />
-              </div>
-              <div
-                v-if="isLoading"
-                class="tw:text-center tw:w-full full-height tw:mt-4 tw:flex tw:justify-center"
-              >
-                <OSpinner size="md" />
               </div>
             </template>
           </OTable>
@@ -369,7 +364,7 @@ export default defineComponent({
         { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: 200, meta: { align: "center" } },
         { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: 100, meta: { align: "left" } },
         { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: 200, meta: { align: "left" } },
-        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column" } },
+        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
       ];
     };
 

@@ -71,6 +71,7 @@
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
             row-key="uuid"
+            :loading="isLoading"
             pagination="client"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
@@ -216,12 +217,6 @@
             </template>
           </OTable>
 
-          <div
-            v-if="isLoading"
-            class="tw:text-center tw:w-full full-height tw:mt-4 tw:flex tw:justify-center"
-          >
-            <OSpinner size="md" />
-          </div>
         </div>
       </div>
     </div>
