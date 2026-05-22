@@ -1,15 +1,17 @@
 <template>
-  <div class="tw:flex" :class="isChild ? 'tw:flex-col' : ''">
-    <OSelect
-      v-model="fields.functionName"
-      label="Select Function"
-      label-position="inside"
-      :options="filteredFunctions"
-      data-test="dashboard-function-dropdown"
-      :class="isChild ? 'tw:w-52' : 'tw:w-72'"
-      @search="onFunctionSearch"
-    />
-    <div :class="isChild ? 'tw:w-full' : 'tw:w-full tw:p-3 tw:flex tw:gap-2'">
+  <div class="tw:flex tw:flex-col">
+    <div class="tw:w-60 tw:flex-none">
+      <OSelect
+        v-model="fields.functionName"
+        label="Select Function"
+        label-position="inside"
+        :options="filteredFunctions"
+        data-test="dashboard-function-dropdown"
+        class="tw:w-full"
+        @search="onFunctionSearch"
+      />
+    </div>
+    <div class="tw:w-full tw:mt-2">
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="tw:w-full">
         <div
@@ -40,20 +42,13 @@
               </div>
             </div>
 
-            <div class="tw:flex tw:flex-col">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
               <div class="tw:flex tw:items-center tw:gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div
-                :class="[
-                  'tw:flex',
-                  fields.args[argIndex]?.type === 'function'
-                    ? 'tw:items-start'
-                    : 'tw:items-end',
-                ]"
-              >
+              <div class="tw:flex tw:items-start">
                 <!-- type selector -->
                 <OSelect
                   v-model="fields.args[argIndex].type"
@@ -109,17 +104,21 @@
                 />
 
                 <!-- histogram interval for sql queries -->
-                <HistogramIntervalDropDown
+                <div
                   v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-                  :model-value="fields.args[argIndex].value"
-                  @update:modelValue="
-                    (newValue: any) => {
-                      fields.args[argIndex].value = newValue;
-                    }
-                  "
-                  class="tw:w-52"
-                  :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
-                />
+                  class="tw:w-52 tw:flex-none"
+                >
+                  <HistogramIntervalDropDown
+                    :model-value="fields.args[argIndex].value"
+                    @update:modelValue="
+                      (newValue: any) => {
+                        fields.args[argIndex].value = newValue;
+                      }
+                    "
+                    class="tw:w-full"
+                    :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                  />
+                </div>
 
                 <!-- Nested function inline with type selector -->
                 <SelectFunction
@@ -548,6 +547,10 @@ export default {
 
 <style lang="scss" scoped>
 .arg-type-select {
+  // Constrain to icon-only width, prevent OSelect's internal tw:w-full from expanding it
+  width: fit-content !important;
+  flex: none !important;
+
   // Make the trigger compact - only show the icon + chevron (no label text)
   :deep(span[class~="tw:flex-1"][class~="tw:truncate"]) {
     display: none !important;
@@ -555,6 +558,7 @@ export default {
 
   :deep(button[type="button"]) {
     min-width: 2.5rem;
+    height: 2.5rem;
     padding-inline-end: 1.5rem !important;
   }
 }

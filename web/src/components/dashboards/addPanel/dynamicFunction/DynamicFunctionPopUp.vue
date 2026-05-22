@@ -74,29 +74,33 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="tw:pt-2">
-          <div style="display: flex">
-            <div style="width: calc(100% - 134px)">
-              <div class="text-label-bold tw:pb-3">Configuration</div>
-              <SelectFunction
-                v-model="fields"
-                data-test="dynamic-function-popup-select-function"
-                :allowAggregation="allowAggregation"
-              />
+          <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
+            <div style="display: flex">
+              <div
+                style="
+                  width: calc(100% - 134px);
+                "
+              >
+                <div class="text-label-bold tw:pb-3">Configuration</div>
+                <SelectFunction
+                  v-model="fields"
+                  data-test="dynamic-function-popup-select-function"
+                  :allowAggregation="allowAggregation"
+                />
+              </div>
             </div>
-          </div>
           </div>
         </OTabPanel>
         <OTabPanel name="raw">
           <div class="tw:pt-2">
-          <div style="display: flex; width: 100%">
-            <div style="width: 100%; padding-right: 12px">
-              <RawQueryBuilder
-                v-model="fields"
-                data-test="dynamic-function-popup-raw-query-builder"
-              />
+            <div style="display: flex; width: 100%">
+              <div style="width: 100%; padding-right: 0.75rem">
+                <RawQueryBuilder
+                  v-model="fields"
+                  data-test="dynamic-function-popup-raw-query-builder"
+                />
+              </div>
             </div>
-          </div>
           </div>
         </OTabPanel>
       </OTabPanels>
@@ -184,7 +188,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default {
   name: "DynamicFunctionPopUp",
   components: {
