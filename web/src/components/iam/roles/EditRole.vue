@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-role-permissions-count"
                 class="tw:font-bold tw:text-[14px]"
               >
-                {{ countOfVisibleResources }} Permissions
+                {{ selectedPermissionsHash.size }} Permissions
               </span>
               <OToggleGroup
                 data-test="edit-role-permissions-ui-type-toggle"
