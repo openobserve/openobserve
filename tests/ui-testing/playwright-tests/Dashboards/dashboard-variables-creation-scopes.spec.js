@@ -129,7 +129,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_NAME).fill(tabVar);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="tabs"]').click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
     await selectStreamType(page, "logs");
@@ -144,11 +146,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
     await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
     // Click on the autocomplete to see available variables
     const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
@@ -223,16 +225,19 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_NAME).fill(tab2Var);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="tabs"]').click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Open tabs dropdown and select tab2
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Tab2 option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).click();
+    // Wait for dropdown popover to be visible
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    // Click the Tab2 option by label
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab2"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab2"]').click();
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
     await selectStreamType(page, "logs");
@@ -246,11 +251,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
     await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
     // Click on the autocomplete to see available variables
     const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
@@ -369,27 +374,30 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_NAME).fill(panelVar);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="panels"]').click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // First select the tab containing the panel
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Tab1 option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).click();
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    // Wait for dropdown popover to be visible
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    // Click the Tab1 option by label
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab1"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab1"]').click();
+    await page.keyboard.press("Escape");
     // Wait for dropdown to close
-    await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Then select the panel by name
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible" });
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).click();
+    // Wait for dropdown popover to be visible
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel1"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel1"]').click();
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
     await selectStreamType(page, "logs");
@@ -403,11 +411,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
     await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
     // Click on the autocomplete to see available variables
     const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
@@ -478,27 +486,30 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator(SELECTORS.VARIABLE_NAME).fill(panel2Var);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="panels"]').click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // First select the default tab to enable the panels dropdown
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Default tab option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).click();
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    // Wait for dropdown popover to be visible
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    // Click the Default tab option by label
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').click();
+    await page.keyboard.press("Escape");
     // Wait for dropdown to close
-    await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Now open the panels dropdown and select panel2 by name
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible" });
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
+    // Wait for dropdown popover to be visible
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').click();
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
     await selectStreamType(page, "logs");
@@ -512,11 +523,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
     await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
     // Click on the autocomplete to see available variables
     const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();

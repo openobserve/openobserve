@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red">
+                <div v-show="filterCycleError" style="color: red" data-test="dashboard-variable-cycle-error">
                   {{ filterCycleError }}
                 </div>
               </div>

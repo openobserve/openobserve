@@ -26,9 +26,6 @@ export default class DashboardVariables {
     await variableTab.waitFor({ state: "attached", timeout: 10000 });
     await variableTab.waitFor({ state: "visible", timeout: 10000 });
 
-    // Additional wait for panel animation and stability
-    await this.page.waitForTimeout(500);
-
     // Click the Variable Tab
     await variableTab.click();
 
@@ -41,11 +38,11 @@ export default class DashboardVariables {
       .locator('[data-test="dashboard-variable-stream-type-select"]')
       .click();
 
+    await this.page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     await this.page
-      .getByRole("option", { name: streamtype, exact: true })
-      .locator("div")
-      .nth(2)
+      .locator(`[data-test="dashboard-variable-stream-type-select-option"][data-test-value="${streamtype}"]`)
       .click();
+    await this.page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Select Stream and Field using shared utilities
     await selectStreamFromDropdown(this.page, streamName);
@@ -65,17 +62,17 @@ export default class DashboardVariables {
       await filterNameSelector.fill(filterConfig.filterName);
       
       // Wait for and select the filter name option
-      const filterNameOption = this.page.getByRole("option", { name: filterConfig.filterName });
+      const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
       await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
       await filterNameOption.click();
-      
+
       // Wait for and interact with Operator selector
       const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
       await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
       await operatorSelector.click();
-      
+
       // Wait for and select the operator option
-      const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+      const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
       
@@ -125,9 +122,8 @@ export default class DashboardVariables {
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click();
 
-    // Wait for the save action to complete and DOM to stabilize
-    await this.page.waitForTimeout(3000);
-    // await this.page.waitForLoadState("networkidle");
+    // Wait for the save action to complete and settings drawer to re-appear
+    await this.page.locator('[data-test="dashboard-settings-drawer"]').waitFor({ state: 'visible', timeout: 10000 });
 
     // Use JavaScript evaluation to click the close button to avoid DOM instability issues
     await this.page.evaluate(() => {
@@ -163,7 +159,7 @@ export default class DashboardVariables {
     // // Wait for search stream to complete (waits for 'data: [[DONE]]' marker)
     // await searchStreamPromise;
 
-    const option = this.page.getByRole("option", { name: value });
+    const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
   }
@@ -240,7 +236,7 @@ export default class DashboardVariables {
     await typeSelect.waitFor({ state: "visible", timeout: 10000 });
     await typeSelect.click();
 
-    const typeOption = this.page.getByRole("option", { name: "Query Values" });
+    const typeOption = this.page.locator('[data-test="dashboard-variable-type-select-option"][data-test-value="query_values"]');
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
 
@@ -255,9 +251,6 @@ export default class DashboardVariables {
 
     // Wait for options to be available
     await this.page.waitForSelector('[data-test="dashboard-variable-stream-type-select-popover"]', { state: 'visible', timeout: 15000 });
-
-    // Longer delay to ensure options are fully rendered (especially when tests run in parallel)
-    await this.page.waitForTimeout(500);
 
     // Use JavaScript evaluation to click the option to avoid DOM detachment issues
     const clicked = await this.page.evaluate((streamTypeName) => {
@@ -285,7 +278,7 @@ export default class DashboardVariables {
     await this.page.keyboard.type(stream, { delay: 50 });
 
     const streamOption = this.page
-      .locator('[data-test="dashboard-variable-stream-select-option"]', { hasText: stream })
+      .locator(`[data-test="dashboard-variable-stream-select-option"][data-test-value="${stream}"]`)
       .first();
     await streamOption.waitFor({ state: "visible", timeout: 5000 });
     await streamOption.click();
@@ -304,7 +297,7 @@ export default class DashboardVariables {
     );
 
     const fieldOption = this.page
-      .locator('[data-test="dashboard-variable-field-select-option"]', { hasText: field })
+      .locator(`[data-test="dashboard-variable-field-select-option"][data-test-value="${field}"]`)
       .first();
     await fieldOption.waitFor({ state: "visible", timeout: 5000 });
     await fieldOption.click();
@@ -331,8 +324,6 @@ export default class DashboardVariables {
     await this.page.waitForLoadState('domcontentloaded');
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Additional buffer for parallel test execution
-    await this.page.waitForTimeout(500);
   }
 
   /**

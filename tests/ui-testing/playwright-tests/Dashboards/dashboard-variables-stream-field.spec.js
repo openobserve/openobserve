@@ -179,7 +179,7 @@ test.describe(
       await scopedVars.selectStream("e2e_automate");
 
       // Wait for field schema to load after selecting real stream
-      await page.waitForTimeout(1000);
+      await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       const fieldResult = await scopedVars.verifyFieldDropdownContainsVariable("fieldVar");
       expect(fieldResult.found).toBe(true);
@@ -496,9 +496,6 @@ test.describe(
       await saveBtnF1.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF1.click();
 
-      // Allow cycle detection to process and error to render
-      await page.waitForTimeout(500);
-
       const hasCycleF1 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF1).toBe(true);
 
@@ -507,7 +504,6 @@ test.describe(
       // Wait for edit form to close (save button hidden indicates form is gone)
       await page.locator(SELECTORS.VARIABLE_SAVE_BTN).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
-      await page.waitForTimeout(1000); // Extra stabilization for form reset
       await page
         .locator(SELECTORS.ADD_VARIABLE_BTN)
         .waitFor({ state: "visible", timeout: 10000 });
@@ -526,9 +522,6 @@ test.describe(
       const saveBtnF2 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
       await saveBtnF2.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF2.click();
-
-      // Allow cycle detection to process and error to render
-      await page.waitForTimeout(500);
 
       const hasCycleF2 = await scopedVars.hasCircularDependencyError();
       expect(hasCycleF2).toBe(true);
@@ -626,7 +619,6 @@ test.describe(
       // Reopen dashboard — this is the initial load we want to test
       await reopenDashboardFromList(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       // --- G3: Verify all variables loaded on initial fresh dashboard load ---
       await scopedVars.waitForVariableSelectorVisible("streamName", { timeout: 40000 });
@@ -643,7 +635,6 @@ test.describe(
       // In CI, SSE streaming responses can take longer to complete, so give
       // extra time for all initial variable loads to finish.
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(3000);
 
       // --- G1: Change streamName → "default"; streamChild must cascade-reload
       // with stream="default" (resolved, not "$streamName").
@@ -670,7 +661,6 @@ test.describe(
 
       // Allow G1 responses to settle before G2
       await safeWaitForNetworkIdle(page, { timeout: 10000 });
-      await page.waitForTimeout(3000);
 
       // --- G2: Change fieldName → "kubernetes_container_name"; fieldChild must reload
       // with field="kubernetes_container_name" (resolved, not "$fieldName")
@@ -875,7 +865,6 @@ test.describe(
       // Reopen dashboard — this is the initial load we want to test
       await reopenDashboardFromList(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       // Monitor _values_stream calls while switching to Tab1
       const apiMonitor = monitorVariableAPICalls(page, {
@@ -964,7 +953,6 @@ test.describe(
       // Reopen dashboard — this is the initial load we want to test
       await reopenDashboardFromList(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       const apiMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
@@ -1053,7 +1041,6 @@ test.describe(
       // Reopen dashboard — this is the initial load we want to test
       await reopenDashboardFromList(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       const apiMonitor = monitorVariableAPICalls(page, {
         expectedCount: 1,
@@ -1200,7 +1187,6 @@ test.describe(
       // Reopen dashboard — panel variable loads when the panel renders
       await openDashboardWithPanels(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       const result = await apiMonitor;
 
@@ -1275,7 +1261,6 @@ test.describe(
 
       await openDashboardWithPanels(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       const result = await apiMonitor;
 
@@ -1356,7 +1341,6 @@ test.describe(
 
       await openDashboardWithPanels(page, dashboardName);
       await safeWaitForNetworkIdle(page, { timeout: 15000 });
-      await page.waitForTimeout(2000);
 
       const result = await apiMonitor;
 

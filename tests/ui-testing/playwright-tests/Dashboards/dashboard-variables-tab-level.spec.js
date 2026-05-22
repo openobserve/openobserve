@@ -392,8 +392,6 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const varDropdownTab1Again = page.locator(`[data-test="variable-selector-${variableName}"]`);
     await varDropdownTab1Again.waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    // Wait extra time for variable to fully initialize after tab switch
-    await page.waitForTimeout(1000);
     await varDropdownTab1Again.click();
     // Wait for dropdown menu to open
     await page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`).waitFor({ state: "visible", timeout: 10000 });

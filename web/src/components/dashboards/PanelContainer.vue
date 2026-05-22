@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
+    :data-test-panel-title="props.data.title"
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div

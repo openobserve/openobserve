@@ -138,10 +138,10 @@ export default class DashboardVariablesScoped {
     const menu = this.page.locator(popoverSelector);
     let targetOption;
     if (optionText) {
-      targetOption = menu.getByRole("option", { name: optionText, exact: true });
+      targetOption = menu.locator(`[data-test-value="${optionText}"]`);
     } else {
-      // Filter to non-empty options to skip hidden/placeholder entries at index 0
-      targetOption = menu.locator(SELECTORS.OPTION).filter({ hasText: /.+/ }).nth(optionIndex);
+      // Use the option locator scoped to the menu popover, indexed by position
+      targetOption = menu.locator(SELECTORS.OPTION).nth(optionIndex);
     }
     const optionTimeout = Math.max(timeout, 15000); // At least 15s for options under load
 
@@ -149,10 +149,9 @@ export default class DashboardVariablesScoped {
     try {
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
     } catch (e) {
-      // Click outside to close, then reopen
-      await this.page.locator('body').click({ position: { x: 0, y: 0 } });
+      // Close by pressing Escape, then reopen
+      await this.page.keyboard.press('Escape');
       await this.waitForMenuHidden({ timeout: 3000 });
-      await this.page.waitForTimeout(500);
       await varDropdown.click();
       await this.page.locator(popoverSelector).waitFor({ state: "visible", timeout });
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
@@ -195,8 +194,8 @@ export default class DashboardVariablesScoped {
    */
   async selectMenuItem(text, options = {}) {
     const { exact = true, timeout = 5000 } = options;
-    // Use Playwright's getByText for safe text matching (avoids regex metacharacter issues)
-    const item = this.page.locator(SELECTORS.MENU_ITEM).getByText(text, { exact });
+    // Use data-test-label for items whose value may be a UUID but label is text
+    const item = this.page.locator(`[data-test$="-option"][data-test-label="${text}"]`);
     await item.waitFor({ state: "visible", timeout });
     await item.click();
   }
@@ -230,8 +229,8 @@ export default class DashboardVariablesScoped {
         }
       } catch (e) {
         lastError = e;
-        // Wait briefly and retry
-        await this.page.waitForTimeout(1000); // Increased from 500ms to 1s
+        // Wait for DOM to settle and retry
+        await this.page.waitForLoadState('domcontentloaded');
       }
     }
 
@@ -422,7 +421,7 @@ export default class DashboardVariablesScoped {
     const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
     await variableTab.waitFor({ state: "visible", timeout: 10000 });
     await variableTab.click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: 'visible', timeout: 10000 });
 
     // Click Add Variable
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({ timeout: 5000 });
@@ -441,7 +440,9 @@ export default class DashboardVariablesScoped {
     };
 
     await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
-    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${normalizedScope}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Assign to tabs if tab-scoped
     if (normalizedScope === "tabs" && assignedTabs.length > 0) {
@@ -449,23 +450,22 @@ export default class DashboardVariablesScoped {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500); // Wait for dropdown to open
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-      // Click each tab by label text
+      // Click each tab by label text using data-test-label
       for (const tabId of assignedTabs) {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
         const tabItem = this.page
-          .locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]')
-          .filter({ hasText: new RegExp(`^${tabLabel}$`) });
+          .locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Close the dropdown by clicking the trigger again to toggle it closed
-      await tabsSelect.click();
-      await this.page.waitForTimeout(300);
+      // Close the dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
     // Assign to panels if panel-scoped
@@ -478,23 +478,22 @@ export default class DashboardVariablesScoped {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-      // Click each tab by label text
+      // Click each tab by label text using data-test-label
       for (const tabId of tabsToSelect) {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
         const tabItem = this.page
-          .locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]')
-          .filter({ hasText: new RegExp(`^${tabLabel}$`) });
+          .locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by clicking the trigger again to toggle it closed
-      await tabsSelect.click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       // Now select the panels
       if (assignedPanels.length > 0) {
@@ -502,24 +501,21 @@ export default class DashboardVariablesScoped {
         const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
         await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
         await panelsSelect.click();
-        await this.page.waitForTimeout(1000);
 
         // Wait for panels popover to open
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
-        // Click each panel by panel name using OSelect option pattern
+        // Click each panel by panel name using data-test-label
         for (const panelName of assignedPanels) {
           const panelItem = this.page
-            .locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]')
-            .filter({ hasText: new RegExp(`^${panelName}$`) });
+            .locator(`[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelName}"]`);
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
-          await this.page.waitForTimeout(500);
         }
 
-        // Close the dropdown by clicking the trigger again to toggle it closed
-        await panelsSelect.click();
-        await this.page.waitForTimeout(500);
+        // Close the dropdown by pressing Escape
+        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
 
@@ -635,8 +631,6 @@ export default class DashboardVariablesScoped {
     } catch (e) {
       // If neither indicator appears, try network idle as fallback
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-      // Brief wait for DOM updates
-      await this.page.waitForTimeout(500);
     }
   }
 
@@ -672,7 +666,6 @@ export default class DashboardVariablesScoped {
     // Dependencies are added through filters where the value references another variable using $variableName
     // Wait for any pending DOM updates to complete
     await this.page.waitForLoadState('domcontentloaded');
-    await this.page.waitForTimeout(500); // Small wait for UI to stabilize
 
     const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
     await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
@@ -686,7 +679,7 @@ export default class DashboardVariablesScoped {
     await filterNameSelector.click();
     await filterNameSelector.fill(filterFieldName);
 
-    const filterNameOption = this.page.getByRole("option", { name: filterFieldName, exact: true });
+    const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterFieldName}"]`);
     await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
     await filterNameOption.click();
 
@@ -695,9 +688,7 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    // Use .first() instead of .locator("div").nth(2) — Quasar may or may not include
-    // a q-focus-helper div making the nth(2) index unstable across renders.
-    const operatorOption = this.page.getByRole("option", { name: operator, exact: true }).first();
+    const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${operator}"]`);
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -808,7 +799,7 @@ export default class DashboardVariablesScoped {
     await filterNameSelector.click();
     await filterNameSelector.fill(filterConfig.filterName);
 
-    const filterNameOption = this.page.getByRole("option", { name: filterConfig.filterName });
+    const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
     await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
     await filterNameOption.click();
 
@@ -816,7 +807,7 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).first();
+    const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -858,7 +849,7 @@ export default class DashboardVariablesScoped {
 
     await input.fill(value);
 
-    const option = this.page.getByRole("option", { name: value });
+    const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
@@ -1011,55 +1002,13 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>}
    */
   async hasCircularDependencyError() {
-    // The error is displayed as red text with the message "Variables has cycle:"
-    // When there's a cycle error, the save button should still be visible (save failed)
-
-    // First, look for cycle error text directly — don't rely on save button visibility
-    // because brief DOM rerenders can temporarily hide/show the button.
-    // Strategy 1: Look for div with inline style containing "color" and text containing "cycle"
+    const errorEl = this.page.locator('[data-test="dashboard-variable-cycle-error"]');
     try {
-      const errorElement = this.page.locator('div[style*="color"]').filter({ hasText: /cycle/i });
-      await errorElement.waitFor({ state: "visible", timeout: 12000 });
-      const text = await errorElement.textContent();
-      if (text && text.toLowerCase().includes('cycle')) {
-        return true;
-      }
-    } catch {
-      // Continue to next strategy
-    }
-
-    // Strategy 2: Look for any text containing "Variables has cycle"
-    try {
-      const fallbackError = this.page.getByText(/Variables has cycle/i);
-      await fallbackError.waitFor({ state: "visible", timeout: 5000 });
+      await errorEl.waitFor({ state: 'visible', timeout: 12000 });
       return true;
     } catch {
-      // Continue to next strategy
-    }
-
-    // Strategy 3: Look for any div containing "cycle" (case insensitive)
-    try {
-      const generalError = this.page.locator('div').filter({ hasText: /cycle/i });
-      await generalError.first().waitFor({ state: "visible", timeout: 3000 });
-      const text = await generalError.first().textContent();
-      if (text && /variables.*cycle|cycle.*variable/i.test(text)) {
-        return true;
-      }
-    } catch {
-      // All strategies failed
-    }
-
-    // Fallback: check if save button is still visible (save was blocked)
-    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
-    const isSaveBtnVisible = await saveBtn.isVisible().catch(() => false);
-
-    if (!isSaveBtnVisible) {
-      // Save succeeded (button is hidden), so there's no cycle error
       return false;
     }
-
-    // Save button is visible but no cycle text found — might be another error
-    return false;
   }
 
   /**
@@ -1107,8 +1056,9 @@ export default class DashboardVariablesScoped {
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
     const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
-    const tooltip = this.page.locator('[data-test="o-tooltip-content"]').filter({ hasText: new RegExp(expectedText, 'i') });
+    const tooltip = this.page.locator('[data-test="o-tooltip-content"]');
     await expect(tooltip).toBeVisible({ timeout: 5000 });
+    await expect(tooltip).toContainText(expectedText, { ignoreCase: true });
   }
 
   /**
@@ -1172,9 +1122,6 @@ export default class DashboardVariablesScoped {
     const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
     await optionLocator.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // Add a small stabilization delay to ensure options are fully rendered
-    await this.page.waitForTimeout(500);
-
     // Get the text of the target option before clicking
     const targetOption = optionLocator.nth(optionIndex);
     const targetOptionText = await targetOption.textContent().then((t) => (t ? t.trim() : null)).catch(() => null);
@@ -1193,7 +1140,6 @@ export default class DashboardVariablesScoped {
     const apiResult = await apiMonitor;
 
     // Verify the value actually changed by checking the input value
-    await this.page.waitForTimeout(500);
     const currentValue = await varDropdown.inputValue().catch(() => '');
 
     return {
@@ -1233,43 +1179,37 @@ export default class DashboardVariablesScoped {
     const isActive = await variableTab.getAttribute('aria-selected');
     if (isActive !== 'true') {
       await variableTab.click();
-      await this.page.waitForTimeout(500);
-    } else {
-      await this.page.waitForTimeout(300);
+      await this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     // Click Add Variable button
     await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await this.page.waitForTimeout(500);
 
     // Select scope first (before filling other fields)
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
-    const scopeUIText = {
-      'global': 'Global',
-      'tabs': 'Selected Tabs',
-      'panels': 'Selected Panels'
-    };
 
     await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
-    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${normalizedScope}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Assign to tabs if needed
     if (normalizedScope === "tabs" && assignedTabs.length > 0) {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
     // Assign to panels if needed
@@ -1279,44 +1219,43 @@ export default class DashboardVariablesScoped {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
         const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
         await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
         await panelsSelect.click();
-        await this.page.waitForTimeout(1000);
 
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator(`[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelName}"]`);
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
-          await this.page.waitForTimeout(500);
         }
 
-        // Toggle-close the panels dropdown by clicking the trigger again
-        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
-        await this.page.waitForTimeout(500);
+        // Close the panels dropdown by pressing Escape
+        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
 
     // Select variable type - Custom
     await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
-    await this.page.getByRole("option", { name: "Custom", exact: true }).click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator('[data-test="dashboard-variable-type-select-option"][data-test-value="custom"]').click();
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
     await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
@@ -1381,7 +1320,6 @@ export default class DashboardVariablesScoped {
       ]);
     } catch (e) {
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-      await this.page.waitForTimeout(500);
     }
   }
 
@@ -1412,43 +1350,37 @@ export default class DashboardVariablesScoped {
     const isActive = await variableTab.getAttribute('aria-selected');
     if (isActive !== 'true') {
       await variableTab.click();
-      await this.page.waitForTimeout(500);
-    } else {
-      await this.page.waitForTimeout(300);
+      await this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     // Click Add Variable button
     await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await this.page.waitForTimeout(500);
 
     // Select scope first
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
-    const scopeUIText = {
-      'global': 'Global',
-      'tabs': 'Selected Tabs',
-      'panels': 'Selected Panels'
-    };
 
     await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
-    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${normalizedScope}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Assign to tabs if needed
     if (normalizedScope === "tabs" && assignedTabs.length > 0) {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
     // Assign to panels if needed
@@ -1458,44 +1390,43 @@ export default class DashboardVariablesScoped {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
         const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
         await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
         await panelsSelect.click();
-        await this.page.waitForTimeout(1000);
 
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator(`[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelName}"]`);
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
-          await this.page.waitForTimeout(500);
         }
 
-        // Toggle-close the panels dropdown by clicking the trigger again
-        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
-        await this.page.waitForTimeout(500);
+        // Close the panels dropdown by pressing Escape
+        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
 
     // Select variable type - Constant
     await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
-    await this.page.getByRole("option", { name: "Constant", exact: true }).click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator('[data-test="dashboard-variable-type-select-option"][data-test-value="constant"]').click();
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
     await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
@@ -1522,7 +1453,6 @@ export default class DashboardVariablesScoped {
       ]);
     } catch (e) {
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-      await this.page.waitForTimeout(500);
     }
   }
 
@@ -1553,43 +1483,37 @@ export default class DashboardVariablesScoped {
     const isActive = await variableTab.getAttribute('aria-selected');
     if (isActive !== 'true') {
       await variableTab.click();
-      await this.page.waitForTimeout(500);
-    } else {
-      await this.page.waitForTimeout(300);
+      await this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     // Click Add Variable button
     await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await this.page.waitForTimeout(500);
 
     // Select scope first
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
-    const scopeUIText = {
-      'global': 'Global',
-      'tabs': 'Selected Tabs',
-      'panels': 'Selected Panels'
-    };
 
     await this.page.locator('[data-test="dashboard-variable-scope-select"]').click();
-    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${normalizedScope}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Assign to tabs if needed
     if (normalizedScope === "tabs" && assignedTabs.length > 0) {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
     // Assign to panels if needed
@@ -1599,44 +1523,43 @@ export default class DashboardVariablesScoped {
       const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
       await tabsSelect.waitFor({ state: "visible", timeout: 10000 });
       await tabsSelect.click();
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator(`[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`);
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Toggle-close the tabs dropdown by clicking the trigger again
-      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-      await this.page.waitForTimeout(300);
+      // Close the tabs dropdown by pressing Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
         const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
         await panelsSelect.waitFor({ state: "visible", timeout: 10000 });
         await panelsSelect.click();
-        await this.page.waitForTimeout(1000);
 
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator(`[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelName}"]`);
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
-          await this.page.waitForTimeout(500);
         }
 
-        // Toggle-close the panels dropdown by clicking the trigger again
-        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
-        await this.page.waitForTimeout(500);
+        // Close the panels dropdown by pressing Escape
+        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
 
     // Select variable type - Textbox
     await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
-    await this.page.getByRole("option", { name: "Textbox", exact: true }).click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator('[data-test="dashboard-variable-type-select-option"][data-test-value="textbox"]').click();
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
     await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
@@ -1665,7 +1588,6 @@ export default class DashboardVariablesScoped {
       ]);
     } catch (e) {
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-      await this.page.waitForTimeout(500);
     }
   }
 
@@ -1704,8 +1626,8 @@ export default class DashboardVariablesScoped {
     await dropdown.first().waitFor({ state: "visible", timeout });
     const count = await dropdown.count();
 
-    // Close dropdown by clicking outside
-    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+    // Close dropdown by pressing Escape
+    await this.page.keyboard.press('Escape');
     await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     return count;
@@ -1797,20 +1719,12 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<string|null>} The error text or null if not visible
    */
   async getCycleErrorText() {
-    // Look for red-colored text containing "cycle"
-    const errorElement = this.page.locator('div[style*="color: red"], div[style*="color:red"], .text-negative, .text-red').filter({ hasText: /cycle/i });
+    const errorEl = this.page.locator('[data-test="dashboard-variable-cycle-error"]');
     try {
-      await errorElement.waitFor({ state: "visible", timeout: 3000 });
-      return await errorElement.textContent();
+      await errorEl.waitFor({ state: 'visible', timeout: 3000 });
+      return await errorEl.textContent();
     } catch {
-      // Fallback: search for any text with "Variables has cycle"
-      const fallback = this.page.getByText(/Variables has cycle/i);
-      try {
-        await fallback.waitFor({ state: "visible", timeout: 1000 });
-        return await fallback.textContent();
-      } catch {
-        return null;
-      }
+      return null;
     }
   }
 
@@ -1849,7 +1763,7 @@ export default class DashboardVariablesScoped {
     const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
     await variableTab.waitFor({ state: "visible", timeout: 10000 });
     await variableTab.click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: 'visible', timeout: 10000 });
 
     // Click Add Variable
     await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
@@ -1859,9 +1773,10 @@ export default class DashboardVariablesScoped {
 
     // Select scope
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
-    const scopeUIText = { 'global': 'Global', 'tabs': 'Selected Tabs', 'panels': 'Selected Panels' };
     await this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await this.page.getByRole("option", { name: scopeUIText[normalizedScope] || normalizedScope, exact: true }).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${normalizedScope}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Select stream type
     await selectStreamType(this.page, streamType);
@@ -1885,8 +1800,8 @@ export default class DashboardVariablesScoped {
     await saveBtn.click();
 
     if (expectCycleError) {
-      // Wait briefly for error to appear, don't expect save success
-      await this.page.waitForTimeout(1000);
+      // Wait for cycle error to appear using the data-test attribute
+      await this.page.locator('[data-test="dashboard-variable-cycle-error"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       return;
     }
 
@@ -1902,7 +1817,6 @@ export default class DashboardVariablesScoped {
       ]);
     } catch {
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-      await this.page.waitForTimeout(500);
     }
   }
 
@@ -1927,8 +1841,6 @@ export default class DashboardVariablesScoped {
     }
 
     // Wait for any validation or dependency updates to process
-    // Increased wait time to ensure UI fully updates before save
-    await this.page.waitForTimeout(1500);
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
   }
 
@@ -1950,8 +1862,16 @@ export default class DashboardVariablesScoped {
    * @param {string} typeName - Type name (e.g., "Constant", "Query Values", "Custom", "Textbox")
    */
   async changeVariableType(typeName) {
+    const typeValueMap = {
+      'Query Values': 'query_values',
+      'Constant': 'constant',
+      'Textbox': 'textbox',
+      'Custom': 'custom',
+    };
+    const typeValue = typeValueMap[typeName] || typeName.toLowerCase().replace(/\s+/g, '_');
     await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
-    await this.page.getByRole("option", { name: typeName, exact: true }).click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${typeValue}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
   }
 }

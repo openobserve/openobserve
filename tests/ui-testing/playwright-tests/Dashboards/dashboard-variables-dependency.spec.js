@@ -908,8 +908,6 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 30000 });
 
-    await page.waitForTimeout(5000);
-
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 30000 });
 
@@ -981,7 +979,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await scopedVars.waitForMenuVisible({ timeout: 5000 });
 
     // When a variable query returns no results, it should show "No Data Found"
-    const noDataText = page.getByText("No Data Found", { exact: true });
+    const noDataText = page.locator('[data-test="variable-query-value-selector-no-data"]');
     await expect(noDataText).toBeVisible({ timeout: 5000 });
 
     // Close the dropdown
