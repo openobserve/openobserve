@@ -390,6 +390,9 @@ pub async fn delete_bulk(
             "service_accounts",
             "DELETE",
             None,
+            false,
+            false,
+            true,
         )
         .await
         {

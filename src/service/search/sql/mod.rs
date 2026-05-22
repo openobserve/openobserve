@@ -79,7 +79,7 @@ pub struct Sql {
     pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
-    pub time_range: Option<(i64, i64)>,
+    pub time_range: (i64, i64),
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
@@ -252,7 +252,7 @@ impl Sql {
 
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
-            HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
+            HistogramIntervalVisitor::new((query.start_time, query.end_time));
         let _ = statement.visit(&mut histogram_interval_visitor);
         if let Some(error) = histogram_interval_visitor.error {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
@@ -260,7 +260,7 @@ impl Sql {
         let mut histogram_interval = if query.histogram_interval > 0 {
             Some(validate_and_adjust_histogram_interval(
                 query.histogram_interval,
-                Some((query.start_time, query.end_time)),
+                (query.start_time, query.end_time),
             ))
         } else {
             histogram_interval_visitor.interval
@@ -299,7 +299,7 @@ impl Sql {
             schemas: final_schemas,
             limit,
             offset,
-            time_range: Some((query.start_time, query.end_time)),
+            time_range: (query.start_time, query.end_time),
             group_by,
             order_by,
             histogram_interval,

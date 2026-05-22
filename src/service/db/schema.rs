@@ -113,43 +113,67 @@ pub async fn set_stream_is_llm(
         .unwrap_or_default();
     settings.is_llm_stream = is_llm_stream;
 
-    if is_llm_stream && !settings.defined_schema_fields.is_empty() {
-        // Provision Gen-AI semantic-convention columns for the stream. Legacy llm_*
-        // columns (if any from before the Gen-AI migration) are left as-is in UDS so
-        // historical data still reads cleanly; new streams only get gen_ai_* columns.
-        let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-        let missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
-            .iter()
-            .filter(|f| !schema_cache.contains_field(f.name()))
-            .cloned()
-            .collect();
+    if is_llm_stream {
+        // Provision Gen-AI semantic-convention columns for the stream. Always merge
+        // gen_ai_* fields into the Arrow schema so they are available at ingestion
+        // time, even for streams that only have legacy llm_* fields or for non-UDS
+        // streams. Legacy llm_* columns are left as-is so historical data still reads
+        // cleanly.
+        ensure_gen_ai_fields_in_schema(org_id, stream_name, stream_type).await?;
 
-        if !missing_fields.is_empty() {
-            let gen_ai_schema = Schema::new(missing_fields);
-            merge(org_id, stream_name, stream_type, &gen_ai_schema, None).await?;
-        }
-
-        // Add to defined_schema_fields only if not already present
-        let mut uds_updated = false;
-        for field in GEN_AI_SCHEMA_FIELDS.iter() {
-            if !settings
-                .defined_schema_fields
-                .contains(&field.name().to_string())
-            {
-                settings
+        // Add to defined_schema_fields only when UDS is already enabled
+        if !settings.defined_schema_fields.is_empty() {
+            let mut uds_updated = false;
+            for field in GEN_AI_SCHEMA_FIELDS.iter() {
+                if !settings
                     .defined_schema_fields
-                    .push(field.name().to_string());
-                uds_updated = true;
+                    .contains(&field.name().to_string())
+                {
+                    settings
+                        .defined_schema_fields
+                        .push(field.name().to_string());
+                    uds_updated = true;
+                }
             }
-        }
-        if uds_updated {
-            settings.defined_schema_fields.sort();
+            if uds_updated {
+                settings.defined_schema_fields.sort();
+            }
         }
     }
 
     let mut metadata = std::collections::HashMap::with_capacity(1);
     metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     update_setting(org_id, stream_name, stream_type, metadata).await
+}
+
+/// Ensure gen_ai_* schema fields are present in a stream's Arrow schema.
+///
+/// This is a pure schema-merge operation: it adds any missing gen_ai_* fields
+/// from [`GEN_AI_SCHEMA_FIELDS`] into the stream's schema so they are
+/// available at ingestion time. Unlike [`set_stream_is_llm`], this does NOT
+/// modify `defined_schema_fields` (User-Defined Schema), so it is safe to call
+/// on non-UDS streams without accidentally turning on UDS.
+///
+/// Handles the case where a stream was already marked as an LLM stream but has
+/// only legacy `llm_*` fields — calling this ensures the newer `gen_ai_*`
+/// columns exist for querying.
+pub async fn ensure_gen_ai_fields_in_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<(), anyhow::Error> {
+    let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+    let missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
+        .iter()
+        .filter(|f| !schema_cache.contains_field(f.name()))
+        .cloned()
+        .collect();
+
+    if !missing_fields.is_empty() {
+        let gen_ai_schema = Schema::new(missing_fields);
+        merge(org_id, stream_name, stream_type, &gen_ai_schema, None).await?;
+    }
+    Ok(())
 }
 
 /// Arrow schema fields provisioned on streams marked as LLM streams.
