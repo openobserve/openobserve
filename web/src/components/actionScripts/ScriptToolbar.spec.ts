@@ -11,6 +11,12 @@ vi.mock('vue-i18n', () => ({
   })
 }));
 
+// ScriptToolbar calls toggleFullscreen() from @/utils/dom directly — mock at the module boundary.
+const mockToggleFullscreen = vi.fn();
+vi.mock('@/utils/dom', () => ({
+  toggleFullscreen: () => mockToggleFullscreen(),
+}));
+
 
 describe('ScriptToolbar.vue', () => {
   let wrapper: VueWrapper;
@@ -118,18 +124,19 @@ describe('ScriptToolbar.vue', () => {
     it('renders back button with correct styling', () => {
       wrapper = createWrapper();
       const backBtn = wrapper.find('[data-test="add-script-back-btn"]');
-      
+
       expect(backBtn.exists()).toBe(true);
       expect(backBtn.attributes('title')).toBe('Go Back');
-      expect(backBtn.classes()).toContain('cursor-pointer');
+      // The back button uses Tailwind tw: prefix classes, not bare cursor-pointer
+      expect(backBtn.classes()).toContain('tw:cursor-pointer');
     });
 
     it('renders name input field', () => {
       wrapper = createWrapper();
-      const nameInput = wrapper.find('.q-input-stub');
-      
+      // The component uses OInput (O2 lib), queried by its data-test attribute
+      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
+
       expect(nameInput.exists()).toBe(true);
-      expect(nameInput.attributes('data-test')).toBe('add-script-name-input');
     });
 
     it('renders action buttons', () => {
@@ -161,10 +168,10 @@ describe('ScriptToolbar.vue', () => {
 
     it('passes disableName to input field', () => {
       wrapper = createWrapper({ disableName: true });
-      const nameInput = wrapper.find('.q-input-stub');
-      
+      // The component uses OInput (O2 lib), queried by its data-test attribute
+      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
+
       expect(nameInput.exists()).toBe(true);
-      // In actual component, these props would be passed through
     });
   });
 
@@ -265,11 +272,11 @@ describe('ScriptToolbar.vue', () => {
     it('handles fullscreen toggle', async () => {
       wrapper = createWrapper();
       const fullscreenBtn = wrapper.find('[data-test="add-script-fullscreen-btn"]');
-      const vm = wrapper.vm as any;
-      
+
       await fullscreenBtn.trigger('click');
-      
-      expect(mockQuasar.fullscreen.toggle).toHaveBeenCalled();
+
+      // Component calls toggleFullscreen() from @/utils/dom — verified via module mock
+      expect(mockToggleFullscreen).toHaveBeenCalled();
     });
 
     it('emits save event and shows input error when save button is clicked', async () => {
@@ -317,8 +324,9 @@ describe('ScriptToolbar.vue', () => {
   describe('Input Field Configuration', () => {
     it('configures input field', () => {
       wrapper = createWrapper();
-      const nameInput = wrapper.find('.q-input-stub');
-      
+      // The component uses OInput (O2 lib), queried by its data-test attribute
+      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
+
       expect(nameInput.exists()).toBe(true);
     });
 

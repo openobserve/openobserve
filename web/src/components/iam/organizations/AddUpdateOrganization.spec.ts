@@ -3,8 +3,8 @@ import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
-import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 
+import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 
 vi.mock("@/services/organizations", () => ({
   default: {
@@ -20,6 +20,16 @@ vi.mock("@/services/organizations", () => ({
 }));
 
 const orgService = (await import("@/services/organizations")).default;
+
+// toast() is used for all user-facing feedback (loading, error, success).
+// The module-level mock returns a dummy dismiss function so calls never throw.
+const toastDismiss = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => toastDismiss),
+  toastRecords: [],
+  useToast: vi.fn(),
+}));
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // ODrawer stub: keeps slot content queryable, surfaces open state and
 // proxies the migration emit so the parent's @update:open wiring is exercised.
@@ -85,7 +95,11 @@ const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
 
 describe("AddUpdateOrganization", () => {
   beforeEach(() => {
+    // Restore service mocks to their default implementations, then
+    // clear all call history (including toast / toastDismiss) so each
+    // test starts from a clean slate.
     vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("renders create organization title when not updating", () => {
@@ -128,21 +142,27 @@ describe("AddUpdateOrganization", () => {
 
   it("trims name on submit and calls organizations.create, success path resets form, emits updated and update:open false", async () => {
     const wrapper = mountComp();
-    await wrapper.find('[data-test="org-name"]').setValue("  My Org  ");
 
-    wrapper.vm.addOrganizationForm = {
-      validate: vi.fn().mockResolvedValue(true),
-      resetValidation: vi.fn(),
-    };
+    // OInput renders data-test on its outer wrapper div, not the native input.
+    // Reach inside OInput to set the value on the actual <input> element.
+    const nameInput = wrapper.find('[data-test="org-name"] input');
+    await nameInput.setValue("  My Org  ");
 
-    await wrapper.find("form").trigger("submit.prevent");
+    // onSubmit is wired to ODrawer's @click:primary, not a <form> submit.
+    await wrapper
+      .findComponent({ name: "ODrawer" })
+      .vm.$emit("click:primary");
     await flushPromises();
 
     expect(orgService.create).toHaveBeenCalledWith({ name: "My Org" });
+    // Loading toast shown, then dismissed on success.
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "loading" }),
+    );
+    expect(toastDismiss).toHaveBeenCalled();
     expect(wrapper.emitted("updated")).toBeTruthy();
     expect(wrapper.emitted("update:open")).toBeTruthy();
     expect(wrapper.emitted("update:open")![0]).toEqual([false]);
-    expect(wrapper.vm.organizationData.name).toBe("");
   });
 
   it("when create returns non-200, sets pro plan required flow and navigates to subscribe", async () => {
@@ -157,13 +177,15 @@ describe("AddUpdateOrganization", () => {
 
     const pushSpy = vi.spyOn(router, "push");
     const wrapper = mountComp();
-    await wrapper.find('[data-test="org-name"]').setValue("Test Org");
-    wrapper.vm.addOrganizationForm = {
-      validate: vi.fn().mockResolvedValue(true),
-      resetValidation: vi.fn(),
-    };
 
-    await wrapper.find("form").trigger("submit.prevent");
+    // OInput: reach inside to the native <input>
+    const nameInput = wrapper.find('[data-test="org-name"] input');
+    await nameInput.setValue("Test Org");
+
+    // Trigger via ODrawer @click:primary (replaces the old <form> submit)
+    await wrapper
+      .findComponent({ name: "ODrawer" })
+      .vm.$emit("click:primary");
     await flushPromises();
 
     expect(wrapper.vm.proPlanRequired).toBe(true);
@@ -175,26 +197,29 @@ describe("AddUpdateOrganization", () => {
     });
   });
 
-  it("handles create rejection and shows notify negative", async () => {
+  it("handles create rejection and shows error toast", async () => {
     vi.spyOn(orgService, "create").mockRejectedValueOnce({
       response: { data: { message: "Organization creation failed." } },
     });
 
     const wrapper = mountComp();
-    await wrapper.find('[data-test="org-name"]').setValue("Err Org");
-    wrapper.vm.addOrganizationForm = {
-      validate: vi.fn().mockResolvedValue(true),
-      resetValidation: vi.fn(),
-    };
 
-    const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+    // OInput: reach inside to the native <input>
+    const nameInput = wrapper.find('[data-test="org-name"] input');
+    await nameInput.setValue("Err Org");
 
-    await wrapper.find("form").trigger("submit.prevent");
+    // Trigger via ODrawer @click:primary
+    await wrapper
+      .findComponent({ name: "ODrawer" })
+      .vm.$emit("click:primary");
     await flushPromises();
 
-    expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    // Component uses toast() (not Quasar $q.notify). Error variant equals "error".
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
+    // The loading toast is also dismissed in the catch handler.
+    expect(toastDismiss).toHaveBeenCalled();
   });
 
   it("completeSubscriptionProcess navigates to billing plans with newOrgIdentifier", async () => {

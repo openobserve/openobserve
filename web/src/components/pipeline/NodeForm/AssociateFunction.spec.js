@@ -21,6 +21,9 @@ import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -448,13 +451,12 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "", function: "" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
       await wrapper.vm.saveFunction();
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Function Name is required",
-          color: "negative",
         })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
@@ -468,10 +470,10 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "newFunc", function: "def newFunc(r): return r" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
       await wrapper.vm.saveFunction();
-      expect(notifyMock).not.toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 

@@ -555,7 +555,7 @@ describe("IngestLogs Index Component", () => {
       }).not.toThrow();
     });
 
-    it("should redirect to curl when route name is ingestLogs on beforeMount", () => {
+    it("should redirect to curl when route name is ingestLogs on beforeMount", async () => {
       const pushSpy = vi.fn();
       const mockIngestLogsRouter = createRouter({
         history: createMemoryHistory(),
@@ -566,6 +566,8 @@ describe("IngestLogs Index Component", () => {
           },
         ],
       });
+      // Push to set initial route synchronously before mounting
+      await mockIngestLogsRouter.push("/");
       mockIngestLogsRouter.push = pushSpy;
 
       const testWrapper = mount(Index, {
@@ -588,14 +590,16 @@ describe("IngestLogs Index Component", () => {
     });
 
     it("should redirect to curl when route name becomes ingestLogs on updated", async () => {
-      // Create a router whose route name can be changed to trigger onUpdated
+      const DummyComponent = { template: "<div />" };
       const mockIngestLogsRouter = createRouter({
         history: createMemoryHistory(),
         routes: [
-          { path: "/", name: "curl" },
-          { path: "/ingest", name: "ingestLogs" },
+          { path: "/", name: "curl", component: DummyComponent },
+          { path: "/ingest", name: "ingestLogs", component: DummyComponent },
         ],
       });
+      // Push to set initial route synchronously before mounting
+      await mockIngestLogsRouter.push("/");
 
       const testWrapper = mount(Index, {
         props: mockProps,
@@ -605,13 +609,16 @@ describe("IngestLogs Index Component", () => {
             OSplitter: true,
             OTabs: true,
             ORouteTab: true,
-            RouterView: true,
           },
         },
       });
 
-      // Navigate to ingestLogs route to trigger onUpdated redirect
+      // Navigate to ingestLogs route
       await mockIngestLogsRouter.push({ name: "ingestLogs" });
+      await flushPromises();
+
+      // Trigger a component update via prop change so onUpdated fires
+      await testWrapper.setProps({ currOrgIdentifier: "triggered-org" });
       await flushPromises();
 
       // The onUpdated hook should have redirected to "curl"

@@ -16,7 +16,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
-import { QBtn, QFieldset, QInput, QSelect } from "quasar";
 import {
   mockAkeylessFormData,
   createCipherKeyMountConfig,

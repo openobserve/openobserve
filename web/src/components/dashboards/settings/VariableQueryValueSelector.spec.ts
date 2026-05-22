@@ -96,6 +96,7 @@ describe("VariableQueryValueSelector", () => {
       updateInputValue() {},
       blur() {},
       hidePopup() {},
+      close() {},
     },
   };
 
@@ -521,18 +522,16 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
       await wrapper.vm.toggleSelectAll();
-      
-      // Verify the popup closing behavior occurred
-      if (wrapper.props('variableItem').multiSelect) {
-        expect(mockRef.updateInputValue).toHaveBeenCalled();
-      } else {
-        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      }
+
+      // Verify the popup closing behavior occurred — closePopUpWhenValueIsSet calls close()
+      expect(mockRef.close).toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
   });
 
@@ -608,15 +607,17 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
       await wrapper.vm.handleCustomValue("test-close");
       
       // Verify the custom value was handled and popup closing behavior occurred
+      // closePopUpWhenValueIsSet calls close() — not updateInputValue
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(mockRef.updateInputValue).toHaveBeenCalled();
+      expect(mockRef.close).toHaveBeenCalled();
     });
   });
 
@@ -801,7 +802,8 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
@@ -1028,18 +1030,21 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it.skip("should handle large dataset performance", () => {
+    it("should handle large dataset performance", () => {
       const largeOptions = Array.from({ length: 1000 }, (_, i) => ({
         label: `Option ${i}`,
         value: `option-${i}`
       }));
-      
+
       wrapper = createWrapper({
         variableItem: { ...defaultVariableItem, options: largeOptions }
       });
-      
-      wrapper.vm.filterText = "Option 999";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+
+      wrapper.vm.onSearch("Option 999");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.includes("Option 999")
+      );
+      expect(matching).toHaveLength(1);
     });
 
     it("should handle special characters in values", () => {
@@ -1120,7 +1125,8 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       

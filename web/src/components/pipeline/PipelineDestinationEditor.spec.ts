@@ -25,6 +25,7 @@ vi.mock("vue-router", () => ({
 }));
 
 import PipelineDestinationEditor from "@/components/pipeline/PipelineDestinationEditor.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // ---------------------------------------------------------------------------
 // Stub for the heavy child component
@@ -99,7 +100,7 @@ describe("PipelineDestinationEditor - rendering", () => {
 
   it("renders the back arrow icon", async () => {
     wrapper = await mountComp();
-    expect(wrapper.find(".OIcon").exists()).toBe(true);
+    expect(wrapper.findComponent(OIcon).exists()).toBe(true);
   });
 });
 
@@ -112,8 +113,7 @@ describe("PipelineDestinationEditor - back arrow click emits cancel", () => {
 
   it("emits 'cancel' when back arrow container is clicked", async () => {
     wrapper = await mountComp();
-    // The clickable wrapper div is the parent of the OIcon
-    const backDiv = wrapper.find(".cursor-pointer");
+    const backDiv = wrapper.find('[title="Go Back"]');
     expect(backDiv.exists()).toBe(true);
     await backDiv.trigger("click");
     expect(wrapper.emitted("cancel")).toBeTruthy();

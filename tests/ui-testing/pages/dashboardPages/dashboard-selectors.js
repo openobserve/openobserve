@@ -19,11 +19,11 @@ const QUASAR = {
   // settings overlay still open" after `addScopedVariable` saves; the settings drawer
   // overlay intercepts pointer events on the dashboard, so missing the new selector
   // here causes clicks on variable dropdowns to time out.
-  DIALOG: '.q-dialog, [data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
-  DIALOG_CARD: '.q-dialog .q-card',
+  DIALOG: '[data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
+  DIALOG_CARD: '[data-test="dashboard-settings-drawer"] .q-card',
 
   // Menu/Dropdown components
-  MENU: '.q-menu',
+  MENU: '[data-test$="-popover"]',
   MENU_ITEM: '.q-item',
 
   // Form components

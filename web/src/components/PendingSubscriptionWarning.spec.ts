@@ -58,10 +58,16 @@ describe('PendingSubscriptionWarning.vue', () => {
       global: {
         plugins: [currentStore, router],
         stubs: {
-          'OIcon': true,
+          // Stub OIcon with a data-test attribute so tests can locate it
+          // semantically without relying on CSS classes or internal markup.
+          OIcon: {
+            name: 'OIcon',
+            props: ['name', 'size', 'color'],
+            template: '<span data-test="pending-subscription-warning-icon" :data-name="name" />',
+          },
           'q-btn': true,
           OButton: {
-            template: '<button class="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
+            template: '<button data-test="pending-subscription-warning-btn" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
             props: ['variant', 'size', 'disabled', 'loading'],
             emits: ['click'],
           },
@@ -78,38 +84,39 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('displays warning icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('OIcon-stub');
+      // OIcon is stubbed with data-test="pending-subscription-warning-icon".
+      // Locate it semantically rather than by CSS class or implementation tag.
+      const icon = wrapper.find('[data-test="pending-subscription-warning-icon"]');
       expect(icon.exists()).toBe(true);
-      expect(icon.attributes('name')).toBe('warning');
-      expect(icon.attributes('size')).toBe('80px');
-      expect(icon.attributes('color')).toBe('warning row col-8 justify-center q-mt-lg');
+      expect(icon.attributes('data-name')).toBe('warning');
     });
 
     it('displays warning message', () => {
       wrapper = createWrapper();
-      const warningText = wrapper.find('span.text-red');
-      expect(warningText.exists()).toBe(true);
-      expect(warningText.text()).toBe('Warning:');
+      // "Warning:" text is inside a <span> within an underlined bold element.
+      // Query by text content via the wrapping element rather than by CSS class.
+      expect(wrapper.text()).toContain('Warning:');
     });
 
     it('displays subscription button', () => {
       wrapper = createWrapper();
-      const button = wrapper.find('button.o-button-stub');
+      // OButton stub renders with data-test="pending-subscription-warning-btn".
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       expect(button.exists()).toBe(true);
-      // Button text may be empty in stub, just check it exists
     });
 
-    it('has correct structure and classes', () => {
+    it('has the main container rendered', () => {
+      // Structural CSS classes (Quasar/Tailwind utility classes) must not be
+      // asserted in unit tests — use existence or semantic checks instead.
       wrapper = createWrapper();
-      const mainDiv = wrapper.find('.row.col-11.justify-center.q-mt-xl');
-      expect(mainDiv.exists()).toBe(true);
+      expect(wrapper.find('div').exists()).toBe(true);
     });
   });
 
   describe('Router Navigation', () => {
     it('calls routerPush when button is clicked', async () => {
       wrapper = createWrapper();
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       
       await button.trigger('click');
       
@@ -126,7 +133,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -140,7 +147,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         selectedOrganization: {}
       });
       
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -156,7 +163,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -219,7 +226,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -236,14 +243,14 @@ describe('PendingSubscriptionWarning.vue', () => {
       });
       
       wrapper = createWrapper();
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       
       expect(() => button.trigger('click')).not.toThrow();
     });
 
     it('handles multiple button clicks', async () => {
       wrapper = createWrapper();
-      const button = wrapper.find('button.o-button-stub');
+      const button = wrapper.find('[data-test="pending-subscription-warning-btn"]');
       
       await button.trigger('click');
       await button.trigger('click');
@@ -259,7 +266,7 @@ describe('PendingSubscriptionWarning.vue', () => {
     it('renders with empty store state', () => {
       wrapper = createWrapper({});
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('button.o-button-stub').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pending-subscription-warning-btn"]').exists()).toBe(true);
     });
   });
 
@@ -275,31 +282,32 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('has proper HTML structure for warning text', () => {
       wrapper = createWrapper();
-      const warningSpan = wrapper.find('span.text-red');
-      const underlineElement = warningSpan.element.parentElement;
-      
-      expect(warningSpan.exists()).toBe(true);
-      expect(underlineElement?.tagName.toLowerCase()).toBe('u');
+      // "Warning:" is wrapped in a <u> element for underline emphasis.
+      // Locate via the semantic <u> tag rather than by CSS class.
+      const underlineElement = wrapper.find('u');
+      expect(underlineElement.exists()).toBe(true);
+      expect(underlineElement.text()).toContain('Warning:');
     });
   });
 
   describe('Styling and Classes', () => {
-    it('applies correct CSS classes to main container', () => {
+    // CSS class assertions are forbidden by testing rules (Rule #3: No CSS
+    // classes anywhere). Styling is the responsibility of visual-regression
+    // tests. The tests below verify structural/behavioral presence instead.
+
+    it('renders the main container', () => {
       wrapper = createWrapper();
-      const mainDiv = wrapper.find('div');
-      
-      expect(mainDiv.classes()).toContain('row');
-      expect(mainDiv.classes()).toContain('col-11');
-      expect(mainDiv.classes()).toContain('justify-center');
-      expect(mainDiv.classes()).toContain('q-mt-xl');
+      // Verify the root element exists; class values are not asserted.
+      expect(wrapper.find('div').exists()).toBe(true);
     });
 
-    it('has correct icon styling', () => {
+    it('renders the warning icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('OIcon-stub');
-      
-      expect(icon.attributes('size')).toBe('80px');
-      expect(icon.attributes('color')).toContain('warning');
+      // OIcon stub has data-test="pending-subscription-warning-icon".
+      // Verify it renders the correct icon name.
+      const icon = wrapper.find('[data-test="pending-subscription-warning-icon"]');
+      expect(icon.exists()).toBe(true);
+      expect(icon.attributes('data-name')).toBe('warning');
     });
   });
 });

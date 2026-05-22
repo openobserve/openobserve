@@ -17,6 +17,9 @@ import { iconRegistry } from "../Icon/OIcon.icons";
 const props = withDefaults(defineProps<OCollapsibleProps>(), {
   defaultOpen: false,
   variant: "default",
+  // Provide explicit undefined default so Vue 3's boolean-prop auto-false
+  // (applied to `boolean?` props) does not shadow the defaultOpen-based path.
+  modelValue: undefined as boolean | undefined,
 });
 
 const emit = defineEmits<OCollapsibleEmits>();
@@ -99,6 +102,7 @@ watch(
         variant === 'sidebar'
           ? 'tw:px-3 tw:py-0 tw:min-h-[36px] tw:rounded-none'
           : 'tw:px-2 tw:py-2 tw:rounded-md',
+        triggerClass,
       ]"
     >
       <!-- Sidebar: left-side chevron (always before slot or label) -->

@@ -119,7 +119,8 @@ export default class DashboardVariablesScoped {
     }
 
     // Wait for variable dropdown to be visible and ready
-    const varDropdown = this.page.getByLabel(variableName, { exact: true });
+    // Use data-test selector — getByLabel cannot reliably find OSelect triggers post-migration
+    const varDropdown = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
     await varDropdown.waitFor({ state: "visible", timeout });
 
     // Ensure network is idle before clicking
@@ -129,32 +130,31 @@ export default class DashboardVariablesScoped {
 
     await varDropdown.click();
 
-    // Wait for dropdown menu to open - use last() to target the most recently opened menu
-    await this.page.locator(SELECTORS.MENU).last().waitFor({ state: "visible", timeout });
+    // Wait for the variable's own inner popover to open
+    const popoverSelector = `[data-test="variable-selector-${variableName}-inner-popover"]`;
+    await this.page.locator(popoverSelector).waitFor({ state: "visible", timeout });
 
-    // Build the target option locator - prefer text-based selection for reliability
-    const menu = this.page.locator(SELECTORS.MENU).last();
+    // Build the target option locator scoped to this variable's popover
+    const menu = this.page.locator(popoverSelector);
     let targetOption;
     if (optionText) {
-      // Text-based selection: more reliable than index-based, avoids wrong option in CI
       targetOption = menu.getByRole("option", { name: optionText, exact: true });
     } else {
-      // Index-based selection: scope to visible menu to avoid matching stale options
-      targetOption = menu.locator(SELECTORS.OPTION).nth(optionIndex);
+      // Filter to non-empty options to skip hidden/placeholder entries at index 0
+      targetOption = menu.locator(SELECTORS.OPTION).filter({ hasText: /.+/ }).nth(optionIndex);
     }
     const optionTimeout = Math.max(timeout, 15000); // At least 15s for options under load
 
-    // Retry mechanism: if option not visible, reopen dropdown
+    // Retry mechanism: if option not visible, close and reopen dropdown
     try {
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
     } catch (e) {
-      // Option not visible - may need to wait for data to load
-      // Close and reopen dropdown to trigger fresh load
-      await this.page.keyboard.press('Escape');
+      // Click outside to close, then reopen
+      await this.page.locator('body').click({ position: { x: 0, y: 0 } });
       await this.waitForMenuHidden({ timeout: 3000 });
-      await this.page.waitForTimeout(500); // Brief pause
+      await this.page.waitForTimeout(500);
       await varDropdown.click();
-      await this.page.locator(SELECTORS.MENU).last().waitFor({ state: "visible", timeout });
+      await this.page.locator(popoverSelector).waitFor({ state: "visible", timeout });
       await targetOption.waitFor({ state: "visible", timeout: optionTimeout });
     }
 
@@ -180,8 +180,8 @@ export default class DashboardVariablesScoped {
       result.apiResult = await apiMonitor;
     }
 
-    // Return result if we have anything to return
-    if (Object.keys(result).length > 0) {
+    // Return result - always return an object when called with options
+    if (Object.keys(result).length > 0 || returnSelectedValue || monitorApi) {
       return result;
     }
   }
@@ -428,7 +428,7 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({ timeout: 5000 });
 
     // Fill variable name
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
 
     // Normalize scope - accept both "panel" and "panels", "tab" and "tabs"
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
@@ -456,14 +456,15 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page
+          .locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]')
+          .filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Close the dropdown by clicking outside or pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the dropdown by clicking the trigger again to toggle it closed
+      await tabsSelect.click();
       await this.page.waitForTimeout(300);
     }
 
@@ -484,14 +485,15 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page
+          .locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]')
+          .filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      // Close the tabs dropdown
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking the trigger again to toggle it closed
+      await tabsSelect.click();
       await this.page.waitForTimeout(300);
 
       // Now select the panels
@@ -502,20 +504,21 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // Wait for dropdown items to load (OSelect role=option or legacy .q-item)
-        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+        // Wait for panels popover to open
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
-        // Click each panel checkbox by panel name
+        // Click each panel by panel name using OSelect option pattern
         for (const panelName of assignedPanels) {
-          // Use OSelect option (Reka Listbox) post-migration with .q-item fallback
-          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page
+            .locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]')
+            .filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
-          await this.page.waitForTimeout(500); // Wait after each selection
+          await this.page.waitForTimeout(500);
         }
 
-        // Close the dropdown
-        await this.page.keyboard.press('Escape');
+        // Close the dropdown by clicking the trigger again to toggle it closed
+        await panelsSelect.click();
         await this.page.waitForTimeout(500);
       }
     }
@@ -830,7 +833,7 @@ export default class DashboardVariablesScoped {
     await this.page
       .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')
       .click();
-    await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').fill(value);
+    await this.page.locator('[data-test="dashboard-variable-custom-value-0"] input').fill(value);
   }
 
   /**
@@ -1314,7 +1317,7 @@ export default class DashboardVariablesScoped {
     await this.page.waitForTimeout(500);
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
     await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
 
     // Add custom options - the first option already exists by default
@@ -1491,7 +1494,7 @@ export default class DashboardVariablesScoped {
     await this.page.waitForTimeout(500);
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
     await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
 
     // Set constant value
@@ -1630,7 +1633,7 @@ export default class DashboardVariablesScoped {
     await this.page.waitForTimeout(500);
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
     await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
 
     // Set default value

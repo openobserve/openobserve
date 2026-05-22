@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
+      data-test="edit-group-footer"
     class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
       style="z-index: 2"
     >

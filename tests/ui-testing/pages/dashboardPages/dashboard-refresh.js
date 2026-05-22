@@ -60,26 +60,25 @@ export default class DashboardTimeRefresh {
     // Switch to the absolute tab
     await this.absolutetimeTime.click();
 
-    // Click the left chevron button within the QDate component to navigate to previous month.
-    // Scope to .q-date to avoid clicking unrelated chevron_left buttons on the page.
-    const qDate = this.page.locator(".q-date").first();
-    await qDate.waitFor({ state: "visible" });
-    await qDate
-      .locator("button")
-      .filter({ hasText: "chevron_left" })
-      .first()
-      .click();
+    // Click the prev button in the new Reka UI date range calendar to navigate to previous month.
+    const prevBtn = this.page.locator('[data-test="daterangecalendar-prev"]').first();
+    await prevBtn.waitFor({ state: "visible" });
+    await prevBtn.click();
     await this.page.waitForTimeout(500);
 
-    // Select the start and end days dynamically
-    await this.page
-      .getByRole("button", { name: String(startDay) })
-      .last()
-      .click();
-    await this.page
-      .getByRole("button", { name: String(endDay) })
-      .last()
-      .click();
+    // Select the start and end days dynamically.
+    // Scope to the calendar root and exclude outside-view / disabled cells
+    // so day "1" resolves to the visible month's cell, not a disabled neighbour.
+    const visibleCell = (day) =>
+      this.page
+        .locator(
+          '[data-test="daterangecalendar-root"] [data-reka-calendar-cell-trigger]:not([data-outside-view]):not([data-disabled])'
+        )
+        .filter({ hasText: new RegExp(`^${String(day)}$`) })
+        .first();
+
+    await visibleCell(startDay).click();
+    await visibleCell(endDay).click();
 
     // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();

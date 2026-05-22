@@ -91,15 +91,20 @@ describe("OtelConfig", () => {
 
   // Test 4: Component structure - OTLP HTTP section
   it("should render OTLP HTTP section", () => {
-    const httpTitle = wrapper.find(".text-subtitle1");
+    const httpTitle = wrapper.find('[data-test="ingestion-otelconfig-otlp-http-title"]');
+    expect(httpTitle.exists()).toBe(true);
     expect(httpTitle.text()).toBe("OTLP HTTP");
   });
 
   // Test 5: Component structure - OTLP gRPC section
-  it("should render OTLP gRPC section", () => {
-    const sections = wrapper.findAll(".text-subtitle1");
-    expect(sections).toHaveLength(2);
-    expect(sections[1].text()).toBe("OTLP gRPC");
+  it("should render OTLP gRPC section when not in cloud mode", () => {
+    const httpTitle = wrapper.find('[data-test="ingestion-otelconfig-otlp-http-title"]');
+    const grpcTitle = wrapper.find('[data-test="ingestion-otelconfig-otlp-grpc-title"]');
+
+    expect(httpTitle.exists()).toBe(true);
+    expect(httpTitle.text()).toBe("OTLP HTTP");
+    expect(grpcTitle.exists()).toBe(true);
+    expect(grpcTitle.text()).toBe("OTLP gRPC");
   });
 
   // Test 6: CopyContent components are present

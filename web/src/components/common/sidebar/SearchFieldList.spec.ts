@@ -81,7 +81,9 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 // Mock copyToClipboard — migrated from quasar to @/utils/clipboard
-const mockCopyToClipboard = vi.fn(() => Promise.resolve(true));
+const { mockCopyToClipboard } = vi.hoisted(() => ({
+  mockCopyToClipboard: vi.fn(() => Promise.resolve(true)),
+}));
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
@@ -99,6 +101,11 @@ const mockStore = createStore({
       identifier: "test-org",
     },
     theme: "dark",
+    zoConfig: {
+      timestamp_column: "_timestamp",
+      query_values_default_num: 10,
+      showFtsFieldValues: false,
+    },
   },
 });
 
@@ -220,13 +227,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
     it("should render search input with correct attributes", () => {
       wrapper = createWrapper();
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
-      );
+      // Search input is provided by OFieldList, queried by placeholder
+      const searchInput = wrapper.find('[placeholder="Search field"]');
       expect(searchInput.exists()).toBe(true);
-      expect(searchInput.attributes("data-cy")).toBe(
-        "index-field-search-input",
-      );
     });
 
     it("should render with empty fields array", () => {
@@ -296,70 +299,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
   });
 
-  describe("FilterFieldFn Function Tests", () => {
-    it("should filter rows correctly with matching terms", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [
-        { name: "user_name" },
-        { name: "user_email" },
-        { name: "timestamp" },
-      ];
-      const filtered = vm.filterFieldFn(rows, "user");
-      expect(filtered).toHaveLength(2);
-      expect(filtered[0].name).toBe("user_name");
-      expect(filtered[1].name).toBe("user_email");
-    });
-
-    it("should return empty array when no matches found", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [{ name: "user_name" }, { name: "timestamp" }];
-      const filtered = vm.filterFieldFn(rows, "nonexistent");
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("should handle empty search term", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [{ name: "test" }];
-      const filtered = vm.filterFieldFn(rows, "");
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("should be case insensitive", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [{ name: "UserName" }];
-      const filtered = vm.filterFieldFn(rows, "username");
-      expect(filtered).toHaveLength(1);
-    });
-
-    it("should handle null or undefined terms", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [{ name: "test" }];
-
-      // The function currently throws for null/undefined, so we test that it returns empty array
-      const filteredNull = vm.filterFieldFn(rows, "");
-      const filteredEmpty = vm.filterFieldFn(rows, "");
-
-      expect(filteredNull).toHaveLength(0);
-      expect(filteredEmpty).toHaveLength(0);
-    });
-
-    it("should filter with partial matches", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const rows = [
-        { name: "log_level" },
-        { name: "log_message" },
-        { name: "timestamp" },
-      ];
-      const filtered = vm.filterFieldFn(rows, "log");
-      expect(filtered).toHaveLength(2);
-    });
-  });
+  // filterFieldFn tests removed: function no longer exists in the component.
+  // Filtering is now handled internally by OFieldList.
 
   describe("OpenFilterCreator Function Tests", () => {
     beforeEach(() => {
@@ -381,34 +322,26 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     it("should handle ftsKey fields correctly", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = {
-        stopPropagation: vi.fn(),
-        preventDefault: vi.fn(),
-      };
 
-      vm.openFilterCreator(mockEvent, { name: "test_field", ftsKey: true });
+      vm.openFilterCreator({ name: "test_field", ftsKey: true });
 
-      expect(mockEvent.stopPropagation).toHaveBeenCalled();
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-      expect(mockStreamService).not.toHaveBeenCalled();
+      // ftsKey fields return early (unless showFtsFieldValues is enabled)
+      expect(fieldValuesMocks.fetchFieldValues).not.toHaveBeenCalled();
     });
 
     it("should fetch field values for non-fts fields", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
 
-      expect(mockStreamService).toHaveBeenCalledWith(
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
         expect.objectContaining({
           fields: ["test_field"],
           stream_name: "test-stream",
-          start_time: "2023-01-01",
-          end_time: "2023-01-02",
           stream_type: "logs",
           size: 10,
         }),
@@ -418,15 +351,14 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     it("should use custom stream name if provided", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
         stream_name: "custom_stream",
       });
 
-      expect(mockStreamService).toHaveBeenCalledWith(
+      expect(fieldValuesMocks.fetchFieldValues).toHaveBeenCalledWith(
         expect.objectContaining({
           stream_name: "custom_stream",
         }),
@@ -436,9 +368,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     it("should set loading state correctly", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: "test_field", ftsKey: false });
+      vm.openFilterCreator({ name: "test_field", ftsKey: false });
 
       expect(vm.fieldValues["test_field"].isLoading).toBe(true);
       expect(vm.fieldValues["test_field"].values).toEqual([]);
@@ -453,9 +384,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     it("should handle successful API response", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
@@ -484,9 +414,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
@@ -504,9 +433,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
@@ -518,9 +446,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const query = "session_has_replay IS NOT NULL AND session_id is not null";
       wrapper = createWrapper({ query });
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
@@ -535,9 +462,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     it("should not include WHERE clause in sql when query prop is empty", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, {
+      await vm.openFilterCreator({
         name: "test_field",
         ftsKey: false,
       });
@@ -588,10 +514,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
       try {
-        await vm.openFilterCreator(mockEvent, {
+        await vm.openFilterCreator({
           name: "test_field",
           ftsKey: false,
         });
@@ -612,9 +537,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: "test_field", ftsKey: false });
+      vm.openFilterCreator({ name: "test_field", ftsKey: false });
 
       expect(vm.fieldValues["test_field"].isLoading).toBe(true);
 
@@ -722,7 +646,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("12345");
 
-      expect(mockWriteText).toHaveBeenCalledWith("12345");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("12345", {
+        successMessage: "Value copied to clipboard",
+      });
     });
 
     it("should handle null values", async () => {
@@ -731,7 +657,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(null);
 
-      expect(mockWriteText).toHaveBeenCalledWith(null);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(null, {
+        successMessage: "Value copied to clipboard",
+      });
     });
 
     it("should handle undefined values", async () => {
@@ -740,33 +668,28 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(undefined);
 
-      expect(mockWriteText).toHaveBeenCalledWith(undefined);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(undefined, {
+        successMessage: "Value copied to clipboard",
+      });
     });
   });
 
   describe("Filter Field Value Tests", () => {
-    it("should update filterFieldValue on input", async () => {
+    it("should have a search input for filtering fields", () => {
       wrapper = createWrapper();
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
-      );
+      // Search is handled by OFieldList internally; verify the search input exists
+      const searchInput = wrapper.find('[placeholder="Search field"]');
+      expect(searchInput.exists()).toBe(true);
+    });
+
+    it("should accept input in the search field", async () => {
+      wrapper = createWrapper();
+      const searchInput = wrapper.find('[placeholder="Search field"]');
 
       await searchInput.setValue("test-filter");
 
-      expect(wrapper.vm.filterFieldValue).toBe("test-filter");
-    });
-
-    it("should clear filterFieldValue", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.filterFieldValue = "test-value";
-      await nextTick();
-
-      vm.filterFieldValue = "";
-      await nextTick();
-
-      expect(vm.filterFieldValue).toBe("");
+      // The input should reflect the typed value
+      expect((searchInput.element as HTMLInputElement).value).toBe("test-filter");
     });
   });
 
@@ -775,8 +698,8 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const fields = [{ name: "fts_field", ftsKey: true, showValues: false }];
       wrapper = createWrapper({ fields });
 
-      // The field should render with field-container class
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // The field should render with field-type-container class
+      expect(wrapper.find(".field-type-container").exists()).toBe(true);
     });
 
     it("should render expansion item for non-fts fields with showValues", () => {
@@ -813,6 +736,11 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         state: {
           selectedOrganization: { identifier: "test-org" },
           theme: "dark",
+          zoConfig: {
+            timestamp_column: "_timestamp",
+            query_values_default_num: 10,
+            showFtsFieldValues: false,
+          },
         },
       });
 
@@ -836,6 +764,11 @@ describe("FieldList.vue Comprehensive Coverage", () => {
         state: {
           selectedOrganization: { identifier: "test-org" },
           theme: "light",
+          zoConfig: {
+            timestamp_column: "_timestamp",
+            query_values_default_num: 10,
+            showFtsFieldValues: false,
+          },
         },
       });
 
@@ -877,10 +810,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      await vm.openFilterCreator(mockEvent, { name: "field1", ftsKey: false });
-      await vm.openFilterCreator(mockEvent, { name: "field2", ftsKey: false });
+      await vm.openFilterCreator({ name: "field1", ftsKey: false });
+      await vm.openFilterCreator({ name: "field2", ftsKey: false });
 
       expect(Object.keys(vm.fieldValues)).toContain("field1");
       expect(Object.keys(vm.fieldValues)).toContain("field2");
@@ -911,10 +843,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
-      vm.openFilterCreator(mockEvent, { name: "field1", ftsKey: false });
-      vm.openFilterCreator(mockEvent, { name: "field2", ftsKey: false });
+      vm.openFilterCreator({ name: "field1", ftsKey: false });
+      vm.openFilterCreator({ name: "field2", ftsKey: false });
 
       expect(vm.fieldValues.field1.isLoading).toBe(true);
       expect(vm.fieldValues.field2.isLoading).toBe(true);
@@ -950,7 +881,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const copyButton = wrapper.find('[data-test*="copy-btn"]');
       await copyButton.trigger("click");
 
-      expect(mockWriteText).toHaveBeenCalledWith("test_field");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test_field", {
+        successMessage: "Value copied to clipboard",
+      });
     });
   });
 
@@ -981,10 +914,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
       try {
-        await vm.openFilterCreator(mockEvent, {
+        await vm.openFilterCreator({
           name: "test_field",
           ftsKey: false,
         });
@@ -1009,10 +941,9 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
 
       try {
-        await vm.openFilterCreator(mockEvent, {
+        await vm.openFilterCreator({
           name: "test_field",
           ftsKey: false,
         });
@@ -1043,11 +974,11 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.filterFieldValue = "test-filter";
+      vm.currentPage = 3;
 
       await wrapper.setProps({ streamType: "metrics" });
 
-      expect(vm.filterFieldValue).toBe("test-filter");
+      expect(vm.currentPage).toBe(3);
     });
   });
 
@@ -1056,15 +987,15 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const fields = [{ name: "test_field", ftsKey: true, showValues: false }];
       wrapper = createWrapper({ fields });
 
+      // Add button has data-test with field name
       expect(
         wrapper
-          .find('[data-test="log-search-index-list-fields-table"]')
+          .find('[data-test="log-search-index-list-filter-test_field-field-btn"]')
           .exists(),
       ).toBe(true);
+      // Search input is provided by OFieldList (queried by placeholder)
       expect(
-        wrapper
-          .find('[data-test="log-search-index-list-field-search-input"]')
-          .exists(),
+        wrapper.find('[placeholder="Search field"]').exists(),
       ).toBe(true);
     });
 

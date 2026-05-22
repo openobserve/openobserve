@@ -19,7 +19,7 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="field-group-header tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+          class="field-group-header tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
           :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
           @click="toggleGroup(row.group)"
         >
@@ -29,7 +29,7 @@
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
-            size="icon-xs-sq"
+            size="icon"
             class="tw:flex-shrink-0"
           >
             <OIcon
@@ -185,7 +185,7 @@ defineExpose({ scrollToTop });
 .field-group-header {
   font-weight: 600;
   font-size: 0.75rem;
-  padding: 0.25rem 0.325rem;
+  padding: 0 0.325rem;
   cursor: pointer;
 }
 </style>
