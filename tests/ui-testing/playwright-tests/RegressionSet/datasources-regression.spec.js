@@ -76,11 +76,14 @@ test.describe("Data Sources Regression Bug Fixes", () => {
       'Bug #11682: Page content should not disappear when re-clicking AI Integration tab'
     ).toBeGreaterThan(0);
 
-    // If credential fields existed before, they should still exist
+    // If credential fields exist, verify they persist after re-click
+    // (credentials only appear if the user has previously configured them)
     if (credentialCountBefore > 0) {
       expect(credentialCountAfter,
         'Bug #11682: Credential fields should not disappear when re-clicking AI Integration tab'
       ).toBe(credentialCountBefore);
+    } else {
+      testLogger.info('No pre-existing credential fields — verifying content persistence instead');
     }
 
     testLogger.info('✓ PASSED: AI Integration content persists on tab re-click');

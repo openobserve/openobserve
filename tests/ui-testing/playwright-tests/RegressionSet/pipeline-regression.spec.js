@@ -160,9 +160,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     testLogger.info('Validation API correctly used metrics stream type');
 
     // Verify no unexpected "Discard Changes" dialog appeared using page object
-    await pageManager.pipelinesPage.expectDiscardDialogNotVisible().catch(() => {
-      testLogger.error('Unexpected Discard Changes dialog appeared!');
-    });
+    const discardVisible = await pageManager.pipelinesPage.isDiscardChangesDialogVisible();
+    expect(discardVisible, 'No Discard Changes dialog should appear').toBe(false);
 
     // Clean up - cancel the pipeline creation using page object
     await pageManager.pipelinesPage.cleanupPipelineCreation();
@@ -269,9 +268,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     testLogger.info('Validation API correctly used traces stream type');
 
     // Verify no unexpected "Discard Changes" dialog appeared using page object
-    await pageManager.pipelinesPage.expectDiscardDialogNotVisible().catch(() => {
-      testLogger.error('Unexpected Discard Changes dialog appeared!');
-    });
+    const discardVisibleTraces = await pageManager.pipelinesPage.isDiscardChangesDialogVisible();
+    expect(discardVisibleTraces, 'No Discard Changes dialog should appear').toBe(false);
 
     // Clean up - cancel the pipeline creation using page object
     await pageManager.pipelinesPage.cleanupPipelineCreation();
@@ -553,10 +551,11 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     testLogger.info(`Success notifications count: ${successCount}`);
 
-    // Bug verification: should not have duplicate notifications (max 1 success)
+    // Bug verification: 0-1 success notifications is OK (notification may auto-dismiss).
+    // 2+ means the bug (#11483) has regressed — must be <= 1, not <= 2.
     expect(successCount,
       'Bug #11483: Should not show duplicate notifications on pipeline destination save'
-    ).toBeLessThanOrEqual(2);
+    ).toBeLessThanOrEqual(1);
 
     testLogger.info('PASSED: No duplicate notifications detected');
   });
@@ -601,15 +600,20 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     const hasTable = await table.isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Table visible: ${hasTable}`);
 
-    // Check 4: Add button should be accessible
-    const addButton = page.locator('[role="button"]').filter({ hasText: /New|Add|Create/i }).first();
+    // Check 4: Add/New button should be accessible
+    const addButton = page.getByRole('button', { name: /New|Add|Create|Template/i }).first();
     const hasAddButton = await addButton.isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Add button visible: ${hasAddButton}`);
 
-    // Primary assertion: evaluation template page should have functional UI
-    const uiFunctional = hasRefreshButton || hasAddButton || hasTable;
-    expect(uiFunctional,
-      'Bug #11267: Evaluation template page should have functional UI elements'
+    // Assert each UI element independently — Bug #11267: all must be present
+    expect(hasRefreshButton,
+      'Bug #11267: Evaluation template page should have a refresh button'
+    ).toBeTruthy();
+    expect(hasAddButton,
+      'Bug #11267: Evaluation template page should have an Add/Create button'
+    ).toBeTruthy();
+    expect(hasTable,
+      'Bug #11267: Evaluation template page should have a table'
     ).toBeTruthy();
 
     testLogger.info('PASSED: Evaluation template UI is properly styled');

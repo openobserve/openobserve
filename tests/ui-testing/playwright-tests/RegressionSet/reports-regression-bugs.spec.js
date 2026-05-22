@@ -77,37 +77,30 @@ test.describe("Reports Regression Bug Fixes", () => {
     await page.waitForTimeout(3000);
     testLogger.info('Opened report for editing');
 
-    // Capture initial start time
+    // Capture initial start time (mandatory — must be visible)
     const startTimeInput = page.getByLabel('Start Time *');
-    let initialStartTime = '';
-    if (await startTimeInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      initialStartTime = await startTimeInput.inputValue().catch(() => '');
-    }
+    await expect(startTimeInput, 'Start Time input should be visible').toBeVisible({ timeout: 5000 });
+    const initialStartTime = await startTimeInput.inputValue();
     testLogger.info(`Initial start time: "${initialStartTime}"`);
 
-    // Step 5: Change timezone to UTC and save
-    const zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
-    if (await zoneInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await zoneInput.click({ force: true });
-      await page.waitForTimeout(1000);
+    // Step 5: Change timezone to UTC and save (using POM properties)
+    await expect(pm.reportsPage.zoneInput, 'Timezone input should be visible').toBeVisible({ timeout: 5000 });
+    await pm.reportsPage.zoneInput.click({ force: true });
+    await page.waitForTimeout(1000);
 
-      const utcOption = page.getByRole('option', { name: 'UTC', exact: true });
-      if (await utcOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await utcOption.click();
-        await page.waitForTimeout(1000);
-        testLogger.info('Changed timezone to UTC');
-      }
-    }
+    const utcOption = page.getByRole('option', { name: 'UTC', exact: true });
+    await expect(utcOption, 'UTC option should be visible').toBeVisible({ timeout: 5000 });
+    await utcOption.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('Changed timezone to UTC');
 
-    const saveButton = pm.reportsPage.saveButton;
-    if (await saveButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await saveButton.click({ force: true });
-      await page.waitForTimeout(3000);
-      testLogger.info('Saved report with UTC timezone');
-    }
+    await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
+    await pm.reportsPage.saveButton.click({ force: true });
+    await page.waitForTimeout(3000);
 
-    // Wait for save alert
-    await page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+    // Verify save succeeded via POM method
+    await expect(page.getByRole('alert').first(), 'Save success alert should appear').toBeVisible({ timeout: 15000 });
+    testLogger.info('Saved report with UTC timezone');
 
     // Step 6: Re-open the report and verify time hasn't shifted
     await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
@@ -121,23 +114,19 @@ test.describe("Reports Regression Bug Fixes", () => {
     await page.waitForTimeout(3000);
 
     const startTimeInputAfter = page.getByLabel('Start Time *');
-    let afterStartTime = '';
-    if (await startTimeInputAfter.isVisible({ timeout: 3000 }).catch(() => false)) {
-      afterStartTime = await startTimeInputAfter.inputValue().catch(() => '');
-    }
+    await expect(startTimeInputAfter, 'Start Time input should be visible after save').toBeVisible({ timeout: 5000 });
+    const afterStartTime = await startTimeInputAfter.inputValue();
     testLogger.info(`After save start time: "${afterStartTime}"`);
 
-    // Verify time hasn't shifted by timezone offset
-    if (initialStartTime && afterStartTime) {
-      const initialHour = parseInt(initialStartTime.split(':')[0]);
-      const afterHour = parseInt(afterStartTime.split(':')[0]);
-      const hourDiff = Math.abs(initialHour - afterHour);
+    // Verify time hasn't shifted by timezone offset (mandatory assertion)
+    const initialHour = parseInt(initialStartTime.split(':')[0]);
+    const afterHour = parseInt(afterStartTime.split(':')[0]);
+    const hourDiff = Math.abs(initialHour - afterHour);
 
-      testLogger.info(`Hour difference: ${hourDiff}`);
-      expect(hourDiff,
-        'Bug #11231: Timestamp should not shift by timezone offset after save'
-      ).toBeLessThanOrEqual(1);
-    }
+    testLogger.info(`Hour difference: ${hourDiff}`);
+    expect(hourDiff,
+      'Bug #11231: Timestamp should not shift by timezone offset after save'
+    ).toBeLessThanOrEqual(1);
 
     testLogger.info('PASSED: Report save does not shift timestamp');
 

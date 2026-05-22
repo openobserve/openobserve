@@ -327,11 +327,17 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     const enteredValue = await nameInput.inputValue().catch(() => '');
     testLogger.info(`Alert name entered: "${enteredValue}"`);
 
-    // PRIMARY ASSERTION: The name input should accept special characters
+    // PRIMARY ASSERTION: The name input should accept all special characters
     // The bug was that special chars caused "unauthorized" errors
     expect(enteredValue,
-      'Bug #4342: Alert name input should accept special characters #, %, :'
+      'Bug #4342: Alert name input should accept special character #'
     ).toContain('#');
+    expect(enteredValue,
+      'Bug #4342: Alert name input should accept special character %'
+    ).toContain('%');
+    expect(enteredValue,
+      'Bug #4342: Alert name input should accept special character :'
+    ).toContain(':');
 
     testLogger.info('✓ PASSED: Alert name with special chars accepted');
   });
@@ -366,21 +372,19 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
 
     // Switch to the Advanced tab (has SQL editor for alert conditions)
     const advancedTab = page.locator(pm.alertsPage.advancedTabBtn).first();
-    if (await advancedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await advancedTab.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('✓ Switched to Advanced tab');
-    }
+    await expect(advancedTab, 'Advanced tab should be visible').toBeVisible({ timeout: 5000 });
+    await advancedTab.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Switched to Advanced tab');
 
-    // Look for the SQL editor and try to enter "default" without quotes
+    // Look for the SQL editor and enter "default" without quotes
     const sqlEditor = page.locator('[data-test*="alert-sql-editor"], [data-test*="sql-editor"], .monaco-editor').first();
-    if (await sqlEditor.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await sqlEditor.click({ force: true });
-      await page.waitForTimeout(500);
-      await page.keyboard.type('default', { delay: 50 });
-      await page.waitForTimeout(1000);
-      testLogger.info('✓ Typed "default" in SQL editor without quotes');
-    }
+    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 5000 });
+    await sqlEditor.click({ force: true });
+    await page.waitForTimeout(500);
+    await page.keyboard.type('default', { delay: 50 });
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Typed "default" in SQL editor without quotes');
 
     // The bug was that "default" without quotes caused errors
     // Verify no immediate error message appeared
