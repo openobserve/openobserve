@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
-use o2_enterprise::enterprise::cloud::billing_invites;
-use serde::Deserialize;
+use o2_enterprise::enterprise::cloud::{
+    billing_group, billing_group::BillingGroupMember, billing_invites,
+};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
@@ -26,6 +28,11 @@ use crate::{
 #[derive(Deserialize, ToSchema)]
 pub struct InviteRequest {
     org_id: String,
+}
+
+#[derive(Serialize)]
+pub struct MembershipResponse {
+    membership: Option<BillingGroupMember>,
 }
 
 /// get invites for the org
@@ -194,4 +201,84 @@ pub async fn reject(
         return HttpResponse::bad_request(format!("error in accepting invite: {e}"));
     }
     HttpResponse::ok("successfully rejected")
+}
+
+/// get own membership
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/billing_group/membership",
+    context_path = "/api",
+    operation_id = "GetBIllingGRoupMembership",
+    summary = "get info about own billing group membership",
+    description = "get info about own billing group membership",
+    request_body(
+        content = inline(()),
+        description = "empty",
+        content_type = "application/json",
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "Organizations",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn check_membership(Path(org_id): Path<String>) -> Response {
+    match billing_group::list_billing_membership_of(&org_id).await {
+        Ok(membership) => HttpResponse::json(MembershipResponse { membership }),
+        Err(e) => {
+            log::error!("error checking billing group membership for {org_id} : {e}");
+            HttpResponse::internal_error(format!("error in checking membership : {e}"))
+        }
+    }
+}
+
+/// get members of self
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/billing_group/members",
+    context_path = "/api",
+    operation_id = "GetBIllingGRoupMembers",
+    summary = "get info about members of own billing group",
+    description = "get info about members of own billing group",
+    request_body(
+        content = inline(()),
+        description = "empty",
+        content_type = "application/json",
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "Organizations",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn check_members(Path(org_id): Path<String>) -> Response {
+    match billing_group::list_billing_group_members_of(&org_id).await {
+        Ok(members) => HttpResponse::json(members),
+        Err(e) => {
+            log::error!("error checking billing group members for {org_id} : {e}");
+            HttpResponse::internal_error(format!("error in checking members : {e}"))
+        }
+    }
 }

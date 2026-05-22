@@ -1026,6 +1026,14 @@ pub fn service_routes() -> Router {
                 "/{org_id}/billing_group/invites/{token}/reject",
                 delete(organization::billing_group::reject),
             )
+            .route(
+                "/{org_id}/billing_group/membership",
+                get(organization::billing_group::check_membership),
+            )
+            .route(
+                "/{org_id}/billing_group/members",
+                get(organization::billing_group::check_members),
+            );
     }
 
     // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
