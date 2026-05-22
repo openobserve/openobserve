@@ -909,7 +909,7 @@ pub async fn delete_cache(
 
 pub fn handle_histogram(
     origin_sql: &mut String,
-    q_time_range: Option<(i64, i64)>,
+    q_time_range: (i64, i64),
     histogram_interval: i64,
 ) {
     let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
@@ -1168,7 +1168,7 @@ mod tests {
     fn test_handle_histogram() {
         // Test case 1: Basic histogram with numeric interval
         let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
-        let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
+        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
         handle_histogram(&mut sql, time_range, 10);
         assert!(sql.contains("histogram(_timestamp,"));
         assert!(sql.contains("second"));
@@ -1203,7 +1203,7 @@ mod tests {
             },
             limit: 100,
             offset: 0,
-            time_range: None,
+            time_range: (0, 0),
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,

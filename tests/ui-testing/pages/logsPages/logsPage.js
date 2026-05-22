@@ -7993,4 +7993,76 @@ export class LogsPage {
         });
     }
 
+    /**
+     * Get timestamp column header in logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTimestampColumnHeader() {
+        return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    }
+
+    /**
+     * Get source column header in logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSourceColumnHeader() {
+        return this.page.locator('[data-test="log-search-result-table-th-source"]');
+    }
+
+    /**
+     * Get bar chart / histogram container
+     * @returns {import('@playwright/test').Locator}
+     */
+    getBarChart() {
+        return this.page.locator('[data-test="logs-search-result-bar-chart"]');
+    }
+
+    /**
+     * Get logs result table element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTable() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"]');
+    }
+
+    /**
+     * Get stream dropdown selector
+     * @returns {import('@playwright/test').Locator}
+     */
+    getStreamDropdown() {
+        return this.page.locator('[data-test="log-search-index-list-select-stream"]');
+    }
+
+    /**
+     * Get stream dropdown search input
+     * @returns {import('@playwright/test').Locator}
+     */
+    getStreamSearchInput() {
+        return this.page.locator('[data-test="log-search-index-list-select-stream"] input');
+    }
+
+    /**
+     * Get visualize toggle button
+     * @returns {import('@playwright/test').Locator}
+     */
+    getVisualizeToggle() {
+        return this.page.locator('[data-test="logs-visualize-toggle"]');
+    }
+
+    /**
+     * Get query editor element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getQueryEditor() {
+        return this.page.locator('[data-test="logs-search-bar-query-editor"]');
+    }
+
+    /**
+     * Get Quasar time picker (fallback when absolute tab time input not available)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getQuasarTimePicker() {
+        return this.page.locator('.q-time');
+    }
+
 }
