@@ -427,7 +427,7 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({ timeout: 5000 });
 
     // Fill variable name
-    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
 
     // Normalize scope - accept both "panel" and "panels", "tab" and "tabs"
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
@@ -463,8 +463,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the dropdown by clicking the trigger again to toggle it closed
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -491,8 +491,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking the trigger again to toggle it closed
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       // Now select the panels
@@ -513,8 +513,8 @@ export default class DashboardVariablesScoped {
           await panelItem.click();
         }
 
-        // Close the dropdown by pressing Escape
-        await this.page.keyboard.press('Escape');
+        // Close the dropdown by clicking the trigger again to toggle it closed
+        await panelsSelect.click();
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
@@ -572,7 +572,7 @@ export default class DashboardVariablesScoped {
               // Click add button for additional values
               await this.page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
             // }
-            await this.page.locator(`[data-test="dashboard-variable-custom-value-${i}"]`).fill(customValues[i]);
+            await this.page.locator(`[data-test="dashboard-variable-custom-value-${i}-field"]`).fill(customValues[i]);
           }
         }
       } else {
@@ -583,7 +583,7 @@ export default class DashboardVariablesScoped {
 
         // Add single custom value
         if (customValues.length > 0) {
-          await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').fill(customValues[0]);
+          await this.page.locator('[data-test="dashboard-variable-custom-value-0-field"]').fill(customValues[0]);
         }
       }
     }
@@ -605,7 +605,7 @@ export default class DashboardVariablesScoped {
         .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')
         .click();
       await this.page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
-      await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').fill("test");
+      await this.page.locator('[data-test="dashboard-variable-custom-value-0-field"]').fill("test");
     }
 
     // Save variable
@@ -677,7 +677,9 @@ export default class DashboardVariablesScoped {
     const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
     await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
     await filterNameSelector.click();
-    await filterNameSelector.fill(filterFieldName);
+    const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').last();
+    await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
+    await filterNameSearch.fill(filterFieldName);
 
     const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterFieldName}"]`);
     await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
@@ -693,50 +695,35 @@ export default class DashboardVariablesScoped {
     await operatorOption.click();
 
     // Set the value to reference the dependency variable using $variableName syntax
-    const autoComplete = this.page.locator('[data-test="common-auto-complete"]').last();
-    await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-    await autoComplete.click();
+    // OCombobox renders its inner input as [data-test="${name}-input"]; we target the last filter row's input
+    const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
+    await filterValueInput.fill(dependencyVariableName);
 
-    // Wait for input to be focused and ready
-    await autoComplete.waitFor({ state: "attached", timeout: 5000 });
-
-    // Clear any existing value and type the variable name to trigger autocomplete
-    await autoComplete.clear();
-    await autoComplete.fill(dependencyVariableName);
-
-    // Wait for dropdown options to appear (CommonAutoComplete exposes data-test on each option)
-    const dropdownAppeared = await this.page.waitForSelector('[data-test="common-auto-complete-option"]', {
-      state: "visible",
-      timeout: 3000
-    }).then(() => true).catch(() => false);
+    // Wait for autocomplete dropdown options
+    const dropdownAppeared = await this.page.waitForFunction(
+      () => document.querySelectorAll('[data-test*="filter-value-selector"][data-test$="-option"]').length > 0,
+      { timeout: 3000 }
+    ).then(() => true).catch(() => false);
 
     if (dropdownAppeared) {
-      // Try to find and click the option - the dropdown shows variable names
       try {
-        // Click the matching option by text content within the data-test container
-        const option = this.page
-          .locator('[data-test="common-auto-complete-option"]', { hasText: dependencyVariableName })
-          .first();
+        const option = this.page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').filter({ hasText: dependencyVariableName }).first();
         await option.waitFor({ state: 'visible', timeout: 2000 });
         await option.click();
 
-        // Verify the value was set correctly with $ prefix
-        const currentValue = await autoComplete.inputValue();
+        const currentValue = await filterValueInput.inputValue();
         if (!currentValue.startsWith('$')) {
-          // If $ wasn't added automatically, add it manually
-          await autoComplete.clear();
-          await autoComplete.fill(`$${dependencyVariableName}`);
+          await filterValueInput.clear();
+          await filterValueInput.fill(`$${dependencyVariableName}`);
         }
-      } catch (error) {
-        // If clicking option failed, manually set the value with $ prefix
-        await autoComplete.clear();
-        await autoComplete.fill(`$${dependencyVariableName}`);
-        // await this.page.keyboard.press('Escape');
+      } catch {
+        await filterValueInput.clear();
+        await filterValueInput.fill(`$${dependencyVariableName}`);
       }
     } else {
-      // No dropdown appeared, manually set the value with $ prefix
-      await autoComplete.clear();
-      await autoComplete.fill(`$${dependencyVariableName}`);
+      await filterValueInput.clear();
+      await filterValueInput.fill(`$${dependencyVariableName}`);
     }
   }
 
@@ -797,7 +784,9 @@ export default class DashboardVariablesScoped {
     const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
     await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
     await filterNameSelector.click();
-    await filterNameSelector.fill(filterConfig.filterName);
+    const filterNameSearchInput = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
+    await filterNameSearchInput.waitFor({ state: "visible", timeout: 5000 });
+    await filterNameSearchInput.fill(filterConfig.filterName);
 
     const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
     await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
@@ -811,10 +800,10 @@ export default class DashboardVariablesScoped {
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
-    const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
-    await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-    await autoComplete.click();
-    await autoComplete.fill(filterConfig.value);
+    // OCombobox renders its inner input as [data-test="${name}-input"]; target the last filter row's input
+    const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
+    await filterValueInput.fill(filterConfig.value);
   }
 
   /**
@@ -824,7 +813,7 @@ export default class DashboardVariablesScoped {
     await this.page
       .locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]')
       .click();
-    await this.page.locator('[data-test="dashboard-variable-custom-value-0"] input').fill(value);
+    await this.page.locator('[data-test="dashboard-variable-custom-value-0-field"]').fill(value);
   }
 
   /**
@@ -1207,8 +1196,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -1228,8 +1217,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
@@ -1245,8 +1234,8 @@ export default class DashboardVariablesScoped {
           await panelItem.click();
         }
 
-        // Close the panels dropdown by pressing Escape
-        await this.page.keyboard.press('Escape');
+        // Close the panels dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+        await panelsSelect.click();
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
@@ -1258,8 +1247,8 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
-    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label-field"]').fill(label);
 
     // Add custom options - the first option already exists by default
     if (values.length > 0) {
@@ -1279,12 +1268,12 @@ export default class DashboardVariablesScoped {
           await addOptionBtn.scrollIntoViewIfNeeded();
           await addOptionBtn.evaluate(btn => btn.click());
           // Wait for the new option row to appear in the DOM before proceeding
-          await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).waitFor({ state: "visible", timeout: 10000 });
+          await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label-field"]`).waitFor({ state: "visible", timeout: 10000 });
         }
 
         // Fill label and value for this option
-        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).fill(valueLabel);
-        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-value"]`).fill(valueValue);
+        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label-field"]`).fill(valueLabel);
+        await this.page.locator(`[data-test="dashboard-custom-variable-${i}-value-field"]`).fill(valueValue);
 
         // Set as default if specified
         if (isDefault) {
@@ -1378,8 +1367,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -1399,8 +1388,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
@@ -1416,8 +1405,8 @@ export default class DashboardVariablesScoped {
           await panelItem.click();
         }
 
-        // Close the panels dropdown by pressing Escape
-        await this.page.keyboard.press('Escape');
+        // Close the panels dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+        await panelsSelect.click();
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
@@ -1429,11 +1418,11 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
-    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label-field"]').fill(label);
 
     // Set constant value
-    await this.page.locator('[data-test="dashboard-variable-constant-value"]').fill(value);
+    await this.page.locator('[data-test="dashboard-variable-constant-value-field"]').fill(value);
 
     // Save variable
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
@@ -1511,8 +1500,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
     }
 
@@ -1532,8 +1521,8 @@ export default class DashboardVariablesScoped {
         await tabItem.click();
       }
 
-      // Close the tabs dropdown by pressing Escape
-      await this.page.keyboard.press('Escape');
+      // Close the tabs dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+      await tabsSelect.click();
       await this.page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
       if (assignedPanels.length > 0) {
@@ -1549,8 +1538,8 @@ export default class DashboardVariablesScoped {
           await panelItem.click();
         }
 
-        // Close the panels dropdown by pressing Escape
-        await this.page.keyboard.press('Escape');
+        // Close the panels dropdown by clicking trigger again (toggle — Escape does not close OSelect multi-select)
+        await panelsSelect.click();
         await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
       }
     }
@@ -1562,12 +1551,12 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Fill name and label
-    await this.page.locator('[data-test="dashboard-variable-name"] input').fill(name);
-    await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-label-field"]').fill(label);
 
     // Set default value
     if (defaultValue) {
-      await this.page.locator('[data-test="dashboard-variable-textbox-default-value"]').fill(defaultValue);
+      await this.page.locator('[data-test="dashboard-variable-textbox-default-value-field"]').fill(defaultValue);
     }
 
     // Save variable
@@ -1768,8 +1757,8 @@ export default class DashboardVariablesScoped {
     // Click Add Variable
     await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
 
-    // Fill variable name
-    await this.page.locator(SELECTORS.VARIABLE_NAME).fill(name);
+    // Fill variable name (use -field suffix to target the inner input, not the OInput wrapper)
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
 
     // Select scope
     const normalizedScope = scope === 'panel' ? 'panels' : (scope === 'tab' ? 'tabs' : scope);
@@ -1825,22 +1814,8 @@ export default class DashboardVariablesScoped {
    * @param {string} streamNameOrVar - New stream name or $variable reference
    */
   async updateStream(streamNameOrVar) {
-    const streamSelect = this.page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-
-    // selectStreamFromDropdown handles click, fill, and option selection.
-    // Do NOT click beforehand — that would double-click and toggle the dropdown closed.
+    // selectStreamFromDropdown handles click, popover search fill, and option selection.
     await selectStreamFromDropdown(this.page, streamNameOrVar);
-
-    // Verify the stream value was actually set
-    const inputValue = await streamSelect.inputValue().catch(() => "");
-    if (!inputValue.includes(streamNameOrVar.replace('$', ''))) {
-      // Value not set correctly, try again with direct input
-      await streamSelect.click();
-      await streamSelect.fill(streamNameOrVar);
-      await this.page.keyboard.press('Tab'); // Trigger blur event
-    }
-
-    // Wait for any validation or dependency updates to process
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
   }
 
@@ -1849,11 +1824,7 @@ export default class DashboardVariablesScoped {
    * @param {string} fieldNameOrVar - New field name or $variable reference
    */
   async updateField(fieldNameOrVar) {
-    const fieldSelect = this.page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    // Clear current field
-    await this.page.keyboard.press("Control+A");
-    await this.page.keyboard.press("Backspace");
+    // selectFieldFromDropdown handles click, popover search fill, and option selection.
     await selectFieldFromDropdown(this.page, fieldNameOrVar);
   }
 

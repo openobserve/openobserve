@@ -31,7 +31,7 @@ export default class DashboardVariables {
 
     // Add Variable
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({timeout:5000});
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
 
     // Select Stream Type
     await this.page
@@ -109,10 +109,7 @@ export default class DashboardVariables {
         .locator('[data-test="dashboard-add-custom-value-btn"]')
         .click();
       await this.page
-        .locator('[data-test="dashboard-variable-custom-value-0"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-variable-custom-value-0"]')
+        .locator('[data-test="dashboard-variable-custom-value-0-field"]')
         .fill("test");
     }
 
@@ -240,10 +237,9 @@ export default class DashboardVariables {
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
 
-    // Fill variable name — data-test is on OInput wrapper div; fill targets the inner input
-    const nameInput = this.page.locator('[data-test="dashboard-variable-name"] input');
+    // Fill variable name — target the OInput inner field directly via -field suffix
+    const nameInput = this.page.locator('[data-test="dashboard-variable-name-field"]');
     await nameInput.waitFor({ state: "visible", timeout: 10000 });
-    await nameInput.click();
     await nameInput.fill(variableName);
 
     // Select stream type — each OSelect forwards parent data-test to popover (`*-popover`) and options (`*-option`).

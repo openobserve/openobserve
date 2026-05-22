@@ -379,8 +379,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Try to add panel variable for Panel2 and check if Panel1's variable appears in dependency options
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panelVar2);
+    await page.locator('[data-test="dashboard-variable-name-field"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(panelVar2);
 
     // Select scope as panels
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
@@ -393,7 +393,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').click();
-    await page.keyboard.press('Escape');
+    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select Panel2
@@ -401,6 +401,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').click();
+    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream type, stream, and field using shared utilities
@@ -414,21 +415,23 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible", timeout: 5000 });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
     await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
     await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the value autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.click();
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput.click();
 
-    // Get all available variable options
-    const options = page.locator(SELECTORS.OPTION);
-    const optionTexts = await options.allTextContents();
+    // OCombobox opens on focus; wait briefly for options to appear
+    const hasDropdown = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
+    const optionTexts = hasDropdown
+      ? await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents()
+      : [];
 
     // Panel1's variable should NOT be in the list
     expect(optionTexts).not.toContain(panelVar1);

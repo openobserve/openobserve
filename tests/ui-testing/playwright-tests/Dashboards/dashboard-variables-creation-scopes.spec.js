@@ -126,7 +126,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
 
     // Try to add tab variable
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(tabVar);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
@@ -145,26 +145,24 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
     await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
     await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown) {
       // If dropdown appears, verify panel variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
+      const options = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents();
       expect(options).not.toContain(panelVar);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
@@ -222,7 +220,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
 
     // Try to add variable to Tab2
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(tab2Var);
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(tab2Var);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
@@ -237,6 +235,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Click the Tab2 option by label
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab2"]').waitFor({ state: "visible" });
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab2"]').click();
+    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
@@ -250,27 +249,25 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
     await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
     await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput2 = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput2.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput2.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown2 = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown2) {
       // If dropdown appears, verify tab1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
-      expect(options).not.toContain(tab1Var);
+      const options2 = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents();
+      expect(options2).not.toContain(tab1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
       // This is actually the expected behavior - tab2 cannot depend on tab1's variable
@@ -371,7 +368,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Wait for variables tab to be active and add button to be visible
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(panelVar);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
@@ -386,8 +383,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Click the Tab1 option by label
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab1"]').waitFor({ state: "visible" });
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Tab1"]').click();
-    await page.keyboard.press("Escape");
-    // Wait for dropdown to close
+    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Then select the panel by name
@@ -397,6 +393,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel1"]').waitFor({ state: "visible" });
     await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel1"]').click();
+    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
@@ -410,26 +407,24 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
     await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
     await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-    await autoComplete.click();
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput3 = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput3.waitFor({ state: "visible", timeout: 10000 });
+    await filterValueInput3.click();
 
-    // Wait for dropdown options to appear - CommonAutoComplete uses data-test="common-auto-complete-option"
-    await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).first().waitFor({ state: "visible", timeout: 10000 });
-    // Ensure all options are loaded
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // OCombobox opens on focus; wait for options to appear
+    await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().waitFor({ state: "visible", timeout: 10000 });
 
-    const options = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).allTextContents();
-    expect(options).toContain(globalVar);
-    expect(options).toContain(tabVar);
+    const options3 = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents();
+    expect(options3).toContain(globalVar);
+    expect(options3).toContain(tabVar);
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -483,7 +478,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
 
     // Try to add variable to Panel2 depending on Panel1's variable
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panel2Var);
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(panel2Var);
 
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
     await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
@@ -498,8 +493,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Click the Default tab option by label
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').waitFor({ state: "visible" });
     await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').click();
-    await page.keyboard.press("Escape");
-    // Wait for dropdown to close
+    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Now open the panels dropdown and select panel2 by name
@@ -509,6 +503,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').waitFor({ state: "visible" });
     await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').click();
+    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
     await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream and field using shared utilities
@@ -522,27 +517,25 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible" });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
     await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
     await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput4 = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput4.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput4.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown4 = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown4) {
       // If dropdown appears, verify panel1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
-      expect(options).not.toContain(panel1Var);
+      const options4 = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents();
+      expect(options4).not.toContain(panel1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
       // This is expected - panel variables cannot depend on other panel variables

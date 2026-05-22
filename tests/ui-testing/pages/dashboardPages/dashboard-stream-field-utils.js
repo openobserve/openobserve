@@ -176,10 +176,23 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
  */
 export async function verifyDropdownContainsVariable(page, dropdownSelector, variableName) {
   const dropdown = page.locator(dropdownSelector);
+
+  // Derive the popover search input selector — dropdownSelector is e.g.
+  // '[data-test="dashboard-variable-stream-select"]' → popover input is
+  // '[data-test="dashboard-variable-stream-select-popover"] input'
+  const dataTestMatch = dropdownSelector.match(/data-test="([^"]+)"/);
+  const searchInputSelector = dataTestMatch
+    ? `[data-test="${dataTestMatch[1]}-popover"] input`
+    : null;
+
   await dropdown.click();
 
-  // Type $ to filter for variables
-  await dropdown.fill(`$${variableName}`);
+  // Type $ to filter for variables using the popover search input
+  if (searchInputSelector) {
+    const searchInput = page.locator(searchInputSelector);
+    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await searchInput.fill(`$${variableName}`);
+  }
 
   // Wait for options to appear
   const hasOptions = await page
@@ -211,9 +224,10 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
     hasVariableLabel = result.hasVariableLabel;
   }
 
-  // If not found via filter, try without filter text (open full list)
-  if (!found) {
-    await dropdown.fill("");
+  // If not found via filter, clear and retry with full list
+  if (!found && searchInputSelector) {
+    const searchInput = page.locator(searchInputSelector);
+    await searchInput.fill("");
     const retryResult = await page.evaluate((varName) => {
       const options = document.querySelectorAll('[data-test$="-option"]');
       for (const opt of options) {
