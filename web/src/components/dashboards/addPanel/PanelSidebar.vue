@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="sidebar-content scroll"
       data-test="panel-sidebar-content"
       v-if="isOpen"
+      @scroll.passive="onSidebarScroll"
     >
       <slot></slot>
     </div>
@@ -68,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, provide } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -90,10 +91,16 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const isOpen = ref(props.modelValue);
+    const sidebarScrollTick = ref(0);
+    provide('sidebarScrollTick', sidebarScrollTick);
 
     const toggleSidebar = () => {
       isOpen.value = !isOpen.value;
       emit("update:modelValue", isOpen.value);
+    };
+
+    const onSidebarScroll = () => {
+      sidebarScrollTick.value++;
     };
 
     watch(
@@ -106,6 +113,7 @@ export default defineComponent({
     return {
       isOpen,
       toggleSidebar,
+      onSidebarScroll,
     };
   },
 });

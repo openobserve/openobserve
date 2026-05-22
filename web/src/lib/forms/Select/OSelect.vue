@@ -30,6 +30,7 @@ import {
 } from "reka-ui";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
+  type Ref,
   computed,
   inject,
   nextTick,
@@ -588,6 +589,16 @@ onBeforeUnmount(() => {
   }
 });
 
+// Close when the sidebar scroll container scrolls, preventing the portal
+// from floating disconnected at the top of the screen.
+const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+if (sidebarScrollTick) {
+  watch(sidebarScrollTick, () => {
+    if (popoverOpen.value) popoverOpen.value = false;
+    if (selectOpen.value) selectOpen.value = false;
+  });
+}
+
 // ── Chip overflow (width-aware) ──────────────────────────────────────────
 // In multi-select mode, fit as many chips as the trigger width allows; the
 // rest collapse into a "+N more" indicator. When `maxVisibleChips` is set,
@@ -916,16 +927,17 @@ const fieldWidthClass = computed(() => {
             align="start"
             :trap-focus="false"
             :disable-outside-pointer-events="false"
+            :hide-when-detached="true"
             :data-test="
               parentDataTest ? `${parentDataTest}-popover` : undefined
             "
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:max-h-72 tw:overflow-hidden',
+              'tw:overflow-hidden',
               'tw:rounded-md tw:shadow-lg',
               'tw:bg-select-content-bg',
             ]"
-            :style="dropdownStyle"
+            :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
             @pointerdown.stop
           >
@@ -1265,10 +1277,11 @@ const fieldWidthClass = computed(() => {
         <SelectContent
           position="popper"
           :side-offset="4"
+          :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
             'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
-            'tw:max-h-60 tw:overflow-hidden',
+            'tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-md',
             'tw:bg-select-content-bg tw:border-select-content-border',
             'tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out',
@@ -1277,7 +1290,7 @@ const fieldWidthClass = computed(() => {
             'tw:data-[side=bottom]:slide-in-from-top-2',
             'tw:data-[side=top]:slide-in-from-bottom-2',
           ]"
-          :style="dropdownStyle"
+          :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
           @click.stop
           @pointerdown.stop
         >
