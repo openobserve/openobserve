@@ -4,7 +4,7 @@ const PageManager = require('../../pages/page-manager.js');
 
 async function closeStreamDetailSidebar(page) {
   // Close stream detail sidebar if open
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
+  const cancelButton = page.locator('[data-test="schema-cancel-button"]');
   const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
   if (cancelVisible) {
     await cancelButton.click();
