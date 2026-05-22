@@ -712,6 +712,7 @@ export default defineComponent({
         // Show error notification when user doesn't have access to meta org
         toast({
           message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
+          color: "negative",
           timeout: 5000,
         });
       }
