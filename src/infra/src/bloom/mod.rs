@@ -26,7 +26,7 @@
 //! ```text
 //! 0     ────────────────────────────────────
 //!       MAGIC      4B   "O2BF"
-//!       VERSION    1B   0x02
+//!       VERSION    1B   0x01
 //! ────────────────────────────────────────────
 //!       BODY            (concat of raw SBBF bitsets — each is exactly
 //!                        `num_blocks × 32` little-endian bytes, no
@@ -58,14 +58,6 @@
 //! [`sbbf::check_block`] against it without ever loading the surrounding
 //! bytes — which is the whole point of switching off
 //! `parquet::bloom_filter::Sbbf`'s eagerly-decoded API.
-//!
-//! ## Format version
-//!
-//! `VERSION` was 0x01 in the prototype, which wrapped each body in a
-//! Parquet thrift `BloomFilterHeader`. V2 strips that header and writes
-//! bytes that round-trip through [`sbbf::Sbbf::to_bytes`] /
-//! [`sbbf::Sbbf::from_bytes`]. V1 files are not readable by V2 code —
-//! the reader logs once and treats the bucket as "keep all".
 
 pub mod footer_cache;
 pub mod path;
@@ -82,7 +74,7 @@ pub use writer::{BloomBuilder, BloomWriter, FieldBloom};
 pub const MAGIC: &[u8; 4] = b"O2BF";
 
 /// Current `.bf` format version.
-pub const VERSION: u8 = 0x02;
+pub const VERSION: u8 = 0x01;
 
 /// Algorithm tag for SBBF + gxhash64 (the project-wide default 64-bit
 /// hash from `config::utils::hash`). Block layout follows the Parquet

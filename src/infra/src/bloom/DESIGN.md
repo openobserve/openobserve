@@ -119,7 +119,7 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
 ```
 0  ─────────────────────────────────────────
    MAGIC      4B   "O2BF"
-   VERSION    1B   0x02
+   VERSION    1B   0x01
 ─────────────────────────────────────────────
    BODY            (concat of raw SBBF bitsets — each is exactly
                     `num_blocks × 32` little-endian bytes, no
@@ -149,7 +149,7 @@ Width-overflow checks at write time return `WriteError::{FieldNameTooLong, TooMa
 
 Tail magic + footer-length pointer is used by the reader's `parse_suffix(suffix, total_size)` path: the search side fetches just the footer (typically 16 KB suffix probe) and never materializes the body. The body bytes stay in object store / disk cache; only the **single 32-byte block** each point check needs is read on demand via `cache_storage::get_ranges`.
 
-**Format version**: `VERSION = 0x02` (was `0x01` in the prototype, which wrapped each body in a thrift `BloomFilterHeader` produced by `parquet::bloom_filter::Sbbf::write`). V2 strips that header so `body_offset..body_offset+body_size` is exactly a sequence of 32-byte blocks. V1 files are rejected by the V2 reader (`BadVersion(0x01)`); migration is wipe + rebuild via setting `bloom_ver = 0` on affected `file_list` rows.
+**Format version**: `VERSION = 0x01`. This is the first released format — `body_offset..body_offset+body_size` is exactly a sequence of 32-byte raw SBBF blocks, no framing. Earlier in-development prototypes wrapped each body in a Parquet thrift `BloomFilterHeader` from `parquet::bloom_filter::Sbbf::write`; those never shipped, and the current code only knows the raw-block layout.
 
 ### 4.4 `file_id` choice
 
