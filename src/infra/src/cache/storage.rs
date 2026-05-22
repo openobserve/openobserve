@@ -20,9 +20,8 @@ use bytes::Bytes;
 use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Error, GetOptions, GetResult, ListResult, MultipartUpload, OBJECT_STORE_COALESCE_DEFAULT,
-    ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
-    coalesce_ranges, path::Path,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use crate::{
@@ -154,12 +153,17 @@ impl ObjectStoreExt for CacheFS {
         location: &Path,
         ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
-        coalesce_ranges(
-            ranges,
-            |range| self.get_range(account, location, range),
-            OBJECT_STORE_COALESCE_DEFAULT,
-        )
-        .await
+        if ranges.is_empty() {
+            return Ok(Vec::new());
+        }
+        let path = location.to_string();
+        // Single cache lookup for ALL ranges: memory cache → in-memory slice,
+        // disk cache → one File::open + N preads. Falls back to remote on
+        // cache miss (which itself does batched ranges per backend).
+        if let Ok(v) = file_data::get_ranges_opts(account, &path, ranges, false).await {
+            return Ok(v);
+        }
+        storage::get_ranges(account, &path, ranges).await
     }
 
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta> {
