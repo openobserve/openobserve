@@ -2633,6 +2633,7 @@
     "serviceAccounts": "서비스 계정",
     "serviceAccountsName": "서비스 계정 이름",
     "basicUsers": "유저",
+    "organizationMembers": "조직 구성원",
     "quota": "할당량",
     "externalUserWarningTitle": "외부 사용자 경고",
     "externalUserWarningMessage": "외부 사용자를 역할에 직접 추가해도 권한이 부여되지 않습니다.대신 사용자 그룹에 추가하세요.",

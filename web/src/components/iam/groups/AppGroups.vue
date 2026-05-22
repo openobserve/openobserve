@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
+            <div class="tw:flex tw:items-center tw:justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
                 variant="ghost"

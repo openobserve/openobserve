@@ -924,6 +924,7 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
+    "organizationMembers": "Organization Members",
     "invitations": "Invitations",
     "quota": "Quotas",
     "externalUserWarningTitle": "External user warning",

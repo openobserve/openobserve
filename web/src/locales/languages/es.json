@@ -2620,6 +2620,7 @@
     "serviceAccounts": "Cuentas de servicio",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
     "basicUsers": "Usuarios",
+    "organizationMembers": "Miembros de la Organización",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",

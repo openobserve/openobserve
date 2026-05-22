@@ -75,7 +75,7 @@ const columns: OTableColumnDef[] = [
   >
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
+      <div class="tw:flex tw:items-center tw:justify-center">
         <OButton
           :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
           variant="ghost"

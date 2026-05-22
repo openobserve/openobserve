@@ -2622,6 +2622,7 @@
     "serviceAccounts": "Dienstkonten",
     "serviceAccountsName": "Name des Dienstkontos",
     "basicUsers": "Nutzer",
+    "organizationMembers": "Organisationsmitglieder",
     "quota": "Kontingente",
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
