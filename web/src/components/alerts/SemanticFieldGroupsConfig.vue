@@ -36,24 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hint="t('correlation.categoryHint')"
           class="showLabelOnTop"
           style="max-width: 100%"
-        >
-          <template v-slot:option="scope">
-            <div
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-              @click="scope.toggleOption(scope.opt)"
-            >
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm">
-                  <span class="tw:font-medium">{{ scope.opt.label }}</span>
-                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2"
-                    >({{ scope.opt.count }}
-                    {{ t("settings.correlation.groupsLabel") }})</span
-                  >
-                </span>
-              </div>
-            </div>
-          </template>
-        </OSelect>
+        />
       </div>
       <div class="tw:w-full col-md-8 tw:flex tw:items-center tw:justify-end tw:gap-2">
         <OButton

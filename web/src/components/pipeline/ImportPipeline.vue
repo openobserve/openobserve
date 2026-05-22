@@ -103,40 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
                         :label="t('alerts.stream_name') + ' *'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
                         class="tw:py-2 showLabelOnTop no-case"
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
                         @update:model-value="(val) => {
                           userSelectedStreamName[index] = val;
                           updateStreamFields(val, index);
                         }"
-                        behavior="menu"
-                        @input-value="handleDynamicStreamName($event, index)"
-                      >
-                        <template v-slot:option="scope">
-                          <div
-                            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-                            @click="scope.toggleOption(scope.opt)"
-                          >
-                            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                              <span
-                                class="tw:text-sm"
-                                :class="{
-                                  'tw:text-gray-400': scope.opt.disable,
-                                }"
-                              >
-                                {{ scope.opt.label }}
-                              </span>
-                            </div>
-                          </div>
-                        </template>
-                      </OSelect>
+                        @search="handleDynamicStreamName($event, index)"
+                      />
                     </div>
                   </span>
                   <!-- source stream type should be one of the valid stream types -->

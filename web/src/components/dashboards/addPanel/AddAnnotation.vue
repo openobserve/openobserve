@@ -17,40 +17,10 @@
             :options="groupedPanelsOptions"
             multiple
             @update:model-value="updateSelectedPanels"
-            :display-value="displayValue"
             style="min-width: 150px"
             label="Select Panels"
-            input-debounce="0"
-            behavior="menu"
-            use-input
             class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
-            popup-no-route-dismiss
-            popup-content-style="z-index: 10001"
-          >
-            <template v-slot:option="{ opt, selected, toggleOption }">
-              <div
-                v-if="opt.isTab"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:bg-muted tw:font-bold tw:pointer-events-none"
-              >
-                <span class="tw:text-sm">{{ opt.label }}</span>
-              </div>
-
-              <div
-                v-else
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-                @click="toggleOption(opt)"
-              >
-                <OCheckbox
-                  class="tw:shrink-0"
-                  :model-value="selected"
-                  @update:model-value="() => toggleOption(opt)"
-                />
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm">{{ opt.label }}</span>
-                </div>
-              </div>
-            </template>
-          </OSelect>
+          />
         <div class="tw:text-xs tw:mt-3">
           Timestamp: {{ annotationDateString }}
         </div>
@@ -102,7 +72,6 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -136,7 +105,7 @@ const selectedPanels = ref([]);
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
-    { label: tab, isTab: true },
+    { label: tab, isTab: true, disable: true },
     ...panels.map((panel) => ({
       label: panel.title,
       value: panel.id,
