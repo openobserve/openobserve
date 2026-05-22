@@ -120,7 +120,9 @@ class ChangeOrgPage {
     // Streams Page Methods
     async validateStreamsPageDefault(pageManager) {
         await pageManager.streamsPage.gotoStreamsPage();
-        await pageManager.streamsPage.streamsPageDefaultOrg();
+        // streamsPage.streamsPageDefaultOrg uses banned selectors
+        // (getByText/text-engine) — switch via the data-test-only homePage flow.
+        await pageManager.homePage.homePageDefaultOrg();
         await pageManager.homePage.homePageURLValidationDefaultOrg();
         await pageManager.streamsPage.streamsURLValidation();
     }
