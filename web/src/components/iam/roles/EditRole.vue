@@ -1148,8 +1148,8 @@ const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
       count += 1;
     }
 
-    // Recursively count in nested entities
-    if (permission.entities?.length) {
+    // Recursively count in nested entities only when the parent row is expanded
+    if (permission.entities?.length && permission.expand) {
       count += countVisibleResources(permission.entities);
     }
   });
