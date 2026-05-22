@@ -15,6 +15,7 @@
 
 use std::ops::ControlFlow;
 
+use config::utils::sql::is_complex_query_stmt;
 use hashbrown::HashMap;
 use infra::errors::Error;
 use sqlparser::{
@@ -26,7 +27,7 @@ use sqlparser::{
     tokenizer::Span,
 };
 
-use crate::service::search::{sql::visitor::utils::is_complex_query, utils::conjunction};
+use crate::service::search::utils::conjunction;
 
 pub fn add_new_filters_with_and_operator(
     sql: &str,
@@ -40,7 +41,7 @@ pub fn add_new_filters_with_and_operator(
         .map_err(|e| Error::Message(e.to_string()))?
         .pop()
         .unwrap();
-    if is_complex_query(&mut statement) {
+    if is_complex_query_stmt(&statement) {
         return Ok(sql.to_string());
     }
     let mut visitor = AddNewFiltersWithAndOperatorVisitor::new(filters);

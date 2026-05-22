@@ -73,14 +73,6 @@ pub(super) fn has_group_by(query: &Query) -> bool {
     }
 }
 
-pub(super) fn has_having(query: &Query) -> bool {
-    if let SetExpr::Select(ref select) = *query.body {
-        select.having.is_some()
-    } else {
-        false
-    }
-}
-
 pub(super) fn has_join(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
         select.from.len() > 1

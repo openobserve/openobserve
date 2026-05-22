@@ -22,13 +22,13 @@ mod simple_distinct_query;
 mod timestamp_selected;
 mod visitors;
 
-pub use complex_query::is_complex_query;
+pub use complex_query::{is_complex_query, is_complex_query_stmt};
 pub use eligible_for_histogram::is_eligible_for_histogram;
 pub use explain_query::is_explain_query;
 pub use simple_aggregate_query::is_simple_aggregate_query;
 pub use simple_distinct_query::is_simple_distinct_query;
 pub use timestamp_selected::is_timestamp_selected;
-pub use visitors::TimestampVisitor;
+pub use visitors::{TimestampVisitor, has_wildcard};
 
 pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",

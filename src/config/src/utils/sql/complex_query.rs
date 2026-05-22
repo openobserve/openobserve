@@ -13,33 +13,122 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
+use std::ops::ControlFlow;
 
-use super::{
-    helpers::{has_group_by, has_having, has_join, is_aggregate_in_select},
-    visitors::{has_distinct, has_subquery, has_union},
+use sqlparser::{
+    ast::{Expr, GroupByExpr, Query, SetExpr, Statement, Visit, Visitor},
+    dialect::GenericDialect,
+    parser::Parser,
 };
+
+use super::AGGREGATE_UDF_LIST;
 
 pub fn is_complex_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
-    for statement in ast.iter() {
-        if let Statement::Query(query) = statement
-            && (is_aggregate_in_select(query)
-                || has_group_by(query)
-                || has_having(query)
-                || has_join(query)
-                || has_union(query))
-        {
-            return Ok(true);
-        } else if has_distinct(statement) || has_subquery(statement) {
-            return Ok(true);
-        }
+    Ok(ast.iter().any(is_complex_query_stmt))
+}
+
+pub fn is_complex_query_stmt(statement: &Statement) -> bool {
+    let mut visitor = ComplexityVisitor::new();
+    let _ = statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+// 5. has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 6. has distinct
+// 7. has having
+struct ComplexityVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexityVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
     }
-    Ok(false)
+}
+
+impl Visitor for ComplexityVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        match query.body.as_ref() {
+            SetExpr::Select(select) => {
+                // check if has group by
+                match &select.group_by {
+                    GroupByExpr::Expressions(v, _) => self.is_complex = !v.is_empty(),
+                    _ => self.is_complex = true,
+                }
+                // check if has join
+                if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                    self.is_complex = true;
+                }
+                if select.distinct.is_some() {
+                    self.is_complex = true;
+                }
+                if select.having.is_some() {
+                    self.is_complex = true;
+                }
+                if self.is_complex {
+                    return ControlFlow::Break(());
+                }
+            }
+            // check if SetOperation
+            SetExpr::SetOperation { .. } => {
+                self.is_complex = true;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                let name = func.name.to_string().to_lowercase();
+                let name = trim_quotes(&name);
+                if AGGREGATE_UDF_LIST.contains(&name.as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn trim_quotes(s: &str) -> String {
+    let s = s
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(s);
+    s.strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(s)
+        .to_string()
 }
 
 #[cfg(test)]
 mod tests {
+    use sqlparser::{dialect::GenericDialect, parser::Parser};
+
     use super::*;
 
     #[test]
@@ -101,5 +190,41 @@ mod tests {
         let query = r#"SELECT histogram(_timestamp) AS zo_sql_time, "kubernetes_docker_id" AS zo_sql_key, SUM(count) AS zo_sql_num FROM "distinct_values_logs_default22" GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"#;
         let ab = is_complex_query(query);
         print!("{ab:?}");
+    }
+
+    #[test]
+    fn test_is_complex_query_wildcard_is_not_complex() {
+        assert!(!is_complex_query("SELECT * FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_complex_query_multi_from_is_complex() {
+        assert!(is_complex_query("SELECT a FROM t1, t2 WHERE t1.id = t2.id").unwrap());
+    }
+
+    #[test]
+    fn test_is_complex_query_window_function_is_complex() {
+        assert!(is_complex_query("SELECT a, row_number() OVER (PARTITION BY a) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_complex_query_stmt_simple_select_is_not_complex() {
+        let sql = "SELECT a, b FROM t WHERE a = 1";
+        let ast = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+        assert!(!is_complex_query_stmt(&ast[0]));
+    }
+
+    #[test]
+    fn test_is_complex_query_stmt_subquery_is_complex() {
+        let sql = "SELECT a FROM t WHERE a IN (SELECT a FROM t2)";
+        let ast = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+        assert!(is_complex_query_stmt(&ast[0]));
+    }
+
+    #[test]
+    fn test_is_complex_query_stmt_join_is_complex() {
+        let sql = "SELECT a FROM t1 JOIN t2 ON t1.id = t2.id";
+        let ast = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+        assert!(is_complex_query_stmt(&ast[0]));
     }
 }

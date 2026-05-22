@@ -17,6 +17,7 @@ mod distinct;
 mod subquery;
 mod timestamp;
 mod union;
+mod wildcard;
 mod window_function;
 
 pub(super) use distinct::has_distinct;
@@ -24,4 +25,5 @@ pub(super) use subquery::has_subquery;
 pub use timestamp::TimestampVisitor;
 pub(super) use timestamp::has_timestamp;
 pub(super) use union::{has_union, is_multi_search_eligible_for_histogram};
+pub use wildcard::has_wildcard;
 pub(super) use window_function::has_window_functions;
