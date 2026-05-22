@@ -2633,6 +2633,7 @@
     "serviceAccounts": "Hizmet Hesapları",
     "serviceAccountsName": "Hizmet Hesapları Adı",
     "basicUsers": "Kullanıcılar",
+    "organizationMembers": "Organizasyon Üyeleri",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",

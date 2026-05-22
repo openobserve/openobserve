@@ -2644,6 +2644,7 @@
     "quota": "クォータ",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
+    "organizationMembers": "組織メンバー",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
     "invitations": "招待状"

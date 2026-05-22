@@ -2633,6 +2633,7 @@
     "serviceAccounts": "Serviceaccounts",
     "serviceAccountsName": "Naam van serviceaccounts",
     "basicUsers": "Gebruikers",
+    "organizationMembers": "Organisatieleden",
     "quota": "Quota",
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",
