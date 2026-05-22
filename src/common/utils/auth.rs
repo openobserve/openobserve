@@ -348,6 +348,16 @@ where
             } else {
                 path_columns[0].to_string()
             }
+        } else if url_len == 2 && path_columns[1].eq("anomaly_detection") {
+            // Anomaly detection uses alert RBAC — list/create checked against alert_folders
+            if method.eq("GET") {
+                method = "LIST".to_string();
+            }
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get("alert_folders").unwrap().key,
+                folder
+            )
         } else if url_len == 2
             || (url_len > 2 && path_columns[1].eq("settings"))
             || (url_len > 2 && path_columns[1] == "sourcemaps")
@@ -483,6 +493,13 @@ where
                 "{}:{}",
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 path_columns[0]
+            )
+        } else if url_len == 3 && path_columns[1].eq("anomaly_detection") {
+            // Anomaly detection uses alert RBAC — individual config access checked against alerts
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get("alerts").unwrap().key,
+                path_columns[2]
             )
         } else if url_len == 3 {
             // Handle /v2 alert and report apis
@@ -661,6 +678,13 @@ where
                     path_columns[0]
                 )
             }
+        } else if url_len == 4 && path_columns[1].eq("anomaly_detection") {
+            // Anomaly detection uses alert RBAC — train/detect/history checked against alerts
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get("alerts").unwrap().key,
+                path_columns[2]
+            )
         } else if url_len == 4 {
             // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) {
@@ -908,6 +932,18 @@ where
                     .get("incidents")
                     .map_or("incidents", |model| model.key),
                 path_columns[1] // org_id
+            )
+        } else if method.eq("POST")
+            && path_columns[0].eq(V2_API_PREFIX)
+            && path_columns.get(2) == Some(&"alerts")
+            && path_columns.get(4) == Some(&"clone")
+        {
+            // POST /v2/{org_id}/alerts/{alert_id}/clone — requires GET on the source alert
+            method = "GET".to_string();
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get("alerts").unwrap().key,
+                path_columns[3]
             )
         } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
             method = resolve_write_method(&method, &path_columns);

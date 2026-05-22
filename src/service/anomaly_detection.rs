@@ -29,6 +29,7 @@ use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use svix_ksuid::KsuidLike;
 
 use crate::{
+    common::{meta::authz::Authz, utils::auth::set_ownership},
     handler::http::request::anomaly_detection::{
         CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
     },
@@ -350,6 +351,17 @@ pub async fn create_config(
     let result = anomaly_config_table::create(db, new_config)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: result.anomaly_id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_name.to_owned(),
+        },
+    )
+    .await;
 
     // Broadcast config creation to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]
@@ -717,6 +729,13 @@ pub async fn clone_config(
     let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
+    // Capture folder name for RBAC ownership before folder_id is consumed.
+    let ofga_folder_name = if let Some(ref name) = folder_id {
+        name.clone()
+    } else {
+        pk_to_name(Some(&src.folder_id)).await
+    };
+
     // If a new folder name is given, resolve it to the PK; otherwise inherit the
     // source's already-stored PK.
     let resolved_folder_id = if let Some(name) = folder_id {
@@ -770,6 +789,17 @@ pub async fn clone_config(
     let result = anomaly_config_table::create(db, cloned)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: result.anomaly_id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: ofga_folder_name,
+        },
+    )
+    .await;
 
     // Broadcast cloned config to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]
