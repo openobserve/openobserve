@@ -52,7 +52,6 @@ impl PartitionGenerator {
     /// * `step` - Regular partition step size in microseconds
     /// * `order_by` - Sort order for partitions
     /// * `is_complex_query` - Whether this query requires complex search handling
-    /// * `add_mini_partition` - Whether to add a mini partition for faster initial results
     /// * `cache_strategy` - Optional cache-aware partition strategy
     ///
     /// # Returns
@@ -65,7 +64,6 @@ impl PartitionGenerator {
         step: i64,
         order_by: OrderBy,
         is_complex_query: bool,
-        add_mini_partition: bool,
         #[cfg(feature = "enterprise")] cache_strategy: Option<StreamingAggsPartitionStrategy>,
     ) -> Vec<[i64; 2]> {
         // If cache-aware strategy is provided, use it
@@ -77,11 +75,7 @@ impl PartitionGenerator {
         // Otherwise, use standard partition generation logic
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
-                start_time,
-                end_time,
-                step,
-                order_by,
-                add_mini_partition,
+                start_time, end_time, step, order_by,
             )
         } else if is_complex_query {
             vec![[start_time, end_time]]
@@ -159,20 +153,9 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
-        add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
-        let mut partitions = if add_mini_partition {
-            let mini_partition_size = self.calculate_mini_partition_size(step);
-            self.generate_histogram_aligned_partitions_with_mini(
-                start_time,
-                end_time,
-                step,
-                order_by,
-                mini_partition_size,
-            )
-        } else {
-            self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by)
-        };
+        let mut partitions =
+            self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by);
 
         self.handle_empty_partitions(&mut partitions, start_time, end_time);
         partitions
@@ -214,55 +197,6 @@ impl PartitionGenerator {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         if order_by == OrderBy::Asc {
             partitions.reverse();
-        }
-
-        partitions
-    }
-
-    /// Generate histogram-aligned partitions with mini partition
-    fn generate_histogram_aligned_partitions_with_mini(
-        &self,
-        start_time: i64,
-        end_time: i64,
-        step: i64,
-        order_by: OrderBy,
-        mini_partition_size: i64,
-    ) -> Vec<[i64; 2]> {
-        let mut partitions = Vec::new();
-
-        // Add mini partition
-        if let Some(mini_partition) =
-            self.create_mini_partition(start_time, end_time, mini_partition_size, order_by)
-        {
-            partitions.push(mini_partition);
-
-            // Generate remaining partitions with histogram alignment
-            match order_by {
-                OrderBy::Desc => {
-                    let remaining_start = mini_partition[0];
-                    let remaining_partitions = self.generate_histogram_aligned_partitions(
-                        start_time,
-                        remaining_start,
-                        step,
-                        OrderBy::Desc,
-                    );
-                    partitions.extend(remaining_partitions);
-                }
-                OrderBy::Asc => {
-                    let remaining_end = mini_partition[1];
-                    let remaining_partitions = self.generate_histogram_aligned_partitions(
-                        remaining_end,
-                        end_time,
-                        step,
-                        OrderBy::Asc,
-                    );
-                    partitions.extend(remaining_partitions);
-                }
-            }
-        } else {
-            // Fall back to regular histogram alignment if mini partition can't be created
-            partitions =
-                self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by);
         }
 
         partitions
@@ -392,7 +326,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -420,7 +353,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -464,7 +396,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -494,7 +425,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -539,7 +469,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -569,7 +498,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -612,7 +540,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -642,7 +569,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false, // add_mini_partition = false
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -685,7 +611,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -716,7 +641,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -764,7 +688,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -792,7 +715,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -837,7 +759,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -868,7 +789,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -916,7 +836,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -945,7 +864,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -991,7 +909,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -1013,7 +930,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            true, // add_mini_partition = true
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -1053,7 +969,6 @@ mod enterprise_tests {
             step,
             OrderBy::Desc,
             true,
-            false,
             None,
         );
 
@@ -1072,7 +987,6 @@ mod enterprise_tests {
             step,
             OrderBy::Asc,
             true,
-            false,
             None,
         );
         expected_partitions.reverse();
@@ -1098,7 +1012,6 @@ mod enterprise_tests {
             step,
             OrderBy::Desc,
             true,
-            false,
             None,
         );
 

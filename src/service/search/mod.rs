@@ -785,7 +785,6 @@ pub async fn search_partition(
         partition_settings.step,
         sql_order_by,
         is_complex_query,
-        false,
         #[cfg(feature = "enterprise")]
         stremaing_aggs_cache_strategy,
     );
