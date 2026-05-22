@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="isLoading"
               :key="store.state.selectedOrganization?.identifier"
+              class="tw:h-[calc(100vh-var(--navbar-height))]!"
             >
               <router-view v-slot="{ Component }">
                 <component :is="Component" @sendToAiChat="sendToAiChat" />
