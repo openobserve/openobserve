@@ -81,6 +81,7 @@
                 when the stream schema doesn't list a given field yet.
               -->
               <OCombobox
+                ref="fieldComboboxRef"
                 v-model="newFieldName"
                 class="tw:flex-1"
                 :items="availableFieldOptions"
@@ -150,6 +151,11 @@ export default defineComponent({
     const urlError = ref("");
     const isEditing = computed(() => !!props.link?.name);
     const newFieldName = ref("");
+    // Template ref to OCombobox so we can call its imperative `clear()` after
+    // every commit (Add / Enter / select). The v-model path alone is
+    // unreliable because reka-ui's internal search-term state survives
+    // synchronous v-model round-trips when the parent clears in the same tick.
+    const fieldComboboxRef = ref<{ clear: () => Promise<void> } | null>(null);
 
     const form = ref({
       name: "",
@@ -158,7 +164,13 @@ export default defineComponent({
     });
 
     function clearFieldInput() {
+      // Reset the v-model AND call OCombobox's imperative `clear()`. The
+      // v-model write alone is insufficient because Vue's pre-flush watcher
+      // dedupes synchronous "" → value → "" round-trips (they look like a
+      // no-op), and reka-ui keeps an internal search-term state that survives
+      // the v-model reset. The exposed clear() resets both layers together.
       newFieldName.value = "";
+      fieldComboboxRef.value?.clear();
     }
 
     function addField() {
@@ -243,6 +255,7 @@ export default defineComponent({
       urlError,
       form,
       newFieldName,
+      fieldComboboxRef,
       availableFieldOptions,
       addField,
       onFieldSelect,

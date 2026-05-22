@@ -14,7 +14,15 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  ref,
+  useAttrs,
+  useId,
+  useSlots,
+  watch,
+} from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -49,6 +57,10 @@ watch(
   },
 );
 
+// Container ref — used only by the imperative `clear()` method to reach the
+// native <input> rendered by reka-ui's ComboboxInput.
+const rootEl = ref<HTMLElement | null>(null);
+
 // ── Filtered options ────────────────────────────────────────────────────────
 // Apply optional regex-based needle extraction (same logic as CommonAutoComplete).
 const filteredOptions = computed<ComboboxOption[]>(() => {
@@ -74,6 +86,34 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
     opt.label.toLowerCase().includes(lower),
   );
 });
+
+// ── Imperative reset ────────────────────────────────────────────────────────
+// Opt-in API for consumers that need to deterministically clear the combobox
+// in the same tick as a commit (e.g. CrossLinkDialog adds the picked value as
+// a chip and immediately resets the input). The v-model write alone is
+// insufficient because Vue's pre-flush watcher dedupes synchronous
+// "" → "X" → "" round-trips, AND reka-ui's ComboboxInput keeps a separate
+// internal search-term state that can survive the v-model reset.
+//
+// Behaviour parity with reka-ui's defaults is preserved for every other
+// consumer — they continue to receive the standard select-shows-value flow
+// because they never call this method.
+async function clear() {
+  internalValue.value = "";
+  emit("update:modelValue", "");
+  // Two ticks: let our reactive update flush, then let reka-ui's internal
+  // writes (filterSearch reset, etc.) settle before we touch the DOM.
+  await nextTick();
+  await nextTick();
+  const el = rootEl.value?.querySelector("input") ?? null;
+  if (el && el.value !== "") {
+    el.value = "";
+    // Synthetic input event so reka-ui's internal filterSearch also resets.
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+defineExpose({ clear });
 
 // ── Event handlers ──────────────────────────────────────────────────────────
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -115,6 +155,7 @@ const hasLabel = computed(
 
 <template>
   <div
+    ref="rootEl"
     v-bind="$attrs"
     class="tw:flex tw:flex-col tw:gap-1 tw:w-full"
     :data-test="parentDataTest"
