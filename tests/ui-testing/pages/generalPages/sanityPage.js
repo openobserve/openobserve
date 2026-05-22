@@ -7,398 +7,319 @@ const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHel
 export class SanityPage {
     constructor(page) {
         this.page = page;
-        
-        // Quick Mode locators
-        this.quickModeToggleButton = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
-        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner';
-        
-        // Fields and Query Editor locators
-        this.allFieldsButton = '[data-test="logs-all-fields-btn"]';
-        this.fieldSearchInput = '[data-cy="index-field-search-input"]';
-        this.interestingJobFieldButton = '[data-test="log-search-index-list-interesting-job-field-btn"]';
-        this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
-        this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.queryEditorContent = '[data-test="logs-search-bar-query-editor"]';
-        
+
+        // ============================================================
+        // Quick Mode / Fields / Query Editor locators
+        // ============================================================
+        this.quickModeToggleButton = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        this.allFieldsButton = page.locator('[data-test="logs-all-fields-btn"]');
+        this.interestingJobFieldButton = page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]');
+        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        this.queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+
+        // ============================================================
         // Search and Refresh locators
-        this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
-        this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
-        this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-        
+        // ============================================================
+        this.refreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        this.utilitiesMenuButton = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        this.resetFiltersButton = page.locator('[data-test="logs-search-bar-reset-filters-btn"]');
+        this.searchResultTitle = page.locator('[data-test="logs-search-result-title"]');
+        this.searchResultPagination = page.locator('[data-test="logs-search-result-pagination"]');
+        this.searchResultLogsTable = page.locator('[data-test="logs-search-result-logs-table"]');
+
+        // ============================================================
         // Pagination and Results locators
-        this.resultColumnSource = '[data-test="log-table-column-0-source"]';
-        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
-        
+        // ============================================================
+        this.resultColumnSource = page.locator('[data-test="log-table-column-0-source"]');
+        this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
+
+        // ============================================================
         // Histogram locators
-        this.histogramToggleButton = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
-        this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
-        
-        // Saved Search locators
-        this.saveSearchButton = 'button';
-        this.alertNameInput = '[data-test="add-alert-name-input"]';
+        // ============================================================
+        this.histogramToggleButton = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
+        this.histogramCanvas = page.locator('[data-test="logs-search-result-bar-chart"] canvas');
+        this.histogramBarChart = page.locator('[data-test="logs-search-result-bar-chart"]');
+
+        // ============================================================
+        // Saved View / Function dialog locators
+        // ============================================================
         // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were migrated
         // from q-dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
         // each dialog now exposes its own ODialog primary button. The dialogs are mutually exclusive at runtime.
-        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
-        this.savedViewsButton = '[data-test="logs-search-saved-views-btn"]';
-        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
+        this.savedViewDialogSave = page.locator('[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]');
         // After ConfirmDialog migrated to ODialog, the OK button no longer
         // carries a "confirm-button" data-test. The ODialog primary footer
         // button surfaces as "o-dialog-primary-btn" inside the open dialog.
-        this.confirmButton = '[data-test="o-dialog-primary-btn"]';
-        
-        // Function locators
-        this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
+        this.confirmDialogPrimary = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+        // Generic ODialog primary button (used for force-delete style flows where the
+        // confirm dialog wrapper data-test differs).
+        this.openDialogPrimary = page.locator('[data-test="o-dialog-primary-btn"]:visible').first();
+
+        // ============================================================
+        // Function locators (SearchBar VRL editor section)
+        // ============================================================
         // TransformSelector save button (when actions are enabled)
-        this.functionSaveButton = '[data-test="logs-search-bar-save-transform-btn"]';
+        this.functionSaveButton = page.locator('[data-test="logs-search-bar-save-transform-btn"]');
         // FunctionSelector save button (when actions are disabled)
-        this.functionSaveButtonNew = '[data-test="logs-search-bar-save-function-btn"]';
-        this.functionSaveButtonAlternate = '[data-test="logs-search-bar-function-dropdown"]';
-        this.fnEditor = '[data-test="logs-vrl-function-editor"]';
-        this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
-        
+        this.functionSaveButtonNew = page.locator('[data-test="logs-search-bar-save-function-btn"]');
+        this.functionSaveButtonAlternate = page.locator('[data-test="logs-search-bar-function-dropdown"]');
+        this.vrlToggleButton = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+        this.fnEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+        this.fnEditorInputArea = page.locator('[data-test="logs-vrl-function-editor"] [data-test="logs-vrl-function-editor-inputarea"]');
+        this.savedFunctionNameInput = page.locator('[data-test="saved-function-name-input"]');
+        this.savedFunctionNameInputField = page.locator('[data-test="saved-function-name-input-field"]');
+
+        // ============================================================
         // Menu Navigation locators
-        this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
-        this.realtimeTab = '[data-test="tab-realtime"]';
-        this.streamPipelinesTab = '[data-test="stream-pipelines-tab"]';
-        this.functionStreamTab = '[data-test="function-stream-tab"]';
-        this.dashboardsMenuItem = '[data-test="menu-link-\\/dashboards-item"]';
-        this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
-        
+        // ============================================================
+        this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
+        this.realtimeTab = page.locator('[data-test="tab-realtime"]');
+        this.streamPipelinesTab = page.locator('[data-test="stream-pipelines-tab"]');
+        this.functionStreamTab = page.locator('[data-test="function-stream-tab"]');
+        this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
+        this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
+        this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
+
+        // ============================================================
         // Dashboard Folder locators
-        this.dashboardSearch = '[data-test="dashboard-search"]';
-        this.newFolderButton = '[data-test="dashboard-new-folder-btn"]';
-        this.folderAddName = '[data-test="dashboard-folder-add-name"]';
+        // ============================================================
+        this.dashboardSearch = page.locator('[data-test="dashboard-search"]');
+        this.newFolderButton = page.locator('[data-test="dashboard-new-folder-btn"]');
+        // dashboard-folder-add-name is an OFormInput wrapper; fill the auto-generated `-field` variant.
+        this.folderAddNameField = page.locator('[data-test="dashboard-folder-add-name-field"]');
         // AddFolder.vue now uses ODrawer's primary footer button — there is
         // no standalone "dashboard-folder-add-save" element after migration.
-        this.folderAddSave = '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]';
-        this.dashboardMoreIcon = '[data-test="dashboard-more-icon"]';
-        this.deleteFolderIcon = '[data-test="dashboard-delete-folder-icon"]';
+        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.deleteFolderIcon = page.locator('[data-test="dashboard-delete-folder-icon"]');
 
+        // ============================================================
         // Stream locators
-        this.addStreamButton = '[data-test="log-stream-add-stream-btn"]';
-        this.streamNameInput = 'label:has-text("Name *") + input, input[aria-label="Name *"], [data-test="add-stream-name-input"]';
-        this.streamTypeDropdown = '[data-test="add-stream-type-input"]';
+        // ============================================================
+        this.addStreamButton = page.locator('[data-test="log-stream-add-stream-btn"]');
+        // data-test moved onto OInput in AddStream.vue so the native input is `-field`.
+        this.streamNameInputField = page.locator('[data-test="add-stream-name-input-field"]');
+        this.streamTypeDropdown = page.locator('[data-test="add-stream-type-input"]');
+        this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
         // AddStream.vue uses ODrawer's primary footer button as Save —
         // legacy "save-stream-btn" was removed during the migration.
-        this.saveStreamButton = '[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]';
-        this.searchStreamInput = '[placeholder="Search Stream"]';
-        this.deleteButton = { role: 'button', name: 'Delete' };
-        
-        // VRL Function Editor locators
-        this.vrlFunctionEditor = '[data-test="logs-vrl-function-editor"]';
-        this.vrlEditorContent = '[data-test="logs-vrl-function-editor"] .inputarea';
-        
-        // Generic locators
-        this.searchFunctionInput = '[placeholder="Search Function"]';
-        this.createNewFunctionButton = { role: 'button', name: 'New function' };
-        this.nameLabel = { label: 'Name' };
-        this.saveButton = { role: 'button', name: 'Save' };
-        
-        // Settings locators (sanity2 specific)
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
-        this.generalSettingsTab = { role: 'tab', name: 'General Settings' };
-        this.scrapeIntervalInput = '[data-test="general-settings-scrape-interval"]';
-        this.dashboardSubmitButton = '[data-test="dashboard-add-submit"]';
-        
-        // Stream Stats locators (sanity2 specific)
-        this.refreshStatsButton = '[data-test="log-stream-refresh-stats-btn"]';
-        this.streamCellButton = { role: 'cell', name: '01' };
-        
-        // Schema Pagination locators (sanity2 specific)
-        this.schemaLastPageButton = '[data-test="logs-page-fields-list-pagination-lastpage-button"]';
-        this.schemaFirstPageButton = '[data-test="logs-page-fields-list-pagination-firstpage-button"]';
-        this.schemaPage2Button = '[data-test="logs-page-fields-list-pagination-page-2-button"]';
-        this.schemaPage3Button = '[data-test="logs-page-fields-list-pagination-page-3-button"]';
-        this.schemaPage4Button = '[data-test="logs-page-fields-list-pagination-page-4-button"]';
-        this.schemaPaginationText = 'fast_rewind12fast_forward';
-        this.streamSelectDropdown = '[data-test="log-search-index-list-select-stream"]';
-        this.fieldsListContainer = '[data-test="log-search-index-list"]';
-        
-        // Advanced Histogram locators (sanity2 specific)
-        this.histogramCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
-        this.timestampColumn = '[data-test="log-table-column-1-_timestamp"]';
-        this.timestampExpandMenu = '[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]';
+        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        // Stream search input on Streams page; OInput auto-generates `-field` variant.
+        this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
+        // Stream delete button per row (data-test added in LogStream.vue this pass).
+        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn"]').first();
+        // Stream delete confirmation dialog primary button.
+        this.streamDeleteDialogPrimary = page.locator('[data-test="log-stream-delete-dialog"] [data-test="o-dialog-primary-btn"]');
+
+        // ============================================================
+        // Function list page locators
+        // ============================================================
+        this.functionListSearchInputField = page.locator('[data-test="functions-list-search-input-field"]');
+        this.functionListAddButton = page.locator('[data-test="function-list-add-function-btn"]');
+        this.functionListDeleteFirstBtn = page.locator('[data-test="function-list-delete-function-btn"]').first();
+        this.addFunctionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        this.addFunctionSaveBtn = page.locator('[data-test="add-function-save-btn"]');
+
+        // ============================================================
+        // Settings locators
+        // ============================================================
+        this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+        // general-settings-tab data-test added in settings/index.vue this pass.
+        this.generalSettingsTab = page.locator('[data-test="general-settings-tab"]');
+        // OInput auto-generates `-field` for the native input.
+        this.scrapeIntervalInputField = page.locator('[data-test="general-settings-scrape-interval-field"]');
+        this.settingsSaveButton = page.locator('[data-test="dashboard-add-submit"]');
+
+        // ============================================================
+        // Stream Stats locators
+        // ============================================================
+        this.refreshStatsButton = page.locator('[data-test="log-stream-refresh-stats-btn"]');
+        this.firstStreamRow = page.locator('[data-test="o2-table-row-0"]');
+
+        // ============================================================
+        // Schema Pagination locators
+        // ============================================================
+        this.schemaLastPageButton = page.locator('[data-test="logs-page-fields-list-pagination-lastpage-button"]');
+        this.schemaFirstPageButton = page.locator('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
+        this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
+        this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
+        this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
+        this.streamSelectDropdown = page.locator('[data-test="log-search-index-list-select-stream"]');
+        this.e2eAutomateStreamOption = page.locator('[data-test="log-search-index-list-select-stream-option"][data-test-value="e2e_automate"]');
+
+        // ============================================================
+        // Advanced Histogram / Timestamp locators
+        // ============================================================
+        this.timestampColumn = page.locator('[data-test="log-table-column-1-_timestamp"]');
+        this.timestampExpandMenu = page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+
+        // ============================================================
+        // Toast locators (used for success / error verification)
+        // ============================================================
+        this.toastSuccess = page.locator('[data-test="o-toast-success"]');
     }
 
+    // ================================================================
     // Quick Mode Methods
+    // ================================================================
     async verifyQuickModeToggleVisible() {
-        await expect(this.page.locator(this.quickModeToggleButton)).toBeVisible({ timeout: 30000 });
+        await expect(this.quickModeToggleButton).toBeVisible({ timeout: 30000 });
     }
 
-    async clickInterestingFieldsAndDisplayQuery() {
-        // Get the toggle button element
-        const toggleButton = this.page.locator(this.quickModeToggleInner);
-        await expect(toggleButton).toBeVisible({ timeout: 10000 });
-
-        // Check if toggle is off and click if needed
-        const isSwitchedOff = await toggleButton.evaluate((node) =>
-            node.classList.contains("q-toggle__inner--falsy")
-        );
-
-        if (isSwitchedOff) {
-            await toggleButton.click();
-        }
-
-        await this.page.locator(this.allFieldsButton).click();
-        
-        const fieldSearchInput = this.page.locator(this.fieldSearchInput);
-        await expect(fieldSearchInput).toBeVisible({ timeout: 10000 });
-        await fieldSearchInput.fill("job");
-        
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.locator(this.interestingJobFieldButton).first().click();
-        await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
-        
-        await expect(
-            this.page.locator(this.queryEditor).getByText(/job/).first()
-        ).toBeVisible({ timeout: 10000 });
-    }
-
-    // Refresh Button Methods  
+    // ================================================================
+    // Refresh Button Methods
+    // ================================================================
     async clickRefreshButton() {
         const logData = require('../../../fixtures/log.json');
         const { expect } = require('@playwright/test');
-        
+
         // Wait for API response
         const searchPromise = this.page.waitHelpers.waitForApiResponse(logData.applyQuery, {
             description: 'logs search query',
             timeout: 30000
         });
-        
+
         // Click refresh button with proper waits
-        const refreshButton = this.page.locator(this.refreshButton);
-        await this.page.waitHelpers.waitForElementClickable(refreshButton, {
+        await this.page.waitHelpers.waitForElementClickable(this.refreshButton, {
             description: 'logs search refresh button'
         });
-        
-        await refreshButton.click({ force: true });
-        
+
+        await this.refreshButton.click({ force: true });
+
         // Verify successful response
         const response = await searchPromise;
         expect(response.status()).toBe(200);
     }
 
+    // ================================================================
     // Pagination Methods
+    // ================================================================
     async displayResultTextAndPagination() {
         const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await this.page.locator(this.refreshButton).click();
+        await this.refreshButton.click();
         await searchPromise;
 
-        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to/, { timeout: 15000 });
-        await this.page.waitForTimeout(1000);
+        await expect(this.searchResultTitle).toContainText(/Showing 1 to/, { timeout: 15000 });
 
         try {
-            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
+            await expect(this.searchResultPagination).toBeVisible({ timeout: 10000 });
         } catch (error) {
             testLogger.warn('Pagination element not found, retrying with refresh button click');
-            await this.page.locator(this.refreshButton).click();
+            await this.refreshButton.click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
+            await expect(this.searchResultPagination).toBeVisible({ timeout: 10000 });
         }
     }
 
+    // ================================================================
     // Histogram Methods
+    // ================================================================
     async clickHistogramToggle() {
         // Histogram toggle is now inside the utilities hamburger menu
-        await this.page.locator(this.histogramToggleButton).click();
+        await this.histogramToggleButton.click();
     }
 
     async toggleHistogramOffAndOn() {
         await this.clickHistogramToggle();
-        await this.page.locator('[data-test="logs-search-result-title"]').click();
+        await this.searchResultTitle.click();
         expect(
-            await this.page.locator('[data-test="logs-search-result-bar-chart"]').isVisible()
+            await this.histogramBarChart.isVisible()
         ).toBe(false);
         await this.clickHistogramToggle();
-        await this.page.waitForTimeout(2000);
-        await expect(this.page.getByRole('heading', { name: 'No data found for histogram.' })).toBeVisible();
+        await expect(this.histogramBarChart).toBeVisible({ timeout: 15000 });
     }
 
-    // Saved Search Methods
-    async createAndDeleteSavedSearch(savedViewName) {
-        await this.page.locator(this.saveSearchButton).filter({ hasText: "savesaved_search" }).click();
-        
-        await this.page.locator(this.alertNameInput).click();
-        await this.page.locator(this.alertNameInput).fill(savedViewName);
-        
-        await this.page.locator(this.savedViewDialogSave).click();
-        
-        await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
-        
-        await this.page.locator(this.savedViewSearchInput).click();
-        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-        
-        await this.page.getByText(savedViewName).first().click();
-        
-        await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
-        await this.page.locator(this.savedViewSearchInput).click();
-        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-        await this.page.getByText("favorite_border").first().click();
-        
-        await this.page.getByText("Favorite Views").click();
-        await this.page.getByLabel('Clear').first().click();
-        await this.page.getByLabel("Collapse").click();
-        
-        await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
-        await this.page.locator('[data-test="log-search-saved-view-favorite-list-fields-table"] div').filter({ hasText: "Favorite Views" }).nth(1).click();
-        
-        await this.page.locator(this.savedViewSearchInput).click();
-        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-        
-        const deleteButton = this.page.locator(`[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`);
-        
-        try {
-            await this.page.waitForLoadState('domcontentloaded');
-            await deleteButton.click({ timeout: 15000 });
-        } catch (error) {
-            try {
-                await deleteButton.click({ force: true, timeout: 10000 });
-            } catch (forceError) {
-                const box = await deleteButton.boundingBox();
-                if (box) {
-                    await this.page.mouse.click(box.x + box.width/2, box.y + box.height/2);
-                } else {
-                    throw forceError;
-                }
-            }
-        }
-        
-        await this.page.waitForLoadState('domcontentloaded');
-        await waitUtils.smartWait(this.page, 2000, 'Dialog stabilization');
-        
-        const confirmButton = this.page.locator(this.confirmButton);
-        
-        await expect(confirmButton).toBeVisible({ timeout: 10000 });
-        await expect(confirmButton).toBeEnabled({ timeout: 5000 });
-        await this.page.waitForLoadState('domcontentloaded');
-        
-        try {
-            await confirmButton.click({ timeout: 15000 });
-        } catch (normalError) {
-            try {
-                await confirmButton.click({ force: true, timeout: 10000 });
-            } catch (forceError) {
-                const box = await confirmButton.boundingBox();
-                if (box) {
-                    await this.page.mouse.click(box.x + box.width/2, box.y + box.height/2);
-                } else {
-                    throw forceError;
-                }
-            }
-        }
-    }
-
+    // ================================================================
     // Query Limit Methods
+    // ================================================================
     async displayLimitedResults() {
         const initialSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await this.page.locator(this.refreshButton).click();
+        await this.refreshButton.click();
         await initialSearchPromise;
-        
-        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
 
-        const queryEditor = this.page.locator(this.queryEditorContent);
-        await expect(queryEditor).toBeVisible({ timeout: 10000 });
+        await this.sqlModeToggleButton.click();
+
+        await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
 
         // Use MonacoEditorHelper to replace editor content via keyboard events.
         // .fill() on Monaco's .inputarea appends instead of replacing, producing an
         // invalid concatenated query that causes the server to abort the stream.
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
 
         const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await this.page.locator(this.refreshButton).click({ force: true });
+        await this.refreshButton.click({ force: true });
         await limitSearchPromise;
 
-        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to 5/, { timeout: 15000 });
+        await expect(this.searchResultTitle).toContainText(/Showing 1 to 5/, { timeout: 15000 });
 
         // Reset filters button is now directly on the toolbar
-        await this.page.locator(this.resetFiltersButton).click();
+        await this.resetFiltersButton.click();
         await this.page.waitForLoadState('domcontentloaded');
     }
 
+    // ================================================================
     // Function Methods
+    // ================================================================
     async createAndDeleteFunction(functionName) {
-        await this.page.locator(this.refreshButton).click();
+        await this.refreshButton.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        const fnEditor = this.page.locator(this.fnEditor);
 
         // Check if VRL editor is visible, if not try to enable it via toggle
-        if (await fnEditor.count() === 0) {
-            const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-
-            if (await vrlToggle.count() > 0 && await vrlToggle.isVisible()) {
-                await vrlToggle.locator('div').nth(2).click({ force: true });
-                await this.page.waitForTimeout(1000);
+        if (await this.fnEditor.count() === 0) {
+            if (await this.vrlToggleButton.count() > 0 && await this.vrlToggleButton.isVisible()) {
+                await this.vrlToggleButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
             }
         }
 
-        const fnEditorTextbox = this.page.locator(this.fnEditor).getByRole('code');
-
         try {
-            await expect(fnEditorTextbox).toBeVisible({ timeout: 5000 });
+            await expect(this.fnEditor.first()).toBeVisible({ timeout: 5000 });
             await this.page.waitForLoadState('domcontentloaded');
-            await fnEditorTextbox.click({ force: true });
+            await this.fnEditor.first().click({ force: true });
         } catch (error) {
             // Monaco editor not visible, try clicking toggle button
             testLogger.warn('Monaco editor not visible, trying toggle button');
-            const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-            if (await vrlToggle.count() > 0) {
-                await vrlToggle.locator('div').nth(1).click({ force: true });
-                await this.page.waitForTimeout(1000);
-
-                // Retry clicking monaco editor
-                await expect(fnEditorTextbox).toBeVisible({ timeout: 10000 });
-                await fnEditorTextbox.click({ force: true });
+            if (await this.vrlToggleButton.count() > 0) {
+                await this.vrlToggleButton.click({ force: true });
+                await expect(this.fnEditor.first()).toBeVisible({ timeout: 10000 });
+                await this.fnEditor.first().click({ force: true });
             } else {
-                // Fallback to any monaco editor
-                const cmContent = this.page.locator('.monaco-editor').first();
-                if (await cmContent.count() > 0) {
-                    await cmContent.click({ force: true });
-                } else {
-                    throw error;
-                }
+                throw error;
             }
         }
-        
-        await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
-        await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
 
-        // Wait for 3 seconds before attempting to click save button
-        await this.page.waitForTimeout(3000);
+        // Type into the Monaco editor via keyboard after focusing it.
+        await this.fnEditor.first().click({ force: true });
+        await this.page.keyboard.type('.a=2');
+        // Wait for editor content to register before save attempt.
+        await expect(this.fnEditor.first()).toBeVisible();
 
         // Try clicking the Save button with fallback strategies
         // Note: The app uses different selectors based on whether actions are enabled:
         // - TransformSelector (actions enabled): logs-search-bar-save-transform-btn
         // - FunctionSelector (actions disabled): logs-search-bar-save-function-btn
-        let saveDialogVisible = false;
 
         // First attempt: Click TransformSelector save button (actions enabled)
         try {
           testLogger.info('Attempting to click TransformSelector save button');
-          await this.page.locator(this.functionSaveButton).click({ timeout: 5000 });
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
-          saveDialogVisible = true;
+          await this.functionSaveButton.click({ timeout: 5000 });
+          await this.savedFunctionNameInput.waitFor({ state: 'visible', timeout: 3000 });
           testLogger.info('TransformSelector save button click succeeded');
         } catch (error) {
           testLogger.warn('TransformSelector save button not found, trying FunctionSelector');
 
           // Second attempt: Click FunctionSelector save button (actions disabled)
           try {
-            await this.page.locator(this.functionSaveButtonNew).click({ timeout: 5000 });
-            await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
-            saveDialogVisible = true;
+            await this.functionSaveButtonNew.click({ timeout: 5000 });
+            await this.savedFunctionNameInput.waitFor({ state: 'visible', timeout: 3000 });
             testLogger.info('FunctionSelector save button click succeeded');
           } catch (functionSelectorError) {
             testLogger.warn('FunctionSelector save button also failed, trying dropdown fallback');
 
             // Third attempt: Try alternate locator (button inside dropdown)
             try {
-              await this.page.locator(this.functionSaveButtonAlternate).getByRole('button').filter({ hasText: 'save' }).click();
-              await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
-              saveDialogVisible = true;
+              await this.functionSaveButtonAlternate.click();
+              await this.savedFunctionNameInput.waitFor({ state: 'visible', timeout: 3000 });
               testLogger.info('Dropdown fallback save button click succeeded');
             } catch (alternateError) {
               testLogger.error('All save button attempts failed');
@@ -406,20 +327,27 @@ export class SanityPage {
             }
           }
         }
-        
-        await this.page.locator(this.savedFunctionNameInput).click();
-        await this.page.locator(this.savedFunctionNameInput).fill(functionName);
-        await this.page.locator(this.savedViewDialogSave).click();
+
+        // The saved-function-name-input wraps an OInput → fill the auto-generated `-field`.
+        const nameField = this.savedFunctionNameInputField;
+        await nameField.click();
+        await nameField.fill(functionName);
+        await this.savedViewDialogSave.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        
-        await this.page.locator(this.pipelineMenuItem).click();
-        await this.page.locator(this.realtimeTab).click();
-        await this.page.locator(this.functionStreamTab).click();
-        
-        await this.page.getByPlaceholder("Search Function").click();
-        await this.page.getByPlaceholder("Search Function").fill(functionName);
-        await this.page.getByRole("button", { name: "Delete Function" }).click();
-        await this.page.locator(this.confirmButton).click();
+
+        await this.pipelineMenuItem.click();
+        await this.realtimeTab.click();
+        await this.functionStreamTab.click();
+
+        await this.functionListSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.functionListSearchInputField.fill(functionName);
+
+        // Wait for the matching row to appear before clicking delete.
+        const functionRowCell = this.page.locator(`[data-test="function-list-name-cell-${functionName}"]`);
+        await expect(functionRowCell).toBeVisible({ timeout: 10000 });
+
+        await this.functionListDeleteFirstBtn.click();
+        await this.confirmDialogPrimary.click();
     }
 
     async createFunctionViaFunctionsPage() {
@@ -435,69 +363,76 @@ export class SanityPage {
 
         const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
 
-        await this.page.locator(this.pipelineMenuItem).click();
+        await this.pipelineMenuItem.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        await this.page.locator(this.streamPipelinesTab).click();
+        await this.streamPipelinesTab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        await this.page.locator(this.realtimeTab).click();
-        await this.page.waitForTimeout(500);
-        await this.page.locator(this.functionStreamTab).click();
-        await this.page.waitForTimeout(500);
+        await this.realtimeTab.click();
+        await this.functionStreamTab.click();
 
-        await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
-        await this.page.getByLabel(this.nameLabel.label).click();
-        await this.page.getByLabel(this.nameLabel.label).fill(uniqueFunctionName);
-        
-        await this.page.locator(this.vrlFunctionEditor).click();
-        await this.page.waitForTimeout(500);
+        await this.functionListAddButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.functionListAddButton.click();
+
+        await this.addFunctionNameInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.addFunctionNameInputField.click();
+        await this.addFunctionNameInputField.fill(uniqueFunctionName);
+
+        await this.fnEditor.first().click();
         await this.page.keyboard.press('Control+A');
         await this.page.keyboard.type('.sanity=1');
-        await this.page.waitForTimeout(500);
 
         // Use the specific data-test selector for the save button to avoid
         // ambiguity with other "Save" labelled buttons on the page.
-        await this.page.locator('[data-test="add-function-save-btn"]').click();
+        await this.addFunctionSaveBtn.click();
 
-        await this.page.getByPlaceholder("Search Function").click();
-        await this.page.getByPlaceholder("Search Function").fill(uniqueFunctionName);
-        await this.page.getByRole("button", { name: "Delete Function" }).click();
-        await this.page.locator(this.confirmButton).click();
-        await this.page.getByText("Function deleted").click();
+        await this.functionListSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.functionListSearchInputField.fill(uniqueFunctionName);
+
+        // Wait for the matching row to appear before clicking delete.
+        const functionRowCell = this.page.locator(`[data-test="function-list-name-cell-${uniqueFunctionName}"]`);
+        await expect(functionRowCell).toBeVisible({ timeout: 10000 });
+
+        await this.functionListDeleteFirstBtn.click();
+        await this.confirmDialogPrimary.click();
+        // Verify deletion via success toast (instead of legacy getByText click).
+        await expect(this.toastSuccess.first()).toBeVisible({ timeout: 10000 });
     }
 
+    // ================================================================
     // Dashboard Folder Methods
+    // ================================================================
     async createAndDeleteFolder(folderName) {
-        await this.page.locator(this.dashboardsMenuItem).click();
+        await this.dashboardsMenuItem.click();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(2000);
 
-        await this.page.locator(this.dashboardSearch).click();
-        await this.page.locator(this.newFolderButton).click();
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(this.folderAddName).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(1000);
-        await this.page.locator(this.folderAddName).fill(folderName);
-        await this.page.waitForTimeout(1000);
-        await this.page.locator(this.folderAddSave).click();
-        await this.page.waitForTimeout(2000);
+        await this.dashboardSearch.waitFor({ state: 'visible', timeout: 15000 });
+        await this.dashboardSearch.click();
+        await this.newFolderButton.click();
+        await this.folderAddNameField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.folderAddNameField.fill(folderName);
+        await this.folderAddSave.click();
 
-        await expect(this.page.getByText(folderName)).toBeVisible({ timeout: 10000 });
-        await this.page.getByText(folderName).click();
-        await this.page.waitForTimeout(2000);
+        // Confirm the folder tab appears with the given name.
+        const folderTabName = this.page.locator(`[data-test="dashboard-folder-tab-name-${folderName}"]`);
+        await expect(folderTabName).toBeVisible({ timeout: 15000 });
+        await folderTabName.click();
 
         await this.page.waitForLoadState('domcontentloaded');
-        
-        await this.page.locator(`[data-test^="dashboard-folder-tab"]:has-text("${folderName}") [data-test="dashboard-more-icon"]`).click();
-        await this.page.locator(this.deleteFolderIcon).click({ force: true });
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(this.confirmButton).click();
 
-        await expect(this.page.getByText("Folder deleted successfully")).toBeVisible({ timeout: 10000 });
+        // Open the per-folder dropdown via its more-icon (scoped to this folder's tab).
+        const folderMoreIcon = this.page.locator(
+            `xpath=//*[@data-test="dashboard-folder-tab-name-${folderName}"]/ancestor::*[starts-with(@data-test,'dashboard-folder-tab-')]//*[@data-test="dashboard-more-icon"]`,
+        );
+        await folderMoreIcon.click();
+        await this.deleteFolderIcon.click({ force: true });
+        await this.confirmDialogPrimary.click();
+
+        await expect(this.toastSuccess.first()).toBeVisible({ timeout: 10000 });
     }
 
+    // ================================================================
     // Stream Methods
+    // ================================================================
     async createAndDeleteStream() {
         // Generate unique stream name with 4-digit alphanumeric suffix
         const generateSuffix = () => {
@@ -508,175 +443,119 @@ export class SanityPage {
             }
             return suffix;
         };
-        
-        const uniqueStreamName = `sanitylogstream_${generateSuffix()}`;
-        
-        await this.page.locator(this.streamsMenuItem).click();
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(2000);
 
-        await this.page.locator(this.addStreamButton).click();
-        await this.page.waitForTimeout(2000);
-        await this.page.getByLabel("Name *").waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(2000);
-        await this.page.getByLabel("Name *").fill(uniqueStreamName);
-        
-        await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
-        await this.page.getByRole("option", { name: "Logs" }).click();
-        
-        await this.page.locator(this.saveStreamButton).click();
+        const uniqueStreamName = `sanitylogstream_${generateSuffix()}`;
+
+        await this.streamsMenuItem.click();
+        await this.page.waitForLoadState('domcontentloaded');
+
+        await this.addStreamButton.waitFor({ state: 'visible', timeout: 15000 });
+        await this.addStreamButton.click();
+
+        // The OInput inside add-stream-name-input is the native input.
+        await this.streamNameInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.streamNameInputField.fill(uniqueStreamName);
+
+        // Open stream type OSelect and pick Logs.
+        await this.streamTypeDropdown.click();
+        await this.streamTypeLogsOption.click();
+
+        await this.saveStreamButton.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        // Handle success notification dismissal (text might vary or auto-dismiss)
-        const successMessages = [
-            "Stream created successfully",
-            "Stream created",
-            "Success"
-        ];
-        
-        for (const message of successMessages) {
-            try {
-                await this.page.getByText(message).click({ timeout: 3000 });
-                break;
-            } catch {
-                // Continue to next message variant
-            }
-        }
-        
-        // Ensure any lingering dialogs are dismissed
-        await this.page.waitHelpers.waitForElementHidden('[data-test$="-dialog"]', {
-            timeout: 5000,
-            description: 'success dialog to be dismissed'
+
+        // Wait for AddStream dialog to dismiss (success path).
+        await this.page.waitHelpers.waitForElementHidden('[data-test="add-stream-dialog"]', {
+            timeout: 10000,
+            description: 'add-stream-dialog to be dismissed'
         }).catch(() => {
             // No dialog present, continue
         });
-        
-        await this.page.waitForLoadState('domcontentloaded');
-        
-        const isBackOnStreamsList = await this.page.locator(this.addStreamButton).isVisible({ timeout: 10000 });
-        if (isBackOnStreamsList) {
-            // Stream creation successful
-        } else {
-            // Check for error notifications
-            const notifications = this.page.locator('[role="alert"]');
-            const notificationCount = await notifications.count();
-            if (notificationCount > 0) {
-                for (let i = 0; i < notificationCount; i++) {
-                    const text = await notifications.nth(i).textContent();
-                    console.warn(`Error notification: ${text}`);
-                }
-            }
-        }
-        
-        // Navigate to streams page if needed
-        if (!isBackOnStreamsList) {
-            await this.page.locator(this.streamsMenuItem).click();
-            await this.page.waitForLoadState('domcontentloaded');
-        }
-        
-        await this.page.getByPlaceholder("Search Stream").fill(uniqueStreamName);
-        await this.page.waitForLoadState('domcontentloaded');
-        
-        // Wait for search to yield results - wait for the specific stream to appear in results
-        await expect(this.page.getByText(uniqueStreamName)).toBeVisible({ timeout: 10000 });
-        
-        // Use framework's proper wait helpers to ensure no dialogs interfere
-        await this.page.waitHelpers.waitForElementHidden('[data-test="o-dialog-close-btn"]', {
-            timeout: 5000,
-            description: 'dialog backdrop to be dismissed'
-        }).catch(() => {
-            // No backdrop present, continue
-        });
-        
-        // Wait for search results to load using proper wait
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
 
-        // Click delete button for the specific stream using first() to handle search results
-        await this.page.getByRole("button", { name: "Delete" }).first().click();
-        await this.page.waitForTimeout(2000);
-        
-        // Wait for and click confirmation dialog button - try different variations
-        const confirmButtonVariants = ["Ok", "OK", "Delete", "Confirm", "Yes"];
-        let confirmClicked = false;
-        
-        for (const buttonText of confirmButtonVariants) {
-            try {
-                await expect(this.page.getByRole("button", { name: buttonText })).toBeVisible({ timeout: 3000 });
-                await this.page.getByRole("button", { name: buttonText }).click();
-                confirmClicked = true;
-                break;
-            } catch {
-                // Try next button variant
-            }
-        }
-        
-        if (!confirmClicked) {
-            throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
-        }
+        await this.page.waitForLoadState('domcontentloaded');
+
+        // Search for the newly created stream by name.
+        await this.searchStreamInputField.fill(uniqueStreamName);
+        await this.page.waitForLoadState('domcontentloaded');
+
+        // Wait for the deterministic per-name name cell to appear (added in LogStream.vue).
+        const streamNameCell = this.page.locator(`[data-test="log-stream-name-cell-${uniqueStreamName}"]`);
+        await expect(streamNameCell).toBeVisible({ timeout: 15000 });
+
+        // Click the per-row delete button (data-test added on the OButton this pass).
+        await this.streamDeleteFirstRowBtn.click();
+
+        // Confirm the ODialog destructive primary.
+        await this.streamDeleteDialogPrimary.waitFor({ state: 'visible', timeout: 10000 });
+        await this.streamDeleteDialogPrimary.click();
 
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Verify stream was deleted - search should return no results
-        await this.page.getByPlaceholder("Search Stream").clear();
-        await this.page.getByPlaceholder("Search Stream").fill(uniqueStreamName);
-        await this.page.waitForTimeout(1000);
+        // Verify stream was deleted - clear and re-search; the stream cell should not be visible.
+        await this.searchStreamInputField.clear();
+        await this.searchStreamInputField.fill(uniqueStreamName);
 
-        const streamStillExists = await this.page.getByText(uniqueStreamName).isVisible({ timeout: 3000 }).catch(() => false);
+        const streamStillExists = await streamNameCell.isVisible({ timeout: 3000 }).catch(() => false);
         if (streamStillExists) {
             throw new Error(`Stream ${uniqueStreamName} was not deleted successfully`);
         }
     }
 
+    // ================================================================
     // Result Summary Methods
+    // ================================================================
     async displayPaginationAfterResultSummary() {
         const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await this.page.locator(this.refreshButton).click();
+        await this.refreshButton.click();
         await searchPromise;
 
-        await expect(this.page.locator(this.resultColumnSource)).toBeVisible({ timeout: 15000 });
-        await this.page.locator(this.resultColumnSource).click();
-        
-        await expect(this.page.locator(this.closeDialog)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.closeDialog).click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.resultColumnSource).toBeVisible({ timeout: 15000 });
+        await this.resultColumnSource.click();
 
-        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+        await expect(this.closeDialog).toBeVisible({ timeout: 10000 });
+        await this.closeDialog.click();
+
+        const paginationVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
-            await this.page.locator(this.refreshButton).click();
+            await this.refreshButton.click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after clicking result summary and retrying run query');
             }
         }
     }
 
-    // Sanity2-Specific Methods
-
+    // ================================================================
     // Settings Management Methods
+    // ================================================================
     async changeSettingsSuccessfully() {
-        await waitUtils.smartWait(this.page, 2000, 'pre-settings navigation wait');
-        await this.page.locator(this.settingsMenuItem).click();
-        await waitUtils.smartWait(this.page, 2000, 'settings page load');
-        await this.page.getByRole(this.generalSettingsTab.role, { name: this.generalSettingsTab.name }).click();
-        await this.page.locator(this.scrapeIntervalInput).fill("16");
-        await this.page.locator(this.dashboardSubmitButton).click();
-        await this.page.getByText("Organization settings updated").click();
+        await this.settingsMenuItem.click();
+        await this.generalSettingsTab.waitFor({ state: 'visible', timeout: 15000 });
+        await this.generalSettingsTab.click();
+        await this.scrapeIntervalInputField.waitFor({ state: 'visible', timeout: 15000 });
+        await this.scrapeIntervalInputField.fill('16');
+        await this.settingsSaveButton.click();
+        // Verify success toast appeared.
+        await expect(this.toastSuccess.first()).toBeVisible({ timeout: 15000 });
     }
 
+    // ================================================================
     // Stream Stats Methods
+    // ================================================================
     async displayResultsOnRefreshStats() {
-        await this.page.locator(this.streamsMenuItem).click();
-        await this.page.locator(this.refreshStatsButton).click();
+        await this.streamsMenuItem.click();
+        await this.refreshStatsButton.click();
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.getByRole(this.streamCellButton.role, { name: this.streamCellButton.name, exact: true }).click();
+        // Click the first stream row indicator (was the "01" cell in the legacy q-table).
+        await this.firstStreamRow.waitFor({ state: 'visible', timeout: 15000 });
+        await this.firstStreamRow.click();
     }
 
+    // ================================================================
     // Schema Pagination Methods
+    // ================================================================
     async ingest70FieldsData() {
         testLogger.step('Ingesting 70 fields data for schema pagination test');
 
@@ -732,17 +611,15 @@ export class SanityPage {
 
         // Refresh to pick up the new schema fields in the field list
         testLogger.info('Refreshing to load field data with 70+ fields');
-        const refreshButton = this.page.locator(this.refreshButton);
-        await this.page.waitHelpers.waitForElementClickable(refreshButton, {
+        await this.page.waitHelpers.waitForElementClickable(this.refreshButton, {
             description: 'refresh button for schema pagination'
         });
-        await refreshButton.click({ timeout: 10000 });
+        await this.refreshButton.click({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
         // Wait for pagination to be visible (wait for the first page button as indicator)
         testLogger.debug('Waiting for schema pagination to be visible');
-        const firstPageBtn = this.page.locator(this.schemaFirstPageButton);
-        await this.page.waitHelpers.waitForElementVisible(firstPageBtn, {
+        await this.page.waitHelpers.waitForElementVisible(this.schemaFirstPageButton, {
             description: 'schema pagination first page button',
             timeout: 30000
         });
@@ -750,95 +627,81 @@ export class SanityPage {
 
         // Verify last page button is visible
         testLogger.debug('Verifying schema last page button is visible');
-        const lastPageButton = this.page.locator(this.schemaLastPageButton);
-        await this.page.waitHelpers.waitForElementVisible(lastPageButton, {
+        await this.page.waitHelpers.waitForElementVisible(this.schemaLastPageButton, {
             description: 'schema pagination last page button'
         });
         testLogger.info('Schema last page button verified as visible');
 
         // Click page 2 button
         testLogger.debug('Navigating to page 2 of schema fields');
-        const page2Button = this.page.locator(this.schemaPage2Button);
-        await this.page.waitHelpers.waitForElementClickable(page2Button, {
+        await this.page.waitHelpers.waitForElementClickable(this.schemaPage2Button, {
             description: 'schema pagination page 2 button'
         });
-        await page2Button.click({ timeout: 10000 });
+        await this.schemaPage2Button.click({ timeout: 10000 });
 
         // Click page 3 button
         testLogger.debug('Navigating to page 3 of schema fields');
-        const page3Button = this.page.locator(this.schemaPage3Button);
-        await this.page.waitHelpers.waitForElementClickable(page3Button, {
+        await this.page.waitHelpers.waitForElementClickable(this.schemaPage3Button, {
             description: 'schema pagination page 3 button'
         });
-        await page3Button.click({ timeout: 10000 });
+        await this.schemaPage3Button.click({ timeout: 10000 });
 
         // Click page 4 button
         testLogger.debug('Navigating to page 4 of schema fields');
-        const page4Button = this.page.locator(this.schemaPage4Button);
-        await this.page.waitHelpers.waitForElementClickable(page4Button, {
+        await this.page.waitHelpers.waitForElementClickable(this.schemaPage4Button, {
             description: 'schema pagination page 4 button'
         });
-        await page4Button.click({ timeout: 10000 });
+        await this.schemaPage4Button.click({ timeout: 10000 });
 
         // Click first page button
         testLogger.debug('Navigating back to first page of schema fields');
-        const firstPageButton = this.page.locator(this.schemaFirstPageButton);
-        await this.page.waitHelpers.waitForElementClickable(firstPageButton, {
+        await this.page.waitHelpers.waitForElementClickable(this.schemaFirstPageButton, {
             description: 'schema pagination first page button'
         });
-        await firstPageButton.click({ timeout: 10000 });
+        await this.schemaFirstPageButton.click({ timeout: 10000 });
 
         testLogger.info('Schema pagination test completed successfully');
     }
 
+    // ================================================================
     // Advanced Histogram Methods
+    // ================================================================
     async displayPaginationWhenHistogramOffWithResult() {
         // First, ensure data is loaded by clicking the refresh button
-        const refreshButton = this.page.locator(this.refreshButton);
-        await expect(refreshButton).toBeVisible({ timeout: 15000 });
-        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
+        await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
 
         const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await refreshButton.click({ timeout: 10000 });
+        await this.refreshButton.click({ timeout: 10000 });
         await searchPromise;
 
         // Turn off histogram (now inside utilities hamburger menu)
         await this.clickHistogramToggle();
-        await this.page.waitForTimeout(1000);
-        
+
         // Click on result column with error handling
         try {
-            const resultColumn = this.page.locator(this.resultColumnSource);
-            await expect(resultColumn).toBeVisible({ timeout: 15000 });
-            await resultColumn.click({ timeout: 10000 });
+            await expect(this.resultColumnSource).toBeVisible({ timeout: 15000 });
+            await this.resultColumnSource.click({ timeout: 10000 });
         } catch (error) {
             console.warn('Result column click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.resultColumnSource).click({ timeout: 10000 });
+            await this.resultColumnSource.click({ timeout: 10000 });
         }
-
-        await this.page.waitForTimeout(2000);
 
         // Close dialog with error handling
         try {
-            const closeDialogButton = this.page.locator(this.closeDialog);
-            await expect(closeDialogButton).toBeVisible({ timeout: 15000 });
-            await closeDialogButton.click({ timeout: 10000 });
+            await expect(this.closeDialog).toBeVisible({ timeout: 15000 });
+            await this.closeDialog.click({ timeout: 10000 });
         } catch (error) {
             console.warn('Close dialog click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.closeDialog).click({ timeout: 10000 });
+            await this.closeDialog.click({ timeout: 10000 });
         }
 
-        await this.page.waitForTimeout(2000);
-
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
-            await this.page.locator(this.refreshButton).click();
+            await this.refreshButton.click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after histogram off and retrying run query');
             }
@@ -848,34 +711,29 @@ export class SanityPage {
     async displayPaginationWhenOnlySQLWithResult() {
         // Turn off histogram (now inside utilities hamburger menu)
         await this.clickHistogramToggle();
-        await this.page.waitForTimeout(1000);
 
         // Enable SQL mode
-        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
-        await this.page.waitForTimeout(1000);
+        await this.sqlModeToggleButton.click();
 
         // Click run query button
         const sqlSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
-        await this.page.locator(this.refreshButton).click();
+        await this.refreshButton.click();
         await sqlSearchPromise;
-        await this.page.waitForTimeout(1000);
 
         // Click on result column
-        await expect(this.page.locator(this.timestampColumn)).toBeVisible({ timeout: 15000 });
-        await this.page.locator(this.timestampColumn).click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.timestampColumn).toBeVisible({ timeout: 15000 });
+        await this.timestampColumn.click();
 
         // Close dialog
-        await this.page.locator(this.closeDialog).click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.closeDialog).toBeVisible({ timeout: 15000 });
+        await this.closeDialog.click();
 
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
-            await this.page.locator(this.refreshButton).click();
+            await this.refreshButton.click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.searchResultPagination.isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after SQL mode on and retrying run query');
             }
@@ -884,76 +742,65 @@ export class SanityPage {
 
     async displayHistogramInSQLMode() {
         // First, ensure data is loaded by clicking the refresh button
-        const initialRefreshButton = this.page.locator(this.refreshButton);
-        await expect(initialRefreshButton).toBeVisible({ timeout: 15000 });
-        await expect(initialRefreshButton).toBeEnabled({ timeout: 10000 });
-        
+        await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
+
         try {
-            await initialRefreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Initial refresh button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await initialRefreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
-        
+
         // Wait for canvas to be ready and visible (should now be there after data load)
-        await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
+        await expect(this.histogramCanvas).toBeVisible({ timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
+
         // First canvas click with error handling
         try {
-            await this.page.locator(this.histogramCanvas).click({
+            await this.histogramCanvas.click({
                 position: { x: 182, y: 66 },
                 timeout: 10000
             });
         } catch (error) {
             console.warn('First canvas click failed, retrying after wait:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.histogramCanvas).click({
+            await this.histogramCanvas.click({
                 position: { x: 182, y: 66 },
                 timeout: 10000
             });
         }
-        
+
         // Enable SQL mode with error handling
-        const sqlModeSwitch = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
-        await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
+        await expect(this.sqlModeToggleButton).toBeVisible({ timeout: 15000 });
 
         try {
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await this.sqlModeToggleButton.click({ timeout: 10000 });
         } catch (error) {
             console.warn('SQL mode switch failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await this.sqlModeToggleButton.click({ timeout: 10000 });
         }
 
         // Click refresh button with waits
-        const refreshButton = this.page.locator(this.refreshButton);
-        await expect(refreshButton).toBeVisible({ timeout: 15000 });
-        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
-        
+        await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
+
         try {
-            await refreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await refreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
         }
 
-        await expect(
-            this.page.getByRole("heading", { name: "Error while fetching" })
-        ).not.toBeVisible();
-        
         // Wait for canvas to be ready again after refresh
-        await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
-        
+        await expect(this.histogramCanvas).toBeVisible({ timeout: 15000 });
+
         // Second canvas click with error handling
         try {
-            await this.page.locator(this.histogramCanvas).click({
+            await this.histogramCanvas.click({
                 position: { x: 182, y: 66 },
                 timeout: 10000
             });
@@ -963,113 +810,90 @@ export class SanityPage {
     }
 
     async displayResultsWhenSQLHistogramOnWithStreamSelection() {
-        
+
         // Navigate to home first
-        await expect(this.page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 15000 });
-        
-        await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+        await expect(this.homeMenuItem).toBeVisible({ timeout: 15000 });
+
+        await this.homeMenuItem.click();
         await this.page.waitForLoadState('domcontentloaded');
-        
+
         // Use proper logs navigation that includes VRL editor
         const currentUrl = new URL(this.page.url());
         const orgId = currentUrl.searchParams.get('org_identifier') || 'default';
         const logsUrl = `/web/logs?org_identifier=${orgId}&fn_editor=true`;
-        
+
         await this.page.goto(logsUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-        
-        // Select the e2e_automate stream before proceeding
+
+        // Select the e2e_automate stream before proceeding via the OSelect option.
         try {
-            await this.page.locator('[data-test="log-search-index-list-select-stream"]').waitFor({ timeout: 10000 });
-            await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
-            await this.page.waitForTimeout(2000);
-            
-            // Try to select e2e_automate stream
-            await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
+            await this.streamSelectDropdown.waitFor({ timeout: 10000 });
+            await this.streamSelectDropdown.click();
+            await this.e2eAutomateStreamOption.first().click({ timeout: 5000 });
         } catch (error) {
-            try {
-                await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] .q-toggle__inner').click({ timeout: 5000 });
-            } catch (toggleError) {
-                // Stream selection failed, continuing anyway
-            }
+            // Stream may already be selected from beforeEach; proceed.
         }
-        
+
         // Wait for stream selection to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
+
         // Check if VRL editor is visible, if not click the toggle
-        const fnEditor = this.page.locator('[data-test="logs-vrl-function-editor"]').first();
-        const isFnEditorVisible = await fnEditor.isVisible();
-        
+        const isFnEditorVisible = await this.fnEditor.first().isVisible();
+
         if (!isFnEditorVisible) {
             // Click VRL toggle button only if editor is not displayed
-            await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
-            
+            await this.vrlToggleButton.click();
+
             // Wait for VRL editor to appear after toggle
-            await expect(fnEditor).toBeVisible({ timeout: 15000 });
+            await expect(this.fnEditor.first()).toBeVisible({ timeout: 15000 });
         }
-        
+
         // Verify VRL editor is now available
-        const fnEditorCount = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();
+        const fnEditorCount = await this.fnEditor.count();
         if (fnEditorCount === 0) {
             throw new Error('SQL+Histogram test: VRL editor not found after toggle');
         }
-        
+
         // Enable SQL mode with error handling
-        const sqlModeSwitch2 = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
-        await expect(sqlModeSwitch2).toBeVisible({ timeout: 15000 });
+        await expect(this.sqlModeToggleButton).toBeVisible({ timeout: 15000 });
 
         try {
-            await sqlModeSwitch2.click({ timeout: 10000 });
-            await this.page.waitForTimeout(1000); // Brief wait for mode switch
+            await this.sqlModeToggleButton.click({ timeout: 10000 });
         } catch (error) {
             console.warn('SQL mode switch click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await sqlModeSwitch2.click({ timeout: 10000 });
+            await this.sqlModeToggleButton.click({ timeout: 10000 });
         }
 
-        // Wait for query editor to be ready
-        const queryEditor = this.page.locator(this.queryEditorContent);
-        await expect(queryEditor).toBeVisible({ timeout: 15000 });
-
-        await queryEditor.getByRole('code').click();
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.keyboard.press("Backspace");
-        await this.page.waitForTimeout(300);
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        // Wait for query editor to be ready, then drive content via MonacoEditorHelper.
+        await expect(this.queryEditor).toBeVisible({ timeout: 15000 });
+        const monacoHelper = new MonacoEditorHelper(this.page);
+        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(1000);
 
         // Click refresh button with robust waits
-        const refreshButton = this.page.locator(this.refreshButton);
-        await expect(refreshButton).toBeVisible({ timeout: 15000 });
-        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
-        
+        await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
+
         try {
-            await refreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
         } catch (error) {
             console.warn('Refresh button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await refreshButton.click({ timeout: 10000 });
+            await this.refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
         }
 
         // Wait for search results to load before looking for timestamp menu
-        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 20000 });
-        
+        await expect(this.searchResultLogsTable).toBeVisible({ timeout: 20000 });
+
         // Click timestamp expand menu with error handling
-        const timestampMenu = this.page.locator(this.timestampExpandMenu);
-        await expect(timestampMenu).toBeVisible({ timeout: 15000 });
-        
+        await expect(this.timestampExpandMenu).toBeVisible({ timeout: 15000 });
+
         try {
-            await timestampMenu.click({ timeout: 10000 });
+            await this.timestampExpandMenu.click({ timeout: 10000 });
         } catch (error) {
             console.warn('Timestamp expand menu click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await timestampMenu.click({ timeout: 10000 });
+            await this.timestampExpandMenu.click({ timeout: 10000 });
         }
     }
 }

@@ -97,6 +97,7 @@ const navigate = (page: number) => {
       :aria-current="page === modelValue ? 'page' : undefined"
       :data-test="parentDataTest ? `${parentDataTest}-page-${page}` : undefined"
       :data-test-value="page"
+      :data-test-active="page === modelValue ? 'true' : 'false'"
       @click="navigate(page)"
     >
       {{ page }}

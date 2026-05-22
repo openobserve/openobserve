@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md ingestionPage">
+  <div class="tw:rounded-md ingestionPage" data-test="ingestion-page">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
         <div class="tw:px-3 tw:pt-3 tw:w-full tw:flex tw:items-center tw:gap-2">
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.organizationData.rumToken.rum_token != ''
             "
           >
-            <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
+            <OButton variant="primary" size="sm" data-test="ingestion-reset-token-btn" @click="showRUMUpdateDialogFn">
               {{ t(`ingestion.resetRUMTokenLabel`) }}
             </OButton>
           </span>
@@ -63,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.organizationData.rumToken.rum_token == ''
             "
           >
-            <OButton variant="primary" size="sm" @click="generateRUMToken">
+            <OButton variant="primary" size="sm" data-test="ingestion-reset-token-btn" @click="generateRUMToken">
               {{ t(`ingestion.generateRUMTokenLabel`) }}
             </OButton>
           </span>
           <span v-else>
-            <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
+            <OButton variant="primary" size="sm" data-test="ingestion-reset-token-btn" @click="showUpdateDialogFn">
               {{ t(`ingestion.resetTokenBtnLabel`) }}
             </OButton>
           </span>

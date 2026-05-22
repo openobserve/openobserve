@@ -303,6 +303,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         class="tw:text-xs tw:text-file-error-text tw:leading-none"
         role="alert"
       >

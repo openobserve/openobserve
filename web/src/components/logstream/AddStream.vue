@@ -26,8 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:p-4 tw:w-full">
       <OForm :default-values="streamInputsDefault" @submit="submitForm">
-        <div data-test="add-stream-name-input" class="tw:mt-2">
+        <div class="tw:mt-2">
           <OInput
+            data-test="add-stream-name-input"
             v-model="streamInputs.name"
             :label="t('common.name') + ' *'"
             class="showLabelOnTop"
@@ -38,8 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-type-input" class="tw:mt-2">
+        <div class="tw:mt-2">
           <OSelect
+            data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
             :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"
@@ -96,8 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
     <div v-else class="tw:p-4 tw:w-full">
       <OForm :default-values="streamInputsDefault" @submit="submitForm">
-        <div data-test="add-stream-name-input" class="tw:mt-2">
+        <div class="tw:mt-2">
           <OInput
+            data-test="add-stream-name-input"
             v-model="streamInputs.name"
             :label="t('common.name') + ' *'"
             class="showLabelOnTop"
@@ -108,8 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-type-input" class="tw:mt-2">
+        <div class="tw:mt-2">
           <OSelect
+            data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
             :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"

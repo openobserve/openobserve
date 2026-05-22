@@ -466,6 +466,37 @@ export class CrossLinkPage {
     }
 
     /**
+     * Poll until a single named cross-link appears in the field-action dropdown.
+     * Mirrors the `expectCrossLinksFromBothStreams` pattern: re-opens the
+     * dropdown on every iteration so a late-arriving `result_schema?cross_linking=true`
+     * response can be picked up. Returns true if visible within the timeout,
+     * false otherwise (callers do their own `expect()` assertion).
+     */
+    async expectLogCrossLinkVisible(fieldName, crossLinkName, opts = {}) {
+        const timeout = opts.timeout ?? 20000;
+        const intervals = opts.intervals ?? [1000, 1500, 2000];
+        try {
+            await expect
+                .poll(
+                    async () => {
+                        await this.openFieldActionDropdown(fieldName);
+                        await this.page.waitForTimeout(500);
+                        const visible = await this.isLogCrossLinkVisible(crossLinkName);
+                        if (!visible) {
+                            await this.closeFieldActionDropdown();
+                        }
+                        return visible;
+                    },
+                    { timeout, intervals },
+                )
+                .toBe(true);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Close any open field-action dropdown via Escape — keyed off the spec
      * pattern that opens, inspects, then re-opens the dropdown on each poll.
      */

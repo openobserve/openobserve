@@ -720,6 +720,12 @@ export class LogsPage {
         const selectWrapper = this.page.locator(this.indexDropDown);
         await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
 
+        // OSelect's PopoverTrigger is an inner element — clicking the outer wrapper div does
+        // not always reach it. Prefer the explicit `-trigger` data-test (added on OSelect.vue
+        // PopoverTrigger). Fall back to the wrapper for environments that pre-date that attr.
+        const selectTrigger = this.page.locator(`${this.indexDropDown}-trigger`);
+        const popoverNode = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`,
         );
@@ -728,9 +734,17 @@ export class LogsPage {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
 
             try {
-                testLogger.info(`selectStream: Clicking OSelect wrapper to open stream popover`);
-                await selectWrapper.click();
-                await this.page.waitForTimeout(1000);
+                const triggerCount = await selectTrigger.count();
+                testLogger.info(`selectStream: Clicking OSelect (triggerCount=${triggerCount}) to open stream popover`);
+                // Click the inner PopoverTrigger when available; fall back to the wrapper.
+                if (triggerCount > 0) {
+                    await selectTrigger.first().click();
+                } else {
+                    await selectWrapper.click();
+                }
+                // Wait for the popover to actually open (deterministic — no timeout).
+                const popoverOpened = await popoverNode.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+                testLogger.info(`selectStream: popover opened = ${popoverOpened}`);
 
                 testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
                 const visible = await option

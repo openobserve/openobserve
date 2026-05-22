@@ -76,6 +76,13 @@ class EnrichmentPage {
         this.functionsBtn = '[data-test="logs-search-functions-btn"]';
 
         // ────────────────────────────────────────────────────────────────────
+        // Form-level error messages (rendered by OInput / OFile `-error` slots)
+        // ────────────────────────────────────────────────────────────────────
+        this.nameErrorMsg = page.locator('[data-test="add-enrichment-table-name-error"]');
+        this.fileErrorMsg = page.locator('[data-test="add-enrichment-table-file-error"]');
+        this.urlErrorMsg = page.locator('[data-test="add-enrichment-table-url-error"]');
+
+        // ────────────────────────────────────────────────────────────────────
         // Toast notifications (OToast)
         // ────────────────────────────────────────────────────────────────────
         this.toastError = page.locator('[data-test="o-toast-error"]');
@@ -305,15 +312,28 @@ class EnrichmentPage {
         // Enter the file name
         await this.nameField.fill(fileName);
 
-        // Click on 'Save'
+        // Click on 'Save' and wait for the enrichment_tables POST to complete.
+        // After a successful POST, the parent emits `update:list` → refreshList()
+        // toggles showAddJSTransformDialog = false and the add form unmounts.
+        const saveResponse = this.page.waitForResponse(
+            (resp) => /\/api\/[^/]+\/enrichment_tables\//.test(resp.url()) && resp.request().method() === 'POST',
+            { timeout: 30000 },
+        ).catch(() => null);
         await this.addSaveBtn.click({ force: true });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        const response = await saveResponse;
+        if (response) {
+            testLogger.debug(`uploadEnrichmentFile: POST status=${response.status()} url=${response.url()}`);
+        } else {
+            testLogger.warn('uploadEnrichmentFile: No POST response captured within 30s');
+        }
 
-        // Wait for the form to disappear (indicates save completed and returned to list)
-        await this.addPage.waitFor({ state: 'hidden', timeout: 15000 });
-
-        // Additional wait for page to stabilize
-        await this.page.waitForTimeout(2000);
+        // Wait for the form to disappear (indicates save completed and returned to list).
+        // Either the add form unmounts on success, or the list page becomes visible again
+        // (refreshList navigates and re-renders the list block).
+        await Promise.race([
+            this.addPage.waitFor({ state: 'hidden', timeout: 15000 }),
+            this.listTable.waitFor({ state: 'visible', timeout: 15000 }),
+        ]);
     }
 
     async searchForEnrichmentTable(fileName) {
@@ -547,9 +567,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     // Error Validation Methods
     async attemptSaveWithoutFile(testName) {
-        await this.page.getByLabel(this.nameLabel).fill(testName);
-        await this.page.getByRole('button', { name: this.saveButton }).click();
-        await this.page.getByText(this.csvRequiredError).click();
+        // Fill the name OInput via its `-field` native input
+        await this.nameField.fill(testName);
+        // Click Save — validation triggers inside onSubmit with no API call
+        await this.addSaveBtn.click();
+        // OFile renders the error inside its `-error` data-test span
+        await expect(this.fileErrorMsg).toBeVisible({ timeout: 10000 });
+        await expect(this.fileErrorMsg).toHaveText(this.csvRequiredError);
     }
 
     // Append Data Methods
@@ -595,43 +619,25 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async uploadFileWithVRLQuery(filePath, fileName) {
-        // Set the file to be uploaded
-        const inputFile = await this.page.locator(this.fileInput);
-        await inputFile.setInputFiles(filePath);
+        // Reuse the canonical upload flow (handles file + name + save + form close)
+        await this.uploadEnrichmentFile(filePath, fileName);
 
-        // Enter the file name
-        await this.page.fill(this.fileNameInput, fileName);
+        // Search for the uploaded file name — list is rendered after refreshList
+        await this.searchEnrichmentTableInList(fileName);
 
-        // Click on 'Save'
-        await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Search for the uploaded file name
-        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Verify the file name in the enrichment table
-        await this.verifyFileInTable(fileName);
+        // Verify the row is visible via its per-row type-cell data-test
+        await this.verifyTableRowVisible(fileName);
     }
 
     async exploreWithVRLProcessing(fileName) {
-        // Explore the file with VRL query
-        await this.page.getByRole("button", { name: this.exploreButton }).waitFor({ state: 'visible' });
-        
-        // Wait for navigation response before clicking
-        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.getByRole("button", { name: this.exploreButton }).click();
-        await navigationPromise;
-        
-        // Ensure we're on the logs page with additional wait
+        // Click the per-row Explore button — `<name>-explore-btn`
+        await this.clickExploreButton(fileName);
+
+        // Ensure we're on the logs page (refresh button appears once IndexList renders)
         await this.page.waitForLoadState('domcontentloaded');
-        // Wait for VRL editor initialization to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        // Verify we're on the correct page before proceeding
-        await this.page.waitForSelector(this.refreshButton, { 
+        await this.page.waitForSelector(this.refreshButton, {
             state: 'visible',
-            timeout: 15000 
+            timeout: 15000
         });
         
         // Check if VRL editor is enabled via URL parameter
@@ -755,58 +761,69 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async uploadFileForAppendTest(filePath, fileName) {
-        // First upload step
-        const inputFile = await this.page.locator(this.fileInput);
-        await inputFile.setInputFiles(filePath);
+        // Reuse the canonical upload flow so the save POST + form unmount logic
+        // stays consistent across tests.
+        await this.uploadEnrichmentFile(filePath, fileName);
 
-        // Enter the file name
-        await this.page.fill(this.fileNameInput, fileName);
-
-        // Click on 'Save'
-        await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        // Search and explore the uploaded table
-        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Search the newly uploaded table — landed on the list page after save
+        await this.searchEnrichmentTableInList(fileName);
     }
 
-    async exploreAndVerifyInitialData() {
-        await this.page.getByRole("button", { name: this.exploreButton }).click();
-        await this.page.locator(this.dateTimeBtn).click();
-        await expect(this.page.getByRole('cell', { name: this.startTimeCell })).toBeVisible();
-        await this.page.locator(this.timestampColumn).click();
-        await this.page.locator(this.closeDialog).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    async exploreAndVerifyInitialData(tableName) {
+        // The first row's explore button — Quasar tableName is provided when the
+        // legacy caller wants a specific row; fall back to the first explore btn.
+        if (tableName) {
+            await this.clickExploreButton(tableName);
+        } else {
+            await this.exploreEnrichmentTable();
+        }
+        await this.dateTimeBtn.click();
+        await this.verifyStartTimeVisible();
+        await this.timestampColumn.click();
+        await this.logDetailDrawerClose.click();
+        await this.logDetailDrawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
     }
 
     async navigateAndAppendData(fileName, filePath) {
-        // Navigate to append data to the existing enrichment table
-        await this.page.locator(this.pipelineMenuItem).click();
-        await this.page.locator(this.enrichmentTableTab).click();
-        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.getByRole("button", { name: this.enrichmentTablesButton }).click();
+        // Navigate back to enrichment tables list
+        await this.pipelineMenuItem.click();
+        await this.enrichmentTableTab.click();
+        await this.listPage.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Select the append toggle
-        await this.page.getByLabel(this.appendDataToggle).locator("div").first().click();
+        // Search for the existing table to bring its row into view
+        await this.searchEnrichmentTableInList(fileName);
 
-        // Upload the CSV again for appending
-        const inputFile = await this.page.locator(this.fileInput);
-        await inputFile.setInputFiles(filePath);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.getByRole('button', { name: this.saveButton }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Open edit form for the row
+        await this.clickEditButton(fileName);
+        await this.verifyUpdateMode();
+
+        // Enable append toggle (OSwitch in update mode for file-based tables)
+        await this.appendSwitch.waitFor({ state: 'visible', timeout: 10000 });
+        await this.appendSwitch.click();
+
+        // Upload the CSV again for appending — OFile auto-derives `-field`
+        await this.fileField.setInputFiles(filePath);
+
+        // Click save — POST goes out, form unmounts back to list
+        const saveResponse = this.page.waitForResponse(
+            (resp) => /\/api\/[^/]+\/enrichment_tables\//.test(resp.url()) && resp.request().method() === 'POST',
+            { timeout: 30000 },
+        ).catch(() => null);
+        await this.addSaveBtn.click();
+        await saveResponse;
+        await Promise.race([
+            this.addPage.waitFor({ state: 'hidden', timeout: 15000 }),
+            this.listTable.waitFor({ state: 'visible', timeout: 15000 }),
+        ]);
     }
 
     async verifyAppendedData(fileName) {
-        // Verify appended data
-        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.getByRole("button", { name: this.exploreButton }).click();
+        // Verify appended data — re-find the row, click Explore, assert results land
+        await this.searchEnrichmentTableInList(fileName);
+        await this.clickExploreButton(fileName);
 
-        // Verify row count increased
-        const showingText = this.page.getByText(this.showingText);
-        await expect(showingText).toBeVisible();
+        // Wait for the logs results panel to render at least one row
+        await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async testCSVValidationError() {
@@ -814,15 +831,14 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async attemptSaveWithoutName(filePath) {
-        // Upload file WITHOUT entering name
-        const inputFile = await this.page.locator(this.fileInput);
-        await inputFile.setInputFiles(filePath);
+        // Upload file WITHOUT entering name — OFile auto-derives `-field`
+        await this.fileField.setInputFiles(filePath);
 
         // Click save without entering name
-        await this.page.getByRole('button', { name: this.saveButton }).click();
+        await this.addSaveBtn.click();
 
-        // Wait for and verify error message
-        await this.page.getByText('Field is required!').waitFor({ state: 'visible' });
+        // Wait for and verify the name-required error via OInput's `-error` data-test
+        await expect(this.nameErrorMsg).toBeVisible({ timeout: 10000 });
     }
 
     async clickCancelButton() {
@@ -843,16 +859,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // the search input visibility indicates the list page is ready.
         await this.searchInputField.waitFor({ state: 'visible', timeout: 30000 });
 
-        // Clear existing search first
+        // Clear existing search first, then fill with the table name to filter
         await this.searchInputField.clear();
-        await this.page.waitForTimeout(500);
-
-        // Fill the search input with table name to filter results
         await this.searchInputField.fill(tableName);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Wait for search to process
-        await this.page.waitForTimeout(1000);
+        // Wait until either the matching row is visible or the empty state is
+        // shown (search filter is client-side — no network round trip needed).
+        await expect.poll(async () => {
+            const rowVisible = await this.getRowTypeCell(tableName).isVisible({ timeout: 500 }).catch(() => false);
+            if (rowVisible) return 'row';
+            const tableVisible = await this.listTable.isVisible({ timeout: 500 }).catch(() => false);
+            return tableVisible ? 'table' : 'pending';
+        }, { timeout: 10000, intervals: [200, 500, 1000] }).not.toBe('pending');
     }
 
     async verifyTableVisibleInList(tableName) {
@@ -864,9 +883,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Schema button is conditionally rendered (only when the URL job
         // completes or the table is file-based). On URL-based tables, the job
         // is processed async by the backend — poll-and-reload until either
-        // the schema button or a status icon (failed) appears.
+        // the schema button or a status icon (failed) appears. The pentest
+        // env may take 30-60s to fetch the CSV from the public URL.
         const schemaBtn = this.getRowSchemaBtn(tableName);
-        const maxAttempts = 24;
+        const maxAttempts = 12;
         const pollInterval = 5000;
         for (let i = 0; i < maxAttempts; i++) {
             const visible = await schemaBtn.isVisible({ timeout: 2000 }).catch(() => false);
@@ -899,9 +919,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
             throw new Error(`Edit button for table "${tableName}" not visible — URL job may still be processing.`);
         }
         await editBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Wait for edit form to start loading
-        await this.page.waitForTimeout(1000);
+        // Edit form mounts immediately — wait for the add/update page wrapper
+        await this.addPage.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.debug('Edit button clicked');
     }
 
@@ -911,10 +930,6 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // for "Add" and "Update" — title differs but page data-test does not.
         // Use the page locator + name field as ready signals.
         await this.addPage.waitFor({ state: 'visible', timeout: 30000 });
-        // Wait for form to fully load
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Additional wait for form elements to render (radio buttons, inputs, etc.)
-        await this.page.waitForTimeout(3000);
         // Verify the name field is present (always rendered in both modes)
         await this.nameField.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.debug('Update mode form verified visible and loaded');
@@ -1379,10 +1394,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async verifyTableRowHidden(tableName) {
         testLogger.debug(`Verifying table row hidden: ${tableName}`);
 
-        // Wait a moment for deletion to process
-        await this.page.waitForTimeout(2000);
-
-        await expect(this.getRowTypeCell(tableName)).toBeHidden();
+        // Wait for the row to be removed — toBeHidden waits up to its timeout
+        await expect(this.getRowTypeCell(tableName)).toBeHidden({ timeout: 10000 });
 
         testLogger.debug('Table row verified hidden');
     }

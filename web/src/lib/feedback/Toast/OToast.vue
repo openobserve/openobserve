@@ -99,6 +99,7 @@ const screenReaderTitle = computed(() =>
     ]"
     :role="rootRole"
     :data-test="`o-toast-${variant ?? 'default'}`"
+    :data-test-message="message"
     @update:open="(val) => emit('openChange', val)"
   >
     <!-- Icon -->

@@ -93,6 +93,13 @@ export class PipelinesPage {
         // Table OButton — prefer the data-test locator; fall back to the
         // legacy getByRole locator for older specs still using the old PO copy.
         this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
+        // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
+        this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        // Add / Update Enrichment Table form root
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Enrichment table tab locator (data-test prefix; the tab is rendered by
+        // OToggleGroup under the Functions section).
+        this.enrichmentTableTabLocator = page.locator('[data-test="function-enrichment-table-tab"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -697,9 +704,14 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await this.page.locator(this.pipelineMenu).click();
-        await this.page.click(this.enrichmentTableTab, { force: true });
+        await this.pipelineMenuLink.click();
+        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
+        // visibility races when the tab list animates in.
+        await this.enrichmentTableTabLocator.click({ force: true });
         await this.addEnrichmentTableText.click();
+        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
+        // inside the same parent — wait for it to be visible before returning.
+        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
@@ -721,45 +733,44 @@ export class PipelinesPage {
         await this.page.getByPlaceholder('Search').fill(fileName);
         await this.page.waitForTimeout(3000);
     }
+    // Per-row factory helpers for enrichment table rows (data-test scoped by name)
+    getEnrichmentRowTypeCell(name) {
+        return this.page.locator(`[data-test="${name}-type-cell"]`);
+    }
+    getEnrichmentRowDeleteBtn(name) {
+        return this.page.locator(`[data-test="${name}-delete-btn"]`);
+    }
+
     async deleteEnrichmentTableByName(fileName) {
-        // First ensure we search for the specific file
+        // Wait for the enrichment tables list page to be ready
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
-        await searchBox.waitFor({ state: 'visible' });
-        await searchBox.clear();
-        await searchBox.fill(fileName);
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(1000); // Allow search to filter results
-        
-        const rows = await this.tableRowsLocator;
-        let fileFound = false;
 
-        for (let i = 0; i < (await rows.count()); i++) {
-            const row = rows.nth(i);
-            const functionName = await row
-              .locator("td.text-left")
-              .nth(1)
-              .textContent();
+        // Use the OInput search via its auto-derived `-field` native input
+        await this.enrichmentSearchField.waitFor({ state: 'visible', timeout: 30000 });
+        await this.enrichmentSearchField.clear();
+        await this.enrichmentSearchField.fill(fileName);
 
-            if (functionName?.trim() === fileName) {
-                fileFound = true;
-                testLogger.debug("Uploaded file found", { functionName });
-
-                // Click the 'Delete Function' button
-                await row.locator('[title="Delete Function"]').click();
-
-                // Confirm the deletion
-                await this.confirmButton.click();
-                break;
-            }
-        }
-
-        if (!fileFound) {
+        // Wait until the row for the target table is visible (client-side filter)
+        const typeCell = this.getEnrichmentRowTypeCell(fileName);
+        const visible = await typeCell.isVisible({ timeout: 10000 }).catch(() => false);
+        if (!visible) {
             throw new Error(
               `Uploaded file "${fileName}" not found in the enrichment table.`
             );
         }
+        testLogger.debug("Uploaded file found", { functionName: fileName });
 
+        // Click the per-row delete button — `<name>-delete-btn`
+        const deleteBtn = this.getEnrichmentRowDeleteBtn(fileName);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+
+        // Confirm the deletion via the confirm dialog's primary button
+        await this.confirmButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.confirmButton.click();
+
+        // Wait for the row to actually disappear from the list
+        await typeCell.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
     async navigateToEnrichmentTableTab() {

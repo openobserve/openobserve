@@ -35,7 +35,12 @@ export class DashboardPage {
     this.searchAcrossFoldersToggle = page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2);
 
     // Dashboard create dialog locators
-    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    // OInput wraps the dialog name field — the wrapper carries
+    // `add-dashboard-name`, and the inner native <input> exposes the
+    // `-field` suffix (per AGENT_RULES §4). Always fill the `-field` variant.
+    this.dashboardAddDialog = page.locator('[data-test="dashboard-add-dialog"]');
+    this.dashboardNameWrapper = page.locator('[data-test="add-dashboard-name"]');
+    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name-field"]');
     this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]');
 
     // Dashboard view/edit locators
@@ -129,29 +134,34 @@ export class DashboardPage {
     await this.addDashboardButton.click();
 
     // Wait for dialog with retry mechanism
-    let isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
+    // Use deterministic waitFor — wait on the drawer dialog being attached
+    // (mounts in a portal); the wrapper + inner `-field` follow.
+    let isDialogOpen = await this.dashboardAddDialog
+      .waitFor({ state: 'attached', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
 
-    if (!isNameFieldVisible) {
+    if (!isDialogOpen) {
       // First retry: click the button again
-      await this.page.waitForTimeout(1000);
       await this.addDashboardButton.click();
-      await this.page.waitForTimeout(2000);
-      isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
+      isDialogOpen = await this.dashboardAddDialog
+        .waitFor({ state: 'attached', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
 
-      if (!isNameFieldVisible) {
+      if (!isDialogOpen) {
         throw new Error('Dashboard name field is not visible after clicking the add dashboard button twice');
       }
     }
 
-    // Wait for the input to be fully ready
+    // Wait for the input to be fully ready (use the inner `-field` input
+    // — that's the actual fillable element).
     await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
 
     // Fill the dashboard name
     await this.dashboardNameInput.fill(this.dashboardName);
 
     // Wait for Vue to process the input and enable the button
-    await this.page.waitForTimeout(1000);
-
     // Wait for submit button to be visible
     await this.dashboardSubmitButton.waitFor({ state: 'visible', timeout: 30000 });
 

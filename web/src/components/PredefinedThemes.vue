@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <OButton
+        data-test="predefined-themes-reset-btn"
         variant="ghost-destructive"
         size="xs"
         @click="resetToDefaultTheme"
@@ -34,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OCardSection class="tw:pt-0">
         <OTabs v-model="activeTab" dense class="tw:text-gray-500" align="justify">
-          <OTab name="light" label="Light Mode" />
-          <OTab name="dark" label="Dark Mode" />
+          <OTab data-test="predefined-themes-tab-light" name="light" label="Light Mode" />
+          <OTab data-test="predefined-themes-tab-dark" name="dark" label="Dark Mode" />
         </OTabs>
       </OCardSection>
 
@@ -46,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
+              :data-test="`predefined-themes-card-light-${themeNameSlug(theme.name)}`"
               class="theme-card-compact tw:mb-2"
             >
               <div class="tw:flex tw:items-center tw:flex-nowrap">
@@ -62,11 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'light')"
+                  :data-test="`predefined-themes-applied-badge-light-${themeNameSlug(theme.name)}`"
                   variant="success"
                   size="sm"
                   class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
+                  :data-test="`predefined-themes-apply-btn-light-${themeNameSlug(theme.name)}`"
                   variant="primary"
                   size="sm"
                   @click="applyTheme(theme, 'light')"
@@ -75,9 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact tw:mb-2">
+            <div data-test="predefined-themes-card-light-custom-color" class="theme-card-compact tw:mb-2">
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
+                  data-test="predefined-themes-custom-color-preview-light"
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
@@ -102,11 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('light')"
+                  data-test="predefined-themes-applied-badge-light-custom-color"
                   variant="success"
                   size="sm"
                   class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
+                  data-test="predefined-themes-apply-btn-light-custom-color"
                   variant="primary"
                   size="sm"
                   @click="applyCustomTheme('light')"
@@ -120,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
+              :data-test="`predefined-themes-card-dark-${themeNameSlug(theme.name)}`"
               class="theme-card-compact tw:mb-2"
             >
               <div class="tw:flex tw:items-center tw:flex-nowrap">
@@ -136,11 +144,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'dark')"
+                  :data-test="`predefined-themes-applied-badge-dark-${themeNameSlug(theme.name)}`"
                   variant="success"
                   size="sm"
                   class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
+                  :data-test="`predefined-themes-apply-btn-dark-${themeNameSlug(theme.name)}`"
                   variant="primary"
                   size="sm"
                   @click="applyTheme(theme, 'dark')"
@@ -149,9 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact tw:mb-2">
+            <div data-test="predefined-themes-card-dark-custom-color" class="theme-card-compact tw:mb-2">
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
+                  data-test="predefined-themes-custom-color-preview-dark"
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
@@ -176,11 +187,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('dark')"
+                  data-test="predefined-themes-applied-badge-dark-custom-color"
                   variant="success"
                   size="sm"
                   class="tw:mr-1"
                 >Applied</OBadge>
                 <OButton
+                  data-test="predefined-themes-apply-btn-dark-custom-color"
                   variant="primary"
                   size="sm"
                   @click="applyCustomTheme('dark')"
@@ -614,6 +627,11 @@ const predefinedThemes = [
     },
   },
 ];
+
+// Slugify a theme name into a kebab-case identifier for data-test attributes
+// e.g. "Ocean Breeze" -> "ocean-breeze"
+const themeNameSlug = (name: string): string =>
+  name.toLowerCase().replace(/\s+/g, "-");
 
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;

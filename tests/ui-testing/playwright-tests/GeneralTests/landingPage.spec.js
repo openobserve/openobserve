@@ -90,8 +90,9 @@ test.describe("Landing Page Test Cases", () => {
       testLogger.warn('Could not run query', { error: error.message });
     }
 
-    // Wait for results
-    await page.waitForTimeout(2000);
+    // Wait for the logs results table to be attached as a positive signal that
+    // the query finished rendering (race against the "no results" state).
+    await pm.homePage.getLogsResultsTable().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     return await captureLogsState(pm);
   }
@@ -103,8 +104,8 @@ test.describe("Landing Page Test Cases", () => {
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Wait for sidebar to be interactive
-        await page.waitForTimeout(500);
+        // Wait for the sidebar logs menu to be visible/interactive before clicking.
+        await pm.homePage.getLogsMenuItem().waitFor({ state: 'visible', timeout: 5000 });
 
         // Click on logs menu using page object method
         await pm.homePage.clickLogsMenu();
@@ -115,8 +116,7 @@ test.describe("Landing Page Test Cases", () => {
         await page.waitForURL(/logs/, { timeout: 20000 });
 
         // Wait for logs page indicator
-        await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-        await page.waitForTimeout(1000);
+        await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 15000 });
 
         testLogger.info(`Successfully returned to logs page on attempt ${attempt}`);
         return; // Success, exit function
@@ -125,7 +125,8 @@ test.describe("Landing Page Test Cases", () => {
         if (attempt === maxRetries) {
           throw new Error(`Failed to return to logs page after ${maxRetries} attempts`);
         }
-        await page.waitForTimeout(2000); // Longer wait before retry
+        // Brief deterministic wait keyed on the sidebar logs menu re-appearing.
+        await pm.homePage.getLogsMenuItem().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       }
     }
   }
@@ -245,8 +246,8 @@ test.describe("Landing Page Test Cases", () => {
       // Return to logs (includes URL verification)
       await returnToLogs(page, pm);
 
-      // Extra wait to ensure page is stable
-      await page.waitForTimeout(500);
+      // Extra deterministic wait keyed on the logs page indicator being stable.
+      await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
       // Verify state preservation
       const verification = await verifyStatePreserved(pm, initialState);
@@ -399,8 +400,8 @@ test.describe("Landing Page Test Cases", () => {
       // Return to logs (includes URL verification)
       await returnToLogs(page, pm);
 
-      // Extra wait to ensure page is stable
-      await page.waitForTimeout(500);
+      // Extra deterministic wait keyed on the logs page indicator being stable.
+      await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
       // Verify state preservation
       const verification = await verifyStatePreserved(pm, initialState);
@@ -469,7 +470,7 @@ test.describe("Landing Page Test Cases", () => {
     await pm.homePage.openProfileMenu();
     await expect(pm.homePage.logoutButton).toBeVisible();
     await expect(pm.homePage.themeManager).toBeVisible();
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.homePage.pressEscape();
     testLogger.info('Profile menu verified');
 
     // ==========================================
@@ -479,18 +480,21 @@ test.describe("Landing Page Test Cases", () => {
 
     await pm.homePage.openOrgSelector();
     await expect(pm.homePage.orgMenuList).toBeVisible();
-    await expect(pm.homePage.orgSearchInput).toBeVisible();
+    // Visibility lives on the OInput wrapper; the inner native input itself isn't
+    // a visible element on its own (it's wrapped in a styled div).
+    await expect(pm.homePage.orgSearchInputWrapper).toBeVisible();
 
-    // Test search
+    // Test search — fill the input, then wait deterministically for the first
+    // matching org row to appear in the menu (no fixed delay).
     await pm.homePage.orgSearchInput.fill('default');
-    await page.waitForTimeout(1000);
+    await pm.homePage.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     const firstResult = pm.homePage.orgMenuItemLabel.first();
     if (await firstResult.isVisible()) {
       const text = await firstResult.textContent();
       expect(text.toLowerCase()).toContain('default');
     }
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.homePage.pressEscape();
     testLogger.info('Organization selector verified');
 
     // ==========================================

@@ -54,9 +54,6 @@ export class ServicesCatalogPage {
     this.table = page.locator('[data-test="services-catalog-table"]');
     // Inner TenstackTable <table> — always rendered once the wrapper mounts.
     this.tableInner = page.locator('[data-test="services-catalog-table"] [data-test="o2-table"]');
-    // Combined locator: matches either the wrapper or the inner table — used
-    // by isTableVisible() to stay deterministic across attribute-forwarding modes.
-    this.tableAny = page.locator('[data-test="services-catalog-table"], [data-test="services-catalog-table"] [data-test="o2-table"], [data-test="o2-table"]:visible');
     this.emptyState = page.locator('[data-test="services-catalog-empty"]');
     this.loading = page.locator('[data-test="services-catalog-loading"]');
     this.allServiceLinks = page.locator(`[data-test^="${this.serviceLinkPrefix}"]`);
@@ -128,10 +125,10 @@ export class ServicesCatalogPage {
     /** @param {string|number} n */
     this.getPageButton = (n) =>
       page.locator(`[data-test="${this.paginationDataTest}-page-${n}"]`);
-    // OPagination sets aria-current="page" on the active button. data-test^= keeps
-    // the selector data-test-only (no element / class / role).
+    // OPagination marks the current page with data-test-active="true". Combined
+    // with the data-test^= page-prefix this stays strictly data-test only.
     this.currentPageButton = page.locator(
-      `[data-test^="${this.paginationDataTest}-page-"][aria-current="page"]`,
+      `[data-test^="${this.paginationDataTest}-page-"][data-test-active="true"]`,
     );
     /** @param {string} columnId */
     this.getColumnSortClickTarget = (columnId) =>
@@ -161,12 +158,33 @@ export class ServicesCatalogPage {
   async navigate(period = '24h') {
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    // Use the trailing-slash form `/web/traces/` — without it some dev servers
+    // route the request to the SPA fallback and drop query params before the
+    // Vue router can read them. The trailing-slash form is what Vue Router
+    // canonicalises to and what the index.vue page reads from on mount.
     await this.page.goto(
-      `${baseUrl}/web/traces?tab=services-catalog&org_identifier=${org}&period=${period}`,
+      `${baseUrl}/web/traces/?tab=services-catalog&org_identifier=${org}&period=${period}`,
       { timeout: 60000 },
     );
     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
     await this.page.waitForLoadState('load', { timeout: 15000 });
+    // Ensure the services-catalog tab is the active one. If the URL param was
+    // dropped (e.g. due to a router replace during mount), click the tab button
+    // explicitly. This is defensive — keeps the tab activation deterministic.
+    const filterVisible = await this.filterInputField
+      .waitFor({ state: 'attached', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!filterVisible) {
+      // Fallback: click the services-catalog tab button explicitly.
+      await this.servicesCatalogTabBtn
+        .waitFor({ state: 'visible', timeout: 8000 })
+        .catch(() => {});
+      await this.servicesCatalogTabBtn.click().catch(() => {});
+      await this.filterInputField
+        .waitFor({ state: 'attached', timeout: 15000 })
+        .catch(() => {});
+    }
   }
 
   async clickServiceCatalogTab() {
@@ -456,12 +474,12 @@ export class ServicesCatalogPage {
     const pageBtn = this.getPageButton(n);
     await pageBtn.waitFor({ state: 'visible', timeout: 5000 });
     await pageBtn.click();
-    // After navigation, the OPagination sets aria-current="page" on the
+    // After navigation, the OPagination sets data-test-active="true" on the
     // clicked button — wait for that to converge before returning.
     await expect.poll(
-      async () => await pageBtn.getAttribute('aria-current'),
+      async () => await pageBtn.getAttribute('data-test-active'),
       { timeout: 5000, intervals: [50, 100, 200] },
-    ).toBe('page');
+    ).toBe('true');
   }
 
   async isPrevDisabled() {
@@ -473,10 +491,9 @@ export class ServicesCatalogPage {
   }
 
   async getCurrentPage() {
-    // OPagination sets aria-current="page" on the active button.
-    // The page-number buttons all carry data-test-value="<page>" so we use that
-    // combined with the aria-current attribute filter — both are non-class,
-    // non-element selectors permitted by the policy.
+    // OPagination sets data-test-active="true" on the active page button.
+    // Combined with the data-test^= page-prefix and data-test-value="<page>"
+    // it lets us identify the active page using only data-test attributes.
     await this.currentPageButton.waitFor({ state: 'attached', timeout: 5000 });
     const val = await this.currentPageButton.getAttribute('data-test-value');
     const parsed = parseInt(val, 10);

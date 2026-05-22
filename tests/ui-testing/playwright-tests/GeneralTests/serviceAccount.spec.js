@@ -14,8 +14,7 @@ test.describe("Service Account for API access", () => {
     // Avoid waitForLoadState('networkidle') — deployed envs continuously poll RUM/
     // analytics endpoints so the network never idles.
     async function waitForServiceAccountsPage(page) {
-        await page.waitForSelector('[data-test="iam-service-accounts-tab"]', { timeout: 10000 });
-        await page.waitForTimeout(1000); // Brief pause to allow any system accounts to load
+        await page.locator('[data-test="iam-service-accounts-tab"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     test("Error Message displayed if Email Blank", async ({ page }, testInfo) => {
@@ -244,27 +243,15 @@ test.describe("Service Account for API access", () => {
         await waitForServiceAccountsPage(page);
 
         // Check if SRE Agent system account exists in the table
-        const sreAgentSelector = 'td:has-text("o2-sre-agent.")';
-        const sreAgentExists = await page.locator(sreAgentSelector).count() > 0;
+        const sreAgentExists = await pageManager.iamPage.sreAgentSystemAccountExists();
 
         if (sreAgentExists) {
             testLogger.info('SRE Agent system account found in service accounts table');
 
             // Verify SRE Agent account shows system managed status
-            const sreAgentRow = page.locator('tr').filter({ hasText: 'o2-sre-agent.' });
-            await expect(sreAgentRow).toBeVisible();
-
             // SRE Agent should not have delete/update buttons (system managed)
             // If they exist, they should be disabled or not clickable
-            const deleteButton = sreAgentRow.locator('button[title="Delete Service Account"]');
-            const updateButton = sreAgentRow.locator('button[title="Update Service Account"]');
-
-            if (await deleteButton.count() > 0) {
-                await expect(deleteButton).toBeDisabled();
-            }
-            if (await updateButton.count() > 0) {
-                await expect(updateButton).toBeDisabled();
-            }
+            await pageManager.iamPage.verifySreAgentSystemAccountProtection();
 
             testLogger.info('SRE Agent system account protection verified');
         } else {

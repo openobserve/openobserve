@@ -14,6 +14,14 @@ export default class DashboardShareExportPage {
     );
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
     this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+    // Scoped success toast for the share-link "Link Copied Successfully!" message —
+    // multiple success toasts can coexist (e.g. "Dashboard added successfully."
+    // and "Link Copied Successfully!"), so we key off OToast's data-test-message
+    // attribute (set in `web/src/lib/feedback/Toast/OToast.vue`) to avoid the
+    // strict-mode "resolves to 2 elements" error.
+    this.toastSuccessShareLink = page.locator(
+      '[data-test="o-toast-success"][data-test-message*="Link Copied"]'
+    );
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
     this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
@@ -33,13 +41,17 @@ export default class DashboardShareExportPage {
   }
 
   //Wait for share success toast (Link copied successfully)
+  //Uses the scoped toastSuccessShareLink locator so we don't collide with
+  //an overlapping "Dashboard added successfully." toast (strict-mode safe).
   async waitForShareSuccess(timeout = 10000) {
-    await expect(this.toastSuccess).toBeVisible({ timeout });
+    await expect(this.toastSuccessShareLink).toBeVisible({ timeout });
   }
 
   //Returns the share success toast locator for assertion in specs
+  //Returns the scoped "Link Copied" toast — callers that just want
+  //to assert presence/absence of the share toast specifically use this.
   getShareSuccessToast() {
-    return this.toastSuccess;
+    return this.toastSuccessShareLink;
   }
 
   //Read the short URL copied to clipboard after share

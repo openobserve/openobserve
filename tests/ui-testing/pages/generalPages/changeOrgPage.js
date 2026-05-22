@@ -18,7 +18,7 @@ class ChangeOrgPage {
     }
 
     async validateHomePageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.homePage.homePageValidation();
         await pageManager.homePage.homePageURLValidation(newOrgName);
         await pageManager.homePage.gotoHomePage();
@@ -36,7 +36,7 @@ class ChangeOrgPage {
     }
 
     async validateLogsPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.logsPage.navigateToLogs(multiOrgIdentifier);
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -51,7 +51,7 @@ class ChangeOrgPage {
     }
 
     async validateMetricsPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.metricsPage.gotoMetricsPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -59,14 +59,18 @@ class ChangeOrgPage {
     // Traces Page Methods
     async validateTracesPageDefault(pageManager) {
         await pageManager.tracesPage.navigateToTraces();
-        await pageManager.tracesPage.tracesPageDefaultOrg();
+        // Use the shared search-filtered org switch (homePage.homePageDefaultOrg)
+        // — the per-identifier shortcut in tracesPage.tracesPageDefaultOrg only
+        // works when "default" is on the first OTable page, which fails against
+        // the pentest backend's large org list.
+        await pageManager.homePage.homePageDefaultOrg();
         await pageManager.homePage.homePageURLValidationDefaultOrg();
         await pageManager.tracesPage.validateTracesPage();
         await pageManager.tracesPage.tracesURLValidation();
     }
 
     async validateTracesPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.tracesPage.navigateToTraces();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -80,7 +84,7 @@ class ChangeOrgPage {
     }
 
     async validateRumPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.rumPage.gotoRumPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -94,7 +98,7 @@ class ChangeOrgPage {
     }
 
     async validatePipelinesPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.pipelinesPage.gotoPipelinesPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -108,7 +112,7 @@ class ChangeOrgPage {
     }
 
     async validateDashboardPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.dashboardPage.navigateToDashboards();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -122,7 +126,7 @@ class ChangeOrgPage {
     }
 
     async validateStreamsPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.streamsPage.gotoStreamsPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -136,7 +140,7 @@ class ChangeOrgPage {
     }
 
     async validateReportsPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.reportsPage.goToReports();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -151,7 +155,7 @@ class ChangeOrgPage {
     }
 
     async validateAlertsPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.commonActions.navigateToAlerts();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -165,7 +169,7 @@ class ChangeOrgPage {
     }
 
     async validateDataPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.dataPage.gotoDataPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -179,7 +183,7 @@ class ChangeOrgPage {
     }
 
     async validateIamPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.iamPage.gotoIamPage();
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
@@ -193,7 +197,7 @@ class ChangeOrgPage {
     }
 
     async validateManagementPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.managementPage.goToManagement();
         await pageManager.managementPage.managementURLValidation();
     }
@@ -209,7 +213,7 @@ class ChangeOrgPage {
     async validateAboutPageWithOrg(pageManager, newOrgName, multiOrgIdentifier) {
         await pageManager.aboutPage.clickHelpMenu();
         await pageManager.aboutPage.gotoAboutPage();
-        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageOrg(newOrgName, multiOrgIdentifier);
         await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     }
 

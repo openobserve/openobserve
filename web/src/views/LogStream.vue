@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   icon-left="delete"
                   :title="t('logStream.delete')"
+                  data-test="log-stream-delete-btn"
                   variant="ghost-destructive"
                   size="icon-sm"
                   @click="confirmDeleteAction({ row })"

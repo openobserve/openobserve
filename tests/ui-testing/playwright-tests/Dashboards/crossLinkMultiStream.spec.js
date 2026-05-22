@@ -631,11 +631,15 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 3: Expand a log row
         await pm.crossLinkPage.expandFirstLogRow();
 
-        // Step 4: Open kubernetes_container_name field action dropdown
-        await pm.crossLinkPage.openFieldActionDropdown('kubernetes_container_name');
-
-        // Step 5: Verify cross-link appears
-        const hasCrossLink = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkName);
+        // Step 4 & 5: Open kubernetes_container_name field action dropdown and
+        // poll until the cross-link appears. The `result_schema?cross_linking=true`
+        // response is eventually-consistent — a one-shot `isVisible()` raced the
+        // schema-merge on CI, so use the polling helper that re-opens the dropdown
+        // until the late-arriving response lands (mirrors `expectCrossLinksFromBothStreams`).
+        const hasCrossLink = await pm.crossLinkPage.expectLogCrossLinkVisible(
+            'kubernetes_container_name',
+            crossLinkName,
+        );
 
         testLogger.info('Single-stream cross-link visibility', { visible: hasCrossLink });
 

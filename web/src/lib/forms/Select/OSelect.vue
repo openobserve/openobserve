@@ -770,6 +770,9 @@ const fieldWidthClass = computed(() => {
             :id="inputId"
             :name="name"
             :disabled="disabled"
+            :data-test="
+              parentDataTest ? `${parentDataTest}-trigger` : undefined
+            "
             :data-test-selected-value="
               multiple
                 ? selectedValues.map((v) => String(v)).join(',')
@@ -950,6 +953,9 @@ const fieldWidthClass = computed(() => {
                   v-if="inputEnabled"
                   v-model="searchTerm"
                   auto-focus
+                  :data-test="
+                    parentDataTest ? `${parentDataTest}-search` : undefined
+                  "
                   :class="[
                     'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text',
                     'tw:placeholder:text-input-placeholder tw:outline-none',
@@ -1040,7 +1046,7 @@ const fieldWidthClass = computed(() => {
                   >
                     <div
                       v-for="vRow in virtualizer.getVirtualItems()"
-                      :key="vRow.key"
+                      :key="`${vRow.key}-${toRekaString(filteredOptions[vRow.index].value)}`"
                       :data-vrow="vRow.index"
                       :style="{
                         position: 'absolute',

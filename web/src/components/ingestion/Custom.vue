@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ORouteTab
               name="ingestLogs"
+              data-test="ingestion-custom-tab-ingestLogs"
               :to="{
                 name: 'ingestLogs',
                 query: {
@@ -40,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="ingestMetrics"
+              data-test="ingestion-custom-tab-ingestMetrics"
               :to="{
                 name: 'ingestMetrics',
                 query: {
@@ -50,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="ingestTraces"
+              data-test="ingestion-custom-tab-ingestTraces"
               :to="{
                 name: 'ingestTraces',
                 query: {
