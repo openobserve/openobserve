@@ -181,7 +181,7 @@ pub async fn correlate_streams(
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
-            "",
+            &org_id,
             &org_id,
             &user_email.user_id,
             "service_streams",
@@ -303,7 +303,7 @@ pub async fn get_identity_config(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        "",
+        &org_id,
         &org_id,
         &user_email.user_id,
         "service_streams",

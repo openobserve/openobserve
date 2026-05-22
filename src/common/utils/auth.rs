@@ -1026,6 +1026,7 @@ where
             // service_streams APIs are org-level, not stream-specific
             || path.contains("/service_streams/_analytics")
             || path.contains("/service_streams/_correlate")
+            || path.contains("/service_streams/config/identity")
             || (url_len == 5 && path.ends_with("/patterns/extract"))
             // Ignore permission check for generate_sql endpoint, we need to check it in handler
             || (method.eq("POST")
