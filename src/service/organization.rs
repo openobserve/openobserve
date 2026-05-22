@@ -398,6 +398,18 @@ pub async fn create_org(
             ));
         }
 
+        // make sure that the to-be-made super org is not a member itself
+        if let Some(oid) = _make_billed_member_of.as_ref() {
+            let membership =
+                o2_enterprise::enterprise::cloud::billing_group::list_billing_membership_of(oid)
+                    .await?;
+            if membership.is_some() {
+                return Err(anyhow::anyhow!(
+                    "{oid} org itself is part of another billing group, and thus cannot make a new org its member",
+                ));
+            }
+        }
+
         // if for some reason the "super" org was not part of user's org
         // it should anyways fail the  rbac check, but in any case
         // we do the check here
