@@ -278,8 +278,14 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const dragHandles = wrapper.findAll('[data-test^="column-order-drag-handle"]');
-      expect(dragHandles.length).toBe(2);
+      // Assert each indexed drag handle exists individually to avoid matching
+      // child elements rendered inside OIcon which also carry the data-test value.
+      expect(
+        wrapper.find('[data-test="column-order-drag-handle-0"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="column-order-drag-handle-1"]').exists(),
+      ).toBe(true);
     });
 
     it("should render move up/down buttons for each column", async () => {

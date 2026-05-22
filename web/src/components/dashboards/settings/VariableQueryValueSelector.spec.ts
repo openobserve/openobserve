@@ -96,6 +96,7 @@ describe("VariableQueryValueSelector", () => {
       updateInputValue() {},
       blur() {},
       hidePopup() {},
+      close() {},
     },
   };
 
@@ -521,18 +522,16 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
       await wrapper.vm.toggleSelectAll();
-      
-      // Verify the popup closing behavior occurred
-      if (wrapper.props('variableItem').multiSelect) {
-        expect(mockRef.updateInputValue).toHaveBeenCalled();
-      } else {
-        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      }
+
+      // Verify the popup closing behavior occurred — closePopUpWhenValueIsSet calls close()
+      expect(mockRef.close).toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
   });
 
@@ -608,15 +607,17 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
       await wrapper.vm.handleCustomValue("test-close");
       
       // Verify the custom value was handled and popup closing behavior occurred
+      // closePopUpWhenValueIsSet calls close() — not updateInputValue
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(mockRef.updateInputValue).toHaveBeenCalled();
+      expect(mockRef.close).toHaveBeenCalled();
     });
   });
 
@@ -801,7 +802,8 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       
@@ -1123,7 +1125,8 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
       

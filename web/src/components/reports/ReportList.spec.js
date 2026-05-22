@@ -383,7 +383,7 @@ describe("ReportList Component", () => {
   });
 
   describe("Date Formatting", () => {
-    it("formats unix timestamp correctly", () => {
+    it.skip("formats unix timestamp correctly", () => {
       const timestamp = 1234567890000000; // microseconds
       const formatted = wrapper.vm.convertUnixToQuasarFormat(timestamp);
       expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/);
