@@ -108,19 +108,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-email="{ row }">
           <div class="tw:flex tw:items-center">
             <span>{{ row.email }}</span>
-            <OIcon
-              v-if="shouldShowWarning(row)"
-              name="info"
-              size="sm"
-              class="tw:ml-1 tw:cursor-pointer"
-              :data-test="`iam-external-user-warning-icon-${row.email}`"
-             />
-              <OTooltip side="right">
+            <OTooltip v-if="shouldShowWarning(row)" side="right">
+              <OIcon
+                name="info"
+                size="sm"
+                class="tw:ml-1 tw:cursor-pointer"
+                :data-test="`iam-external-user-warning-icon-${row.email}`"
+              />
+              <template #content>
                 <div style="font-size: 12px; line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                   <div class="tw:mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
-              </OTooltip>
+              </template>
+            </OTooltip>
           </div>
         </template>
         <template #empty>

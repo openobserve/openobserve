@@ -28,9 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="iam-roles-search-input">
             <OInput
               v-model="filterQuery"
-              class="tw:h-9 tw:w-48"
-              :placeholder="t('iam.searchRole')"
-            >
+              class="tw:w-48"
+              :placeholder="t('iam.searchRole')"            >
               <template #icon-left>
                 <OIcon name="search" size="sm" />
               </template>
@@ -40,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-add-alert-btn"
             variant="primary"
             size="sm"
+            class="tw:!h-8"
             @click="addRole"
           >
             {{ t('iam.addRole') }}

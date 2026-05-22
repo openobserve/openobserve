@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
           <OInput
               v-model="filterQuery"
-              class="tw:h-[36px] tw:w-[200px]"
+              class="tw:w-[12.5rem]"
               :placeholder="t('user.search')"
             >
               <template #icon-left>
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm"
+              class="tw:!h-8"
               @click="addRoutePush({})"
               data-test="add-basic-user"
             >
