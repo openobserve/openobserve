@@ -147,7 +147,7 @@ Bloom algorithm: SBBF block layout from the Parquet spec, but the hash function 
 
 Width-overflow checks at write time return `WriteError::{FieldNameTooLong, TooManyFields, TooManyFiles, BloomBodyTooLarge}` instead of silent `as` casts.
 
-Tail magic + footer-length pointer is used by the reader's `parse_suffix(suffix, total_size)` path: the search side fetches just the footer (typically 16 KB suffix probe) and never materializes the body. The body bytes stay in object store / disk cache; only the **single 32-byte block** each point check needs is read on demand via `cache_storage::get_ranges`.
+Tail magic + footer-length pointer is used by the reader's `parse_suffix(suffix, total_size)` path: the search side fetches just the footer (typically 16 KB suffix probe) and never materializes the body. The body bytes stay in object store / disk cache; only the **single 32-byte block** each point check needs is read on demand via `infra::cache::storage::get_ranges`.
 
 **Format version**: `VERSION = 0x01`. This is the first released format — `body_offset..body_offset+body_size` is exactly a sequence of 32-byte raw SBBF blocks, no framing. Earlier in-development prototypes wrapped each body in a Parquet thrift `BloomFilterHeader` from `parquet::bloom_filter::Sbbf::write`; those never shipped, and the current code only knows the raw-block layout.
 
@@ -240,7 +240,7 @@ Skipped (search-side prune treats those files as "keep"):
    - **Footer cache miss**: one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES = 16 KB)` to the object store. `GetResult.meta.size` is the total file length (no separate `head`); the suffix bytes go into `BLOOM_FOOTER_CACHE` for the next query.
    - **Footer parse**: `BloomReader::parse_suffix(&suffix, total_size)` produces a footer-only reader. The body is never materialized.
    - **Block planning**: for each `(file_id, value)` target, `reader.block_range_for(field, file_id, value)` returns the absolute byte range of the single 32-byte SBBF block to fetch and the `hash` to feed `check_block`. Targets with no info (unknown field or file_id) are dropped; the per-file fold treats those predicates as "unknown → keep".
-   - **Batched block fetch**: a single `cache_storage::get_ranges(account, path, &ranges)` call pulls every needed 32-byte block. Internally `object_store::coalesce_ranges` merges adjacent ranges into one underlying GET; returns one `Bytes` per input range, in input order.
+   - **Batched block fetch**: a single `infra::cache::storage::get_ranges(account, path, &ranges)` call pulls every needed 32-byte block. Internally `object_store::coalesce_ranges` merges adjacent ranges into one underlying GET; returns one `Bytes` per input range, in input order.
    - **Check**: `BloomReader::check_block_with_hash(&block, hash)` on each fetched 32-byte block.
 4. **Evaluate** per file: kept iff every predicate's bloom returns "maybe" for at least one of its values (OR within a predicate, AND across predicates). A predicate with no info on this file (every value's `block_range_for` returned `None`) is treated as "unknown → keep".
 5. Files with no successfully-evaluated targets (bucket fetch failed wholesale) → conservatively keep.

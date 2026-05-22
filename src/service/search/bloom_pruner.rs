@@ -26,8 +26,8 @@
 //!    - footer cache hit → 0 GETs
 //!    - footer cache miss → 1 suffix GET (16 KB)
 //!    - then **one batched `get_ranges` call** that pulls every required 32-byte SBBF block for all
-//!      `(file, value)` targets in the bucket. `cache_storage::get_ranges` internally coalesces
-//!      adjacent ranges via `object_store::coalesce_ranges`.
+//!      `(file, value)` targets in the bucket. `infra::cache::storage::get_ranges` internally
+//!      coalesces adjacent ranges via `object_store::coalesce_ranges`.
 //! 4. For each `(file_id, predicate value)`, runs the SBBF point check on the fetched 32-byte
 //!    block. A file is kept iff every predicate's bloom returns *maybe* for at least one of its
 //!    values (OR within a predicate, AND across predicates).
@@ -39,10 +39,7 @@ use std::collections::HashMap;
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
-use infra::{
-    bloom::{BLOOM_FOOTER_CACHE, BloomReader, path::bloom_path, sbbf::BLOCK_BYTES},
-    cache::storage as cache_storage,
-};
+use infra::bloom::{BLOOM_FOOTER_CACHE, BloomReader, path::bloom_path, sbbf::BLOCK_BYTES};
 use object_store::{GetOptions, GetRange};
 
 use super::bloom_predicate::BloomPredicate;
@@ -321,7 +318,7 @@ async fn run_group(
     // the SBBF — coalescing rarely merges, but the single API call still
     // saves N round trips of per-range overhead.
     let ranges: Vec<std::ops::Range<u64>> = planned.iter().map(|p| p.range.clone()).collect();
-    let fetched = match cache_storage::get_ranges(account, &path.into(), &ranges).await {
+    let fetched = match infra::cache::storage::get_ranges(account, &path.into(), &ranges).await {
         Ok(v) => v,
         Err(e) => return GroupResult::Err(path.to_string(), FetchError::Store(e)),
     };
@@ -366,7 +363,7 @@ async fn get_footer_suffix(account: &str, path: &str) -> Result<(u64, bytes::Byt
         range: Some(GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)),
         ..Default::default()
     };
-    let res = cache_storage::get_opts(account, &path.into(), opts).await?;
+    let res = infra::cache::storage::get_opts(account, &path.into(), opts).await?;
     let total = res.meta.size;
     let suffix = res.bytes().await?;
     BLOOM_FOOTER_CACHE.put(path.to_string(), total, suffix.clone());
