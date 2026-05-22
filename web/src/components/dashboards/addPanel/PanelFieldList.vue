@@ -12,7 +12,7 @@
       :show-pagination="true"
       :current-page="currentPage"
       row-key="name"
-      :draggable="!hideAllFieldsSelection"
+      :draggable="!hideAllFieldsSelection && !promqlMode"
       :drag-enabled-fn="isRowDragEnabled"
       :sort-fn="sortFieldsFn"
       @update:search="onSearchChange"

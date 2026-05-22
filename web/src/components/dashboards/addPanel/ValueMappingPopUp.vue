@@ -76,16 +76,16 @@
             </div>
             <div
               v-if="mapping.type === 'range'"
-              class="input-container tw:flex-1"
+              class="input-container tw:flex-1 tw:flex tw:flex-col tw:gap-2"
             >
               <OInput
                 v-model="mapping.from"
-                :label="t('dashboard.valueMappingFrom')"
+                :placeholder="t('dashboard.valueMappingFrom')"
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
               />
               <OInput
                 v-model="mapping.to"
-                :label="t('dashboard.valueMappingTo')"
+                :placeholder="t('dashboard.valueMappingTo')"
                 class="tw:flex-1"
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
               />
@@ -105,13 +105,16 @@
                   v-model="mapping.color"
                   class="tw:flex-1 tw:h-9 tw:mt-3"
                 />
-                <OIcon
-                  name="cancel"
-                  class="tw:cursor-pointer"
-                  size="xs"
+                <OButton
+                  variant="ghost"
+                  size="icon"
                   :title="t('dashboard.valueMappingRemoveColor')"
                   @click="removeColorByIndex(index)"
-                />
+                >
+                  <template #icon-left>
+                    <OIcon name="cancel" size="sm" />
+                  </template>
+                </OButton>
               </div>
               <div v-else class="tw:w-full">
                 <OButton
