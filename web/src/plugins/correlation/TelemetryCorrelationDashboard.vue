@@ -56,56 +56,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-      <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
+      <!-- Source event banner -->
       <div
-        class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+        v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
+        class="source-event-banner tw:flex tw:items-start tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-          <span class="tw:text-xs tw:font-semibold tw:opacity-70">
-            {{ t("correlation.filters") }}:
-          </span>
-          <div
-            v-for="(value, key) in pendingDimensions"
-            :key="key"
-            class="tw:flex tw:items-center tw:gap-2"
-          >
-            <span
-              class="tw:text-xs tw:font-semibold"
-              :class="
-                unstableDimensionKeys.has(key)
-                  ? 'tw:opacity-60'
-                  : 'tw:opacity-100'
-              "
-            >
-              {{ key }}:
-            </span>
-            <q-select
-              v-model="pendingDimensions[key]"
-              :options="getDimensionOptions(key, value)"
-              dense
-              outlined
-              emit-value
-              map-options
-              @update:model-value="onPendingDimensionChange"
-              class="dimension-dropdown"
-              borderless
-              style="min-width: 120px"
-            />
-            <q-tooltip v-if="unstableDimensionKeys.has(key)">
-              Unstable dimension - changes on pod restart. Default: All values.
-            </q-tooltip>
-          </div>
-          <!-- Apply Button -->
-          <OButton
-            variant="outline"
-            size="sm-action"
-            :disabled="!hasPendingChanges"
-            @click="applyDimensionChanges"
-            class="tw:ml-2"
-            data-test="apply-dimension-filters"
-          >
-            {{ t('common.apply') }}
-          </OButton>
+        <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
+        <q-badge
+          v-if="sourceEvent.severity"
+          :class="severityClass(sourceEvent.severity)"
+          :label="sourceEvent.severity"
+          class="tw:px-2"
+        />
+        <span class="tw:text-xs tw:font-mono tw:opacity-80">
+          {{ formatEventTimestamp(sourceEvent.timestamp) }}
+        </span>
+        <span
+          v-if="sourceEvent.message"
+          class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+          :title="sourceEvent.message"
+        >
+          {{ sourceEvent.message }}
+        </span>
+      </div>
+
+      <!-- Selectable dimension chips (Service Name, Namespace, Pod, Node, …) -->
+      <div
+        v-if="tabFilteredChips.length > 0"
+        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
+        <div
+          v-for="chip in visibleChips"
+          :key="chip.key"
+          class="dim-chip"
+          :class="{
+            'dim-chip-context': chip.kind === 'context',
+            'dim-chip-subject': chip.kind === 'subject',
+            'dim-chip-subject-active':
+              chip.kind === 'subject' && chip.active && !chip.disabled,
+            'dim-chip-subject-inactive':
+              chip.kind === 'subject' && !chip.active && !chip.disabled,
+            'dim-chip-disabled': chip.disabled,
+          }"
+          :style="
+            chip.kind === 'subject' && chip.active && !chip.disabled
+              ? {
+                  background: chipColors(chip.key).border,
+                  borderColor: chipColors(chip.key).border,
+                  color: '#fff',
+                }
+              : chip.kind === 'context'
+              ? {
+                  borderColor: chipColors(chip.key).border,
+                  color: chipColors(chip.key).text,
+                }
+              : undefined
+          "
+          @click="onChipClick(chip)"
+        >
+          <span class="dim-chip-label">{{ chip.label }}</span>
+          <span class="dim-chip-eq">=</span>
+          <span class="dim-chip-value">{{ chip.value }}</span>
+          <q-tooltip v-if="chip.disabled">
+            No metric streams found for this {{ chip.label.toLowerCase() }}
+          </q-tooltip>
+        </div>
+        <div
+          v-if="hiddenChipCount > 0"
+          class="dim-chip-more"
+          @click="chipOverflowExpanded = !chipOverflowExpanded"
+        >
+          {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
         </div>
       </div>
 
@@ -256,41 +277,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="tw:ml-1"
                             />
                           </div>
-                          <div class="metric-group-actions">
-                            <OButton
-                              v-for="button in subjectButtons"
-                              :key="button.id"
-                              variant="ghost"
-                              size="icon-xs"
-                              :disabled="getSubjectButtonState(button, group.id).relevantCount === 0"
-                              :class="{
-                                'subject-button-active':
-                                  getSubjectButtonState(button, group.id).state === 'all' &&
-                                  getSubjectButtonState(button, group.id).relevantCount > 0,
-                                'subject-button-partial':
-                                  getSubjectButtonState(button, group.id).state === 'partial',
-                              }"
-                              @click.stop="toggleSubjectInGroup(button, group.id)"
-                            >
-                              {{ button.label }}
-                            </OButton>
-                            <OButton
-                              variant="ghost"
-                              size="icon-xs"
-                              @click.stop="selectAllInGroup(group.id)"
-                              :disabled="getGroupSelectionState(group.id) === 'all'"
-                            >
-                              All
-                            </OButton>
-                            <OButton
-                              variant="ghost"
-                              size="icon-xs"
-                              @click.stop="deselectAllInGroup(group.id)"
-                              :disabled="getGroupSelectionState(group.id) === 'none'"
-                            >
-                              None
-                            </OButton>
-                          </div>
                         </div>
                         <q-item
                           v-for="stream in group.streams"
@@ -317,8 +303,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-section>
                             <q-item-label
                               class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
-                              >{{ stream.stream_name }}</q-item-label
                             >
+                              {{ stream.stream_name }}
+                              <q-badge
+                                v-if="essentialStreamNames.has(stream.stream_name)"
+                                color="amber-7"
+                                text-color="white"
+                                label="essential"
+                                class="tw:ml-1"
+                                style="font-size: 0.625rem"
+                              />
+                            </q-item-label>
                           </q-item-section>
                         </q-item>
                       </template>
@@ -347,45 +342,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="metric-splitter-separator" />
             </template>
 
-            <!-- ── Right area: group tabs + dashboard ── -->
+            <!-- ── Right area: pill row + dashboard ── -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
-                <!-- Group tabs -->
-                <OTabs
-                  v-if="nonEmptyGroupTabs.length > 0"
-                  v-model="activeMetricGroupTab"
-                  dense
-                  align="left"
-                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                <!-- Intent pill row -->
+                <div
+                  class="intent-pill-row tw:flex tw:items-center tw:gap-1 tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:overflow-x-auto"
                 >
-                  <OTab
-                    v-for="group in groupedUniqueMetricStreams.groups.filter(
-                      (g) => nonEmptyGroupTabs.includes(g.id),
-                    )"
-                    :key="group.id"
-                    :name="group.id"
-                    class="tw:flex-none!"
+                  <OButton
+                    v-for="pill in pillDescriptors"
+                    :key="pill.id"
+                    variant="ghost"
+                    size="icon-xs"
+                    :disabled="pill.disabled"
+                    :class="{
+                      'intent-pill-active': activeIntent === pill.id,
+                    }"
+                    @click="setActiveIntent(pill.id)"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                      <component :is="group.icon" />
-                      <span>{{ group.label }}</span>
-                      <q-badge
-                        dense
-                        :color="
-                          activeMetricGroupTab === group.id
-                            ? 'primary'
-                            : 'grey-5'
-                        "
-                        text-color="white"
-                        :label="
-                          groupedSelectedMetricStreams.byGroup[group.id]
-                            ?.length ?? 0
-                        "
-                        class="tw:ml-0.5"
-                      />
-                    </div>
-                  </OTab>
-                </OTabs>
+                    <q-icon
+                      v-if="pill.icon"
+                      :name="pill.icon"
+                      size="0.875rem"
+                      class="tw:mr-1"
+                    />
+                    <span>{{ pill.label }}</span>
+                    <q-badge
+                      dense
+                      :color="activeIntent === pill.id ? 'primary' : 'grey-5'"
+                      text-color="white"
+                      :label="pill.count"
+                      class="tw:ml-1"
+                    />
+                  </OButton>
+                </div>
 
                 <!-- Dashboard content -->
                 <div class="tw:flex-1 tw:overflow-auto">
@@ -424,12 +414,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </div>
                   <RenderDashboardCharts
-                    v-else-if="activeDashboardForGroup"
+                    v-else-if="dashboardData"
                     ref="dashboardChartsRef"
-                    :key="
-                      activeMetricGroupTab + '_' + groupedDashboardRenderKey
-                    "
-                    :dashboardData="activeDashboardForGroup"
+                    :key="activeIntent + '_' + dashboardRenderKey"
+                    :dashboardData="dashboardData"
                     :currentTimeObj="currentTimeObj"
                     :viewOnly="true"
                     :allowAlertCreation="false"
@@ -612,18 +600,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Embedded Tabs Mode -->
   <div v-else class="correlation-dashboard-embedded">
-    <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
-    <DimensionFiltersBar
-      v-if="!props.hideDimensionFilters"
-      :dimensions="pendingDimensions"
-      :unstable-dimension-keys="unstableDimensionKeys"
-      :get-dimension-options="getDimensionOptions"
-      :has-pending-changes="hasPendingChanges"
-      :show-apply-button="true"
-      unstable-dimension-tooltip="Unstable dimension - changes on pod restart. Default: All values."
-      @update:dimension="handleDimensionUpdate"
-      @apply="applyDimensionChanges"
-    />
+    <!-- Source event banner -->
+    <div
+      v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
+      class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
+      <q-badge
+        v-if="sourceEvent.severity"
+        :class="severityClass(sourceEvent.severity)"
+        :label="sourceEvent.severity"
+        class="tw:px-2"
+      />
+      <span class="tw:text-xs tw:font-mono tw:opacity-80">
+        {{ formatEventTimestamp(sourceEvent.timestamp) }}
+      </span>
+      <span
+        v-if="sourceEvent.message"
+        class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+        :title="sourceEvent.message"
+      >
+        {{ sourceEvent.message }}
+      </span>
+    </div>
+
+    <!-- Selectable dimension chips (Service Name, Namespace, Pod, Node, …) -->
+    <div
+      v-if="tabFilteredChips.length > 0"
+      class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <div
+        v-for="chip in visibleChips"
+        :key="chip.key"
+        class="dim-chip"
+        :class="{ 'dim-chip-inactive': !chip.active }"
+        :style="{
+          borderColor: chip.active ? chipColors(chip.key).border : undefined,
+          color: chip.active ? chipColors(chip.key).text : undefined,
+        }"
+        @click="onChipClick(chip)"
+      >
+        <span class="dim-chip-label">{{ chip.label }}</span>
+        <span class="dim-chip-eq">=</span>
+        <span class="dim-chip-value">{{ chip.value }}</span>
+      </div>
+      <div
+        v-if="hiddenChipCount > 0"
+        class="dim-chip-more"
+        @click="chipOverflowExpanded = !chipOverflowExpanded"
+      >
+        {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+      </div>
+    </div>
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <q-card
@@ -768,41 +796,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="tw:ml-1"
                           />
                         </div>
-                        <div class="metric-group-actions">
-                          <OButton
-                            v-for="button in subjectButtons"
-                            :key="button.id"
-                            variant="ghost"
-                            size="icon-xs"
-                            :disabled="getSubjectButtonState(button, group.id).relevantCount === 0"
-                            :class="{
-                              'subject-button-active':
-                                getSubjectButtonState(button, group.id).state === 'all' &&
-                                getSubjectButtonState(button, group.id).relevantCount > 0,
-                              'subject-button-partial':
-                                getSubjectButtonState(button, group.id).state === 'partial',
-                            }"
-                            @click.stop="toggleSubjectInGroup(button, group.id)"
-                          >
-                            {{ button.label }}
-                          </OButton>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs"
-                            @click.stop="selectAllInGroup(group.id)"
-                            :disabled="getGroupSelectionState(group.id) === 'all'"
-                          >
-                            All
-                          </OButton>
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs"
-                            @click.stop="deselectAllInGroup(group.id)"
-                            :disabled="getGroupSelectionState(group.id) === 'none'"
-                          >
-                            None
-                          </OButton>
-                        </div>
                       </div>
                       <q-item
                         v-for="stream in group.streams"
@@ -829,8 +822,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
-                            >{{ stream.stream_name }}</q-item-label
                           >
+                            {{ stream.stream_name }}
+                            <q-badge
+                              v-if="essentialStreamNames.has(stream.stream_name)"
+                              color="amber-7"
+                              text-color="white"
+                              label="essential"
+                              class="tw:ml-1"
+                              style="font-size: 0.625rem"
+                            />
+                          </q-item-label>
                         </q-item-section>
                       </q-item>
                     </template>
@@ -859,51 +861,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="metric-splitter-separator" />
           </template>
 
-          <!-- ── Right area: group tabs + dashboard ── -->
+          <!-- ── Right area: pill row + dashboard ── -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
-              <!-- Group tabs -->
-              <OTabs
-                v-if="nonEmptyGroupTabs.length > 0"
-                v-model="activeMetricGroupTab"
-                dense
-                align="left"
-                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              <!-- Intent pill row -->
+              <div
+                class="intent-pill-row tw:flex tw:items-center tw:gap-1 tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:overflow-x-auto"
               >
-                <OTab
-                  v-for="group in groupedUniqueMetricStreams.groups.filter(
-                    (g) => nonEmptyGroupTabs.includes(g.id),
-                  )"
-                  :key="group.id"
-                  :name="group.id"
-                  class="tw:flex-none!"
+                <OButton
+                  v-for="pill in pillDescriptors"
+                  :key="pill.id"
+                  variant="ghost"
+                  size="icon-xs"
+                  :disabled="pill.disabled"
+                  :class="{
+                    'intent-pill-active': activeIntent === pill.id,
+                  }"
+                  @click="setActiveIntent(pill.id)"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                    <component
-                      v-if="typeof group.icon !== 'string'"
-                      :is="group.icon"
-                    />
-                    <q-icon
-                      v-if="typeof group.icon === 'string'"
-                      :name="group.icon"
-                      size="xs"
-                    />
-                    <span>{{ group.label }}</span>
-                    <q-badge
-                      dense
-                      :color="
-                        activeMetricGroupTab === group.id ? 'primary' : 'grey-5'
-                      "
-                      text-color="white"
-                      :label="
-                        groupedSelectedMetricStreams.byGroup[group.id]
-                          ?.length ?? 0
-                      "
-                      class="tw:ml-0.5"
-                    />
-                  </div>
-                </OTab>
-              </OTabs>
+                  <q-icon
+                    v-if="pill.icon"
+                    :name="pill.icon"
+                    size="0.875rem"
+                    class="tw:mr-1"
+                  />
+                  <span>{{ pill.label }}</span>
+                  <q-badge
+                    dense
+                    :color="activeIntent === pill.id ? 'primary' : 'grey-5'"
+                    text-color="white"
+                    :label="pill.count"
+                    class="tw:ml-1"
+                  />
+                </OButton>
+              </div>
 
               <!-- Dashboard content -->
               <div class="tw:flex-1 tw:overflow-auto">
@@ -942,9 +933,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <RenderDashboardCharts
-                  v-else-if="activeDashboardForGroup"
-                  :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
-                  :dashboardData="activeDashboardForGroup"
+                  v-else-if="dashboardData"
+                  :key="activeIntent + '_' + dashboardRenderKey"
+                  :dashboardData="dashboardData"
                   :currentTimeObj="currentTimeObj"
                   :viewOnly="true"
                   :allowAlertCreation="false"
@@ -1278,10 +1269,17 @@ import {
 import {
   buildSubjectButtons,
   streamMatchesPatterns,
-  getSubjectSelectionState,
   SUBJECT_BUTTONS_BY_SET,
   type SubjectButton,
 } from "@/composables/useMetricSubjectButtons";
+import {
+  INTENT_DEFINITIONS,
+  filterByIntent,
+  getEssentialStreams,
+  hasEssentials,
+  pickDefaultIntent,
+  type IntentId,
+} from "@/utils/metrics/metricIntent";
 import type { StreamInfo } from "@/services/service_streams";
 import {
   enrichStreamsWithOverlap,
@@ -1290,10 +1288,15 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  getUUID,
+  convertTimeFromNsToMs,
+  convertTimeFromMicroToMilli,
+  timestampToTimezoneDate,
+} from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
-import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1313,6 +1316,16 @@ export interface TelemetryCorrelationDashboardProps {
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
   matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
+  // Semantic-id keyed dimensions for the chip row (e.g. "k8s-pod-name": "checkout-api-7f9d4-x2q").
+  // Distinct from `matchedDimensions` (which is field-name keyed for SQL WHERE construction).
+  // Merge of correlate API's matched_dimensions + additional_dimensions; the FE doesn't care
+  // whether a dimension is "stable" or "unstable" for chip rendering purposes.
+  chipDimensions?: Record<string, string>;
+  sourceEvent?: {
+    timestamp?: number | string; // microseconds, ms, or formatted string — coerced for display
+    severity?: string;           // INFO / WARN / ERROR / DEBUG / FATAL — uppercase preferred
+    message?: string;            // log body / message field
+  };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -1552,6 +1565,522 @@ const unstableDimensionKeys = computed(
   () => new Set(Object.keys(props.additionalDimensions || {})),
 );
 
+// ── Selectable dimension chips ─────────────────────────────────────────────
+//
+// Replaces the dropdown row. A chip is "active" when its pending value is the
+// real source-row value; "inactive" when its value is SELECT_ALL_VALUE
+// (dimension dropped from the filter). Toggling flips between the two.
+// Stable dimensions start active; unstable start inactive (today's behavior).
+
+// Build a quick lookup so a dimension key (e.g. "k8s-pod-name") becomes a
+// human-readable label ("K8s Pod Name"). Falls back to a title-cased version
+// of the raw key when no semantic group matches.
+//
+// ACRONYMS keeps common identifiers fully capitalized rather than only
+// title-cased — e.g. "aws-ecs-task" → "AWS ECS Task", not "Aws Ecs Task".
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+
+const titleCaseWord = (w: string): string => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  // Preserve mixed-case words like "K8s" (lowercase 's' suffix on an acronym).
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+
+const titleCase = (s: string) =>
+  s
+    .split(/\s+/)
+    .map(titleCaseWord)
+    .join(" ");
+
+// Memoize the label lookup so chip rows don't re-scan semanticGroups per render.
+const dimensionDisplayLabelCache = new Map<string, string>();
+let dimensionDisplayLabelCacheKey: any = null;
+
+const dimensionDisplayLabel = (key: string): string => {
+  // Invalidate the cache when semanticGroups identity changes.
+  if (dimensionDisplayLabelCacheKey !== semanticGroups.value) {
+    dimensionDisplayLabelCache.clear();
+    dimensionDisplayLabelCacheKey = semanticGroups.value;
+  }
+  const cached = dimensionDisplayLabelCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const group = semanticGroups.value.find((g) => g.id === key);
+  const label = group?.display ?? titleCase(key.replace(/[-_]/g, " "));
+  dimensionDisplayLabelCache.set(key, label);
+  return label;
+};
+
+// Chip-row dimensions are semantic-id keyed (e.g. "k8s-pod-name"). When the
+// dedicated `chipDimensions` prop is provided, use that; otherwise fall back
+// to the field-name-keyed matched/additional dimensions for backward compat.
+//
+// Call sites sometimes spread API responses whose `additional_dimensions`
+// values can be objects; coerce to scalar strings here so chips never render
+// "[object Object]". Object/null/empty values are dropped entirely.
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+
+const sanitizeChipDimensions = (
+  src: Record<string, unknown> | undefined | null,
+): Record<string, string> => {
+  if (!src) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "") out[k] = s;
+  }
+  return out;
+};
+
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  if (props.chipDimensions && Object.keys(props.chipDimensions).length > 0) {
+    return sanitizeChipDimensions(
+      props.chipDimensions as Record<string, unknown>,
+    );
+  }
+  return sanitizeChipDimensions({
+    ...(props.matchedDimensions ?? {}),
+    ...(props.additionalDimensions ?? {}),
+  });
+});
+
+const chipDimensionKeys = computed<string[]>(() =>
+  Object.keys(chipDimensionSource.value),
+);
+
+// Resolve a semantic-id (e.g. "k8s-pod-name") to the field-name key(s) it
+// represents — first checking pendingDimensions, then falling back to the
+// source row's availableDimensions when the field hasn't been seeded yet
+// (this is the common case for Pod/Node which the correlate API doesn't
+// include in matched/additional dimensions).
+const fieldKeysForSemanticId = (semanticId: string): string[] => {
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) {
+    return semanticId in pendingDimensions.value ? [semanticId] : [];
+  }
+  // Prefer field keys already present in pendingDimensions (existing flow).
+  const pending = group.fields.filter((f) => f in pendingDimensions.value);
+  if (pending.length > 0) return pending;
+  // Fallback: any field present on the source row. The first hit is enough —
+  // we pin it into pendingDimensions when the subject is applied.
+  const avail = props.availableDimensions ?? {};
+  const sourceHit = group.fields.find(
+    (f) => avail[f] !== undefined && avail[f] !== null && avail[f] !== "",
+  );
+  return sourceHit ? [sourceHit] : [];
+};
+
+// A chip is active when any of its mapped field keys has a real value in
+// pendingDimensions (i.e. not SELECT_ALL_VALUE). When the chip's semantic id
+// has no field-name presence in pendingDimensions, we still want the chip to
+// reflect toggle state — fall back to a local set.
+const activeChipKeysLocal = ref<Set<string>>(new Set());
+
+// Seed visual-only chips (those without a corresponding field key in
+// pendingDimensions) as active on first sight of a key — that way the user
+// sees them lit up by default, matching dimension chips that have query
+// effect.
+watch(
+  chipDimensionKeys,
+  (keys) => {
+    const next = new Set(activeChipKeysLocal.value);
+    let mutated = false;
+    for (const k of keys) {
+      const fields = fieldKeysForSemanticId(k);
+      if (fields.length === 0 && !next.has(k)) {
+        next.add(k);
+        mutated = true;
+      }
+    }
+    if (mutated) activeChipKeysLocal.value = next;
+  },
+  { immediate: true },
+);
+
+const isChipActive = (key: string): boolean => {
+  // Check the semantic-id-keyed entry first (written by pinSubject).
+  if (key in pendingDimensions.value) {
+    return pendingDimensions.value[key] !== SELECT_ALL_VALUE;
+  }
+  // Fallback to legacy field-name-keyed entries (from props.matchedDimensions).
+  const fields = fieldKeysForSemanticId(key);
+  if (fields.length > 0) {
+    return fields.some(
+      (f) => pendingDimensions.value[f] !== SELECT_ALL_VALUE,
+    );
+  }
+  return activeChipKeysLocal.value.has(key);
+};
+
+const originalValueForKey = (key: string): string => {
+  const v = chipDimensionSource.value[key];
+  if (v !== undefined && v !== SELECT_ALL_VALUE) return v;
+  return "";
+};
+
+const toggleChip = (key: string) => {
+  const fields = fieldKeysForSemanticId(key);
+  const turningOn = !isChipActive(key);
+  const value = originalValueForKey(key);
+
+  if (fields.length > 0) {
+    // Map across all field aliases present in pendingDimensions for this
+    // semantic id, flipping them in lockstep.
+    const next = { ...pendingDimensions.value };
+    for (const f of fields) {
+      if (turningOn) {
+        // Restore the real value from matched/additional dimensions if known,
+        // otherwise restore the original pre-toggle value or fall back to
+        // SELECT_ALL_VALUE.
+        const matchedV = props.matchedDimensions?.[f];
+        const additionalV = props.additionalDimensions?.[f];
+        next[f] =
+          (matchedV && matchedV !== SELECT_ALL_VALUE && matchedV) ||
+          (additionalV && additionalV !== SELECT_ALL_VALUE && additionalV) ||
+          value ||
+          SELECT_ALL_VALUE;
+      } else {
+        next[f] = SELECT_ALL_VALUE;
+      }
+    }
+    pendingDimensions.value = next;
+  } else {
+    // No field mapping — purely a visual toggle.
+    const nextSet = new Set(activeChipKeysLocal.value);
+    if (turningOn) nextSet.add(key);
+    else nextSet.delete(key);
+    activeChipKeysLocal.value = nextSet;
+  }
+
+  applyDimensionChanges();
+};
+
+// Chip row mental model:
+//   - "context" chips (Service, Namespace, Region, …) — describe where the
+//     user is. Read-only badges, no interaction.
+//   - "subject" chips (Pod, Node, Container, …) — the lens the user is
+//     looking through. Radio behaviour: exactly one active at a time. Clicking
+//     a different subject pivots the metric grid (stream pool refilters,
+//     WHERE clause re-pins).
+//
+// Subject membership comes from SUBJECT_BUTTONS_BY_SET[matchedSetId]. Each
+// entry there lists `semanticIds` — chips whose key matches one of those
+// semantic ids are subjects; everything else is context.
+type ChipKind = "context" | "subject";
+type DimensionChip = {
+  key: string;
+  label: string;
+  value: string;
+  kind: ChipKind;
+  active: boolean;
+  /** Subject chips with no matching streams in the current metric pool. */
+  disabled?: boolean;
+};
+
+// All semantic ids that count as "subjects" for the current workload.
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const specs = SUBJECT_BUTTONS_BY_SET[props.matchedSetId];
+  if (!specs?.length) return new Set();
+  return new Set(specs.flatMap((s) => s.semanticIds));
+});
+
+// Active subject (semantic id) — drives stream-pool filtering and the WHERE
+// clause. Null when no subjects are available.
+const activeSubject = ref<string | null>(null);
+
+const subjectButtons = computed<SubjectButton[]>(() =>
+  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
+);
+
+// Per-subject match count: how many streams in the pool have at least one
+// of the subject's semantic-group field aliases in their **schema**. A
+// subject is "applicable" to a stream when the stream has a column the
+// WHERE clause can filter on — not when the stream's name resembles the
+// subject. Example: `k8s_pod_cpu_usage` carries `k8s_node_name` as a label
+// column, so the Node subject IS applicable to it.
+//
+// Falls back to stream-name regex when schemas haven't been cached yet
+// (graceful initial-render state).
+const subjectMatchCounts = computed<Record<string, number>>(() => {
+  const out: Record<string, number> = {};
+  const pool = props.metricStreams ?? [];
+  if (pool.length === 0) return out;
+
+  const cachedSchemas =
+    (store.state.streams?.metrics as Record<string, any> | undefined) ?? {};
+
+  for (const button of subjectButtons.value) {
+    if (!button.semanticIds || button.poolPatterns.length === 0) continue;
+
+    // Collect every field-alias the subject's semantic groups map to.
+    // A stream is applicable when its schema contains any of these columns.
+    const subjectFieldAliases = new Set<string>();
+    for (const sid of button.semanticIds) {
+      const group = semanticGroups.value.find((g) => g.id === sid);
+      if (group) for (const f of group.fields) subjectFieldAliases.add(f);
+    }
+
+    const seen = new Set<string>();
+    let matchCount = 0;
+    for (const stream of pool) {
+      if (seen.has(stream.stream_name)) continue;
+      seen.add(stream.stream_name);
+
+      const schema = cachedSchemas[stream.stream_name]?.schema as
+        | Array<{ name: string }>
+        | undefined;
+      if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
+        const hasColumn = schema.some((c) => subjectFieldAliases.has(c.name));
+        if (hasColumn) matchCount++;
+      } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
+        // Schema not yet cached — fall back to name-pattern heuristic.
+        matchCount++;
+      }
+    }
+    for (const sid of button.semanticIds) out[sid] = matchCount;
+  }
+  return out;
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  chipDimensionKeys.value
+    .map((key): DimensionChip => {
+      const isSubject = subjectSemanticIds.value.has(key);
+      const matchCount = isSubject ? subjectMatchCounts.value[key] ?? 0 : 0;
+      return {
+        key,
+        label: dimensionDisplayLabel(key),
+        value: originalValueForKey(key),
+        kind: isSubject ? "subject" : "context",
+        active: isSubject ? activeSubject.value === key : true,
+        disabled: isSubject && matchCount === 0,
+      };
+    })
+    // Drop chips with no value — nothing to display.
+    .filter((c) => c.value && c.value !== SELECT_ALL_VALUE),
+);
+
+// Stable color rotation per dimension key — same key always gets the same
+// color across renders and across the app. Hash → palette index.
+const CHIP_COLOR_PALETTE = [
+  { border: "#7c3aed", text: "#7c3aed" }, // purple
+  { border: "#ea580c", text: "#ea580c" }, // orange
+  { border: "#0d9488", text: "#0d9488" }, // teal
+  { border: "#dc2626", text: "#dc2626" }, // red
+  { border: "#2563eb", text: "#2563eb" }, // blue
+  { border: "#65a30d", text: "#65a30d" }, // lime
+  { border: "#d97706", text: "#d97706" }, // amber
+  { border: "#0891b2", text: "#0891b2" }, // cyan
+];
+
+const hashKey = (s: string): number => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+const chipColors = (key: string) =>
+  CHIP_COLOR_PALETTE[hashKey(key) % CHIP_COLOR_PALETTE.length];
+
+// Pin the WHERE clause for a subject change. Writes the semantic id as the
+// key (e.g. "k8s-pod-name") into pendingDimensions; applyDimensionChanges
+// resolves that to each metric stream's actual field name via its own
+// `filters` map, so streams that don't carry the pod field aren't touched
+// (no spurious WHERE) and streams using alternate aliases get the right key.
+const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
+  let next = { ...pendingDimensions.value };
+  let mutated = false;
+
+  if (previousSubject) {
+    if (next[previousSubject] !== SELECT_ALL_VALUE) {
+      next[previousSubject] = SELECT_ALL_VALUE;
+      mutated = true;
+    }
+  }
+
+  if (newSubject) {
+    const resolved = originalValueForKey(newSubject);
+    if (resolved && next[newSubject] !== resolved) {
+      next[newSubject] = resolved;
+      mutated = true;
+    }
+  }
+
+  if (mutated) pendingDimensions.value = next;
+  return mutated;
+};
+
+// Click a subject chip → switch active subject (radio). Context chips are
+// inert.
+const onChipClick = (chip: DimensionChip) => {
+  if (chip.kind === "context") return;
+  if (chip.disabled) return; // no matching streams — nothing to scope to
+  if (activeSubject.value === chip.key) return; // already active — no-op (radio)
+  const previous = activeSubject.value;
+  activeSubject.value = chip.key;
+  pinSubject(chip.key, previous);
+  // Repaint selection from the new (subject × intent) intersection.
+  applyActivePill();
+  // Force a clean rebuild — the selectedMetricStreams watcher may skip when
+  // the stream set's length and order coincidentally match the prior set.
+  dashboardData.value = null;
+  applyDimensionChanges();
+};
+
+// Seed activeSubject from the registry's defaultActive entry (e.g. Pod for
+// k8s). Pins the WHERE clause to the chosen subject's field key AND syncs
+// activeDimensions so the initial loadDashboard (driven by isOpen watcher)
+// builds its query with the pod/node filter already present.
+watch(
+  [
+    subjectSemanticIds,
+    () => props.matchedSetId,
+    () => props.chipDimensions,
+    subjectMatchCounts,
+  ],
+  ([sids, matchedSetId]) => {
+    let mutated = false;
+
+    if (activeSubject.value && sids.has(activeSubject.value)) {
+      mutated = pinSubject(activeSubject.value, null);
+    } else if (!matchedSetId) {
+      activeSubject.value = null;
+    } else {
+      const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+      if (!specs?.length) {
+        activeSubject.value = null;
+      } else {
+        // Prefer the registry's defaultActive subject if it has matching
+        // streams; otherwise fall back to the first subject with matches.
+        // If no subject has matches, leave activeSubject null.
+        const counts = subjectMatchCounts.value;
+        const ordered = [
+          ...specs.filter((s) => s.defaultActive),
+          ...specs.filter((s) => !s.defaultActive),
+        ];
+        let picked: string | null = null;
+        for (const spec of ordered) {
+          const sid = spec.semanticIds[0];
+          if (sid && sids.has(sid) && (counts[sid] ?? 0) > 0) {
+            picked = sid;
+            break;
+          }
+        }
+        if (picked) {
+          activeSubject.value = picked;
+          mutated = pinSubject(picked, null);
+        }
+      }
+    }
+
+    if (!mutated) return;
+
+    // Sync activeDimensions so the immediate loadDashboard call picks up the
+    // pod/node filter. Don't call applyDimensionChanges directly here — it
+    // calls loadDashboard which would race with the isOpen watcher's own
+    // loadDashboard call. The schema-aware rebuildStreamFilters inside
+    // loadDashboard will inject the columns once schemas are fetched.
+    activeDimensions.value = { ...pendingDimensions.value };
+
+    // If we've already completed initial load (e.g. user navigated to a
+    // different log row), kick a fresh reload now.
+    if (initialLoadCompleted.value) {
+      dashboardData.value = null;
+      nextTick(() => {
+        loadDashboard();
+      });
+    }
+  },
+  { immediate: true },
+);
+
+// Overflow handling — show only the first N chips inline, collapse the rest
+// behind a "+N more" indicator that expands on click.
+const CHIP_OVERFLOW_THRESHOLD = 4;
+const chipOverflowExpanded = ref(false);
+
+// Subject chips (Pod / Node) only apply to the metrics tab — trace
+// correlation is trace_id-based, not subject-based. Context chips (Service,
+// Namespace, Cluster, …) stay on all tabs so the user always knows what
+// they're looking at.
+const tabFilteredChips = computed(() =>
+  activeTab.value === "metrics"
+    ? unifiedChips.value
+    : unifiedChips.value.filter((c) => c.kind === "context"),
+);
+
+const visibleChips = computed(() =>
+  chipOverflowExpanded.value
+    ? tabFilteredChips.value
+    : tabFilteredChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+);
+const hiddenChipCount = computed(() =>
+  Math.max(0, tabFilteredChips.value.length - CHIP_OVERFLOW_THRESHOLD),
+);
+
+// ── Source event banner ────────────────────────────────────────────────────
+// Source-event timestamps come from heterogeneous places: log rows
+// (microseconds), spans (nanoseconds), occasional ms/s integers, or already
+// formatted strings. Coerce by magnitude before handing to the shared
+// timezone formatter.
+//
+// Thresholds are picked as the geometric midpoint between current-epoch
+// values for adjacent units (year 2024-ish) so any plausible current
+// timestamp lands in the correct bucket:
+//   seconds      ≈ 1.7e9   → boundary 1e11   (year 5138 in s, year 1973 in ms)
+//   milliseconds ≈ 1.7e12  → boundary 1e14   (year 5138 in ms, year 1973 in µs)
+//   microseconds ≈ 1.7e15  → boundary 1e17   (year 5138 in µs, year 1973 in ns)
+//   nanoseconds  ≈ 1.7e18
+const TS_NS_MIN = 1e17;
+const TS_US_MIN = 1e14;
+const TS_MS_MIN = 1e11;
+const TS_S_MIN = 1e9;
+
+const formatEventTimestamp = (ts: number | string | undefined): string => {
+  if (ts == null || ts === "") return "";
+  // Pre-formatted strings (e.g. ISO) pass through.
+  if (typeof ts === "string" && !/^\d+$/.test(ts.trim())) return ts;
+
+  const n = typeof ts === "number" ? ts : Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return String(ts);
+
+  let ms: number;
+  if (n >= TS_NS_MIN) ms = convertTimeFromNsToMs(n);
+  else if (n >= TS_US_MIN) ms = convertTimeFromMicroToMilli(n);
+  else if (n >= TS_MS_MIN) ms = n;
+  else if (n >= TS_S_MIN) ms = n * 1000;
+  else ms = n;
+
+  try {
+    return `${timestampToTimezoneDate(ms, "UTC", "yyyy-MM-dd HH:mm:ss.SSS")} UTC`;
+  } catch {
+    return String(ts);
+  }
+};
+
+const severityClass = (sev: string | undefined): string => {
+  if (!sev) return "tw:bg-gray-200 tw:text-gray-700";
+  const s = sev.toUpperCase();
+  if (s.includes("ERROR") || s.includes("FATAL"))
+    return "tw:bg-red-100 tw:text-red-700";
+  if (s.includes("WARN")) return "tw:bg-amber-100 tw:text-amber-700";
+  if (s.includes("DEBUG")) return "tw:bg-purple-100 tw:text-purple-700";
+  return "tw:bg-blue-100 tw:text-blue-700";
+};
+
 // Get unique metric streams by stream_name
 const getUniqueStreams = (streams: StreamInfo[]) => {
   const seen = new Set<string>();
@@ -1653,28 +2182,10 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams — initial selection strategy:
-// 1. If the matched_set_id has subject buttons registered, start empty and let
-//    the subject-button watch apply any defaultActive buttons (e.g. Pod for k8s).
-// 2. Otherwise prefer curated defaults from group definitions, falling back to
-//    the first 6 unique streams for non-OTel deployments.
-const selectedMetricStreams = ref<StreamInfo[]>(
-  applyUnstableDimensionDefaults(
-    (() => {
-      if (
-        props.matchedSetId &&
-        SUBJECT_BUTTONS_BY_SET[props.matchedSetId]?.length
-      ) {
-        return [];
-      }
-      const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs =
-        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
-      const defaults = getDefaultMetricSelections(defs, unique);
-      return defaults.length > 0 ? defaults : unique.slice(0, 6);
-    })(),
-  ),
-);
+// Selected metric streams — populated by the intent+scope watch on first run
+// (default pill = Essentials when curated, else Compute, else All). Manual
+// checkbox edits then mutate this ref directly without changing the pill.
+const selectedMetricStreams = ref<StreamInfo[]>([]);
 
 // Filter metric streams based on search text
 const filteredMetricStreams = computed(() => {
@@ -1803,91 +2314,141 @@ const getGroupSelectionState = (
   return "partial";
 };
 
-// Subject buttons (Pod/Node/Container for k8s, etc.) — derived from the
-// matched IdentitySet's semantic groups. Rendered alongside All/None in each
-// metric group's header. Empty when matched_set_id is missing/unrecognized.
-const subjectButtons = computed<SubjectButton[]>(() =>
-  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
-);
+// ── Intent pills + scope chips (v1 refactor) ───────────────────────────────
+//
+// Pills (Essentials / Compute / Memory / Storage / Network / All) replace the
+// per-group tabs. Scope chips (Pod / Node) replace the per-group action row.
+// Pattern: pill click sets the visible/selected set to the (scope ∩ intent)
+// subset of `uniqueMetricStreams`. Manual checkbox edits then mutate the
+// selection directly without changing the active pill.
 
-const getSubjectButtonState = (button: SubjectButton, groupId: string) => {
-  const groupStreams =
-    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
-  return getSubjectSelectionState(
-    button,
-    groupStreams,
-    selectedMetricStreams.value,
+// Apply the active subject to the metric stream pool — only streams whose
+// names match the subject's `poolPatterns` stay visible. poolPatterns can be
+// broader than the subject's WHERE patterns: e.g. Node includes both
+// `k8s_node_*` AND `k8s_pod_*` streams because every pod runs on a node.
+// Pass-through when no subject is active or buttons haven't loaded yet.
+const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
+  const sid = activeSubject.value;
+  if (!sid) return streams;
+  if (subjectButtons.value.length === 0) return streams;
+  const button = subjectButtons.value.find((b) =>
+    Array.isArray(b.semanticIds) && b.semanticIds.includes(sid),
+  );
+  if (!button || button.poolPatterns.length === 0) return streams;
+  return streams.filter((s) =>
+    streamMatchesPatterns(s.stream_name, button.poolPatterns),
   );
 };
 
-const selectSubjectInGroup = (button: SubjectButton, groupId: string) => {
-  const groupStreams =
-    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
-  const matches = groupStreams.filter((s) =>
-    streamMatchesPatterns(s.stream_name, button.patterns),
+// Active intent pill. Default chosen by `pickDefaultIntent` once streams +
+// matchedSetId are known.
+const activeIntent = ref<IntentId>("all");
+
+// Map activeSubject (semantic id, e.g. "k8s-node-name") to the registry's
+// button id (e.g. "node") — that's the key used by ESSENTIALS_BY_WORKLOAD_SUBJECT.
+const activeSubjectButtonId = computed<string | null>(() => {
+  const sid = activeSubject.value;
+  if (!sid) return null;
+  const button = subjectButtons.value.find((b) =>
+    Array.isArray(b.semanticIds) && b.semanticIds.includes(sid),
   );
-  if (matches.length === 0) return;
-  const alreadySelected = new Set(
-    selectedMetricStreams.value.map((s) => s.stream_name),
+  return button?.id ?? null;
+});
+
+// Streams available for the active pill, after scope filtering.
+const streamsForActivePill = computed<StreamInfo[]>(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return filterByIntent(
+    scoped,
+    activeIntent.value,
+    props.matchedSetId,
+    activeSubjectButtonId.value,
   );
-  const toAdd = matches.filter((s) => !alreadySelected.has(s.stream_name));
-  if (toAdd.length === 0) return;
-  selectedMetricStreams.value = [
-    ...selectedMetricStreams.value,
-    ...applyUnstableDimensionDefaults(toAdd),
-  ];
+});
+
+// Pill definitions enriched with availability/disabled state for rendering.
+const pillDescriptors = computed(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return INTENT_DEFINITIONS.map((def) => {
+    const matches = filterByIntent(
+      scoped,
+      def.id,
+      props.matchedSetId,
+      activeSubjectButtonId.value,
+    );
+    let disabled = false;
+    if (def.id === "essentials" && matches.length === 0) disabled = true;
+    return {
+      ...def,
+      count: matches.length,
+      disabled,
+    };
+  });
+});
+
+// Names of streams curated as Essentials for the active workload + subject —
+// used to render an "essential" tag on chart cells regardless of which pill
+// is active.
+const essentialStreamNames = computed<Set<string>>(() => {
+  const ess = getEssentialStreams(
+    uniqueMetricStreams.value,
+    props.matchedSetId,
+    activeSubjectButtonId.value,
+  );
+  return new Set(ess.map((s) => s.stream_name));
+});
+
+// Apply the active pill: replace `selectedMetricStreams` with the streams the
+// pill represents (after scope filter). Called by pill clicks and after scope
+// toggles. Manual checkbox edits go straight to `selectedMetricStreams` and
+// don't go through here.
+const applyActivePill = () => {
+  selectedMetricStreams.value = applyUnstableDimensionDefaults(
+    streamsForActivePill.value,
+  );
 };
 
-const deselectSubjectInGroup = (button: SubjectButton, groupId: string) => {
-  const groupStreams =
-    groupedFilteredMetricStreams.value.byGroup[groupId] ?? [];
-  const matchNames = new Set(
-    groupStreams
-      .filter((s) => streamMatchesPatterns(s.stream_name, button.patterns))
-      .map((s) => s.stream_name),
-  );
-  if (matchNames.size === 0) return;
-  selectedMetricStreams.value = selectedMetricStreams.value.filter(
-    (s) => !matchNames.has(s.stream_name),
-  );
+const setActiveIntent = (id: IntentId) => {
+  if (activeIntent.value === id) return;
+  activeIntent.value = id;
+  applyActivePill();
+  // Force a clean reload — the watcher's debounce + diffing can keep stale
+  // panels around when stream sets pivot (Essentials ↔ Compute).
+  dashboardData.value = null;
+  loadDashboard();
 };
 
-const toggleSubjectInGroup = (button: SubjectButton, groupId: string) => {
-  const { state } = getSubjectButtonState(button, groupId);
-  if (state === "all") {
-    deselectSubjectInGroup(button, groupId);
-  } else {
-    selectSubjectInGroup(button, groupId);
-  }
-};
-
-// Apply defaultActive buttons across every metric group on first availability
-// of subjectButtons. Runs once per matched_set_id transition so user edits are
-// preserved on subsequent reactive updates.
-let lastAppliedDefaultsKey: string | null = null;
+// Initialize intent + scope once data is available. Runs once per
+// (matched_set_id × stream set) transition so user edits aren't trampled by
+// reactive recomputes.
+let lastIntentInitKey: string | null = null;
 watch(
-  [subjectButtons, groupedUniqueMetricStreams],
-  ([buttons, grouped]) => {
-    if (!buttons.length) return;
-    const defaultButtons = buttons.filter((b) => b.defaultActive);
-    if (!defaultButtons.length) return;
-
-    // Key on matched_set_id + the set of group ids that currently have streams.
-    // This way defaults re-apply if the user navigates between contexts but
-    // not on every selection change.
-    const key = `${props.matchedSetId ?? ""}|${Object.keys(grouped.byGroup)
-      .filter((g) => grouped.byGroup[g].length > 0)
+  [
+    () => props.matchedSetId,
+    uniqueMetricStreams,
+    subjectButtons,
+  ],
+  ([matchedSetId, streams, buttons]) => {
+    if (streams.length === 0) return;
+    const key = `${matchedSetId ?? ""}|${streams
+      .map((s) => s.stream_name)
       .sort()
       .join(",")}`;
-    if (lastAppliedDefaultsKey === key) return;
+    if (lastIntentInitKey === key) return;
+    lastIntentInitKey = key;
 
-    for (const button of defaultButtons) {
-      for (const g of grouped.groups) {
-        if (g.streams.length === 0) continue;
-        selectSubjectInGroup(button, g.id);
-      }
-    }
-    lastAppliedDefaultsKey = key;
+    // (Active subject is seeded by its own watcher tied to subjectSemanticIds.)
+
+    // Default intent: Essentials when curated streams exist, else Compute,
+    // else All.
+    activeIntent.value = pickDefaultIntent(
+      streams,
+      matchedSetId,
+      activeSubjectButtonId.value,
+    );
+
+    // Apply the resulting (subject ∩ intent) selection.
+    applyActivePill();
   },
   { immediate: true },
 );
@@ -2030,14 +2591,68 @@ const handleDimensionUpdate = ({
   value: string;
 }) => {
   pendingDimensions.value[key] = value;
-  // console.log("[TelemetryCorrelationDashboard] Pending dimension changed:", pendingDimensions.value);
-  // No action needed - hasPendingChanges computed will update automatically
+  // hasPendingChanges computed updates automatically.
 };
 
 // Handle pending dimension value change - just updates pending state, doesn't regenerate queries
 const onPendingDimensionChange = () => {
-  // console.log("[TelemetryCorrelationDashboard] Pending dimension changed:", pendingDimensions.value);
-  // No action needed - hasPendingChanges computed will update automatically
+  // hasPendingChanges computed updates automatically.
+};
+
+// Rebuild each selected stream's `filters` map from the current dimension
+// state. Reads `activeDimensions` (semantic-id keyed) and writes back to the
+// stream's per-column filter map using either:
+//   1. The stream's existing filter columns (refresh values), or
+//   2. The stream's schema (speculative inject of new columns like pod/node
+//      when the schema confirms the column exists).
+// Pass 2 requires schemas to be cached. Callers that mutate dimensions BEFORE
+// schemas are available should call this AGAIN after `fetchMetricSchemas`.
+const rebuildStreamFilters = (cachedMetricSchemas: Record<string, any>) => {
+  const fieldToDimensionId = new Map<string, string>();
+  const dimensionIdToFields = new Map<string, string[]>();
+  for (const group of semanticGroups.value) {
+    for (const field of group.fields) {
+      fieldToDimensionId.set(field, group.id);
+    }
+    dimensionIdToFields.set(group.id, group.fields);
+  }
+
+  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
+    const updatedFilters = { ...(stream.filters ?? {}) };
+    const presentDimIds = new Set<string>();
+
+    // Pass 1: refresh values for filters the stream already declares.
+    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
+      const dimensionId = fieldToDimensionId.get(filterKey);
+      if (dimensionId) presentDimIds.add(dimensionId);
+      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
+        updatedFilters[filterKey] = activeDimensions.value[dimensionId];
+      }
+    }
+
+    // Pass 2: speculatively inject filters for active dimensions not yet
+    // bound to this stream. Guarded by stream schema lookup.
+    const schema = cachedMetricSchemas[stream.stream_name]?.schema as
+      | Array<{ name: string }>
+      | undefined;
+    if (schema && schema.length > 0) {
+      const schemaColumns = new Set(schema.map((s) => s.name));
+      for (const [dimensionId, value] of Object.entries(
+        activeDimensions.value,
+      )) {
+        if (value === undefined || value === SELECT_ALL_VALUE) continue;
+        if (presentDimIds.has(dimensionId)) continue;
+        const aliases = dimensionIdToFields.get(dimensionId);
+        if (!aliases || aliases.length === 0) continue;
+        const column = aliases.find((a) => schemaColumns.has(a));
+        if (column && !(column in updatedFilters)) {
+          updatedFilters[column] = value;
+        }
+      }
+    }
+
+    return { ...stream, filters: updatedFilters };
+  });
 };
 
 // Apply pending dimension changes and regenerate dashboard
@@ -2045,37 +2660,11 @@ const applyDimensionChanges = () => {
   // Copy pending to active
   activeDimensions.value = { ...pendingDimensions.value };
 
-  // Build field_name -> dimension_id mapping from semantic groups
-  // This is the same approach as applyUnstableDimensionDefaults
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
-
-  // Update metric stream filters with new dimension values
-  // Use semantic groups to map filter field names to dimension IDs
-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...(stream.filters ?? {}) };
-
-    // For each filter in the stream, find its semantic dimension ID
-    // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(
-      stream.filters ?? {},
-    )) {
-      const dimensionId = fieldToDimensionId.get(filterKey);
-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
-        const newValue = activeDimensions.value[dimensionId];
-        updatedFilters[filterKey] = newValue;
-      }
-    }
-
-    return {
-      ...stream,
-      filters: updatedFilters,
-    };
-  });
+  // Rebuild filters from whatever schemas are currently cached. loadDashboard
+  // will re-run this after a fresh fetch to catch newly-cached schemas.
+  rebuildStreamFilters(
+    (store.state.streams?.metrics as Record<string, any> | undefined) ?? {},
+  );
 
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions
@@ -2084,7 +2673,13 @@ const applyDimensionChanges = () => {
   loadDashboard();
 };
 
+// Monotonic token so overlapping loadDashboard calls (e.g. initial load racing
+// with an early subject/chip click) settle on the most recent result rather
+// than whichever async chain finishes last.
+let loadDashboardToken = 0;
+
 const loadDashboard = async () => {
+  const myToken = ++loadDashboardToken;
   try {
     loading.value = true;
     error.value = null;
@@ -2094,6 +2689,10 @@ const loadDashboard = async () => {
     if (selectedMetricStreams.value.length > 0) {
       const streamNames = selectedMetricStreams.value.map((s) => s.stream_name);
       metricSchemas = await fetchMetricSchemas(streamNames);
+      // Now that schemas are cached, re-run the stream-filter rebuild so any
+      // active dimensions (Pod, Node, …) whose columns are confirmed in the
+      // schema get injected into the WHERE clause.
+      rebuildStreamFilters(metricSchemas);
     }
 
     const config: MetricsCorrelationConfig = {
@@ -2110,11 +2709,11 @@ const loadDashboard = async () => {
       metricSchemas: metricSchemas,
     };
 
+    // Stale-result guard: bail out if a newer call has been initiated.
+    if (myToken !== loadDashboardToken) return;
+
     // Generate metrics dashboard JSON (if we have metrics)
     if (selectedMetricStreams.value.length > 0) {
-      // selectedMetricStreams.value.forEach(s => {
-      //   console.log(`  ${s.stream_name}:`, s.filters);
-      // });
       const dashboard = generateDashboard(
         selectedMetricStreams.value,
         config,
@@ -2125,8 +2724,6 @@ const loadDashboard = async () => {
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
       regenerateGroupDashboards(config);
-    } else {
-      // console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
     }
 
     // Generate logs dashboard JSON
@@ -2145,15 +2742,13 @@ const loadDashboard = async () => {
       );
       logsDashboardData.value = logsDashboard;
       logsDashboardRenderKey.value++;
-    } else {
-      // console.log("[TelemetryCorrelationDashboard] No log streams and not from logs page");
     }
   } catch (err: any) {
-    // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
+    if (myToken !== loadDashboardToken) return;
     error.value = err.message || t("correlation.failedToLoad");
     showErrorNotification(error.value);
   } finally {
-    loading.value = false;
+    if (myToken === loadDashboardToken) loading.value = false;
   }
 };
 
@@ -2301,17 +2896,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       }, 100);
     }
 
-    // Log cache usage for debugging
-    if (cachedPanels.length > 0) {
-      console.log(
-        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
-      );
-    }
-  } catch (err: any) {
-    console.error(
-      "[TelemetryCorrelationDashboard] Error adding metric panels, falling back to full reload:",
-      err,
-    );
+  } catch {
     loadDashboard();
   }
 };
@@ -3143,13 +3728,17 @@ watch(
         });
 
     if (dimensionsChanged) {
-      pendingDimensions.value = { ...newDimensions };
-      activeDimensions.value = { ...newDimensions };
+      // Preserve semantic-id-keyed entries written by pinSubject (Pod/Node/…).
+      // The props are field-name-keyed (logFilters) and don't carry the
+      // workload subject keys, so a plain overwrite would wipe them out.
+      const preservedSemanticIds: Record<string, string> = {};
+      const semanticIdSet = new Set(semanticGroups.value.map((g) => g.id));
+      for (const [k, v] of Object.entries(pendingDimensions.value)) {
+        if (semanticIdSet.has(k)) preservedSemanticIds[k] = v;
+      }
 
-      console.log(
-        "[TelemetryCorrelationDashboard] Updated dimensions from props:",
-        newDimensions,
-      );
+      pendingDimensions.value = { ...newDimensions, ...preservedSemanticIds };
+      activeDimensions.value = { ...newDimensions, ...preservedSemanticIds };
     }
   },
   { immediate: true, deep: true },
@@ -3244,17 +3833,95 @@ body.body--dark .metric-splitter-separator {
   .metric-group-actions {
     display: flex;
     gap: 0.25rem;
-
-    .subject-button-active {
-      color: var(--q-primary);
-      font-weight: 600;
-    }
-
-    .subject-button-partial {
-      color: var(--q-primary);
-      opacity: 0.6;
-    }
   }
+}
+
+.intent-pill-row {
+  background: var(--o2-bg-color, #fff);
+}
+
+.intent-pill-active {
+  background: var(--q-primary);
+  color: #fff !important;
+  border-radius: 999px;
+}
+
+.dim-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1.5px solid var(--o2-border-color, #d4d4d4);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-size: 0.75rem;
+  line-height: 1;
+  user-select: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.dim-chip-context {
+  cursor: default;
+}
+.dim-chip-subject {
+  cursor: pointer;
+}
+.dim-chip-subject-inactive:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.dim-chip-subject-active {
+  font-weight: 600;
+}
+.dim-chip-label {
+  font-weight: 500;
+  opacity: 0.8;
+}
+.dim-chip-eq {
+  opacity: 0.5;
+}
+.dim-chip-value {
+  font-weight: 700;
+}
+.dim-chip-subject-active .dim-chip-label {
+  opacity: 0.85;
+}
+.dim-chip-disabled {
+  cursor: not-allowed !important;
+  opacity: 0.4;
+  border-style: dashed;
+  pointer-events: auto; /* keep so tooltip still works */
+}
+.dim-chip-disabled:hover {
+  background: transparent;
+}
+
+.dim-chip-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--o2-text-3, #888);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0.5rem;
+  background: var(--o2-bg-color-2, #f4f4f4);
+}
+.dim-chip-more:hover {
+  background: var(--o2-bg-color-3, #e8e8e8);
+}
+
+.source-event-banner {
+  background: var(--o2-bg-color, #fff);
+}
+
+.source-event-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 // Metric group tabs (Infra / Network / Others sub-tabs within the metrics section)

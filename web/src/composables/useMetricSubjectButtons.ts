@@ -35,12 +35,20 @@ import type { FieldAlias, StreamInfo } from "@/services/service_streams";
 
 export type SubjectButtonSpec = {
   /**
-   * Semantic group id(s) whose `fields` contribute match tokens.
-   * Multiple ids can be merged into one button (e.g. "Pod" combining
-   * `k8s-pod-name` and `k8s-container-name` so containers are treated as
-   * part of the pod subject).
+   * Semantic group id(s) used for the WHERE clause. These drive the actual
+   * SQL filter applied when this subject is active (e.g. "k8s-node-name"
+   * for the Node subject → `WHERE k8s_node_name = '<node>'`).
    */
   semanticIds: string[];
+  /**
+   * Semantic group id(s) used for the **stream pool** filter (which metric
+   * streams are visible/selectable when this subject is active). Optional;
+   * defaults to `semanticIds`. Useful when a subject wants to include
+   * streams beyond its own naming convention — e.g. Node should also show
+   * pod-level metrics (`k8s_pod_*`) because they're all running on that
+   * node, so `poolSemanticIds: ["k8s-node-name", "k8s-pod-name"]`.
+   */
+  poolSemanticIds?: string[];
   /** Stable identifier for the button (used as a Vue key). */
   id: string;
   /** Display label rendered on the chip, e.g. "Pod". */
@@ -50,8 +58,12 @@ export type SubjectButtonSpec = {
 };
 
 export type SubjectButton = SubjectButtonSpec & {
-  /** Regexes built from the semantic group's fields. Matched against metric stream names. */
+  /** Regexes built from `semanticIds` — used to match metric stream names
+   *  when this subject is active. */
   patterns: RegExp[];
+  /** Regexes built from `poolSemanticIds` (or `semanticIds` if unset) — used
+   *  to filter the visible stream pool when this subject is active. */
+  poolPatterns: RegExp[];
 };
 
 /**
@@ -63,7 +75,15 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   // semantic groups whose `group` field is "Kubernetes" the id is "kubernetes".
   kubernetes: [
     { id: "pod",  semanticIds: ["k8s-pod-name"],  label: "Pod", defaultActive: true },
-    { id: "node", semanticIds: ["k8s-node-name"], label: "Node" },
+    {
+      id: "node",
+      semanticIds: ["k8s-node-name"],
+      // Node view includes pod-level metrics too — they're all running on
+      // that node, so scoping to a node means "show me what's happening
+      // on this node" (pod metrics + any node-aggregated metrics).
+      poolSemanticIds: ["k8s-node-name", "k8s-pod-name"],
+      label: "Node",
+    },
   ],
   aws: [
     { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: "ECS Task", defaultActive: true },
@@ -152,11 +172,90 @@ export function buildSubjectButtons(
   const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
   if (!specs?.length) return [];
   return specs
-    .map((spec) => ({
-      ...spec,
-      patterns: patternsForSemanticGroups(spec.semanticIds, semanticGroups),
-    }))
+    .map((spec) => {
+      const patterns = patternsForSemanticGroups(
+        spec.semanticIds,
+        semanticGroups,
+      );
+      const poolPatterns = spec.poolSemanticIds
+        ? patternsForSemanticGroups(spec.poolSemanticIds, semanticGroups)
+        : patterns;
+      return { ...spec, patterns, poolPatterns };
+    })
     .filter((b) => b.patterns.length > 0);
+}
+
+/**
+ * Result of walking the source row for workload subjects. For each semantic
+ * id we record both the value and the field name we found it under, so
+ * downstream consumers (e.g. WHERE-clause builders) know which column to
+ * filter on.
+ */
+export type WorkloadChipEntry = {
+  value: string;
+  fieldName: string;
+};
+
+/**
+ * Build a semantic-id keyed map of `{ value, fieldName }` from a source row.
+ *
+ * For each subject button registered for `matchedSetId`, walk its
+ * `semanticIds` → look up each semantic group → walk its `fields[]` aliases
+ * → find the first one present on `sourceRow` → emit it under the semantic
+ * id key.
+ *
+ * Used to populate Pod / Node / Container etc. chips when the backend's
+ * correlate response omits them (because they aren't service-identifying).
+ *
+ * @param matchedSetId   IdentitySet slug ("kubernetes", "aws", "gcp", "azure")
+ * @param semanticGroups Org's semantic groups (provides `fields[]` aliases)
+ * @param sourceRow      The source log row / span as a flat key→value record
+ */
+export function buildWorkloadChipEntries(
+  matchedSetId: string | undefined | null,
+  semanticGroups: FieldAlias[],
+  sourceRow: Record<string, any> | undefined | null,
+): Record<string, WorkloadChipEntry> {
+  if (!matchedSetId || !sourceRow) return {};
+  const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+  if (!specs?.length) return {};
+  const out: Record<string, WorkloadChipEntry> = {};
+  for (const spec of specs) {
+    for (const semanticId of spec.semanticIds) {
+      const group = semanticGroups.find((g) => g.id === semanticId);
+      if (!group) continue;
+      const hit = group.fields.find(
+        (f) =>
+          sourceRow[f] !== undefined &&
+          sourceRow[f] !== null &&
+          String(sourceRow[f]) !== "",
+      );
+      if (hit) {
+        out[semanticId] = {
+          value: String(sourceRow[hit]),
+          fieldName: hit,
+        };
+        break; // first semantic group with a value wins for this button
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Legacy thin wrapper returning just the value map (semanticId → value),
+ * for callers that don't yet need the field names. Prefer
+ * `buildWorkloadChipEntries` for new code.
+ */
+export function buildWorkloadChipDimensions(
+  matchedSetId: string | undefined | null,
+  semanticGroups: FieldAlias[],
+  sourceRow: Record<string, any> | undefined | null,
+): Record<string, string> {
+  const entries = buildWorkloadChipEntries(matchedSetId, semanticGroups, sourceRow);
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(entries)) out[k] = v.value;
+  return out;
 }
 
 /**
