@@ -19,7 +19,10 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::meta::user::UserRole;
-use o2_enterprise::enterprise::aws_marketplace::{api as aws_mp_api, db as aws_mp_db};
+use o2_enterprise::enterprise::{
+    aws_marketplace::{api as aws_mp_api, db as aws_mp_db},
+    cloud::billing_group,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -176,6 +179,23 @@ pub async fn link_subscription(
             return MetaHttpResponse::internal_error("Failed to check organization status");
         }
         Ok(true) => {} // Continue - org is in free trial
+    }
+
+    let members = match billing_group::list_billing_group_members_of(&org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[AZURE SAAS] Error checking billing group members for {org_id}: {}",
+                e
+            );
+            return MetaHttpResponse::internal_error("Failed to check billing group members");
+        }
+    };
+
+    if !members.is_empty() {
+        return MetaHttpResponse::bad_request(
+            "Organizations with billing group members cannot be linked to Azure marketplace",
+        );
     }
 
     // 4. Check if org is already linked to marketplace
