@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="json-key-value">
                 <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
                 <span class="json-colon">: </span>
-                <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
+                <span class="json-value" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
               </span>
               <span v-if="!isLastDefinedEntry(item, key)" class="json-comma">, </span>
             </template>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="json-key-value">
           <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
           <span class="json-colon">: </span>
-          <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
+          <span class="json-value" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
         </span>
         <span v-if="idx < definedObjectKeys.length - 1" class="json-comma">, </span>
       </template>

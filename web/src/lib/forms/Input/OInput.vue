@@ -270,6 +270,7 @@ const wrapperClasses = computed(() => [
         v-if="isTextarea"
         :id="inputId"
         ref="inputRef"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
         :name="name"
         :placeholder="placeholder"
@@ -303,6 +304,7 @@ const wrapperClasses = computed(() => [
         v-else
         :id="inputId"
         ref="inputRef"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
         :type="type"
         :name="name"

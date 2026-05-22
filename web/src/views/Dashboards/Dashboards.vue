@@ -185,11 +185,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :name="tab.folderId"
                   class="individual-tab"
                   :data-test="`dashboard-folder-tab-${tab.folderId}`"
+                  :data-test-folder-name="tab.name"
                 >
                   <div
                     class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row"
+                    :data-test="`dashboard-folder-tab-name-${tab.name}`"
                   >
-                    <span class="folder-name text-truncate" :title="tab.name">{{
+                    <span
+                      class="folder-name text-truncate"
+                      :title="tab.name"
+                      :data-test="`dashboard-folder-name-${tab.name}`"
+                    >{{
                       tab.name
                     }}</span>
                     <div
@@ -263,7 +269,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 100%; height: 100%"
           >
             <template #cell-name="{ row, value }">
-              <div :title="value" class="text-truncate">
+              <div
+                :title="value"
+                :data-test="`dashboard-name-cell-${value}`"
+                class="text-truncate"
+              >
                 {{
                   value && value.length > 30
                     ? value.slice(0, 30) + "..."

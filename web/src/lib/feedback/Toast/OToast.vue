@@ -98,6 +98,7 @@ const screenReaderTitle = computed(() =>
       variantClasses[variant ?? 'default'],
     ]"
     :role="rootRole"
+    :data-test="`o-toast-${variant ?? 'default'}`"
     @update:open="(val) => emit('openChange', val)"
   >
     <!-- Icon -->
@@ -136,6 +137,7 @@ const screenReaderTitle = computed(() =>
           'tw:text-sm tw:leading-snug',
           title ? 'tw:text-toast-fg-secondary tw:mt-1' : 'tw:text-toast-fg'
         ]"
+        data-test="o-toast-message"
       >
         {{ message }}
       </ToastDescription>

@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             v-close-popup
+            data-test="dashboard-import-cancel-btn"
             @click="goBack()"
             >{{ t("function.cancel") }}</OButton
           >
@@ -197,9 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
                       class="text-red"
+                      data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div
+                        style="width: 300px"
+                        data-test="dashboard-import-error-title-input"
+                      >
                         <OInput
                           v-model="dashboardTitles[errorIndex]"
                           label="Dashboard Title"
@@ -238,11 +243,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
                       class="text-red"
+                      data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
                     </span>
 
-                    <span v-else>{{
+                    <span
+                      v-else
+                      data-test="dashboard-import-error-message"
+                    >{{
                       errorMessage.message || errorMessage
                     }}</span>
                   </div>

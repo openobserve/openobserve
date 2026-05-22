@@ -255,6 +255,7 @@ const wrapperClasses = computed(() => [
             type="button"
             tabindex="-1"
             aria-label="Remove file"
+            :data-test="`o-file-chip-${i}-remove-btn`"
             class="tw:flex tw:items-center tw:text-file-chip-remove tw:hover:opacity-80"
             @click.stop="removeFile(i, $event)"
           >
