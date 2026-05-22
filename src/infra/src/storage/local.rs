@@ -172,6 +172,7 @@ impl ObjectStore for Local {
     /// overhead and repeated file-open cost.
     #[cfg(unix)]
     async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        let start = std::time::Instant::now();
         let file = location.to_string();
         let full_path = self.full_path(location);
         let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
@@ -201,6 +202,24 @@ impl ObjectStore for Local {
                 }
             }
         })?;
+
+        // metrics — count one read per input range so the counter reflects
+        // actual pread calls, not just the outer batched API call.
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns.len() >= 3 && columns[0] == "files" {
+            let total_bytes: u64 = ranges.iter().map(|r| r.end - r.start).sum();
+            let n = ranges.len() as u64;
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
+                .inc_by(total_bytes);
+            metrics::STORAGE_READ_REQUESTS
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
+                .inc_by(n);
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
+                .inc_by(time);
+        }
 
         Ok(results)
     }
