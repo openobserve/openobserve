@@ -1,78 +1,201 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useSlots } from "vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { computed } from "vue";
+import type { Column } from "@tanstack/vue-table";
+import type { OTableColumnDef } from "../OTable.types";
 
-defineProps<{
-  /** Variant: "skeleton" (rows) or "spinner" (centered). Default: "skeleton" */
-  variant?: "skeleton" | "spinner";
-  /** Number of skeleton rows. Default: 5 */
-  skeletonRows?: number;
-  /** Number of skeleton shapes per row. Default: 4 */
-  skeletonCols?: number;
-  /** Position as overlay over existing content */
-  overlay?: boolean;
+const props = defineProps<{
+  /** Number of skeleton rows. Default: 10 */
+  rows?: number;
+  /** Tanstack Column instances (in visible/order/pinning state). */
+  tableColumns: Column<any, any>[];
+  /** Render placeholder for the selection checkbox column */
+  selectionEnabled?: boolean;
+  /** Render placeholder for the expand chevron column */
+  expansionEnabled?: boolean;
 }>();
 
-defineSlots<{
-  default(): any;
-}>();
+const BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
+const JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
 
-const slots = useSlots();
+const cellWidth = (r: number, c: number): number => {
+  const base = BASE_WIDTHS[c % BASE_WIDTHS.length] ?? 60;
+  const jit = JITTER[(r + c) % JITTER.length] ?? 0;
+  return Math.max(25, Math.min(85, base + jit));
+};
+
+const rowCount = computed(() => props.rows ?? 10);
+const safeId = (id: string) => id.replace(/[^a-zA-Z0-9]/g, "-");
+
+// Read columnDef as our richer OTableColumnDef shape.
+const defOf = (col: Column<any, any>): OTableColumnDef =>
+  col.columnDef as unknown as OTableColumnDef;
+
+// `isAction` lives on meta after useTableCore's column conversion.
+const isActionCol = (col: Column<any, any>): boolean => {
+  const def = defOf(col);
+  return !!def.isAction || !!(def.meta as any)?.isAction;
+};
+
+// Mirror OTableBodyCell's width + sticky-pinning behaviour exactly.
+const cellStyle = (col: Column<any, any>): Record<string, any> => {
+  const style: Record<string, any> = {};
+  // Auto-width columns (meta.autoWidth) flex to fill remaining space —
+  // OTableBodyCell skips the width style for these, and we must too.
+  const isAutoWidth = (defOf(col).meta as any)?.autoWidth === true;
+  if (!isAutoWidth) {
+    const sizeVar = `var(--header-${safeId(col.id)}-size)`;
+    style.width = sizeVar;
+    style.maxWidth = sizeVar;
+  }
+  const pin = col.getIsPinned?.();
+  if (pin === "left") {
+    style.position = "sticky";
+    style.left = `${col.getStart?.("left") ?? 0}px`;
+    style.zIndex = 1;
+    style.background = "var(--color-table-cell-bg)";
+    style.boxShadow = "2px 0 4px -2px var(--color-border-default)";
+  } else if (pin === "right") {
+    style.position = "sticky";
+    style.right = `${col.getAfter?.("right") ?? 0}px`;
+    style.zIndex = 1;
+    style.background = "var(--color-table-cell-bg)";
+    style.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
+  }
+  return style;
+};
+
+const actionCountFor = (col: Column<any, any>): number => {
+  const n = Number((defOf(col).meta as any)?.actionCount);
+  if (Number.isFinite(n) && n > 0) return Math.min(6, Math.floor(n));
+  return 2;
+};
+
+const actionDimsFor = (col: Column<any, any>): string => {
+  const s = (defOf(col).meta as any)?.actionSize;
+  if (s === "button") return "tw:h-7 tw:w-7 tw:rounded-md";
+  if (s === "pill") return "tw:h-5 tw:w-12 tw:rounded-md";
+  return "tw:h-[22px] tw:w-[22px] tw:rounded-md"; // icon (Vercel/GitHub style)
+};
+
+const alignClassFor = (col: Column<any, any>): string => {
+  const a = (defOf(col).meta as any)?.align;
+  if (a === "center") return "tw:text-center";
+  if (a === "right") return "tw:text-right";
+  return "tw:text-left";
+};
 </script>
 
 <template>
-  <!-- Custom slot overrides everything -->
-  <template v-if="slots.default">
-    <div
-      data-test="o2-table-loading"
-      :class="overlay ? 'tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70' : ''"
-    >
-      <slot />
-    </div>
-  </template>
-
-  <!-- Spinner variant -->
-  <OInnerLoading
-    v-else-if="variant === 'spinner'"
-    :showing="true"
-    label="Loading"
-    size="sm"
-    data-test="o2-table-loading"
-  />
-
-  <!-- Skeleton variant (default) -->
-  <div
-    v-else
-    data-test="o2-table-loading"
-    :class="
-      overlay
-        ? 'tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70'
-        : 'tw:flex-1 tw:min-h-0 tw:flex tw:flex-col'
-    "
+  <tbody
+    data-test="o2-table-skeleton-body"
+    aria-busy="true"
+    aria-live="polite"
+    aria-label="Loading data"
   >
-    <div
-      data-test="o2-table-skeleton-rows"
-      class="tw:flex tw:flex-col tw:gap-1 tw:p-2 tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-      role="status"
-      aria-label="Loading data"
-      aria-live="polite"
+    <tr
+      v-for="r in rowCount"
+      :key="`o2-skel-${r}`"
+      class="o2-skel-row"
+      :style="{
+        animationDelay: `${(r - 1) * 40}ms`,
+        height: 'var(--o2-table-row-height)',
+      }"
     >
-      <div
-        v-for="i in (skeletonRows ?? 5)"
-        :key="`skel-row-${i}`"
-        class="tw:flex tw:gap-2 tw:flex-1 tw:min-h-0"
+      <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
+      <td
+        v-if="expansionEnabled"
+        class="tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle"
+      />
+
+      <!-- Selection checkbox placeholder — matches OTableBodyRow exactly -->
+      <td
+        v-if="selectionEnabled"
+        class="tw:w-9 tw:text-center tw:align-middle"
       >
-        <OSkeleton
-          v-for="j in (skeletonCols ?? 4)"
-          :key="`skel-cell-${i}-${j}`"
-          type="rect"
-          animation="pulse"
-          class="tw:h-full tw:flex-1"
+        <span
+          class="tw:inline-block tw:h-3.5 tw:w-3.5 tw:rounded-[3px] tw:border tw:border-[var(--color-skeleton-base)]"
+          aria-hidden="true"
         />
-      </div>
-    </div>
-  </div>
+      </td>
+
+      <!-- Data cells — class & style mirror OTableBodyCell exactly -->
+      <td
+        v-for="(col, c) in tableColumns"
+        :key="col.id"
+        :class="[
+          'tw:px-2 tw:align-middle',
+          alignClassFor(col),
+          isActionCol(col) ? 'tw:w-0 tw:whitespace-nowrap' : '',
+        ]"
+        :style="cellStyle(col)"
+      >
+        <!-- Action column → inline group of N icon-sized placeholders -->
+        <span
+          v-if="isActionCol(col)"
+          class="tw:inline-flex tw:items-center tw:gap-1 tw:align-middle"
+        >
+          <span
+            v-for="a in actionCountFor(col)"
+            :key="`a-${r}-${c}-${a}`"
+            :class="['o2-skel-pill tw:inline-block tw:shrink-0', actionDimsFor(col)]"
+            aria-hidden="true"
+          />
+        </span>
+        <!-- Data column → chunky rounded bar with shimmer; td text-align positions it -->
+        <span
+          v-else
+          class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md tw:align-middle"
+          :style="{ width: `${cellWidth(r - 1, c)}%` }"
+          aria-hidden="true"
+        />
+      </td>
+    </tr>
+  </tbody>
 </template>
+
+<style scoped>
+.o2-skel-row {
+  opacity: 0;
+  animation: o2-skel-row-in 320ms ease-out forwards;
+}
+
+.o2-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base) 0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes o2-skel-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes o2-skel-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o2-skel-row {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+  .o2-skel-pill {
+    animation: none;
+  }
+}
+</style>

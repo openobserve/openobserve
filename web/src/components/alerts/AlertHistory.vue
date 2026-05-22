@@ -649,7 +649,7 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 64,
     maxSize: 100,
     sortable: false,
-    meta: { align: "center" },
+    meta: { align: "center", actionCount: 2 },
   },
 ]);
 

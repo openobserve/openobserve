@@ -255,7 +255,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     sortable: false,
     isAction: true,
     size: 80,
-    meta: { align: "center", cellClass: "actions-column" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
