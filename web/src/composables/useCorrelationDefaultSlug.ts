@@ -16,6 +16,11 @@
 import { loadIdentityConfig } from "@/utils/identityConfig";
 import serviceStreamsApi from "@/services/service_streams";
 import type { FieldAlias } from "@/services/service_streams";
+import config from "@/aws-exports";
+
+function isCorrelationAvailable(): boolean {
+  return config.isEnterprise === "true" || config.isCloud === "true";
+}
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +41,7 @@ function evictOrgCacheIfSwitched(orgId: string): void {
 }
 
 async function loadSemanticGroups(orgId: string): Promise<FieldAlias[]> {
+  if (!isCorrelationAvailable()) return [];
   if (semanticGroupsCache.has(orgId)) return semanticGroupsCache.get(orgId)!;
   try {
     const response = await serviceStreamsApi.getSemanticGroups(orgId);
@@ -54,6 +60,7 @@ export async function getCorrelationFieldNames(
   streamName: string,
   streamSchemaFields: { name: string }[],
 ): Promise<string[]> {
+  if (!isCorrelationAvailable()) return [];
   evictOrgCacheIfSwitched(orgId);
   const key = `${orgId}/${streamName}`;
   if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;

@@ -818,12 +818,12 @@ export default defineComponent({
             // Validate operator for custom type
             if (
               input.query_condition.type === "custom" &&
-              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
+              !["=", "!=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
                 item.operator,
               )
             ) {
               alertErrors.push(
-                `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+                `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
               );
               return false;
             }
@@ -837,12 +837,12 @@ export default defineComponent({
           if (condition.column && condition.operator && condition.value !== undefined) {
             if (
               input.query_condition.type === "custom" &&
-              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
+              !["=", "!=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
                 condition.operator,
               )
             ) {
               alertErrors.push(
-                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
               );
             }
             return;
