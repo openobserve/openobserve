@@ -471,6 +471,64 @@ impl TimestampVisitor {
         }
         ControlFlow::Continue(())
     }
+
+    fn check_projection(&mut self, projection: &[SelectItem]) -> ControlFlow<()> {
+        for item in projection {
+            match item {
+                SelectItem::UnnamedExpr(expr) => {
+                    if Self::is_timestamp_expr(expr) {
+                        self.timestamp_selected = true;
+                        return ControlFlow::Break(());
+                    }
+
+                    if let Expr::Identifier(ident) = expr
+                        && self.timestamp_aliases.contains(&ident.value)
+                    {
+                        self.timestamp_selected = true;
+                        return ControlFlow::Break(());
+                    }
+                }
+
+                SelectItem::ExprWithAlias { expr, alias } => {
+                    if alias.value == TIMESTAMP_COL_NAME {
+                        self.timestamp_selected = true;
+                        return ControlFlow::Break(());
+                    }
+
+                    if Self::is_timestamp_expr(expr) {
+                        self.timestamp_aliases.insert(alias.value.clone());
+                    }
+
+                    if let Expr::Identifier(ident) = expr
+                        && self.timestamp_aliases.contains(&ident.value)
+                    {
+                        self.timestamp_aliases.insert(alias.value.clone());
+                    }
+                }
+
+                SelectItem::Wildcard(_) => {
+                    self.timestamp_selected = true;
+                    return ControlFlow::Break(());
+                }
+                _ => {}
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn visit_set_expr(&mut self, set_expr: &SetExpr) -> ControlFlow<()> {
+        match set_expr {
+            SetExpr::Select(select) => {
+                for table in &select.from {
+                    self.visit_table_factor(&table.relation)?;
+                }
+                self.check_projection(&select.projection)
+            }
+            SetExpr::Query(query) => query.visit(self),
+            SetExpr::SetOperation { left, .. } => self.visit_set_expr(left),
+            _ => ControlFlow::Continue(()),
+        }
+    }
 }
 
 impl Default for TimestampVisitor {
@@ -490,61 +548,17 @@ impl Visitor for TimestampVisitor {
             }
         }
 
-        //  Recurse into subqueries in FROM clause
-        if let SetExpr::Select(select) = query.body.as_ref() {
-            for table in &select.from {
-                self.visit_table_factor(&table.relation)?;
-            }
-
-            for item in &select.projection {
-                match item {
-                    SelectItem::UnnamedExpr(expr) => {
-                        if Self::is_timestamp_expr(expr) {
-                            self.timestamp_selected = true;
-                            return ControlFlow::Break(());
-                        }
-
-                        // Handle alias chain: SELECT ts1 FROM (...) where ts1 is alias for
-                        // _timestamp
-                        if let Expr::Identifier(ident) = expr
-                            && self.timestamp_aliases.contains(&ident.value)
-                        {
-                            self.timestamp_selected = true;
-                            return ControlFlow::Break(());
-                        }
-                    }
-
-                    SelectItem::ExprWithAlias { expr, alias } => {
-                        // If alias is "_timestamp", count it, regardless of expr
-                        if alias.value == TIMESTAMP_COL_NAME {
-                            self.timestamp_selected = true;
-                            return ControlFlow::Break(());
-                        }
-
-                        // If the expression is timestamp-related, remember its alias
-                        if Self::is_timestamp_expr(expr) {
-                            self.timestamp_aliases.insert(alias.value.clone());
-                        }
-
-                        // If the expression is an alias we already know maps to timestamp
-                        if let Expr::Identifier(ident) = expr
-                            && self.timestamp_aliases.contains(&ident.value)
-                        {
-                            self.timestamp_aliases.insert(alias.value.clone());
-                        }
-                    }
-
-                    // SELECT * — explicitly excluded
-                    SelectItem::Wildcard(_) => {
-                        self.timestamp_selected = true;
-                        return ControlFlow::Break(());
-                    }
-                    _ => {}
+        match query.body.as_ref() {
+            SetExpr::Select(select) => {
+                //  Recurse into subqueries in FROM clause
+                for table in &select.from {
+                    self.visit_table_factor(&table.relation)?;
                 }
-            }
-        }
 
-        ControlFlow::Continue(())
+                self.check_projection(&select.projection)
+            }
+            _ => self.visit_set_expr(query.body.as_ref()),
+        }
     }
 }
 
@@ -781,6 +795,70 @@ mod tests {
                 "Still results a _timestamp field",
             ),
             // CTE
+            // UNION ALL
+            (
+                "SELECT max(_timestamp) AS _timestamp, log_request_type AS request_type FROM platform WHERE kubernetes_container_name = 'mp' AND log_message = 'Record' GROUP BY log_request_type UNION ALL SELECT max(_timestamp) AS _timestamp, log_request_type AS request_type FROM platform WHERE kubernetes_container_name = 'mp' AND log_message = 'Rest' GROUP BY log_request_type",
+                true,
+                "UNION ALL with _timestamp aliased in both sides",
+            ),
+            (
+                "SELECT name FROM table1 UNION ALL SELECT name FROM table2",
+                false,
+                "UNION ALL without _timestamp on either side",
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp FROM table1 UNION ALL SELECT name FROM table2",
+                true,
+                "UNION ALL with _timestamp aliased on one side (left)",
+            ),
+            (
+                "SELECT name FROM table1 UNION ALL SELECT max(_timestamp) AS _timestamp FROM table2",
+                false,
+                "UNION ALL with _timestamp aliased on one side (right)",
+            ),
+            (
+                "SELECT _timestamp FROM table1 UNION ALL SELECT _timestamp FROM table2",
+                true,
+                "UNION ALL with direct _timestamp selection on both sides",
+            ),
+            (
+                "SELECT * FROM table1 UNION ALL SELECT * FROM table2",
+                true,
+                "UNION ALL with wildcard on both sides",
+            ),
+            (
+                "SELECT name FROM table1 UNION ALL SELECT * FROM table2",
+                false,
+                "UNION ALL with wildcard on one side",
+            ),
+            (
+                "SELECT MAX(_timestamp) AS ts, COUNT(*) AS cnt, ts AS _timestamp FROM table1 UNION ALL SELECT MAX(_timestamp) AS ts, COUNT(*) AS cnt, ts AS _timestamp FROM table2",
+                true,
+                "UNION ALL with alias chain leading to _timestamp",
+            ),
+            (
+                "SELECT MAX(_timestamp) AS ts, COUNT(*) AS cnt FROM table1 UNION ALL SELECT MAX(_timestamp) AS ts, COUNT(*) AS cnt FROM table2",
+                false,
+                "UNION ALL without _timestamp alias in final output",
+            ),
+            // Nested UNION ALL
+            (
+                "SELECT _timestamp FROM table1 UNION ALL (SELECT _timestamp FROM table2 UNION ALL SELECT _timestamp FROM table3)",
+                true,
+                "Nested UNION ALL with _timestamp",
+            ),
+            // UNION (without ALL)
+            (
+                "SELECT max(_timestamp) AS _timestamp FROM table1 UNION SELECT name FROM table2",
+                true,
+                "UNION with _timestamp on one side",
+            ),
+            // UNION ALL with subquery in FROM
+            (
+                "SELECT t._timestamp FROM (SELECT _timestamp FROM table1) t UNION ALL SELECT t._timestamp FROM (SELECT _timestamp FROM table2) t",
+                true,
+                "UNION ALL with subquery in FROM",
+            ),
         ];
 
         for (sql, expected, test_name) in test_cases {
