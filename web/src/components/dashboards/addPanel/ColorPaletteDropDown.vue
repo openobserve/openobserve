@@ -100,12 +100,9 @@ export default defineComponent({
 
     const store = useStore();
 
-    /** Strip HTML tags from i18n strings (e.g. "<b>By Series</b>" → "By Series") */
-    const stripHtml = (s: string) => s.replace(/<[^>]*>/g, "").trim();
-
     const colorOptions = [
       {
-        label: stripHtml(t("dashboard.colorBySeries")),
+        label: t("dashboard.colorBySeries"),
         header: true,
       },
       {
@@ -145,7 +142,7 @@ export default defineComponent({
         value: "shades",
       },
       {
-        label: stripHtml(t("dashboard.colorByValue")),
+        label: t("dashboard.colorByValue"),
         header: true,
       },
       {

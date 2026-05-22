@@ -1204,7 +1204,7 @@ const fieldWidthClass = computed(() => {
                             }}</span>
                             <span
                               v-if="filteredOptions[vRow.index].subLabel"
-                              class="tw:text-xs tw:text-select-placeholder tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"
+                              class="tw:text-xs tw:text-text-secondary tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"
                             >{{ filteredOptions[vRow.index].subLabel }}</span>
                             <div
                               v-if="filteredOptions[vRow.index].colorPalette?.length"
