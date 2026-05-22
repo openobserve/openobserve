@@ -39,11 +39,7 @@ use {
 
 /// Determine whether a streaming aggregate query should be used for the given SQL query.
 #[cfg(feature = "enterprise")]
-pub(crate) fn is_streaming_aggregate(
-    sql: &str,
-    ts_column: Option<&str>,
-    is_http_distinct: bool,
-) -> bool {
+pub(crate) fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
     let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
     let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
 
@@ -53,15 +49,11 @@ pub(crate) fn is_streaming_aggregate(
         is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
     }
 
-    ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs && !is_http_distinct
+    ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub(crate) fn is_streaming_aggregate(
-    _sql: &str,
-    _ts_column: Option<&str>,
-    _is_http_distinct: bool,
-) -> bool {
+pub(crate) fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
     false
 }
 

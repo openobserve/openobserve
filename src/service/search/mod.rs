@@ -66,8 +66,8 @@ use crate::{
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
-            cpu_cores::estimated_secs, settings::calculate_partition_settings,
-            stream_files::collect_stream_files,
+            aggregate::is_streaming_aggregate, cpu_cores::estimated_secs,
+            settings::calculate_partition_settings, stream_files::collect_stream_files,
         },
     },
 };
@@ -646,14 +646,10 @@ pub async fn search_partition(
     let is_complex_query = is_complex_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
     let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).map(|(v, _)| v);
+    let is_streaming_aggregate = is_streaming_aggregate(&req.sql, ts_column.as_deref());
     let apply_over_hits = req.query_fn.as_ref().is_some_and(|v| {
         !v.is_empty() && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or(v.to_string()))
     });
-    let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
-        &req.sql,
-        ts_column.as_deref(),
-        is_http_distinct,
-    );
 
     let use_single_partition = is_http_distinct
         || is_explain_query
