@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
   >
     <div
-      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto"
-      style="max-height: calc(100vh - var(--navbar-height) - 18px)"
+      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
       <div
@@ -142,6 +141,28 @@ export default defineComponent({
     }
 
     const tabOrder = ref(loadTabOrder());
+
+    // DEFAULT_TABS depends on zoConfig.ai_enabled, which arrives asynchronously
+    // from the backend /config response. Re-sync tabOrder whenever the set of
+    // available tabs changes so the AI tab appears once the backend confirms
+    // it's enabled.
+    watch(
+      () => DEFAULT_TABS.value.map((t) => t.id).join(","),
+      () => {
+        const current = tabOrder.value;
+        const merged: { id: string; label: string }[] = [];
+        // Preserve existing user-defined order, drop tabs no longer available
+        current.forEach((t) => {
+          const match = DEFAULT_TABS.value.find((d) => d.id === t.id);
+          if (match) merged.push(match);
+        });
+        // Append any newly available tabs
+        DEFAULT_TABS.value.forEach((d) => {
+          if (!merged.find((m) => m.id === d.id)) merged.push(d);
+        });
+        tabOrder.value = merged;
+      },
+    );
 
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
     const activeHomeTab = ref(
@@ -300,7 +321,8 @@ export default defineComponent({
 }
 
 .home-tab-panel {
-  height: calc(100% - 41px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -328,11 +350,13 @@ export default defineComponent({
 
 .home-page {
   overflow: hidden;
-  min-height: unset;
-  height: calc(100vh - 2.5em);
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-enabled-home-view {
-  height: calc(100vh - 120px);
+  height: 100%;
 }
 </style>

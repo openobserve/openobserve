@@ -18,11 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdown side="bottom" align="start">
     <template #trigger>
       <div>
-        <OIcon name="help" size="sm" />
-        <span v-if="label" class="tw:ml-2">{{ label }}</span>
-        <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
-        <OTooltip :content="t('search.syntaxGuideLabel')" />
-    </div>
+        <OButton
+          data-cy="syntax-guide-button"
+          variant="ghost"
+          size="sm"
+          :class="[
+            noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
+            sqlmode ? 'sql-mode' : 'normal-mode',
+          ]"
+          class="tw:h-4.5!"
+        >
+          <OIcon name="help" size="sm" />
+          <span v-if="label" class="tw:ml-2">{{ label }}</span>
+          <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
+          <OTooltip :content="t('search.syntaxGuideLabel')" />
+      </div>
     </template>
     <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <div v-if="!sqlmode">

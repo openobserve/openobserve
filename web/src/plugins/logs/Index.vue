@@ -205,13 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <h3
                         data-test="logs-search-no-stream-selected-text"
                         class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem]"
                       >
                         <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noStreamSelectedMessage") }}
-                      </h6>
+                      </h3>
                     </div>
                     <div
                       v-else-if="
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <h3
                         data-test="logs-search-error-message"
                         class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
@@ -241,7 +241,7 @@ size="md" />
                           data-test="logs-page-result-error-details-btn-norecord"
                           >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
-                      </h6>
+                      </h3>
                     </div>
                     <div
                       v-else-if="
@@ -253,14 +253,14 @@ size="md" />
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <h3
                         data-test="logs-search-error-message"
                         class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
                         <OIcon name="info"
 size="md" />
                         {{ t("search.applySearch") }}
-                      </h6>
+                      </h3>
                     </div>
                     <div
                       v-else-if="
@@ -271,14 +271,14 @@ size="md" />
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <h3
                         data-test="logs-search-error-message"
                         class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
                         <OIcon name="info"
 size="md" />
                         {{ t("search.applySearch") }}
-                      </h6>
+                      </h3>
                     </div>
                     <div
                       v-else
