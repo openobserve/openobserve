@@ -254,7 +254,11 @@ const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   return [props.modelValue];
 });
 
-const hasSelection = computed(() => selectedValues.value.length > 0);
+const hasSelection = computed(() =>
+  selectedValues.value.some(
+    (v) => v !== undefined && v !== null && v !== "",
+  ),
+);
 
 const selectedLabels = computed(() => {
   return selectedValues.value
