@@ -56,9 +56,9 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
   >
     <!-- Slot takes precedence; falls back to `icon-left` prop -->
     <slot v-if="slots['icon-left']" name="icon-left" />
-    <OIcon v-else-if="iconLeft" :name="iconLeft" :size="iconSize[props.size]" />
+    <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" :size="iconSize[props.size]" />
     <slot />
     <slot v-if="slots['icon-right']" name="icon-right" />
-    <OIcon v-else-if="iconRight" :name="iconRight" :size="iconSize[props.size]" />
+    <OIcon v-else-if="props.iconRight" :name="props.iconRight" :size="iconSize[props.size]" />
   </ToggleGroupItem>
 </template>
