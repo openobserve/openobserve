@@ -413,11 +413,13 @@ export class LogsPage {
     async selectIndexAndStreamJoin() {
         // Select both default and e2e_automate streams for join queries
         // Retry loop with force-click fallback for cloud stability (Pattern 3)
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        const selectComponent = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const selectTrigger = selectComponent.locator('button').first();
         const defaultToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
         const e2eToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
 
         // Open dropdown
+        await selectTrigger.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await selectTrigger.click({ force: true });
         await this.page.waitForTimeout(2000);
 
@@ -537,7 +539,8 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Open dropdown
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        const selectComponent = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const selectTrigger = selectComponent.locator('button').first();
         await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
         await selectTrigger.click();
         await this.page.waitForTimeout(2000);
@@ -587,7 +590,8 @@ export class LogsPage {
     }
 
     async selectIndexStreamDefault() {
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        const selectComponent = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const selectTrigger = selectComponent.locator('button').first();
         await selectTrigger.click();
         await this.page.waitForTimeout(3000);
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
@@ -698,96 +702,48 @@ export class LogsPage {
             try {
                 // Click the OSelect trigger button to open the stream list
                 testLogger.info(`selectStream: Clicking OSelect trigger button`);
-                const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+                const selectComponent = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+                const selectTrigger = selectComponent.locator('button').first();
                 await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
-                await selectTrigger.click();
+                await selectTrigger.click({ force: true });
                 await this.page.waitForTimeout(2000);
 
-                // Use search box to filter streams for faster finding
-                const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
-                const searchVisible = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
-                if (searchVisible) {
-                    testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
-                    await searchInput.click();
-                    await searchInput.fill(''); // Clear any previous filter first
-                    await searchInput.fill(stream);
-                    await this.page.waitForTimeout(1500);
-                }
-
-                // Stream picker is OSelect (Reka Listbox) post-migration; legacy
-                // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
-                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
-
-                // Try to click the stream toggle div directly first
+                // Stream toggle selector - use direct element targeting with force click
                 const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
                 testLogger.info(`selectStream: Looking for: ${streamToggleSelector}`);
 
-                // Scroll through the dropdown to find the stream
-                let maxScrolls = 20;
-                let scrollAmount = 200;
-                let foundStream = false;
-
-                while (maxScrolls > 0 && !foundStream) {
-                    // Check if stream toggle is visible
-                    const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
-                    const toggleDivVisible = await streamToggleDiv.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleDivVisible) {
-                        await streamToggleDiv.click();
+                // Try to click the stream toggle with retry logic
+                let toggleFound = false;
+                for (let toggleAttempt = 1; toggleAttempt <= 3 && !toggleFound; toggleAttempt++) {
+                    try {
+                        const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
+                        await streamToggleDiv.waitFor({ state: 'visible', timeout: 5000 });
+                        await streamToggleDiv.click({ force: true });
                         testLogger.info(`selectStream: Selected stream: ${stream}`);
-                        foundStream = true;
+                        toggleFound = true;
                         return;
-                    }
-
-                    // Try the toggle itself
-                    const streamToggle = this.page.locator(streamToggleSelector);
-                    const toggleVisible = await streamToggle.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleVisible) {
-                        await streamToggle.click();
-                        testLogger.info(`selectStream: Selected stream via toggle: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Try by text
-                    const streamByText = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
-                    const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (textVisible) {
-                        await streamByText.click();
-                        testLogger.info(`selectStream: Selected stream by text: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Scroll down in the dropdown if stream not found yet
-                    const menuVisible = await dropdownMenu.isVisible({ timeout: 500 }).catch(() => false);
-                    if (menuVisible) {
-                        try {
-                            await dropdownMenu.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                            testLogger.debug(`selectStream: Scrolled dropdown by ${scrollAmount}px`);
-                        } catch (scrollError) {
-                            testLogger.debug(`selectStream: Scroll failed: ${scrollError.message}`);
+                    } catch (e) {
+                        testLogger.debug(`selectStream: Toggle attempt ${toggleAttempt} failed: ${e.message}`);
+                        if (toggleAttempt < 3) {
+                            await this.page.waitForTimeout(500);
                         }
                     }
-
-                    await this.page.waitForTimeout(300);
-                    maxScrolls--;
                 }
 
-                // Stream not found in this attempt, close dropdown and retry
-                testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(500);
+                if (!toggleFound) {
+                    // Stream toggle not found in this attempt, close dropdown and retry
+                    testLogger.info(`selectStream: Stream ${stream} toggle not found on attempt ${attempt}`);
+                    await this.page.keyboard.press('Escape');
+                    await this.page.waitForTimeout(500);
 
-                if (attempt < maxRetries) {
-                    testLogger.debug(`selectStream: Waiting 10s before retry...`);
-                    await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
+                    if (attempt < maxRetries) {
+                        testLogger.debug(`selectStream: Waiting 10s before retry...`);
+                        await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
 
-                    // Navigate to logs page again to refresh stream list
-                    await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-                    await this.page.waitForTimeout(3000);
+                        // Navigate to logs page again to refresh stream list
+                        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+                        await this.page.waitForTimeout(3000);
+                    }
                 }
 
             } catch (e) {
@@ -842,7 +798,8 @@ export class LogsPage {
         testLogger.debug(`selectIndexStreamOld: Starting selection for stream: ${streamName}`);
         try {
             // Click the dropdown
-            const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+            const selectComponent = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+            const selectTrigger = selectComponent.locator('button').first();
             await selectTrigger.click();
             testLogger.debug(`selectIndexStreamOld: Clicked dropdown`);
             await this.page.waitForTimeout(2000);

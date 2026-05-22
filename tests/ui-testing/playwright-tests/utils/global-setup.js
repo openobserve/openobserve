@@ -33,16 +33,19 @@ async function globalSetup() {
     
     // Navigate to login page with org identifier to establish correct org context
     const loginUrl = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
-    await page.goto(loginUrl);
-    testLogger.debug('Navigated to base URL with org', { url: loginUrl });
+    try {
+      await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      testLogger.debug('Navigated to base URL with org', { url: loginUrl });
+    } catch (error) {
+      testLogger.error('Failed to navigate to login page', { url: loginUrl, error: error.message });
+      throw error;
+    }
 
-    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
-    // Debug: Log current URL and page title
+    // Debug: Log current URL (skip page.title() as page might be navigating)
     const currentUrl = page.url();
-    const pageTitle = await page.title();
-    testLogger.debug('Page loaded', { currentUrl, pageTitle });
+    testLogger.debug('Page loaded', { currentUrl });
 
     // Handle internal user login if needed
     const internalUserButton = page.getByText('Login as internal user');
@@ -77,17 +80,22 @@ async function globalSetup() {
     await passwordField.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     
     await signInButton.waitFor({ state: 'visible' });
-    await signInButton.click();
+
+    // Wait for navigation after clicking sign in
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {}),
+      signInButton.click()
+    ]);
 
     testLogger.debug('Login credentials submitted');
 
-    // Wait for login to complete - look for navigation or success indicators
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    
+    // Wait for page to stabilize after login
+    await page.waitForTimeout(1000);
+
     // Verify login success by checking for a known element
-    await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 
-      state: 'visible', 
-      timeout: 10000 
+    await page.locator('[data-test="menu-link-\\/-item"]').waitFor({
+      state: 'visible',
+      timeout: 15000
     });
     
     testLogger.info('Global login authentication successful');
