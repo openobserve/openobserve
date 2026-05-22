@@ -20,14 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-cy="syntax-guide-button"
         variant="ghost"
-        size="icon-sm"
+        size="xs"
         :class="[
           noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
           sqlmode ? 'sql-mode' : 'normal-mode',
         ]"
+        class="tw:h-4.5!"
       >
         <OIcon name="help" size="sm" />
-        <span v-if="label" class="tw:ml-1">{{ label }}</span>
+        <span v-if="label" class="tw:ml-2">{{ label }}</span>
         <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
         <OTooltip :content="t('search.syntaxGuideLabel')" />
       </OButton>

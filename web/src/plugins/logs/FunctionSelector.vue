@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="tw:p-0 float-left tw:mr-1 function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
-    <div class="tw:flex tw:items-center tw:mx-1">
+    <div class="tw:flex tw:items-center tw:px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -31,10 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
+          class="tw:ml-1!"
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
-          <OIcon name="arrow-drop-down" size="xs" class="tw:-ms-1" />
+          <OIcon name="arrow-drop-down" size="sm" class="tw:-ml-0.5" />
           <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>
       </template>
