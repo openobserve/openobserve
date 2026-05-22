@@ -811,7 +811,7 @@ export default defineComponent({
         variableData.query_data.filter = [];
       }
       variableData.query_data.filter.push({
-        name: "",
+        name: undefined,
         operator: "=",
         value: "",
       });
@@ -836,8 +836,8 @@ export default defineComponent({
       variableData.escapeSingleQuotes = false;
     }
 
-    const filterUpdated = (index: number, filter: any) => {
-      variableData.query_data.filter[index].name = filter.name;
+    const filterUpdated = (index: number, value: any) => {
+      variableData.query_data.filter[index].name = value;
     };
 
     const removeFilter = (index: any) => {
