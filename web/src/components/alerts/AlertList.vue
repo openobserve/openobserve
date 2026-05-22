@@ -2898,28 +2898,4 @@ export default defineComponent({
   min-width: 0 !important;
 }
 
-.alert-search-input {
-  :deep(.q-field__control) {
-    padding: 0 2px !important;
-  }
-
-  :deep(.q-field__prepend) {
-    padding-left: 2px !important;
-    padding-right: 0 !important;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-}
-
-.all-folders-toggle {
-  :deep(.q-toggle__inner) {
-    height: 1.1em !important;
-  }
-  :deep(.q-toggle__label) {
-    margin-top: 2px !important;
-  }
-}
 </style>

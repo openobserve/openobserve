@@ -466,8 +466,8 @@ export default defineComponent({
         customRoles.value = Array.isArray(res.data) ? res.data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
-          $q.notify({
-            color: "negative",
+          toast({
+            variant: "error",
             message:
               err?.response?.data?.message ||
               "Failed to load custom roles.",
