@@ -707,7 +707,7 @@ export default class DashboardVariablesScoped {
 
     if (dropdownAppeared) {
       try {
-        const option = this.page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').filter({ hasText: dependencyVariableName }).first();
+        const option = this.page.locator(`[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="${dependencyVariableName}"]`).first();
         await option.waitFor({ state: 'visible', timeout: 2000 });
         await option.click();
 

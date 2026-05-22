@@ -157,15 +157,16 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     // Wait for variable to appear on the dashboard after tab switch
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
 
-    const varDropdown1 = page.locator(`[data-test="variable-selector-${variableName}"]`);
-    await varDropdown1.waitFor({ state: "visible", timeout: 5000 });
+    const varTrigger1 = page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
+    await varTrigger1.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await varDropdown1.click();
+    await varTrigger1.click();
     // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    const popover1 = page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`);
+    await popover1.waitFor({ state: "visible", timeout: 5000 });
 
-    const option1 = page.locator(SELECTORS.ROLE_OPTION).nth(0);
-    await option1.waitFor({ state: "visible", timeout: 5000 });
+    const option1 = popover1.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).nth(0);
+    await option1.waitFor({ state: "visible", timeout: 10000 });
     const value1 = await option1.textContent();
     await option1.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
@@ -178,15 +179,16 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     // Wait for variable to appear on the dashboard after tab switch
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
 
-    const varDropdown2 = page.locator(`[data-test="variable-selector-${variableName}"]`);
-    await varDropdown2.waitFor({ state: "visible", timeout: 5000 });
+    const varTrigger2 = page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
+    await varTrigger2.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await varDropdown2.click();
+    await varTrigger2.click();
     // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    const popover2 = page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`);
+    await popover2.waitFor({ state: "visible", timeout: 5000 });
 
-    const option2 = page.locator(SELECTORS.ROLE_OPTION).nth(1);
-    await option2.waitFor({ state: "visible", timeout: 5000 });
+    const option2 = popover2.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).nth(1);
+    await option2.waitFor({ state: "visible", timeout: 10000 });
     const value2 = await option2.textContent();
     await option2.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
