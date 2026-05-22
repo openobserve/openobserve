@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="iam-groups-search-input">
             <OInput
               v-model="filterQuery"
-              class="tw:h-[36px] tw:w-[200px]"
+              class="tw:w-[12.5rem]"
               :placeholder="t('iam.searchGroup')"
             >
               <template #icon-left>
@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-groups-add-group-btn"
             variant="primary"
             size="sm"
+            class="tw:!h-8"
             @click="addGroup"
           >
             {{ t('iam.addGroup') }}

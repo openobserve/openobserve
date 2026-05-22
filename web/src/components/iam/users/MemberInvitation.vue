@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="xs"
+          class="tw:!h-8"
           :disabled="userEmail == ''"
           @click="inviteUser()"
         >
