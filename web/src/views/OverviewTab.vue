@@ -354,13 +354,7 @@ const loadAnomalies = async () => {
     // Fetch history for each config in parallel, cap per-config at 20 hits
     const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
     const results = await Promise.allSettled(
-      configs.map((c) =>
-        anomalyService.getHistory(
-          orgId.value,
-          c.id ?? c.anomaly_id,
-          limitPerConfig,
-        ),
-      ),
+      configs.map((c) => anomalyService.getHistory(orgId.value, c.id ?? c.anomaly_id, limitPerConfig, c.folder_id))
     );
 
     const found: any[] = [];
