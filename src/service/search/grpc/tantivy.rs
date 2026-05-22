@@ -28,8 +28,11 @@ use tantivy::{
     aggregation::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants},
-        agg_result::{AggregationResult, BucketResult},
-        bucket::{CustomOrder, Order, OrderTarget, TermsAggregation},
+        agg_result::{AggregationResult, BucketEntries, BucketResult},
+        bucket::{
+            CustomOrder, HistogramAggregation, HistogramBounds, Order, OrderTarget,
+            TermsAggregation,
+        },
     },
     query::Query,
 };
@@ -39,18 +42,20 @@ use crate::service::search::index::IndexCondition;
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(HashSet<u32>),
-    RowIdsBitVec(usize, BitVec),
-    Count(usize),              // simple count optimization
-    Histogram(Vec<u64>),       // simple histogram optimization
-    TopN(Vec<(String, u64)>),  // simple top n optimization
-    Distinct(HashSet<String>), // simple distinct optimization
+    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
+    RowIdsBitVec(BitVec, usize, Option<u32>),
+    Count(usize),                            // simple count optimization
+    Histogram(Vec<u64>),                     // simple histogram optimization
+    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
+    TopN(Vec<(String, u64)>),                // simple top n optimization
+    Distinct(HashSet<String>),               // simple distinct optimization
 }
 
 impl TantivyResult {
     // used for skip tantivy search
     pub fn percent(&self) -> usize {
         match self {
-            Self::RowIdsBitVec(percent, _) => *percent,
+            Self::RowIdsBitVec(_, percent, _) => *percent,
             _ => 0,
         }
     }
@@ -61,12 +66,21 @@ impl TantivyResult {
                 row_ids.capacity() * std::mem::size_of::<u32>()
                     + std::mem::size_of::<HashSet<u32>>()
             }
-            Self::RowIdsBitVec(_, bitvec) => {
+            Self::RowIdsBitVec(bitvec, ..) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
             }
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
+            }
+            Self::MultiHistogram(multi_histogram) => {
+                multi_histogram
+                    .iter()
+                    .map(|(_, s, _)| {
+                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
+                    })
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(i64, String, u64)>>()
             }
             Self::TopN(top_n) => {
                 top_n
@@ -145,6 +159,86 @@ impl TantivyResult {
         )?;
 
         Ok(Self::Histogram(res))
+    }
+
+    pub fn handle_simple_multi_histogram(
+        searcher: &Searcher,
+        query: Box<dyn Query>,
+        min_value: i64,
+        max_value: i64,
+        bucket_width: u64,
+        breakdown_field: &str,
+    ) -> anyhow::Result<Self> {
+        let limit = config::get_config().limit.query_default_limit;
+        // this value should be zero
+        let offset = (min_value % bucket_width as i64) as f64;
+        let histogram_agg = Aggregation {
+            agg: AggregationVariants::Histogram(HistogramAggregation {
+                field: TIMESTAMP_COL_NAME.to_string(),
+                interval: bucket_width as f64,
+                offset: Some(offset),
+                min_doc_count: Some(1),
+                hard_bounds: Some(HistogramBounds {
+                    min: min_value as f64,
+                    max: max_value as f64,
+                }),
+                extended_bounds: None,
+                keyed: false,
+                is_normalized_to_ns: false,
+            }),
+            sub_aggregation: HashMap::from([(
+                "breakdown".to_string(),
+                Aggregation {
+                    agg: AggregationVariants::Terms(TermsAggregation {
+                        field: breakdown_field.to_string(),
+                        size: Some(limit as u32),
+                        order: None,
+                        missing: None,
+                        min_doc_count: Some(1),
+                        show_term_doc_count_error: Some(false),
+                        segment_size: None,
+                    }),
+                    sub_aggregation: HashMap::new(),
+                },
+            )]),
+        };
+        let aggregations = HashMap::from([("histogram".to_string(), histogram_agg)]);
+        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
+
+        let mut res = searcher.search(&query, &collector)?;
+
+        let mut results = Vec::new();
+        if let AggregationResult::BucketResult(BucketResult::Histogram { buckets }) =
+            res.0.remove("histogram").unwrap()
+        {
+            let hist_buckets = match buckets {
+                BucketEntries::Vec(vec) => vec,
+                BucketEntries::HashMap(map) => map.into_values().collect(),
+            };
+            for mut bucket_entry in hist_buckets {
+                let timestamp = match bucket_entry.key {
+                    Key::F64(k) => k as i64,
+                    _ => continue,
+                };
+                if let AggregationResult::BucketResult(BucketResult::Terms {
+                    buckets: term_entries,
+                    ..
+                }) = bucket_entry.sub_aggregation.0.remove("breakdown").unwrap()
+                {
+                    for term_bucket in term_entries {
+                        let breakdown_value = match term_bucket.key {
+                            Key::Str(s) => s,
+                            Key::F64(f) => f.to_string(),
+                            Key::I64(i) => i.to_string(),
+                            Key::U64(u) => u.to_string(),
+                        };
+                        results.push((timestamp, breakdown_value, term_bucket.doc_count));
+                    }
+                }
+            }
+        }
+
+        Ok(Self::MultiHistogram(results))
     }
 
     pub fn handle_simple_top_n(
@@ -249,6 +343,7 @@ impl TantivyResult {
 pub enum TantivyMultiResultBuilder {
     RowNums(u64),
     Histogram(Vec<Vec<u64>>),
+    MultiHistogram(Vec<Vec<(i64, String, u64)>>),
     TopN(Vec<(String, u64)>),
     Distinct(HashSet<String>),
 }
@@ -257,6 +352,7 @@ impl TantivyMultiResultBuilder {
     pub fn new(optimize_rule: &Option<IndexOptimizeMode>) -> Self {
         match optimize_rule {
             Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
+            Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
             Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
             Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
             Some(IndexOptimizeMode::SimpleSelect(..))
@@ -277,6 +373,17 @@ impl TantivyMultiResultBuilder {
             Self::Histogram(a) => {
                 if !histogram.is_empty() {
                     a.push(histogram);
+                }
+            }
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
+    pub fn add_multi_histogram(&mut self, multi_histogram: Vec<(i64, String, u64)>) {
+        match self {
+            Self::MultiHistogram(a) => {
+                if !multi_histogram.is_empty() {
+                    a.push(multi_histogram);
                 }
             }
             _ => unreachable!("unsupported tantivy multi result"),
@@ -322,6 +429,11 @@ impl TantivyMultiResultBuilder {
                     .collect();
                 TantivyMultiResult::Histogram(histogram)
             }
+            Self::MultiHistogram(results) => {
+                // Merge: flatten all per-file results into a single Vec
+                let merged: Vec<(i64, String, u64)> = results.into_iter().flatten().collect();
+                TantivyMultiResult::MultiHistogram(merged)
+            }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
             Self::Distinct(a) => TantivyMultiResult::Distinct(a),
         }
@@ -331,6 +443,7 @@ impl TantivyMultiResultBuilder {
 pub enum TantivyMultiResult {
     RowNums(u64),
     Histogram(Vec<u64>),
+    MultiHistogram(Vec<(i64, String, u64)>),
     TopN(Vec<(String, u64)>),
     Distinct(HashSet<String>),
 }
@@ -341,6 +454,9 @@ impl Display for TantivyMultiResult {
             Self::RowNums(num) => write!(f, "row_nums: {num}"),
             Self::Histogram(histogram) => {
                 write!(f, "histogram hits: {}", histogram.iter().sum::<u64>())
+            }
+            Self::MultiHistogram(multi_histogram) => {
+                write!(f, "multi_histogram hits: {}", multi_histogram.len())
             }
             Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
             Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
@@ -359,6 +475,13 @@ impl TantivyMultiResult {
     pub fn histogram(self) -> Vec<u64> {
         match self {
             Self::Histogram(a) => a,
+            _ => vec![],
+        }
+    }
+
+    pub fn multi_histogram(self) -> Vec<(i64, String, u64)> {
+        match self {
+            Self::MultiHistogram(a) => a,
             _ => vec![],
         }
     }
@@ -389,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_percent() {
-        let result = TantivyResult::RowIdsBitVec(75, BitVec::repeat(false, 100));
+        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
         assert_eq!(result.percent(), 75);
 
         let result = TantivyResult::RowIds(HashSet::new());
@@ -417,7 +540,7 @@ mod tests {
     #[test]
     fn test_tantivy_result_get_memory_size_bitvec() {
         let bitvec = BitVec::repeat(false, 1000);
-        let result = TantivyResult::RowIdsBitVec(50, bitvec);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 50, None);
         let memory_size = result.get_memory_size();
 
         // Should include BitVec overhead + bit capacity / 8

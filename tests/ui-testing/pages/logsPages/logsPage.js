@@ -1032,6 +1032,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
+        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
     }
@@ -7827,6 +7828,270 @@ export class LogsPage {
      */
     getLogsSearchErrorMessage() {
         return this.page.locator('[data-test="logs-search-error-message"]').first();
+    }
+
+    // ===== REGRESSION: Scroll Retention (#9044) & Undefined Length (#7354) =====
+
+    /**
+     * Wait for search results to be loaded (pagination visible).
+     */
+    async waitForResultsLoaded() {
+        await this.page.locator('[data-test="logs-search-result-pagination"]')
+            .waitFor({ state: 'visible', timeout: 30000 });
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Get the scroll position (scrollTop) of the main results scroll container.
+     * Call waitForResultsLoaded() first to ensure the container exists.
+     * Navigates from pagination -> .search-list -> child with overflow-y-auto.
+     * @returns {Promise<number>}
+     */
+    async getScrollContainerPosition() {
+        return await this.page.evaluate(() => {
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (!pagination) return -1;
+            const searchList = pagination.closest('.search-list');
+            if (!searchList) return -1;
+            const container = searchList.querySelector('[class*="overflow-y-auto"]');
+            return container ? container.scrollTop : -1;
+        });
+    }
+
+    /**
+     * Scroll the main results container to the bottom.
+     * Call waitForResultsLoaded() first to ensure the container exists.
+     */
+    async scrollToResultsBottom() {
+        await this.page.evaluate(() => {
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (!pagination) return;
+            const searchList = pagination.closest('.search-list');
+            if (!searchList) return;
+            const container = searchList.querySelector('[class*="overflow-y-auto"]');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        });
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Click a specific page number in the pagination component.
+     * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
+     */
+    async clickPageNumber(pageNum) {
+        const pageBtn = this.page
+            .locator('[data-test="logs-search-result-pagination"]')
+            .locator(`button[aria-label="${pageNum}"]`);
+        await pageBtn.click({ force: true });
+        await this.waitForResultsLoaded();
+    }
+
+    /**
+     * Click the "Next page" button in the pagination component.
+     */
+    async clickNextPage() {
+        const nextBtn = this.page
+            .locator('[data-test="logs-search-result-pagination"]')
+            .locator('button[aria-label="Next page"]');
+        await nextBtn.click({ force: true });
+        await this.waitForResultsLoaded();
+    }
+
+    /**
+     * Open the "More Options" menu on the logs search bar.
+     */
+    async openMoreOptionsMenu() {
+        const menuBtn = this.page.locator('[data-test="logs-search-bar-more-options-btn"]');
+        await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await menuBtn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Click "List Scheduled Search" in the open More Options menu.
+     * Uses the data-test selector on the menu item when available (enterprise),
+     * falling back to text-based DOM matching for OSS builds.
+     */
+    async clickListScheduledSearch() {
+        const listBtn = this.page.locator('[data-test="search-scheduler-list-btn"]');
+        if (await listBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await listBtn.click();
+        } else {
+            await this.page.evaluate(() => {
+                const items = document.querySelectorAll('[role="menuitem"]');
+                for (const item of items) {
+                    if (item.textContent?.trim() === 'List Scheduled Search') {
+                        item.click();
+                        break;
+                    }
+                }
+            });
+        }
+        await this.page.waitForTimeout(3000);
+    }
+
+    /**
+     * Click a scheduled search row by its trace_id.
+     * @param {string} traceId - The trace_id of the scheduled search job
+     * @returns {Promise<boolean>} true if the row was clicked, false if not found
+     */
+    async clickScheduledSearchRow(traceId) {
+        const row = this.page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await row.locator('[data-test="search-scheduler-expand-btn"]').click();
+        await this.page.waitForTimeout(3000);
+    }
+
+    /**
+     * Navigate to the Streams page via the sidebar.
+     */
+    async navigateToStreams() {
+        const streamsLink = this.page.locator('[data-test="menu-link-\\/streams-item"]');
+        await streamsLink.click();
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(2000);
+    }
+
+    /**
+     * Navigate to the Logs page via the sidebar.
+     */
+    async navigateToLogsFromSidebar() {
+        const logsLink = this.page.locator('[data-test="menu-link-\\/logs-item"]');
+        await logsLink.click();
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(3000);
+    }
+
+    /**
+     * Check if an error message is visible on the logs page.
+     * @returns {Promise<boolean>}
+     */
+    async hasErrorMessage() {
+        const errorEl = this.page.locator('[data-test="logs-search-error-message"]');
+        return await errorEl.isVisible().catch(() => false);
+    }
+
+    /**
+     * Wait for the Run Query button to be ready (not in Cancel query state).
+     * After navigating back to Logs, a query may still be running and the button
+     * shows "Cancel query". Wait for it to finish or time out gracefully.
+     */
+    async waitForRunQueryReady() {
+        const btn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // Wait for the button to leave cancel state AND loading to finish
+        await this.page.waitForFunction(() => {
+            const el = document.querySelector('[data-test="logs-search-bar-refresh-btn"]');
+            if (!el) return true;
+            return el.getAttribute('title') !== 'Cancel query'
+                && el.getAttribute('aria-busy') !== 'true'
+                && !el.hasAttribute('disabled');
+        }, { timeout: 30000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Click the Run Query button if it is enabled. Waits for the button to be ready first.
+     * Returns true if the button was clicked, false if it remained disabled.
+     * @returns {Promise<boolean>}
+     */
+    async clickRunQueryIfReady() {
+        await this.waitForRunQueryReady();
+        const btn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        const isEnabled = await btn.isEnabled({ timeout: 30000 }).catch(() => false);
+        if (isEnabled) {
+            await btn.click();
+            await this.page.waitForTimeout(3000);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the current page number from the pagination component.
+     * @returns {Promise<string>}
+     */
+    async getCurrentPageNumber() {
+        return await this.page.evaluate(() => {
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (!pagination) return '';
+            const btn = pagination.querySelector('button[aria-current="true"]');
+            return btn ? btn.getAttribute('aria-label') : '';
+        });
+    }
+
+    /**
+     * Get timestamp column header in logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTimestampColumnHeader() {
+        return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    }
+
+    /**
+     * Get source column header in logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSourceColumnHeader() {
+        return this.page.locator('[data-test="log-search-result-table-th-source"]');
+    }
+
+    /**
+     * Get bar chart / histogram container
+     * @returns {import('@playwright/test').Locator}
+     */
+    getBarChart() {
+        return this.page.locator('[data-test="logs-search-result-bar-chart"]');
+    }
+
+    /**
+     * Get logs result table element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTable() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"]');
+    }
+
+    /**
+     * Get stream dropdown selector
+     * @returns {import('@playwright/test').Locator}
+     */
+    getStreamDropdown() {
+        return this.page.locator('[data-test="log-search-index-list-select-stream"]');
+    }
+
+    /**
+     * Get stream dropdown search input
+     * @returns {import('@playwright/test').Locator}
+     */
+    getStreamSearchInput() {
+        return this.page.locator('[data-test="log-search-index-list-select-stream"] input');
+    }
+
+    /**
+     * Get visualize toggle button
+     * @returns {import('@playwright/test').Locator}
+     */
+    getVisualizeToggle() {
+        return this.page.locator('[data-test="logs-visualize-toggle"]');
+    }
+
+    /**
+     * Get query editor element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getQueryEditor() {
+        return this.page.locator('[data-test="logs-search-bar-query-editor"]');
+    }
+
+    /**
+     * Get Quasar time picker (fallback when absolute tab time input not available)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getQuasarTimePicker() {
+        return this.page.locator('.q-time');
     }
 
 }

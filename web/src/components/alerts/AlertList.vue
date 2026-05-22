@@ -1722,6 +1722,7 @@ export default defineComponent({
               stream_type: toBeClonestreamType.value,
               stream_name: toBeClonestreamName.value,
             },
+            folderIdToBeCloned.value,
           );
           dismiss();
           toast({

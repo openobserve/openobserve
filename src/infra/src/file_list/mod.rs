@@ -682,6 +682,7 @@ impl From<&FileRecord> for FileKey {
             meta: r.into(),
             deleted: r.deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 }

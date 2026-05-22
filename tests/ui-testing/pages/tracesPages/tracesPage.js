@@ -2070,6 +2070,102 @@ export class TracesPage {
     });
   }
 
+  /**
+   * Get log detail traces tab
+   * @returns {Locator}
+   */
+  getLogDetailTracesTab() {
+    return this.page.locator('[name="correlated-traces"]');
+  }
+
+  /**
+   * Get dialog/modal box
+   * @returns {Locator}
+   */
+  getDialogBox() {
+    return this.page.locator('[data-test="dialog-box"]');
+  }
+
+  /**
+   * Get navbar organization selector
+   * @returns {Locator}
+   */
+  getNavbarOrgSelector() {
+    return this.page.locator('[data-test="navbar-organizations-select"]');
+  }
+
+  /**
+   * Get span blocks in trace details
+   * @returns {Locator}
+   */
+  getSpanBlocks() {
+    return this.page.locator('[data-test="span-block"]');
+  }
+
+  /**
+   * Get span block detail container
+   * @returns {Locator}
+   */
+  getSpanBlockDetail() {
+    return this.page.locator('[data-test="span-block-container"]');
+  }
+
+  /**
+   * Get search bar element
+   * @returns {Locator}
+   */
+  getSearchBarElement() {
+    return this.page.locator('[data-test="logs-search-bar"]');
+  }
+
+  /**
+   * Get timestamp column header (logs table variant, for cross-feature tests)
+   * @returns {Locator}
+   */
+  getLogsTimestampHeader() {
+    return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+  }
+
+  /**
+   * Get first log row's timestamp cell (for cross-feature tests)
+   * @returns {Locator}
+   */
+  getFirstLogTimestampCell() {
+    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr:first-child td').first();
+  }
+
+  /**
+   * Get error indicator elements
+   * @returns {Locator}
+   */
+  getErrorElements() {
+    return this.page.locator('.error, .text-negative, [class*="error"]').first();
+  }
+
+  /**
+   * Get hover/tooltip/popup elements
+   * @returns {Locator}
+   */
+  getHoverElements() {
+    return this.page.locator('[class*="hover"], [class*="tooltip"], [class*="popup"]');
+  }
+
+  /**
+   * Get SQL mode toggle button
+   * @returns {Locator}
+   */
+  getSqlModeToggle() {
+    return this.page.locator(this.sqlModeButton);
+  }
+
+  /**
+   * Get query editor locator
+   * @returns {Locator}
+   */
+  getQueryEditorLocator() {
+    return this.page.locator(this.queryEditor);
+  }
+
 }
 
 

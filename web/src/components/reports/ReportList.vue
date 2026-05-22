@@ -417,7 +417,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       store.state.selectedOrganization.identifier,
       folder,
       undefined,
-      isCache || undefined,
+      isCache,
       nameQuery || undefined,
     );
 

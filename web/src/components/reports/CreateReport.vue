@@ -1410,6 +1410,14 @@ const saveReport = async () => {
 
   savePromise
     .then(() => {
+      // Invalidate the folder cache so ReportList fetches fresh data on mount
+      const folderId = selectedReportFolderId.value || "default";
+      const updated = {
+        ...store.state.organizationData.allReportsListByFolderId,
+      };
+      delete updated[folderId];
+      store.dispatch("setAllReportsListByFolderId", updated);
+
       toast({
         variant: "success",
         message: `Report ${

@@ -44,8 +44,12 @@ mod utils;
 use crate::service::search::datafusion::{
     distributed_plan::{empty_exec::NewEmptyExec, remote_scan_exec::RemoteScanExec},
     optimizer::physical_optimizer::index_optimizer::{
-        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
-        select::is_simple_select, topn::is_simple_topn, utils::is_complex_plan,
+        count::is_simple_count,
+        distinct::is_simple_distinct,
+        histogram::{is_simple_histogram, is_simple_multi_histogram},
+        select::is_simple_select,
+        topn::is_simple_topn,
+        utils::is_complex_plan,
     },
 };
 
@@ -53,19 +57,22 @@ use crate::service::search::datafusion::{
 /// this is used for optimizer that do not need global information
 /// NOTE: use this optimizer in follower only when all filter
 /// can be extract to index condition(except _timestamp filter)
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct FollowerIndexOptimizerRule {
     time_range: (i64, i64),
+    index_fields: HashSet<String>,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl FollowerIndexOptimizerRule {
     pub fn new(
         time_range: (i64, i64),
+        index_fields: HashSet<String>,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
             time_range,
+            index_fields,
             index_optimizer_mode,
         }
     }
@@ -81,8 +88,11 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
             return Ok(plan);
         }
 
-        let mut rewriter =
-            FollowerIndexOptimizer::new(self.time_range, self.index_optimizer_mode.clone());
+        let mut rewriter = FollowerIndexOptimizer::new(
+            self.time_range,
+            self.index_fields.clone(),
+            self.index_optimizer_mode.clone(),
+        );
         let plan = plan.rewrite(&mut rewriter)?.data;
         Ok(plan)
     }
@@ -98,16 +108,19 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
 
 struct FollowerIndexOptimizer {
     time_range: (i64, i64),
+    index_fields: HashSet<String>,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl FollowerIndexOptimizer {
     pub fn new(
         time_range: (i64, i64),
+        index_fields: HashSet<String>,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
             time_range,
+            index_fields,
             index_optimizer_mode,
         }
     }
@@ -142,6 +155,15 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
             if let Some(index_optimize_mode) =
                 is_simple_histogram(Arc::clone(&plan), self.time_range)
             {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            // Check for SimpleMultiHistogram
+            if let Some(index_optimize_mode) = is_simple_multi_histogram(
+                Arc::clone(&plan),
+                self.time_range,
+                self.index_fields.clone(),
+            ) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
@@ -393,6 +415,7 @@ mod tests {
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
+                HashSet::new(),
                 index_optimizer_mode.clone(),
             )))
             .with_default_features()
@@ -424,6 +447,7 @@ mod tests {
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
+                HashSet::new(),
                 index_optimizer_mode.clone(),
             )))
             .with_default_features()
