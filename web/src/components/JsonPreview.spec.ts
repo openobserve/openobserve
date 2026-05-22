@@ -27,6 +27,10 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-url"),
 }));
 
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/components/logs/LogsHighLighting.vue", () => ({
   default: {
     name: "LogsHighLighting",
@@ -43,17 +47,8 @@ vi.mock("@/components/logs/ChunkedContent.vue", () => ({
   },
 }));
 
-const mockNotify = vi.fn();
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
-
 import JsonPreview from "./JsonPreview.vue";
+import * as clipboardUtils from "@/utils/clipboard";
 
 
 // ── Mount factory ─────────────────────────────────────────────────────────────
@@ -187,20 +182,19 @@ describe("JsonPreview", () => {
       expect(emitted![0][0]).toEqual(value);
     });
 
-    it("should call $q.notify after clicking the copy button", async () => {
-      wrapper = mountJsonPreview({
-        showCopyButton: true,
-        value: { key: "val" },
-      });
+    it("should call copyToClipboard with the JSON-stringified value after clicking the copy button", async () => {
+      const value = { key: "val" };
+      wrapper = mountJsonPreview({ showCopyButton: true, value });
 
       const copyButton = wrapper.find("button");
       expect(copyButton.exists()).toBe(true);
 
       await copyButton.trigger("click");
 
-      expect(mockNotify).toHaveBeenCalledOnce();
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(clipboardUtils.copyToClipboard).toHaveBeenCalledOnce();
+      expect(clipboardUtils.copyToClipboard).toHaveBeenCalledWith(
+        JSON.stringify(value, null, 2),
+        expect.objectContaining({ successMessage: expect.any(String), timeout: 1500 }),
       );
     });
   });

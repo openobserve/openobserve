@@ -1028,18 +1028,21 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it.skip("should handle large dataset performance", () => {
+    it("should handle large dataset performance", () => {
       const largeOptions = Array.from({ length: 1000 }, (_, i) => ({
         label: `Option ${i}`,
         value: `option-${i}`
       }));
-      
+
       wrapper = createWrapper({
         variableItem: { ...defaultVariableItem, options: largeOptions }
       });
-      
-      wrapper.vm.filterText = "Option 999";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+
+      wrapper.vm.onSearch("Option 999");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.includes("Option 999")
+      );
+      expect(matching).toHaveLength(1);
     });
 
     it("should handle special characters in values", () => {

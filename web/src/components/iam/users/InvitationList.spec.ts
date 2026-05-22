@@ -361,7 +361,7 @@ describe('InvitationList - confirmAcceptInvitation', () => {
     const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'server error' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to accept invitation' }));
   });
 
   it('triggers confirmAcceptInvitation when the accept ODialog emits click:primary', async () => {
@@ -457,7 +457,7 @@ describe('InvitationList - confirmRejectInvitation', () => {
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'server error' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to reject invitation' }));
   });
 
   it('triggers confirmRejectInvitation when the reject ODialog emits click:primary', async () => {

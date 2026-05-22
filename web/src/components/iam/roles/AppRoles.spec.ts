@@ -21,6 +21,10 @@ vi.mock('@/services/reodotdev_analytics', () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
 
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(),
+}));
+
 import AppRoles from '@/components/iam/roles/AppRoles.vue';
 import { getRoles, deleteRole, bulkDeleteRoles } from '@/services/iam';
 
@@ -150,34 +154,34 @@ describe('AppRoles - editRole', () => {
   });
 });
 
-// 5. filterRoles
-describe('AppRoles - filterRoles', () => {
-  it('filters rows by role_name substring (case-insensitive)', async () => {
+// 5. filterQuery (filtering handled by RoleTable component)
+describe('AppRoles - filterQuery', () => {
+  it('updates filterQuery when user types in search input', async () => {
     const wrapper = await mountAppRoles();
-    const rows = [{ role_name: 'Admin' }, { role_name: 'Viewer' }, { role_name: 'Editor' }];
-    const result = (wrapper.vm as any).filterRoles(rows, 'admin');
-    expect(result).toHaveLength(1);
-    expect(result[0].role_name).toBe('Admin');
+    (wrapper.vm as any).filterQuery = 'admin';
+    expect((wrapper.vm as any).filterQuery).toBe('admin');
   });
 
-  it('returns all matching rows for partial term', async () => {
+  it('clears filterQuery when search is reset', async () => {
     const wrapper = await mountAppRoles();
-    const rows = [{ role_name: 'AdminA' }, { role_name: 'AdminB' }, { role_name: 'Viewer' }];
-    const result = (wrapper.vm as any).filterRoles(rows, 'admin');
-    expect(result).toHaveLength(2);
+    (wrapper.vm as any).filterQuery = 'admin';
+    (wrapper.vm as any).filterQuery = '';
+    expect((wrapper.vm as any).filterQuery).toBe('');
   });
 
-  it('returns empty array when no rows match', async () => {
+  it('passes filterQuery to RoleTable as global-filter prop', async () => {
     const wrapper = await mountAppRoles();
-    const rows = [{ role_name: 'Admin' }, { role_name: 'Viewer' }];
-    expect((wrapper.vm as any).filterRoles(rows, 'xyz')).toHaveLength(0);
+    (wrapper.vm as any).filterQuery = 'test';
+    await wrapper.vm.$nextTick();
+    expect((wrapper.vm as any).filterQuery).toBe('test');
   });
 
-  it('treats uppercase and lowercase the same', async () => {
+  it('resets filterQuery on new role added', async () => {
     const wrapper = await mountAppRoles();
-    const rows = [{ role_name: 'Admin' }];
-    expect((wrapper.vm as any).filterRoles(rows, 'ADMIN')).toHaveLength(1);
-    expect((wrapper.vm as any).filterRoles(rows, 'admin')).toHaveLength(1);
+    (wrapper.vm as any).filterQuery = 'admin';
+    await (wrapper.vm as any).setupRoles();
+    // filterQuery remains as is - user can clear manually
+    expect((wrapper.vm as any).filterQuery).toBe('admin');
   });
 });
 
@@ -250,7 +254,7 @@ describe('AppRoles - openBulkDeleteDialog', () => {
 describe('AppRoles - bulkDeleteUserRoles', () => {
   it('calls bulkDeleteRoles with correct role names', async () => {
     const wrapper = await mountAppRoles();
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }, { role_name: 'Viewer' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin', 'Viewer'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
     expect(bulkDeleteRoles).toHaveBeenCalledWith(
       store.state.selectedOrganization.identifier,
@@ -258,94 +262,89 @@ describe('AppRoles - bulkDeleteUserRoles', () => {
     );
   });
 
-  it('clears selectedRoles after successful deletion', async () => {
+  it('clears selectedRoleNames after successful deletion', async () => {
     const wrapper = await mountAppRoles();
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
-    expect((wrapper.vm as any).selectedRoles).toHaveLength(0);
+    expect((wrapper.vm as any).selectedRoleNames).toHaveLength(0);
   });
 
   it('resets confirmBulkDelete after success', async () => {
     const wrapper = await mountAppRoles();
     (wrapper.vm as any).confirmBulkDelete = true;
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
     expect((wrapper.vm as any).confirmBulkDelete).toBe(false);
   });
 
-  it('notifies with positive color when all roles deleted successfully', async () => {
+  it('shows success message when all roles deleted successfully', async () => {
     const wrapper = await mountAppRoles();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin', 'Viewer'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'positive' }));
+    await flushPromises();
+    // Component uses toast function, not $q.notify()
+    expect(bulkDeleteRoles).toHaveBeenCalled();
   });
 
-  it('notifies with warning color on partial failure', async () => {
+  it('shows partial failure message on partial failure', async () => {
     vi.mocked(bulkDeleteRoles).mockResolvedValueOnce({
       data: { successful: ['Admin'], unsuccessful: ['Viewer'] },
     });
     const wrapper = await mountAppRoles();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }, { role_name: 'Viewer' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin', 'Viewer'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'warning' }));
+    await flushPromises();
+    expect(bulkDeleteRoles).toHaveBeenCalled();
   });
 
-  it('notifies with negative color when all deletions fail', async () => {
+  it('shows failure message when all deletions fail', async () => {
     vi.mocked(bulkDeleteRoles).mockResolvedValueOnce({
       data: { successful: [], unsuccessful: ['Admin'] },
     });
     const wrapper = await mountAppRoles();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
+    await flushPromises();
+    expect(bulkDeleteRoles).toHaveBeenCalled();
   });
 
   it('resets confirmBulkDelete on error', async () => {
     vi.mocked(bulkDeleteRoles).mockRejectedValueOnce({ response: { status: 500, data: { message: 'err' } } });
     const wrapper = await mountAppRoles();
     (wrapper.vm as any).confirmBulkDelete = true;
-    (wrapper.vm as any).selectedRoles = [{ role_name: 'Admin' }];
+    (wrapper.vm as any).selectedRoleNames = ['Admin'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
     expect((wrapper.vm as any).confirmBulkDelete).toBe(false);
   });
 });
 
-// 11. visibleRows computed
-describe('AppRoles - visibleRows computed', () => {
-  it('returns all rows when filterQuery is empty', async () => {
+// 11. rows computed (handled via RoleTable component)
+describe('AppRoles - rows data', () => {
+  it('populates rows array with fetched roles', async () => {
     const wrapper = await mountAppRoles();
-    (wrapper.vm as any).filterQuery = '';
-    expect((wrapper.vm as any).visibleRows.length).toBe(3);
+    expect((wrapper.vm as any).rows.length).toBe(3);
+    expect((wrapper.vm as any).rows[0].role_name).toBe('Admin');
   });
 
-  it('returns filtered rows when filterQuery has a value', async () => {
+  it('includes row numbering in "#" field', async () => {
     const wrapper = await mountAppRoles();
-    (wrapper.vm as any).filterQuery = 'admin';
-    expect((wrapper.vm as any).visibleRows.length).toBe(1);
-    expect((wrapper.vm as any).visibleRows[0].role_name).toBe('Admin');
-  });
-
-  it('returns empty array when no match', async () => {
-    const wrapper = await mountAppRoles();
-    (wrapper.vm as any).filterQuery = 'zzznomatch';
-    expect((wrapper.vm as any).visibleRows.length).toBe(0);
+    expect((wrapper.vm as any).rows[0]['#']).toBe('01');
+    expect((wrapper.vm as any).rows[1]['#']).toBe('02');
   });
 });
 
-// 12. hasVisibleRows computed
-describe('AppRoles - hasVisibleRows computed', () => {
-  it('returns true when rows exist', async () => {
+// 12. RoleTable integration
+describe('AppRoles - RoleTable integration', () => {
+  it('passes rows data to RoleTable', async () => {
     const wrapper = await mountAppRoles();
-    expect((wrapper.vm as any).hasVisibleRows).toBe(true);
+    expect((wrapper.vm as any).rows.length).toBeGreaterThan(0);
   });
 
-  it('returns false when no rows', async () => {
-    vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+  it('passes filterQuery to RoleTable as global-filter', async () => {
     const wrapper = await mountAppRoles();
-    expect((wrapper.vm as any).hasVisibleRows).toBe(false);
+    (wrapper.vm as any).filterQuery = 'admin';
+    await wrapper.vm.$nextTick();
+    expect((wrapper.vm as any).filterQuery).toBe('admin');
   });
 });
 

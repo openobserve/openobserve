@@ -93,7 +93,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should render separator", () => {
       wrapper = createWrapper();
-      const separator = wrapper.findComponent({ name: "QSeparator" });
+      const separator = wrapper.findComponent({ name: "OSeparator" });
       expect(separator.exists()).toBe(true);
     });
 
@@ -166,12 +166,12 @@ describe("PromQLBuilderOptions", () => {
       expect(infoIcons.length).toBeGreaterThan(0);
     });
 
-    it("should use CommonAutoComplete component", () => {
+    it("should use OCombobox component for legend", () => {
       wrapper = createWrapper();
-      const autoComplete = wrapper.findComponent({
-        name: "CommonAutoComplete",
+      const combobox = wrapper.findComponent({
+        name: "OCombobox",
       });
-      expect(autoComplete.exists()).toBe(true);
+      expect(combobox.exists()).toBe(true);
     });
 
     it("should have correct width for legend input", () => {
@@ -253,7 +253,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should render query type select", () => {
       wrapper = createWrapper();
-      const queryTypeSelect = wrapper.findComponent({ name: "QSelect" });
+      const queryTypeSelect = wrapper.findComponent({ name: "OSelect" });
       expect(queryTypeSelect.exists()).toBe(true);
     });
 
@@ -271,7 +271,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should show query type info tooltip", () => {
       wrapper = createWrapper();
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });
@@ -303,13 +303,13 @@ describe("PromQLBuilderOptions", () => {
 
     it("should be borderless", () => {
       wrapper = createWrapper();
-      const inputs = wrapper.findAllComponents({ name: "QInput" });
+      const inputs = wrapper.findAllComponents({ name: "OInput" });
       expect(inputs.length).toBeGreaterThan(0);
     });
 
     it("should be dense", () => {
       wrapper = createWrapper();
-      const inputs = wrapper.findAllComponents({ name: "QInput" });
+      const inputs = wrapper.findAllComponents({ name: "OInput" });
       expect(inputs.length).toBeGreaterThan(0);
     });
 
@@ -323,7 +323,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should show step value info tooltip", () => {
       wrapper = createWrapper();
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });
@@ -530,13 +530,13 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have tooltips for user guidance", () => {
       wrapper = createWrapper();
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
 
     it("should show info icons for additional context", () => {
       wrapper = createWrapper();
-      const infoIcons = wrapper.findAllComponents({ name: "QIcon" });
+      const infoIcons = wrapper.findAllComponents({ name: "OIcon" });
       expect(infoIcons.length).toBeGreaterThan(0);
     });
   });

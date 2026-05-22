@@ -70,15 +70,23 @@ afterEach(() => {
 
 // 1. Rendering at level 0
 describe('PermissionsTable - level 0 rendering', () => {
-  it('renders the permissions count title at level 0', async () => {
-    const wrapper = await mountTable({ level: 0, visibleResourceCount: 5 });
-    expect(wrapper.find('[data-test="edit-role-permissions-table-title"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="edit-role-permissions-table-title"]').text()).toContain('5');
+  it('renders the table section and hides "No Permissions Selected" when rows are present at level 0', async () => {
+    const rows = [makeRow('stream', true)];
+
+    const wrapper = await mountTable({ level: 0, visibleResourceCount: 1, rows });
+
+    expect(wrapper.find('[data-test="iam-main-permissions-table-section"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="edit-role-permissions-table-no-permissions-title"]').exists(),
+    ).toBe(false);
   });
 
-  it('does NOT render the title at level > 0', async () => {
-    const wrapper = await mountTable({ level: 1 });
-    expect(wrapper.find('[data-test="edit-role-permissions-table-title"]').exists()).toBe(false);
+  it('does NOT render the "No Resources Present" message at level 0 when rows are empty', async () => {
+    const wrapper = await mountTable({ level: 0, rows: [] });
+
+    expect(
+      wrapper.find('[data-test="edit-role-permissions-table-no-resources-title"]').exists(),
+    ).toBe(false);
   });
 
   it('renders "No Permissions Selected" when rows are empty at level 0', async () => {
