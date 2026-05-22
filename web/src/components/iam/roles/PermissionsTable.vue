@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
-        v-if="!level && !rows.length"
+        v-if="!level && !rows.length && !loading"
         class="tw:w-full tw:text-center tw:mt-4 tw:font-bold tw:text-gray-600"
         style="margin-top: 64px; font-size: 18px"
       >
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expansion="multiple"
           :expanded-ids="expandedRowIds"
           :show-header="level === 0"
+          :loading="level === 0 && props.loading"
           :get-row-expansion-enabled="(row: any) => !!row.has_entities"
           @update:expanded-ids="handleOTableExpansionChange"
         >
@@ -172,6 +173,10 @@ const props = defineProps({
   customFilteredPermissions: {
     type: Object,
     default: () => ({}),
+  },
+  loading: {
+    type: Boolean,
+    default: false,
   },
 });
 

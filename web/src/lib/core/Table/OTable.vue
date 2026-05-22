@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, provide, ref, toRef, useSlots, watch } from "vue";
+import { computed, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
@@ -69,6 +69,48 @@ const cellSlotColumns = computed(() =>
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
+
+// ── Skeleton hold ───────────────────────────────────────────────
+// Show the skeleton for at least 2s once loading starts, so it doesn't
+// flash-and-disappear on fast responses. If the server is slow, the
+// skeleton stays visible until data actually arrives.
+const MIN_SKELETON_MS = 2000;
+const heldLoading = ref(false);
+let loadingStartedAt = 0;
+let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  () => props.loading,
+  (loading) => {
+    if (loading) {
+      if (releaseTimer) {
+        clearTimeout(releaseTimer);
+        releaseTimer = null;
+      }
+      loadingStartedAt = Date.now();
+      heldLoading.value = true;
+    } else if (heldLoading.value) {
+      const elapsed = Date.now() - loadingStartedAt;
+      const remaining = MIN_SKELETON_MS - elapsed;
+      if (remaining <= 0) {
+        heldLoading.value = false;
+      } else {
+        releaseTimer = setTimeout(() => {
+          heldLoading.value = false;
+          releaseTimer = null;
+        }, remaining);
+      }
+    }
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (releaseTimer) {
+    clearTimeout(releaseTimer);
+    releaseTimer = null;
+  }
+});
 
 // ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
 const globalFilterLocal = ref(props.globalFilter ?? "");
@@ -248,13 +290,16 @@ useTableKeyboard(table, scrollContainerRef, {
 });
 
 // ── Table-level empty/loading/error state ──────────────────────
+// Use `heldLoading` (props.loading + min-2s hold) so skeleton doesn't flash.
+// While loading, the full skeleton always wins — never show partial rows
+// with a "Loading…" banner over them (that pattern lets consumers'
+// progressive data mutations leak through visually). Consumers that want
+// refetch-without-replacing-content should use the `streaming` prop.
 const showEmpty = computed(
-  () => !props.loading && !props.streaming && !props.error && displayRows.value.length === 0,
+  () => !heldLoading.value && !props.streaming && !props.error && displayRows.value.length === 0,
 );
-const showError = computed(() => !props.loading && !!props.error);
-const showLoadingOverlay = computed(
-  () => props.loading && displayRows.value.length === 0,
-);
+const showError = computed(() => !heldLoading.value && !!props.error);
+const showLoadingOverlay = computed(() => heldLoading.value);
 /** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
 const showStreaming = computed(
   () => props.streaming && displayRows.value.length > 0,
@@ -347,13 +392,15 @@ defineExpose({
       </div>
     </div>
 
-    <!-- ── Loading banner (shown when loading with existing data) ── -->
+    <!-- ── Loading banner (shown when streaming with existing data) ──
+         Only used for the streaming pattern now — when `loading=true`,
+         the table body switches to the full skeleton instead. -->
     <slot
-      v-if="props.loading && displayRows.length > 0 && slots['loading-banner']"
+      v-if="props.streaming && displayRows.length > 0 && slots['loading-banner']"
       name="loading-banner"
     />
     <OBanner
-      v-else-if="props.loading && displayRows.length > 0"
+      v-else-if="props.streaming && displayRows.length > 0"
       variant="info"
       :content="'Loading...'"
       dense
@@ -420,9 +467,18 @@ defineExpose({
           @drag-end="columnMgmt.onDragEnd"
         />
 
+        <!-- ── Skeleton Body (loading with no existing data) ───── -->
+        <OTableLoading
+          v-if="showLoadingOverlay"
+          :rows="props.pageSize ?? 10"
+          :table-columns="table.getVisibleLeafColumns()"
+          :selection-enabled="selection.isEnabled.value"
+          :expansion-enabled="expansion.isEnabled.value"
+        />
+
         <!-- ── Body ─────────────────────────────────────────── -->
         <OTableBody
-          v-if="!showEmpty && !showError"
+          v-else-if="!showEmpty && !showError"
           :rows="displayRows"
           :table="table"
           :selection-enabled="selection.isEnabled.value"
@@ -549,18 +605,14 @@ defineExpose({
         </template>
       </OTableEmpty>
 
-      <!-- ── Loading State ──────────────────────────────────── -->
-      <OTableLoading
-        v-if="showLoadingOverlay"
-        variant="skeleton"
-        :skeleton-rows="props.pageSize ?? 5"
-        :skeleton-cols="props.columns.length"
-        :overlay="false"
+      <!-- ── Custom loading slot (overlay) ───────────────────── -->
+      <div
+        v-if="showLoadingOverlay && slots.loading"
+        class="tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70 tw:flex tw:items-center tw:justify-center"
+        data-test="o2-table-loading-slot"
       >
-        <template v-if="slots.loading" #default>
-          <slot name="loading" />
-        </template>
-      </OTableLoading>
+        <slot name="loading" />
+      </div>
 
       <!-- ── Error State ────────────────────────────────────── -->
       <OTableError
@@ -604,12 +656,15 @@ defineExpose({
       :is-first-page="pagination.isFirstPage.value"
       :is-last-page="pagination.isLastPage.value"
       :title="props.footerTitle"
+      :loading="heldLoading"
       @update:page-size="pagination.setPageSize"
       @first-page="pagination.firstPage"
       @prev-page="pagination.prevPage"
       @next-page="pagination.nextPage"
       @last-page="pagination.lastPage"
     >
+      <!-- OTablePagination authoritatively swaps the slot for a skeleton when
+           its `loading` prop is true, so we can always pass the slot. -->
       <template v-if="slots.bottom" #actions>
         <slot
           name="bottom"

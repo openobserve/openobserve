@@ -23,6 +23,8 @@ const props = withDefaults(
     isLastPage: boolean;
     position?: "top" | "bottom";
     title?: string;
+    /** When true, replace count + range text with skeleton bars */
+    loading?: boolean;
   }>(),
   {
     position: "bottom",
@@ -55,8 +57,19 @@ const pageSizeSelectOptions = computed(() =>
   >
     <!-- Left: bulk actions slot or row count -->
     <div class="tw:flex tw:items-center tw:gap-2">
-      <slot name="actions" />
-      <span v-if="!slots.actions" class="tw:text-primary tw:text-xs" style="font-weight: 700;">
+      <!-- Loading: always skeleton, regardless of slot/count -->
+      <span
+        v-if="loading"
+        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-24 tw:rounded-md"
+        aria-hidden="true"
+        data-test="o2-table-pagination-count-skel"
+      />
+      <slot v-else-if="slots.actions" name="actions" />
+      <span
+        v-else
+        class="tw:text-primary tw:text-xs"
+        style="font-weight: 700;"
+      >
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>
     </div>
@@ -64,6 +77,13 @@ const pageSizeSelectOptions = computed(() =>
     <!-- Right: controls -->
     <div class="tw:flex tw:items-center tw:gap-3">
       <span
+        v-if="loading"
+        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-36 tw:rounded-md"
+        aria-hidden="true"
+        data-test="o2-table-pagination-info-skel"
+      />
+      <span
+        v-else
         class="tw:text-primary tw:text-xs"
         data-test="o2-table-pagination-info"
       >
@@ -104,3 +124,23 @@ const pageSizeSelectOptions = computed(() =>
     </div>
   </div>
 </template>
+
+<style scoped>
+.o2-pag-skel {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base) 0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: o2-pag-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes o2-pag-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .o2-pag-skel { animation: none; }
+}
+</style>

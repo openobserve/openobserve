@@ -264,7 +264,7 @@ export default defineComponent({
         header: t("function.actions"),
         isAction: true,
         size: 150,
-        meta: { align: "center", cellClass: "actions-column" },
+        meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
       },
     ];
 
@@ -284,6 +284,7 @@ export default defineComponent({
     const loading = ref(false);
     const getJSTransforms = () => {
       loading.value = true;
+      // return ;
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading functions...",

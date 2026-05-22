@@ -33,15 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </div>
 
 
-    <template v-if="isFetchingInitialRoles">
-      <div data-test="edit-role-page-loading-spinner" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:w-full" style="margin-top: 64px">
-        <OSpinner size="md" class="tw:mb-2" />
-        <div class="tw:text-center">
-          Hold on tight, we're fetching your role details...
-        </div>
-      </div>
-    </template>
-    <template v-else>
       <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <GroupUsers
           data-test="edit-role-users-section"
@@ -156,7 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
+          <div
+            data-test="edit-role-permissions-table-section"
+            class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+            style="scrollbar-gutter: stable;"
+          >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -165,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :filter="filter"
                 :visibleResourceCount="countOfVisibleResources"
                 :selected-permissions-hash="selectedPermissionsHash"
+                :loading="isFetchingInitialRoles"
                 @updated:permission="handlePermissionChange"
                 @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
@@ -260,15 +256,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('alerts.save') }}
         </OButton>
       </div>
-        
+
       </div>
-    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { defineAsyncComponent, ref, type Ref } from "vue";
+import { defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -305,7 +300,6 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
