@@ -129,12 +129,12 @@ const globalConfig = {
     OButton: OButtonStub,
     "OSelect": {
       template: `
-        <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disable)">
+        <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disabled)">
           <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
             <option v-for="opt in options" :key="opt.value" :value="JSON.stringify(opt)">{{ opt.label }}</option>
           </select>
         </div>`,
-      props: ["modelValue", "options", "label", "disable"],
+      props: ["modelValue", "options", "label", "disabled"],
       emits: ["update:modelValue"],
     },
     "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },

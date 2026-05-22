@@ -67,7 +67,7 @@
                           data-test="dashboard-add-condition-operator"
                           class="o2-custom-select-dashboard"
                         />
-                        <CommonAutoComplete
+                        <OCombobox
                           v-if="
                             !['Is Null', 'Is Not Null'].includes(
                               condition.operator,
@@ -76,8 +76,8 @@
                           :label="t('common.value')"
                           v-model="condition.value"
                           :items="dashboardVariablesFilterItems"
-                          searchRegex="(?:^|[^$])\$?(\w+)"
-                        ></CommonAutoComplete>
+                          search-regex="(?:^|[^$])\$?(\w+)"
+                        />
                       </div>
                     </OTabPanel>
                     <OTabPanel name="list">
@@ -123,7 +123,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -142,7 +142,7 @@ export default defineComponent({
     OTab,
     OTabPanels,
     OTabPanel,
-    CommonAutoComplete,
+    OCombobox,
     StreamFieldSelect,
     OSelect,
   },

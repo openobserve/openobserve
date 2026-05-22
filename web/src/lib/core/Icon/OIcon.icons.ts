@@ -46,7 +46,7 @@ import Cloud from "~icons/material-symbols/cloud-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
-import Delete from "~icons/si/bin-line";
+import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
 import Error from "~icons/material-symbols/error-outline";

@@ -26,7 +26,12 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn(() => "15m"),
-  formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00")
+  formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00"),
+  subtractRelativeTime: vi.fn((endDate: Date, _period: Record<string, number>) => {
+    const result = new Date(endDate);
+    result.setMinutes(result.getMinutes() - 15);
+    return result;
+  }),
 }));
 
 vi.mock("date-fns-tz", () => ({

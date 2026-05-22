@@ -223,9 +223,9 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    const currentFolderInput = wrapper.find('[data-test="alerts-folder-move-name"]');
+    // OInput is a real component (not stubbed), so use findComponent to access props
+    const currentFolderInput = wrapper.findComponent('[data-test="alerts-folder-move-name"]');
     expect(currentFolderInput.exists()).toBe(true);
-    // OInput uses :model-value prop; assert on the component prop
     expect(currentFolderInput.props('modelValue')).toBe('Test Folder 1');
   });
 
@@ -482,9 +482,9 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    const input = wrapper.find('[data-test="alerts-folder-move-name"]');
+    // OInput is a real component (not stubbed), so use findComponent to access props
+    const input = wrapper.findComponent('[data-test="alerts-folder-move-name"]');
     expect(input.exists()).toBe(true);
-    // OInput uses a `disabled` prop, not an HTML attribute
     expect(input.props('disabled')).toBe(true);
   });
 

@@ -60,6 +60,46 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
+// OForm stub: exposes the q-form compatibility surface (validate, resetValidation, form.state.values)
+// so tests control form behaviour without mounting the real TanStack-powered OForm.
+const OFormStub = {
+  name: "OForm",
+  template: '<form class="o-form-stub" @submit.prevent><slot /></form>',
+  props: ["defaultValues", "greedy"],
+  emits: ["submit", "reset"],
+  setup(props: any, { expose }: any) {
+    const formState = {
+      state: {
+        values: { ...props.defaultValues },
+        fieldMeta: {},
+        isValid: true,
+      },
+      validateAllFields: vi.fn().mockResolvedValue(undefined),
+      validateField: vi.fn().mockResolvedValue(undefined),
+      getFieldMeta: vi.fn().mockReturnValue({ errors: [] }),
+      setFieldMeta: vi.fn(),
+      handleSubmit: vi.fn(),
+      reset: vi.fn(),
+    };
+    expose({
+      validate: vi.fn().mockResolvedValue(true),
+      resetValidation: vi.fn(),
+      submit: vi.fn(),
+      reset: vi.fn(),
+      form: formState,
+    });
+    return {};
+  },
+};
+
+// OFormInput stub: renders a basic input so the parent renders without pulling in
+// the real TanStack-powered OFormInput component.
+const OFormInputStub = {
+  name: "OFormInput",
+  template: '<input class="o-form-input-stub" />',
+  props: ["name", "label", "validators"],
+};
+
 // Mock all dependencies
 vi.mock("@/utils/commons.ts", () => ({
   createFolder: vi.fn(),
@@ -150,6 +190,8 @@ describe("AddFolder.vue", () => {
         },
         stubs: {
           ODrawer: ODrawerStub,
+          OForm: OFormStub,
+          OFormInput: OFormInputStub,
         },
       },
     });
@@ -625,26 +667,16 @@ describe("AddFolder.vue", () => {
       wrapper = createWrapper({ editMode: false });
       const vm = wrapper.vm as any;
 
-      vm.folderData.name = "   Padded Name   ";
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: {
-              name: vm.folderData.name,
-              description: vm.folderData.description,
-            },
-          },
-        },
-      };
+      // Set the form state values via the exposed OFormStub (the ref holds the
+      // stub's exposed object, so mutating nested properties works).
+      vm.addFolderForm.form.state.values.name = "   Padded Name   ";
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(createFolderByType).toHaveBeenCalled();
       const callArgs = (createFolderByType as any).mock.calls[0];
-      expect(callArgs[1].name).toBe("Padded Name");
+      expect(JSON.parse(JSON.stringify(callArgs[1])).name).toBe("Padded Name");
     });
   });
 

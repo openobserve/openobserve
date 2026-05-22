@@ -121,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="level === 0" class="tw:py-16 tw:flex tw:justify-center tw:items-center">
               <NoData />
             </div>
-            <div v-else class="tw:py-2 tw:px-4 tw:text-sm tw:text-text-secondary">
+            <div
+              v-else
+              data-test="edit-role-permissions-table-no-resources-title"
+              class="tw:py-2 tw:px-4 tw:text-sm tw:text-text-secondary"
+            >
               No Resources Present
             </div>
           </template>

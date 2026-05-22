@@ -30,7 +30,17 @@ describe("OTree", () => {
 
   it("does not show children before expanding", () => {
     const wrapper = mount(OTree, { props: { nodes: regionNodes } });
-    expect(wrapper.text()).not.toContain("cluster-a");
+    // Children are rendered in the DOM but visually hidden via CSS Grid's
+    // gridTemplateRows: '0fr' when collapsed. Asserting on the style is the
+    // correct behavioral check — it verifies the expand/collapse mechanism,
+    // not mere DOM presence.
+    const childrenContainers = wrapper.findAll(
+      '[role="treeitem"] > div:last-child',
+    );
+    // Every parent node's children wrapper must start collapsed (0fr)
+    childrenContainers.forEach((container) => {
+      expect(container.attributes("style")).toContain("grid-template-rows: 0fr");
+    });
   });
 
   it("reveals children after clicking a parent node row", async () => {

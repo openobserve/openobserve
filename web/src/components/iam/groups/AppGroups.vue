@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
-              variant="outline"
+              variant="outline-destructive"
               size="sm"
               @click="openBulkDeleteDialog"
               icon-left="delete"

@@ -105,7 +105,7 @@ describe("Curl", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
   });
 
@@ -342,7 +342,7 @@ describe("Curl", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-pa-sm');
+      const container = wrapper.find('.tw\\:p-2');
       expect(container.exists()).toBe(true);
     });
 

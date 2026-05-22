@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
 
-        <CommonAutoComplete
+        <OCombobox
           v-if="
             promqlMode &&
             dashboardPanelData.data.type != 'geomap' &&
@@ -444,19 +444,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].config.promql_legend
           "
           :items="dashboardSelectfieldPromQlList"
-          searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop tw:mt-2"
-          stack-label
-          borderless
-          label-slot
-          style="
-            top: none !important;
-            margin-top: none !important;
-            padding-top: 3px !important;
-            width: auto !important;
-          "
+          search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
+          class="tw:mt-2"
           :value-replace-fn="selectPromQlNameOption"
         >
           <template v-slot:label>
@@ -473,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </CommonAutoComplete>
+        </OCombobox>
       </div>
     </OCollapsible>
 
@@ -1110,10 +1099,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t("dashboard.configSectionValueTransformations")
         }}</span>
         <OIcon name="info-outline" size="sm" />
-          <OTooltip
-            :content="t('dashboard.configSectionValueTransformationsTooltip')"
-            max-width="250px"
-          />
+        <OTooltip
+          :content="t('dashboard.configSectionValueTransformationsTooltip')"
+          max-width="250px"
+        />
       </template>
       <div class="config-section-body">
         <ValueMapping />
@@ -1138,10 +1127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t("dashboard.configSectionFieldOverrides")
         }}</span>
         <OIcon name="info-outline" size="sm" />
-          <OTooltip
-            :content="t('dashboard.configSectionFieldOverridesTooltip')"
-            max-width="250px"
-          />
+        <OTooltip
+          :content="t('dashboard.configSectionFieldOverridesTooltip')"
+          max-width="250px"
+        />
       </template>
       <div class="config-section-body hide-child-title">
         <OverrideConfig
@@ -1566,11 +1555,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-drilldown-info"
-         />
-          <OTooltip
-            :content="t('dashboard.drilldownTooltip')"
-            max-width="250px"
-          />
+        />
+        <OTooltip
+          :content="t('dashboard.drilldownTooltip')"
+          max-width="250px"
+        />
       </template>
       <div class="config-section-body">
         <Drilldown :variablesData="variablesData" />
@@ -1604,11 +1593,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-time-shift-info"
-         />
-          <OTooltip
-            :content="t('dashboard.comparisonAgainstTooltip')"
-            max-width="250px"
-          />
+        />
+        <OTooltip
+          :content="t('dashboard.comparisonAgainstTooltip')"
+          max-width="250px"
+        />
       </template>
       <div class="config-section-body">
         <CustomDateTimePicker
@@ -1671,11 +1660,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-markline-info"
-         />
-          <OTooltip
-            :content="t('dashboard.markLinesTooltip')"
-            max-width="250px"
-          />
+        />
+        <OTooltip
+          :content="t('dashboard.markLinesTooltip')"
+          max-width="250px"
+        />
       </template>
       <div class="config-section-body">
         <MarkLineConfig />
@@ -1717,7 +1706,7 @@ import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
@@ -1777,7 +1766,7 @@ export default defineComponent({
     Drilldown,
     ValueMapping,
     ColorBySeries,
-    CommonAutoComplete,
+    OCombobox,
     MarkLineConfig,
     CustomDateTimePicker,
     DateTimePickerDashboard,
@@ -2298,13 +2287,14 @@ export default defineComponent({
 
       //if { is not present add it at the start and than return
 
+      const fieldName = (option as any)?.value ?? option;
       if (openingBraceIndex === -1) {
         const newValue =
-          "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+          "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       } else {
         const newValue =
-          inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+          inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       }
     };

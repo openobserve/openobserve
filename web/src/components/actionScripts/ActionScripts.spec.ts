@@ -536,17 +536,36 @@ describe("ActionScripts", () => {
   });
 
   describe("Pagination", () => {
-    it("should handle pagination changes", async () => {
-      const mockVal = { label: "10", value: 10 };
-      wrapper.vm.changePagination(mockVal);
+    // The component uses OTable with built-in client-side pagination (pagination="client").
+    // There is no changePagination method or QTablePagination component in this version.
+    // The OTable component handles all pagination state internally.
 
-      expect(wrapper.vm.selectedPerPage).toBe(10);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
+    it("should display the action scripts table which owns pagination", () => {
+      // Pagination is handled by OTable internally; verify the table is rendered
+      const table = wrapper.find('[data-test="action-scripts-table"]');
+      expect(table.exists()).toBe(true);
     });
 
-    it("should display pagination components", () => {
-      const topPagination = wrapper.find('[data-test="table-pagination"]');
-      expect(topPagination.exists()).toBe(true);
+    it("should show correct row count in footer when rows are present", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+      ];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      // resultTotal should be 1
+      expect(wrapper.vm.resultTotal).toBe(1);
     });
   });
 

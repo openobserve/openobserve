@@ -4,10 +4,10 @@
     :class="
       !customQuery && !fields.isDerived
         ? 'tw:flex tw:gap-2'
-        : 'tw:flex tw:flex-col tw:gap-2'
+        : 'tw:flex tw:flex-col tw:gap-y-2'
     "
   >
-    <div style="width: auto; padding-right: 12px; padding-top: 12px">
+    <div style="width: auto;">
       <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
@@ -199,6 +199,7 @@ export default {
     OSelect,
     OInput,
     OCheckbox,
+    OSeparator,
   },
   props: {
     modelValue: {
@@ -274,7 +275,7 @@ export default {
       }
 
       if (!fields.value.havingConditions.length) {
-        fields.value.havingConditions.push({ operator: null, value: null });
+        fields.value.havingConditions.push({ operator: "=", value: null });
       }
 
       await nextTick();
@@ -344,6 +345,12 @@ export default {
 
   &:focus {
     border-color: var(--q-primary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--o2-primary-background);
   }
 }
 </style>

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       ref="selectRef"
       style="min-width: 150px"
-      v-model="selectedValue"
+      :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
       :options="computedOptions"
@@ -36,26 +36,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span class="tw:flex-1 tw:text-start tw:truncate">{{ displayValue }}</span>
+        <span class="tw:flex-1 tw:text-start tw:truncate">{{
+          displayValue
+        }}</span>
       </template>
-      <template #before-options v-if="computedOptions.length > 0">
-        <div
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
-          @click.stop="toggleSelectAll"
-        >
-          <OCheckbox :model-value="isAllSelected" @update:model-value="toggleSelectAll" @click.stop />
-          <span>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</span>
-        </div>
-        <OSeparator />
-        <div
-          v-if="currentSearchTerm"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
-          @click.stop="handleCustomValue(currentSearchTerm)"
-        >
-          {{ currentSearchTerm }}
-          <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
-        </div>
-        <OSeparator v-if="currentSearchTerm" />
+      <template #before-options>
+        <template v-if="computedOptions.length > 0">
+          <!-- multiSelect: show checkbox + Select All -->
+          <div
+            v-if="variableItem.multiSelect"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            @click.stop="toggleSelectAll"
+          >
+            <OCheckbox
+              :model-value="isAllSelected"
+              @update:model-value="toggleSelectAll"
+              @click.stop
+            />
+            <span>Select All</span>
+          </div>
+          <!-- single-select: show plain All -->
+          <div
+            v-else
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            @click.stop="toggleSelectAll"
+          >
+            <span>All</span>
+          </div>
+          <OSeparator />
+          <div
+            v-if="currentSearchTerm"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            @click.stop="handleCustomValue(currentSearchTerm)"
+          >
+            {{ currentSearchTerm }}
+            <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
+          </div>
+          <OSeparator v-if="currentSearchTerm" />
+        </template>
       </template>
       <template #empty>
         <div
@@ -66,7 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ currentSearchTerm }}
           <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
         </div>
-        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2">No Data Found</div>
+        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2">
+          No Data Found
+        </div>
       </template>
     </OSelect>
   </div>
@@ -85,7 +105,7 @@ import {
 } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -173,13 +193,19 @@ export default defineComponent({
       return selectedValue.value === SELECT_ALL_VALUE;
     });
 
+    // When "Select All" is active, feed OSelect all individual option values so
+    // every checkbox appears ticked. Otherwise pass the real selection as-is.
+    const oSelectModelValue = computed(() => {
+      if (props.variableItem.multiSelect && isAllSelected.value) {
+        return computedOptions.value.map((opt: any) => opt.value);
+      }
+      return selectedValue.value;
+    });
+
     const closePopUpWhenValueIsSet = async () => {
       filterText.value = "";
       if (selectRef.value) {
-        (selectRef.value as any).updateInputValue("");
-        (selectRef.value as any).blur();
-        await nextTick();
-        (selectRef.value as any).hidePopup();
+        (selectRef.value as any).close();
       }
     };
 
@@ -373,6 +399,7 @@ export default defineComponent({
 
     return {
       selectedValue,
+      oSelectModelValue,
       computedOptions,
       onSearch,
       currentSearchTerm,

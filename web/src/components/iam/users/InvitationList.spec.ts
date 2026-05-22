@@ -3,6 +3,10 @@ import { mount, flushPromises } from '@vue/test-utils';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
+const dismissToastMock = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(() => dismissToastMock),
+}));
 
 vi.mock('@/aws-exports', () => ({
   default: { isCloud: 'false', isEnterprise: 'true' },
@@ -352,11 +356,12 @@ describe('InvitationList - confirmAcceptInvitation', () => {
       new Error('server error'),
     );
     const wrapper = await mountInvitationList();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
+    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    vi.mocked(toast).mockClear();
     const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to accept invitation' }));
   });
 
   it('triggers confirmAcceptInvitation when the accept ODialog emits click:primary', async () => {
@@ -447,11 +452,12 @@ describe('InvitationList - confirmRejectInvitation', () => {
       new Error('server error'),
     );
     const wrapper = await mountInvitationList();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
+    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    vi.mocked(toast).mockClear();
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to reject invitation' }));
   });
 
   it('triggers confirmRejectInvitation when the reject ODialog emits click:primary', async () => {
@@ -483,20 +489,5 @@ describe('InvitationList - confirmRejectInvitation', () => {
   });
 });
 
-// 8. changePagination
-describe('InvitationList - changePagination', () => {
-  it('updates selectedPerPage', async () => {
-    const wrapper = await mountInvitationList();
-    // Provide a mock qTable to avoid setPagination error
-    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
-    (wrapper.vm as any).changePagination({ label: '50', value: 50 });
-    expect((wrapper.vm as any).selectedPerPage).toBe(50);
-  });
-
-  it('updates pagination.rowsPerPage', async () => {
-    const wrapper = await mountInvitationList();
-    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
-    (wrapper.vm as any).changePagination({ label: '100', value: 100 });
-    expect((wrapper.vm as any).pagination.rowsPerPage).toBe(100);
-  });
-});
+// 8. changePagination — removed: component uses OTable client-side pagination,
+// no longer exposes changePagination / selectedPerPage / pagination.rowsPerPage.

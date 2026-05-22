@@ -264,7 +264,7 @@ describe("Fluentd", () => {
 
   // Test 19: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
   });
 
   // Test 20: getImageURL function exposure

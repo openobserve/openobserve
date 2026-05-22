@@ -335,7 +335,7 @@ describe("About", () => {
     });
 
     const buildBadge = wrapper.find(".build-badge");
-    const icon = buildBadge.find(".OIcon");
+    const icon = buildBadge.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
   });
 

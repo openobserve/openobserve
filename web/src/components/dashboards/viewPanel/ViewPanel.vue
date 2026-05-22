@@ -94,8 +94,8 @@
     <OSeparator />
     <div class="tw:flex" style="height: calc(100vh - 130px); overflow: hidden">
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-        <div class="tw:flex" style="height: 100%">
-          <div class="tw:flex tw:flex-col" style="height: 100%">
+        <div class="tw:flex" style="height: 100%; width: 100%">
+          <div class="tw:flex tw:flex-col" style="height: 100%; width: 100%">
             <div class="layout-panel-container tw:flex tw:flex-col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"

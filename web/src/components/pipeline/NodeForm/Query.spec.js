@@ -7,6 +7,9 @@ import i18n from "@/locales";
 import Query from "./Query.vue";
 import searchService from "@/services/search";
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // Mock the services and composables
 vi.mock("@/services/search", () => ({
@@ -98,8 +101,6 @@ describe("Query Component", () => {
       }
     });
 
-    const notifyMock = vi.fn();
-    wrapper.vm.$q.notify = notifyMock;
   });
 
   afterEach(() => {
@@ -153,31 +154,31 @@ describe("Query Component", () => {
 
     it("handles SQL query validation failure", async () => {
       const errorMessage = "Invalid SQL syntax";
-      
+
       // Setup the mock rejection
-      searchService.search.mockImplementationOnce(() => 
+      searchService.search.mockImplementationOnce(() =>
         Promise.reject({
             response: { data: { message: errorMessage } },
             message: errorMessage
           })
       )
-      
+
       // Set initial state
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs";
       wrapper.vm.isValidSqlQuery = true;
       wrapper.vm.validatingSqlQuery = true;
-      
+
       // Call validate and wait for next tick
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       await wrapper.vm.$nextTick();
-      
+
       // Verify the final state
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(expect.objectContaining({
-        type: "negative",
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
         message: `Invalid SQL Query: ${errorMessage}`
       }));
     });

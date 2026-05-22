@@ -414,7 +414,6 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -436,7 +435,6 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     ODropdown,
-    CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,

@@ -169,6 +169,7 @@ const streamTypeError = ref('');
 const streamNameError = ref('');
 
 const indexOptions = ref([]);
+const filteredStreams = ref([]);
 
 const isValidName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-encryption-mechanism">
+  <div class="cipher-keys-add-encryption-mechanism tw:flex tw:flex-col tw:gap-y-2">
     <OSelect
       data-test="add-cipher-key-auth-method-input"
       v-model="frmData.key.mechanism.type"

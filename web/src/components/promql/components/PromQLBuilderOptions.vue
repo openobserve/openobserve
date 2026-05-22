@@ -12,19 +12,14 @@
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("dashboard.legendLabel") }}</span>
             <div class="field-input-wrapper">
-              <CommonAutoComplete
+              <OCombobox
                 v-model="
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].config.promql_legend
                 "
                 :items="dashboardSelectfieldPromQlList"
-                searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                borderless
+                search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
                 data-test="dashboard-promql-builder-legend"
                 :value-replace-fn="selectPromQlNameOption"
                 style="width: 260px"
@@ -61,11 +56,7 @@
               style="width: 140px"
             >
               <template v-slot:icon-right>
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="tw:cursor-pointer"
-                >
+                <OIcon name="info" size="sm" class="tw:cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       ({{ t("dashboard.optional") }}) <b>Step - </b>
@@ -81,7 +72,7 @@
             </OInput>
           </div>
 
-                    <!-- Query Type Select (Range/Instant) -->
+          <!-- Query Type Select (Range/Instant) -->
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("common.type") }}</span>
             <OSelect
@@ -118,7 +109,7 @@
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -128,7 +119,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "PromQLBuilderOptions",
   components: {
-    CommonAutoComplete,
+    OCombobox,
     OIcon,
     OInput,
     OSelect,
@@ -204,13 +195,14 @@ export default defineComponent({
 
       //if { is not present add it at the start and than return
 
+      const fieldName = (option as any)?.value ?? option;
       if (openingBraceIndex === -1) {
         const newValue =
-          "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+          "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       } else {
         const newValue =
-          inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+          inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       }
     };

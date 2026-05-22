@@ -454,8 +454,7 @@ describe("ImportRegexPattern", () => {
 
       expect(mockToastFn).toHaveBeenCalledWith({
         message: "JSON string is empty",
-        variant: "error",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 2000,
       });
     });
@@ -487,8 +486,7 @@ describe("ImportRegexPattern", () => {
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: "error",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         })
       );

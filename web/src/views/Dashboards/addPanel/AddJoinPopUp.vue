@@ -98,7 +98,10 @@
         v-if="showJoinSummary"
       >
         Performing
-        <span class="text-primary">{{ joinTypeLabel }} Join</span> between
+        <span
+          class="tw:inline-flex tw:items-center tw:rounded tw:px-1.5 tw:py-0.5 tw:text-xs tw:font-semibold"
+          style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
+        >{{ joinTypeLabel }} Join</span> between
         <span class="tw:font-semibold">{{ mainStream }}</span> and
         <span class="tw:font-semibold">{{ modelValue.stream }}</span>
       </div>
@@ -131,6 +134,7 @@
 
           <div class="field-container">
             <OSelect
+              :label-position="'inside'"
               v-model="modelValue.conditions[argIndex].operation"
               :options="operationSelectOptions"
               label="Select Operation"

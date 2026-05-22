@@ -609,7 +609,7 @@ describe("AssociatedStreamFunction", () => {
       vm.expandedRow = { name: "stream1", stream_type: "metrics" };
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(false);
     });
 
@@ -624,7 +624,7 @@ describe("AssociatedStreamFunction", () => {
       vm.expandedRow = { name: "stream1", stream_type: "logs" };
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(true);
     });
   });
@@ -641,18 +641,18 @@ describe("AssociatedStreamFunction", () => {
       vm.allFunctionsList = [{ name: "func1" }, { name: "func2" }, { name: "func3" }];
       vm.functionsList = [{ name: "func1" }];
 
-      const mockUpdate = vi.fn((cb: any) => cb());
-      vm.filterFn("func", mockUpdate);
+      vm.filterFn("func");
 
-      expect(mockUpdate).toHaveBeenCalled();
       // func1 is already applied; it should be filtered out
       const hasFunc1 = vm.filterFunctions.some((f: any) => f.name === "func1");
       expect(hasFunc1).toBe(false);
+      // func2 and func3 match "func" and are not applied
+      expect(vm.filterFunctions).toHaveLength(2);
     });
   });
 
-  describe("Filter Data (filterData)", () => {
-    it("should filter rows by name (case-insensitive)", async () => {
+  describe("Filter Data (filteredStreamData)", () => {
+    it("should filter rows by name (case-insensitive) via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -660,17 +660,19 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
+      vm.logStream = [
         { name: "STREAM_ONE", stream_type: "logs" },
         { name: "stream_two", stream_type: "metrics" },
       ];
+      vm.filterQuery = "stream_one";
 
-      const result = vm.filterData(rows, "stream_one");
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("STREAM_ONE");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(1);
+      expect(vm.filteredStreamData[0].name).toBe("STREAM_ONE");
     });
 
-    it("should filter rows by stream_type", async () => {
+    it("should filter rows by stream_type via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -678,17 +680,19 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
+      vm.logStream = [
         { name: "stream1", stream_type: "logs" },
         { name: "stream2", stream_type: "metrics" },
       ];
+      vm.filterQuery = "metrics";
 
-      const result = vm.filterData(rows, "metrics");
-      expect(result).toHaveLength(1);
-      expect(result[0].stream_type).toBe("metrics");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(1);
+      expect(vm.filteredStreamData[0].stream_type).toBe("metrics");
     });
 
-    it("should return empty array when no match", async () => {
+    it("should return empty array when no match via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -696,14 +700,17 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [{ name: "stream1", stream_type: "logs" }];
+      vm.logStream = [{ name: "stream1", stream_type: "logs" }];
+      vm.filterQuery = "xyz_not_found";
 
-      expect(vm.filterData(rows, "xyz_not_found")).toHaveLength(0);
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(0);
     });
   });
 
   describe("Pagination", () => {
-    it("should change pagination correctly", async () => {
+    it("should have default page size of 20", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -711,12 +718,22 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.qTable = { setPagination: vi.fn() };
+      expect(vm.pageSize).toBe(20);
+    });
 
-      vm.changePagination({ label: "50", value: 50 });
-      expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.qTable.setPagination).toHaveBeenCalledWith({ rowsPerPage: 50 });
+    it("should have page size options configured", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      expect(vm.pageSizeOptions).toContain(5);
+      expect(vm.pageSizeOptions).toContain(10);
+      expect(vm.pageSizeOptions).toContain(20);
+      expect(vm.pageSizeOptions).toContain(50);
+      expect(vm.pageSizeOptions).toContain(100);
     });
   });
 

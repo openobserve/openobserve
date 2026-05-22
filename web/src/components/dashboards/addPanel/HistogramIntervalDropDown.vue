@@ -3,6 +3,7 @@
   <OSelect
     v-model="histogramIntervalModel"
     label="Histogram interval"
+    label-position="inside"
     :options="histogramIntervalOptions"
     data-test="histogram-interval-dropdown"
     @update:model-value="$emit('update:modelValue', $event)"

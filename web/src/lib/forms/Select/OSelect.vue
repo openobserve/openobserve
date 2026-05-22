@@ -334,7 +334,9 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     }
     return value.map((item) => {
       const key = String(item);
-      return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
+      return valueMap.has(key)
+        ? (valueMap.get(key) as SelectPrimitiveValue)
+        : key;
     });
   }
 
@@ -342,7 +344,9 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     const first = value[0];
     if (first === undefined || first === null) return undefined;
     const key = String(first);
-    return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
+    return valueMap.has(key)
+      ? (valueMap.get(key) as SelectPrimitiveValue)
+      : key;
   }
 
   if (value === undefined || value === null) return undefined;
@@ -392,13 +396,17 @@ function handleClear() {
 // filtered subset — so the master state stays predictable regardless of the
 // search term.
 const selectableOptions = computed<NormalizedOption[]>(() =>
-  normalizedOptions.value.filter((o: NormalizedOption) => !o.header && !o.disabled),
+  normalizedOptions.value.filter(
+    (o: NormalizedOption) => !o.header && !o.disabled,
+  ),
 );
 
 const allSelected = computed(() => {
   const all = selectableOptions.value;
   if (all.length === 0) return false;
-  return all.every((o: NormalizedOption) => selectedValues.value.includes(o.value));
+  return all.every((o: NormalizedOption) =>
+    selectedValues.value.includes(o.value),
+  );
 });
 
 const partiallySelected = computed(() => {
@@ -435,6 +443,14 @@ function handleCreateFromInput() {
 onBeforeUnmount(() => {
   if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
 });
+
+/** Close the dropdown programmatically */
+function close() {
+  popoverOpen.value = false;
+  searchTerm.value = "";
+}
+
+defineExpose({ close });
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -474,10 +490,11 @@ watch(filteredOptions, () => {
 
 function scrollHighlightedIntoView() {
   if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;
-  const rows = listboxScrollEl.value.querySelectorAll<HTMLElement>('[data-vrow]');
+  const rows =
+    listboxScrollEl.value.querySelectorAll<HTMLElement>("[data-vrow]");
   for (const row of rows) {
     if (Number(row.dataset.vrow) === highlightedIndex.value) {
-      row.scrollIntoView({ block: 'nearest' });
+      row.scrollIntoView({ block: "nearest" });
       break;
     }
   }
@@ -486,7 +503,7 @@ function scrollHighlightedIntoView() {
 function handleDropdownKeydown(e: KeyboardEvent) {
   const nav = navigableIndices.value;
 
-  if (e.key === 'Escape') {
+  if (e.key === "Escape") {
     e.preventDefault();
     popoverOpen.value = false;
     return;
@@ -494,17 +511,17 @@ function handleDropdownKeydown(e: KeyboardEvent) {
 
   if (nav.length === 0) return;
 
-  if (e.key === 'ArrowDown') {
+  if (e.key === "ArrowDown") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
     highlightedIndex.value = cur < nav.length - 1 ? nav[cur + 1] : nav[0];
     nextTick(scrollHighlightedIntoView);
-  } else if (e.key === 'ArrowUp') {
+  } else if (e.key === "ArrowUp") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
     highlightedIndex.value = cur > 0 ? nav[cur - 1] : nav[nav.length - 1];
     nextTick(scrollHighlightedIntoView);
-  } else if (e.key === 'Enter') {
+  } else if (e.key === "Enter") {
     e.preventDefault();
     if (highlightedIndex.value >= 0) {
       const opt = filteredOptions.value[highlightedIndex.value];
@@ -652,7 +669,10 @@ const dynamicMaxChips = computed(() => {
     return Math.min(props.maxVisibleChips ?? 3, total);
   }
 
-  const available = Math.max(0, triggerWidth.value - reservedTriggerSpace.value);
+  const available = Math.max(
+    0,
+    triggerWidth.value - reservedTriggerSpace.value,
+  );
   let used = 0;
   let count = 0;
 
@@ -709,7 +729,10 @@ const fieldWidthClass = computed(() => {
 </script>
 
 <template>
-  <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
+  <div
+    v-bind="$attrs"
+    :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]"
+  >
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
@@ -726,7 +749,8 @@ const fieldWidthClass = computed(() => {
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <template v-if="listboxModeEnabled">
@@ -764,7 +788,8 @@ const fieldWidthClass = computed(() => {
             <span
               v-if="label && labelPosition === 'inside'"
               class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
-            >{{ label }}</span>
+              >{{ label }}</span
+            >
 
             <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
             <span
@@ -884,7 +909,9 @@ const fieldWidthClass = computed(() => {
             align="start"
             :trap-focus="false"
             :disable-outside-pointer-events="false"
-            :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
+            :data-test="
+              parentDataTest ? `${parentDataTest}-popover` : undefined
+            "
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
               'tw:max-h-72 tw:overflow-hidden',
@@ -922,195 +949,196 @@ const fieldWidthClass = computed(() => {
                   @keydown="handleDropdownKeydown"
                 />
 
-              <!--
+                <!--
                 Select-all master row. Indeterminate (dash) when only some
                 options are checked, full check when all are. Toggles the
                 whole selection. Rendered as a plain button so it sits
                 outside the listbox's keyboard navigation while remaining
                 focusable.
               -->
-              <div
-                v-if="selectAll && multiple && selectableOptions.length > 0"
-                role="button"
-                tabindex="0"
-                aria-label="Toggle all options"
-                :aria-checked="
-                  allSelected
-                    ? 'true'
-                    : partiallySelected
-                      ? 'mixed'
-                      : 'false'
-                "
-                :class="[
-                  'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2',
-                  'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
-                  'tw:text-select-item-text tw:rounded-sm',
-                  'tw:cursor-pointer tw:select-none tw:outline-none',
-                  'tw:hover:bg-select-item-hover-bg',
-                  'tw:focus-visible:bg-select-item-hover-bg',
-                  'tw:transition-colors tw:duration-100',
-                  'tw:border-b tw:border-select-content-border tw:mb-1 tw:pb-1.5',
-                ]"
-                data-test="o-select-all"
-                @click="toggleAllSelections"
-                @keydown.enter.prevent="toggleAllSelections"
-                @keydown.space.prevent="toggleAllSelections"
-              >
-                <span
-                  :class="[
-                    'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                    'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
-                    allSelected
-                      ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                      : 'tw:bg-checkbox-bg tw:border-checkbox-border',
-                  ]"
-                  aria-hidden="true"
-                >
-                  <svg
-                    v-if="allSelected"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
-                  >
-                    <polyline points="2,6 5,9 10,3" />
-                  </svg>
-                </span>
-                <span class="tw:truncate tw:font-medium">Select all</span>
-              </div>
-
-              <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
-                   on the ListboxFilter input above. Items are index-highlighted reactively. -->
-              <div
-                ref="listboxScrollEl"
-                class="tw:max-h-60 tw:overflow-auto"
-              >
                 <div
-                  v-if="filteredOptions.length === 0"
-                  class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
+                  v-if="selectAll && multiple && selectableOptions.length > 0"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Toggle all options"
+                  :aria-checked="
+                    allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
+                  "
+                  :class="[
+                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2',
+                    'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
+                    'tw:text-select-item-text tw:rounded-sm',
+                    'tw:cursor-pointer tw:select-none tw:outline-none',
+                    'tw:hover:bg-select-item-hover-bg',
+                    'tw:focus-visible:bg-select-item-hover-bg',
+                    'tw:transition-colors tw:duration-100',
+                    'tw:border-b tw:border-select-content-border tw:mb-1 tw:pb-1.5',
+                  ]"
+                  data-test="o-select-all"
+                  @click="toggleAllSelections"
+                  @keydown.enter.prevent="toggleAllSelections"
+                  @keydown.space.prevent="toggleAllSelections"
                 >
-                  <slot name="empty">No options found</slot>
+                  <span
+                    :class="[
+                      'tw:flex tw:items-center tw:justify-center tw:shrink-0',
+                      'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                      allSelected
+                        ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
+                        : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                    ]"
+                    aria-hidden="true"
+                  >
+                    <svg
+                      v-if="allSelected"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                    >
+                      <polyline points="2,6 5,9 10,3" />
+                    </svg>
+                  </span>
+                  <span class="tw:truncate tw:font-medium">Select all</span>
                 </div>
 
-                <!-- Virtualised list — spacer div with absolutely positioned rows -->
-                <div
-                  v-if="filteredOptions.length > 0"
-                  :style="{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    position: 'relative',
-                  }"
-                >
+                <!-- Consumer-supplied rows rendered above the option list -->
+                <slot name="before-options" />
+
+                <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
+                   on the ListboxFilter input above. Items are index-highlighted reactively. -->
+                <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
                   <div
-                    v-for="vRow in virtualizer.getVirtualItems()"
-                    :key="vRow.key"
-                    :data-vrow="vRow.index"
+                    v-if="filteredOptions.length === 0"
+                    class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
+                  >
+                    <slot name="empty">No options found</slot>
+                  </div>
+
+                  <!-- Virtualised list — spacer div with absolutely positioned rows -->
+                  <div
+                    v-if="filteredOptions.length > 0"
                     :style="{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${vRow.size}px`,
-                      transform: `translateY(${vRow.start}px)`,
+                      height: `${virtualizer.getTotalSize()}px`,
+                      position: 'relative',
                     }"
                   >
-                    <!-- Group header — non-interactive label. Virtualisation
+                    <div
+                      v-for="vRow in virtualizer.getVirtualItems()"
+                      :key="vRow.key"
+                      :data-vrow="vRow.index"
+                      :style="{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${vRow.size}px`,
+                        transform: `translateY(${vRow.start}px)`,
+                      }"
+                    >
+                      <!-- Group header — non-interactive label. Virtualisation
                          renders each tw:flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
-                    <div
-                      v-if="filteredOptions[vRow.index].header"
-                      :class="[
-                        'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
-                        'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
-                        'tw:select-none tw:pointer-events-none',
-                      ]"
-                    >
-                      {{ filteredOptions[vRow.index].label }}
-                    </div>
+                      <div
+                        v-if="filteredOptions[vRow.index].header"
+                        :class="[
+                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
+                          'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                          'tw:select-none tw:pointer-events-none',
+                        ]"
+                      >
+                        {{ filteredOptions[vRow.index].label }}
+                      </div>
 
-                    <!-- Regular item -->
-                    <ListboxItem
-                      v-else
-                      :value="toRekaString(filteredOptions[vRow.index].value)"
-                      :disabled="filteredOptions[vRow.index].disabled"
-                      :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
-                      :class="[
-                        'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
-                        'tw:ps-3 tw:pe-3 tw:text-sm',
-                        'tw:text-select-item-text tw:rounded-sm',
-                        'tw:cursor-pointer tw:select-none tw:outline-none',
-                        'tw:transition-colors tw:duration-100',
-                        // highlightedIndex-based highlight — works with virtualised items.
-                        // Reka's data-highlighted only fires for direct DOM children of
-                        // ListboxRoot; virtual rows are not, so we track highlight ourselves.
-                        vRow.index === highlightedIndex
-                          ? 'tw:bg-select-item-hover-bg'
-                          : 'tw:hover:bg-select-item-hover-bg',
-                        multiple
-                          ? ''
-                          : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-                        'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
-                      ]"
-                    >
-                      <!-- Multi-select: always-visible checkbox indicator -->
-                      <template v-if="multiple">
-                        <span
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                            'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
-                            selectedValues.includes(
-                              filteredOptions[vRow.index].value,
-                            )
-                              ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                              : 'tw:bg-checkbox-bg tw:border-checkbox-border',
-                          ]"
-                          aria-hidden="true"
-                        >
-                          <svg
-                            v-if="
+                      <!-- Regular item -->
+                      <ListboxItem
+                        v-else
+                        :value="toRekaString(filteredOptions[vRow.index].value)"
+                        :disabled="filteredOptions[vRow.index].disabled"
+                        :data-test="
+                          parentDataTest
+                            ? `${parentDataTest}-option`
+                            : undefined
+                        "
+                        :class="[
+                          'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
+                          'tw:ps-3 tw:pe-3 tw:text-sm',
+                          'tw:text-select-item-text tw:rounded-sm',
+                          'tw:cursor-pointer tw:select-none tw:outline-none',
+                          'tw:transition-colors tw:duration-100',
+                          // highlightedIndex-based highlight — works with virtualised items.
+                          // Reka's data-highlighted only fires for direct DOM children of
+                          // ListboxRoot; virtual rows are not, so we track highlight ourselves.
+                          vRow.index === highlightedIndex
+                            ? 'tw:bg-select-item-hover-bg'
+                            : 'tw:hover:bg-select-item-hover-bg',
+                          multiple
+                            ? ''
+                            : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
+                          'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
+                        ]"
+                      >
+                        <!-- Multi-select: always-visible checkbox indicator -->
+                        <template v-if="multiple">
+                          <span
+                            :class="[
+                              'tw:flex tw:items-center tw:justify-center tw:shrink-0',
+                              'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
-                            "
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 12 12"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                                ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
+                                : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                            ]"
+                            aria-hidden="true"
                           >
-                            <polyline points="2,6 5,9 10,3" />
-                          </svg>
-                        </span>
-                      </template>
+                            <svg
+                              v-if="
+                                selectedValues.includes(
+                                  filteredOptions[vRow.index].value,
+                                )
+                              "
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                            >
+                              <polyline points="2,6 5,9 10,3" />
+                            </svg>
+                          </span>
+                        </template>
 
-                      <!-- Per-option icon: prefer a raw Vue component (iconComponent),
+                        <!-- Per-option icon: prefer a raw Vue component (iconComponent),
                            fall back to a string name (icon) resolved via OIcon registry. -->
-                      <component
-                        v-if="filteredOptions[vRow.index].iconComponent"
-                        :is="filteredOptions[vRow.index].iconComponent"
-                        class="tw:shrink-0 tw:size-4"
-                      />
-                      <OIcon
-                        v-else-if="filteredOptions[vRow.index].icon"
-                        :name="filteredOptions[vRow.index].icon"
-                        size="xs"
-                        class="tw:shrink-0"
-                      />
-                      <span class="tw:truncate">{{
-                        filteredOptions[vRow.index].label
-                      }}</span>
-                    </ListboxItem>
+                        <component
+                          v-if="filteredOptions[vRow.index].iconComponent"
+                          :is="filteredOptions[vRow.index].iconComponent"
+                          class="tw:shrink-0 tw:size-4"
+                        />
+                        <OIcon
+                          v-else-if="filteredOptions[vRow.index].icon"
+                          :name="filteredOptions[vRow.index].icon"
+                          size="xs"
+                          class="tw:shrink-0"
+                        />
+                        <span class="tw:truncate">{{
+                          filteredOptions[vRow.index].label
+                        }}</span>
+                      </ListboxItem>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div><!-- end bordered container -->
+              <!-- end bordered container -->
             </ListboxRoot>
           </PopoverContent>
         </PopoverPortal>
@@ -1153,7 +1181,8 @@ const fieldWidthClass = computed(() => {
           <span
             v-if="label && labelPosition === 'inside'"
             class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
-          >{{ label }}</span>
+            >{{ label }}</span
+          >
 
           <SelectValue
             :placeholder="placeholder"

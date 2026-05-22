@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
-                      variant="outline"
+                      variant="outline-destructive"
                       size="sm"
                       class="tw:mr-2"
                       @click="openBulkDeleteDialog"

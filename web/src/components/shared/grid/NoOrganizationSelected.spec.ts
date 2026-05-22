@@ -57,10 +57,11 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should have correct CSS classes", () => {
-    expect(wrapper.classes()).toContain('full-width');
-    expect(wrapper.classes()).toContain('column');
+    expect(wrapper.classes()).toContain('tw:w-full');
+    expect(wrapper.classes()).toContain('tw:flex');
+    expect(wrapper.classes()).toContain('tw:flex-col');
     expect(wrapper.classes()).toContain('flex-center');
-    expect(wrapper.classes()).toContain('q-gutter-sm');
+    expect(wrapper.classes()).toContain('tw:gap-2');
   });
 
   it("should have correct font size styling", () => {

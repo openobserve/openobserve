@@ -55,15 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ event.name }}
                 </div>
               </div>
-              <div class="col-auto">
-                <OButton
-                  icon-left="close"
-                  variant="ghost"
-                  size="icon-sm"
-                  data-test="close-drawer-btn"
-                  @click="emit('update:open', false)"
-                />
-              </div>
             </div>
             <div
               data-test="event-session-meta-data"

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emits('update:open', $event)"
   >
     <div class="tw:p-4 tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit.prevent="submitForm">
+      <OForm :default-values="streamInputsDefault" @submit="submitForm">
         <div data-test="add-stream-name-input" class="tw:mt-2">
           <OInput
             v-model="streamInputs.name"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
     <div v-else class="tw:p-4 tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit.prevent="submitForm">
+      <OForm :default-values="streamInputsDefault" @submit="submitForm">
         <div data-test="add-stream-name-input" class="tw:mt-2">
           <OInput
             v-model="streamInputs.name"

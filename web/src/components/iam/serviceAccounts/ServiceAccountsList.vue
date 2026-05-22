@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
-                variant="outline"
+                variant="outline-destructive"
                 size="sm"
                 @click="openBulkDeleteDialog"
                 icon-left="delete"
@@ -168,13 +168,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :primary-button-label="t('user.ok')"
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
+      size="sm"
     >
       <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
     </ODialog>
 
     <ODialog data-test="service-accounts-list-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
-      size="xs"
+      size="sm"
       title="Delete Service Accounts"
       secondary-button-label="Cancel"
       primary-button-label="OK"

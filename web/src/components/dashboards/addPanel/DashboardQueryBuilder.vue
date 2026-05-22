@@ -112,40 +112,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                     class="field-function-menu-popup dashboard-query-builder-dropdown"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index].isDerived
+                          ? 'auto'
+                          : FIELD_FUNCTION_MENU_WIDTH,
+                    }"
                   >
-                    <div
-                      style="padding: 3px 16px 16px 16px"
-                      :style="{
-                        width:
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.x[index].isDerived
-                            ? 'auto'
-                            : FIELD_FUNCTION_MENU_WIDTH,
-                      }"
-                    >
-                      <div>
-                        <div class="tw:mr-1 tw:mb-2">
-                          <DynamicFunctionPopUp
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index]
-                            "
-                            :allowAggregation="false"
-                            :customQuery="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
-                            "
-                            :chartType="dashboardPanelData.data.type"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index]
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
                   </div>
                 </ODropdown>
                 <OButton
@@ -295,40 +287,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
                     class="field-function-menu-popup dashboard-query-builder-dropdown"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.breakdown[index].isDerived
+                          ? 'auto'
+                          : FIELD_FUNCTION_MENU_WIDTH,
+                    }"
                   >
-                    <div
-                      style="padding: 3px 16px 16px 16px"
-                      :style="{
-                        width:
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.breakdown[index].isDerived
-                            ? 'auto'
-                            : FIELD_FUNCTION_MENU_WIDTH,
-                      }"
-                    >
-                      <div>
-                        <div class="tw:mr-1 tw:mb-2">
-                          <DynamicFunctionPopUp
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.breakdown[index]
-                            "
-                            :allowAggregation="false"
-                            :customQuery="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
-                            "
-                            :chartType="dashboardPanelData.data.type"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.breakdown[index]
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
                   </div>
                 </ODropdown>
                 <OButton
@@ -443,44 +427,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                 class="field-function-menu-popup dashboard-query-builder-dropdown"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].isDerived
+                      ? 'auto'
+                      : FIELD_FUNCTION_MENU_WIDTH,
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.y[index].isDerived
-                        ? 'auto'
-                        : FIELD_FUNCTION_MENU_WIDTH,
-                  }"
-                >
-                  <div>
-                    <div class="tw:mr-1 tw:mb-2">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index]
-                        "
-                        :allowAggregation="
-                          dashboardPanelData.data.type == 'heatmap'
-                            ? false
-                            : true
-                        "
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <DynamicFunctionPopUp
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index]
+                  "
+                  :allowAggregation="
+                    dashboardPanelData.data.type == 'heatmap'
+                      ? false
+                      : true
+                  "
+                  :customQuery="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                  "
+                  :chartType="dashboardPanelData.data.type"
+                />
               </div>
             </ODropdown>
             <OButton
@@ -597,40 +573,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
                   class="field-function-menu-popup dashboard-query-builder-dropdown"
+                  :style="{
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.z[index].isDerived
+                        ? 'auto'
+                        : FIELD_FUNCTION_MENU_WIDTH,
+                  }"
                 >
-                  <div
-                    style="padding: 3px 16px 16px 16px"
-                    :style="{
-                      width:
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.z[index].isDerived
-                          ? 'auto'
-                          : FIELD_FUNCTION_MENU_WIDTH,
-                    }"
-                  >
-                    <div>
-                      <div class="tw:mr-1 tw:mb-2">
-                        <DynamicFunctionPopUp
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.z[index]
-                          "
-                          :allowAggregation="true"
-                          :customQuery="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery
-                          "
-                          :chartType="dashboardPanelData.data.type"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.z[index]
+                    "
+                    :allowAggregation="true"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                    :chartType="dashboardPanelData.data.type"
+                  />
                 </div>
               </ODropdown>
               <OButton
@@ -710,7 +678,6 @@ import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -744,7 +711,6 @@ export default defineComponent({
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
-    CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DashboardJoinsOption,
@@ -1538,9 +1504,9 @@ export default defineComponent({
 }
 
 .dashboard-query-builder-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
+  // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+  // transform: translateY(0.5rem);
+  // border-radius: 0px;
 
   :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
@@ -1713,7 +1679,6 @@ export default defineComponent({
 }
 
 .field-function-menu-popup {
-  padding: 3px 16px 16px 16px;
-  width: 771px;
+  padding: 8px;
 }
 </style>

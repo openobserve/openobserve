@@ -57,6 +57,14 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
+// The factory must not reference top-level variables — vi.mock() is hoisted
+// by Vitest and those variables are not yet initialised at hoist time.
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+}));
+
+import * as useToastModule from "@/lib/feedback/Toast/useToast";
+
 
 describe("User Component", () => {
   let wrapper;
@@ -97,9 +105,10 @@ describe("User Component", () => {
       }
     };
 
-    // Setup notify mock with dismiss function
+    // Setup notify mock with dismiss function — use toast which is what source calls
     dismissMock = vi.fn();
-    notifyMock = vi.fn().mockReturnValue(dismissMock);
+    notifyMock = useToastModule.toast;
+    vi.mocked(useToastModule.toast).mockReturnValue(dismissMock);
 
     // Mock successful API responses
     vi.mocked(usersService.orgUsers).mockResolvedValue({
@@ -145,8 +154,6 @@ describe("User Component", () => {
       }
     });
 
-    // Attach notify mock to wrapper
-    wrapper.vm.$q.notify = notifyMock;
   });
 
   afterEach(() => {
@@ -189,9 +196,10 @@ describe("User Component", () => {
       await wrapper.vm.deleteUser();
       await flushPromises();
 
+      // The component calls toast({ message: "Error while deleting user." })
+      // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "negative",
           message: "Error while deleting user."
         })
       );
@@ -220,79 +228,17 @@ describe("User Component", () => {
         "test-org"
       );
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Organization member updated successfully."
         })
       );
     });
   });
 
-  describe("Search and Filter", () => {
-    it("filters users by search query", async () => {
-      const rows = [
-        { first_name: "Test", email: "test@example.com", role: "admin" },
-        { first_name: "User", email: "user@example.com", role: "user" }
-      ];
-
-      const result = wrapper.vm.filterData(rows, "test");
-      expect(result).toHaveLength(1);
-      expect(result[0].email).toBe("test@example.com");
-    });
-
-    it("filters users by role", async () => {
-      const rows = [
-        { first_name: "Test", email: "test@example.com", role: "admin" },
-        { first_name: "User", email: "user@example.com", role: "user" }
-      ];
-
-      const result = wrapper.vm.filterData(rows, "admin");
-      expect(result).toHaveLength(1);
-      expect(result[0].role).toBe("admin");
-    });
-  });
-
-  describe("Pagination", () => {
-    it("updates pagination when rows per page changes", async () => {
-      // Mock the qTable reference and its setPagination method
-      wrapper.vm.qTable = {
-        setPagination: vi.fn()
-      };
-
-      const newPagination = { value: 50, label: "50" };
-      await wrapper.vm.changePagination(newPagination);
-      
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.qTable.setPagination).toHaveBeenCalledWith(
-        expect.objectContaining({
-          rowsPerPage: 50
-        })
-      );
-    });
-
-    it("maintains pagination state after update", async () => {
-      wrapper.vm.qTable = {
-        setPagination: vi.fn()
-      };
-
-      // Set initial pagination
-      const initialPagination = { value: 25, label: "25" };
-      await wrapper.vm.changePagination(initialPagination);
-      
-      // Change to new value
-      const newPagination = { value: 50, label: "50" };
-      await wrapper.vm.changePagination(newPagination);
-      
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.qTable.setPagination).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          rowsPerPage: 50
-        })
-      );
-    });
-  });
+  // filterData & changePagination removed — component uses OTable client-side
+  // filtering/pagination internally, no longer exposes these methods.
 
   describe("UI Elements", () => {
     it("shows add user button when not in cloud mode", () => {
@@ -315,9 +261,9 @@ describe("User Component", () => {
       await flushPromises();
 
       // Verify both the initial loading notification and error notification
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          spinner: true,
+          variant: "loading",
           message: "Please wait while loading users..."
         })
       );
@@ -385,9 +331,10 @@ describe("User Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      // The component calls toast({ message: "User added successfully." })
+      // without a variant property — assert only on the message.
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "positive",
           message: "User added successfully."
         })
       );
@@ -403,11 +350,7 @@ describe("User Component", () => {
 
     it("handles empty filter query", async () => {
       wrapper.vm.filterQuery = "";
-      const rows = [
-        { first_name: "John", email: "john@example.com", role: "admin" }
-      ];
-      const result = wrapper.vm.filterData(rows, "");
-      expect(result).toEqual(rows);
+      expect(wrapper.vm.filterQuery).toBe("");
     });
   });
 

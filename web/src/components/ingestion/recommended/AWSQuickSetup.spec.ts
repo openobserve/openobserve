@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
@@ -44,8 +59,17 @@ vi.mock('@/services/segment_analytics', () => ({
   default: { track: vi.fn() },
 }));
 
+vi.mock('@/utils/clipboard', () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(),
+}));
+
 const mockStore = createStore({
   state: {
+    theme: 'dark',
     selectedOrganization: { identifier: 'test-org', name: 'Test Organization' },
     userInfo: { email: 'test@example.com' },
     organizationData: { organizationPasscode: 'test-passcode' },
@@ -77,6 +101,46 @@ describe('AWSQuickSetup.vue', () => {
       global: {
         plugins: [mockI18n, mockRouter],
         provide: { store: mockStore },
+        stubs: {
+          OToggleGroup: {
+            template: '<div><slot /></div>',
+            props: ['modelValue', 'type', 'disabled', 'orientation', 'variant', 'label', 'labelPosition'],
+            emits: ['update:modelValue'],
+          },
+          OToggleGroupItem: {
+            template: '<div><slot /></div>',
+            props: ['value', 'disabled', 'size'],
+          },
+          OSelect: {
+            template: '<select><slot /></select>',
+            props: ['modelValue', 'options', 'valueKey', 'labelKey', 'placeholder', 'disabled', 'searchable', 'clearable'],
+          },
+          OButton: {
+            template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'loading', 'block', 'as', 'type', 'active', 'label'],
+            emits: ['click'],
+          },
+          OIcon: {
+            template: '<span><slot /></span>',
+            props: ['name', 'size', 'color'],
+          },
+          OBadge: {
+            template: '<span><slot /></span>',
+            props: ['variant', 'size', 'icon', 'clickable', 'disabled', 'count'],
+          },
+          OCheckbox: {
+            template: '<label><input type="checkbox" /></label>',
+            props: ['modelValue', 'value', 'label', 'size', 'disabled', 'indeterminate'],
+          },
+          OTooltip: {
+            template: '<div><slot /></div>',
+            props: ['content', 'side', 'align', 'sideOffset', 'delay', 'maxWidth', 'disabled'],
+          },
+          OSeparator: {
+            template: '<hr />',
+            props: ['vertical'],
+          },
+        },
       },
     });
 
@@ -209,14 +273,14 @@ describe('AWSQuickSetup.vue', () => {
       expect(window.open).toHaveBeenCalled();
     });
 
-    it('should not call window.open when no services selected', async () => {
+    it('should disable deploy button when no services selected', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.deselectAll();
       await wrapper.vm.$nextTick();
       const deployBtn = wrapper.find('[data-test="aws-quick-setup-deploy-btn"]');
-      await deployBtn.trigger('click');
-      expect(window.open).not.toHaveBeenCalled();
+      // When no services are selected, the button is disabled to prevent clicks
+      expect((deployBtn.element as HTMLButtonElement).disabled).toBe(true);
     });
   });
 
