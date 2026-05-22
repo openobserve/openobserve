@@ -412,12 +412,12 @@ export class LogsPage {
     async selectIndexAndStreamJoin() {
         // Select both default and e2e_automate streams for join queries
         // Retry loop with force-click fallback for cloud stability (Pattern 3)
-        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
         const defaultToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
         const e2eToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
 
         // Open dropdown
-        await dropdownArrow.click({ force: true });
+        await selectTrigger.click({ force: true });
         await this.page.waitForTimeout(2000);
 
         // Select default stream with retry
@@ -430,7 +430,7 @@ export class LogsPage {
             } catch (e) {
                 await this.page.keyboard.press('Escape');
                 await this.page.waitForTimeout(500);
-                await dropdownArrow.click({ force: true });
+                await selectTrigger.click({ force: true });
                 await this.page.waitForTimeout(1000);
             }
         }
@@ -439,7 +439,7 @@ export class LogsPage {
             // after 3 retries through the Escape path, it may be closed and
             // a force-click on a hidden toggle silently does nothing.
             if (!(await defaultToggle.isVisible().catch(() => false))) {
-                await dropdownArrow.click({ force: true });
+                await selectTrigger.click({ force: true });
                 await this.page.waitForTimeout(1000);
             }
             await defaultToggle.click({ force: true, timeout: 10000 });
@@ -451,7 +451,7 @@ export class LogsPage {
         // never visible and we burn time in the retry loop.
         const isDropdownStillOpen = await e2eToggle.isVisible().catch(() => false);
         if (!isDropdownStillOpen) {
-            await dropdownArrow.click({ force: true });
+            await selectTrigger.click({ force: true });
             await this.page.waitForTimeout(1000);
         }
 
@@ -465,7 +465,7 @@ export class LogsPage {
             } catch (e) {
                 await this.page.keyboard.press('Escape');
                 await this.page.waitForTimeout(500);
-                await dropdownArrow.click({ force: true });
+                await selectTrigger.click({ force: true });
                 await this.page.waitForTimeout(1000);
                 // Re-select default only if it's no longer marked as selected
                 // (clicking an already-on Quasar toggle would deselect it)
@@ -483,14 +483,14 @@ export class LogsPage {
         if (!e2eSelected) {
             // Last-resort fallback: same dropdown-open guard as above
             if (!(await e2eToggle.isVisible().catch(() => false))) {
-                await dropdownArrow.click({ force: true });
+                await selectTrigger.click({ force: true });
                 await this.page.waitForTimeout(1000);
             }
             await e2eToggle.click({ force: true, timeout: 10000 });
         }
 
         // Close dropdown
-        await dropdownArrow.click({ force: true });
+        await selectTrigger.click({ force: true });
     }
 
     /**
@@ -536,9 +536,9 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Open dropdown
-        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
-        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
-        await dropdownArrow.click();
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        await selectTrigger.click();
         await this.page.waitForTimeout(2000);
 
         // Use search box to filter for first stream (much faster than scrolling)
@@ -581,12 +581,13 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Close dropdown
-        await dropdownArrow.click();
+        await selectTrigger.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
     async selectIndexStreamDefault() {
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        await selectTrigger.click();
         await this.page.waitForTimeout(3000);
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
     }
@@ -679,9 +680,10 @@ export class LogsPage {
         // Navigate to logs page via URL to ensure fresh stream list.
         // skipNavigation=true bypasses page.goto when the caller is already
         // on the logs page and wants to avoid auto-triggering a query.
+        const orgId = getOrgIdentifier();
+        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+
         if (!skipNavigation) {
-            const orgId = getOrgIdentifier();
-            const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
             testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
             await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
             await this.page.waitForTimeout(3000);
@@ -693,11 +695,11 @@ export class LogsPage {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
 
             try {
-                // Click the dropdown arrow to open the stream list
-                testLogger.info(`selectStream: Clicking dropdown arrow`);
-                const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
-                await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
-                await dropdownArrow.click();
+                // Click the OSelect trigger button to open the stream list
+                testLogger.info(`selectStream: Clicking OSelect trigger button`);
+                const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+                await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
+                await selectTrigger.click();
                 await this.page.waitForTimeout(2000);
 
                 // Use search box to filter streams for faster finding
@@ -839,7 +841,8 @@ export class LogsPage {
         testLogger.debug(`selectIndexStreamOld: Starting selection for stream: ${streamName}`);
         try {
             // Click the dropdown
-            await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+            const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+            await selectTrigger.click();
             testLogger.debug(`selectIndexStreamOld: Clicked dropdown`);
             await this.page.waitForTimeout(2000);
 
