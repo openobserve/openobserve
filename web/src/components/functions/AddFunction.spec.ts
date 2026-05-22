@@ -25,6 +25,9 @@ const mockStore = createStore({
   state: {
     theme: 'light',
     isAiChatEnabled: false,
+    zoConfig: {
+      ai_enabled: false,
+    },
     selectedOrganization: {
       identifier: 'test-org',
     },
