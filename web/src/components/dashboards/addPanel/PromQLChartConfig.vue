@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
         placeholder="latitude or lat"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
@@ -73,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
         placeholder="longitude or lon"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
@@ -90,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
         placeholder="weight"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
@@ -110,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
         placeholder="country or location"
-        class="tw:mb-3"
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
@@ -336,7 +332,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('promqlTable', 'configure-column-order')
           "
-          class="tw:mb-2 tw:mt-3"
           style="font-weight: 600"
         ></div>
         <OButton
@@ -735,11 +730,17 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .promql-chart-config {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
   .geomap-config,
   .maps-config,
   .table-config {
-    padding: 0px 0;
-    // border: 1px solid rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0;
   }
 
   // Fix icon cropping in labels
