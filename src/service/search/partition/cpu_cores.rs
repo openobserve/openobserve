@@ -13,23 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::cluster::RoleGroup;
+use config::{get_config, meta::cluster::RoleGroup};
 use infra::{cluster::get_cached_online_querier_nodes, errors::Error};
 
 use super::super::sql::Sql;
 
 /// Resolves the effective CPU core count for the querier nodes that will
-/// actually handle this query.
+/// actually handle this query, then estimates the total seconds required.
 ///
 /// On enterprise, the configured node selection strategy (e.g. "org" or
 /// "stream") determines which subset of online querier nodes are used, so
 /// only the selected nodes' CPU cores are summed. On community edition, all
 /// online querier nodes are summed.
-pub(crate) async fn get_cpu_cores(
+pub(crate) async fn estimated_secs(
     trace_id: &str,
-    _org_id: &str,
     _sql: &Sql,
     is_http_req: bool,
+    original_size: usize,
 ) -> Result<usize, Error> {
     let role_group = if is_http_req {
         Some(RoleGroup::Interactive)
@@ -48,7 +48,7 @@ pub(crate) async fn get_cpu_cores(
     let cpu_cores = {
         let stream_key = _sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            _org_id,
+            &_sql.org_id,
             &stream_key,
             nodes,
             role_group,
@@ -56,10 +56,19 @@ pub(crate) async fn get_cpu_cores(
         .await;
         selected.iter().map(|n| n.cpu_num).sum::<u64>() as usize
     };
+
     #[cfg(not(feature = "enterprise"))]
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
-    log::info!("[trace_id {trace_id}] search_partition: selected {cpu_cores} CPU cores");
+    let cfg = get_config();
+    let mut total_secs = original_size / cfg.limit.query_group_base_speed / cpu_cores;
+    if total_secs * cfg.limit.query_group_base_speed * cpu_cores < original_size {
+        total_secs += 1;
+    }
 
-    Ok(cpu_cores)
+    log::info!(
+        "[trace_id {trace_id}] search_partition: selected {cpu_cores} CPU cores, estimated {total_secs}s"
+    );
+
+    Ok(total_secs)
 }

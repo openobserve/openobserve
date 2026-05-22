@@ -6700,8 +6700,12 @@ dependencies = [
 [[package]]
 name = "object_store"
 version = "0.13.2"
+<<<<<<< feat/bloomfilter-tantivy
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "622acbc9100d3c10e2ee15804b0caa40e55c933d5aa53814cd520805b7958a49"
+=======
+source = "git+https://github.com/openobserve/arrow-rs-object-store?branch=openobserve-v0.13.2#01c97b4d3f7857a1af87f0b66b68d329d3ccd9fd"
+>>>>>>> main
 dependencies = [
  "async-trait",
  "base64 0.22.1",
