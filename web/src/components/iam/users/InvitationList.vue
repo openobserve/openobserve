@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+            <span class="tw:text-xs tw:text-text-primary tw:font-bold">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>

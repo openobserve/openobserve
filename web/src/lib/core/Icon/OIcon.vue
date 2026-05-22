@@ -71,7 +71,7 @@ const isDestructiveIcon = computed<boolean>(() =>
       class="tw:size-full tw:object-contain"
     />
     <!-- Registry icon -->
-    <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" v-bind="$attrs" />
+    <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" />
     <slot />
   </span>
 </template>
