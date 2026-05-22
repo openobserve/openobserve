@@ -27,8 +27,8 @@ use super::super::sql::Sql;
 /// online querier nodes are summed.
 pub(crate) async fn get_cpu_cores(
     trace_id: &str,
-    org_id: &str,
-    sql: &Sql,
+    _org_id: &str,
+    _sql: &Sql,
     is_http_req: bool,
 ) -> Result<usize, Error> {
     let role_group = if is_http_req {
@@ -46,9 +46,9 @@ pub(crate) async fn get_cpu_cores(
 
     #[cfg(feature = "enterprise")]
     let cpu_cores = {
-        let stream_key = sql.get_first_stream_key();
+        let stream_key = _sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            org_id,
+            _org_id,
             &stream_key,
             nodes,
             role_group,
