@@ -419,6 +419,40 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-wildcard-bar-purple: #{$o2-purple-600};
   --o2-wildcard-bar-grey: #{$o2-gray-800};
 
+  // Label chip tokens — data-type label colors (light mode)
+  --o2-label-chip-ip-bg:       #{$o2-green-100};
+  --o2-label-chip-ip-text:     #{$o2-green-800};
+  --o2-label-chip-ipv4-bg:     #{$o2-green-100};
+  --o2-label-chip-ipv4-text:   #{$o2-green-800};
+  --o2-label-chip-ipv6-bg:     #{$o2-green-100};
+  --o2-label-chip-ipv6-text:   #{$o2-green-800};
+  --o2-label-chip-method-bg:   #{$o2-red-200};
+  --o2-label-chip-method-text: #{$o2-red-900};
+  --o2-label-chip-url-bg:      #{$o2-iris-400};
+  --o2-label-chip-url-text:    #{$o2-iris-1100};
+  --o2-label-chip-num-bg:      #{$o2-orange-100};
+  --o2-label-chip-num-text:    #{$o2-orange-900};
+  --o2-label-chip-float-bg:    #{$o2-orange-100};
+  --o2-label-chip-float-text:  #{$o2-orange-900};
+  --o2-label-chip-hex-bg:      #{$o2-yellow-100};
+  --o2-label-chip-hex-text:    #{$o2-yellow-900};
+  --o2-label-chip-ts-bg:       #{$o2-purple-100};
+  --o2-label-chip-ts-text:     #{$o2-purple-800};
+  --o2-label-chip-date-bg:     #{$o2-purple-100};
+  --o2-label-chip-date-text:   #{$o2-purple-800};
+  --o2-label-chip-time-bg:     #{$o2-purple-100};
+  --o2-label-chip-time-text:   #{$o2-purple-800};
+  --o2-label-chip-id-bg:       #{$o2-teal-100};
+  --o2-label-chip-id-text:     #{$o2-teal-800};
+  --o2-label-chip-email-bg:    #{$o2-red-100};
+  --o2-label-chip-email-text:  #{$o2-red-700};
+  --o2-label-chip-str-bg:      #{$o2-gray-300};
+  --o2-label-chip-str-text:    #{$o2-gray-1000};
+  --o2-label-chip-default-bg:  #{$o2-gray-300};
+  --o2-label-chip-default-text: #{$o2-gray-1000};
+  --o2-label-chip-pattern-bg:  #{$o2-blue-200};
+  --o2-label-chip-pattern-text: #{$o2-blue-1100};
+
   // Dashboard
   --o2-dashboard-placeholder-bg: #{$o2-iris-700};
 
@@ -673,7 +707,41 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-wildcard-bar-orange: #{$o2-dark-orange-600};
   --o2-wildcard-bar-purple: #{$o2-dark-purple-600};
   --o2-wildcard-bar-grey: #{$o2-dark-gray-700};
-  
+
+  // Label chip tokens — data-type label colors (dark mode)
+  --o2-label-chip-ip-bg:       #{$o2-dark-green-100};
+  --o2-label-chip-ip-text:     #{$o2-dark-green-800};
+  --o2-label-chip-ipv4-bg:     #{$o2-dark-green-100};
+  --o2-label-chip-ipv4-text:   #{$o2-dark-green-800};
+  --o2-label-chip-ipv6-bg:     #{$o2-dark-green-100};
+  --o2-label-chip-ipv6-text:   #{$o2-dark-green-800};
+  --o2-label-chip-method-bg:   #{$o2-dark-red-200};
+  --o2-label-chip-method-text: #{$o2-dark-red-900};
+  --o2-label-chip-url-bg:      #{$o2-dark-iris-300};
+  --o2-label-chip-url-text:    #{$o2-dark-iris-1100};
+  --o2-label-chip-num-bg:      #{$o2-dark-orange-100};
+  --o2-label-chip-num-text:    #{$o2-dark-orange-700};
+  --o2-label-chip-float-bg:    #{$o2-dark-orange-100};
+  --o2-label-chip-float-text:  #{$o2-dark-orange-700};
+  --o2-label-chip-hex-bg:      #{$o2-dark-yellow-100};
+  --o2-label-chip-hex-text:    #{$o2-dark-yellow-900};
+  --o2-label-chip-ts-bg:       #{$o2-dark-purple-100};
+  --o2-label-chip-ts-text:     #{$o2-dark-purple-700};
+  --o2-label-chip-date-bg:     #{$o2-dark-purple-100};
+  --o2-label-chip-date-text:   #{$o2-dark-purple-700};
+  --o2-label-chip-time-bg:     #{$o2-dark-purple-100};
+  --o2-label-chip-time-text:   #{$o2-dark-purple-700};
+  --o2-label-chip-id-bg:       #{$o2-dark-teal-100};
+  --o2-label-chip-id-text:     #{$o2-dark-teal-900};
+  --o2-label-chip-email-bg:    #{$o2-dark-red-100};
+  --o2-label-chip-email-text:  #{$o2-dark-red-800};
+  --o2-label-chip-str-bg:      #{$o2-dark-gray-300};
+  --o2-label-chip-str-text:    #{$o2-dark-gray-1000};
+  --o2-label-chip-default-bg:  #{$o2-dark-gray-300};
+  --o2-label-chip-default-text: #{$o2-dark-gray-1000};
+  --o2-label-chip-pattern-bg:  #{$o2-dark-blue-200};
+  --o2-label-chip-pattern-text: #{$o2-dark-blue-1100};
+
 }
 
 // ============================================
