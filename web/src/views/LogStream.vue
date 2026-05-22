@@ -410,7 +410,7 @@ export default defineComponent({
         header: t("user.actions"),
         isAction: true,
         size: 120,
-        meta: { align: "center", cellClass: "actions-column" },
+        meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
       },
     ]);
 

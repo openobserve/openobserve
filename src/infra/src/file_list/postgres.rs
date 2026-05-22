@@ -3384,6 +3384,7 @@ mod tests {
             deleted,
             id: 0,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

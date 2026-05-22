@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="visibleRows"
         :columns="columns"
         row-key="name"
+        :loading="loading"
         :selected-ids="selectedKeyIds"
         selection="multiple"
         pagination="client"
@@ -202,7 +203,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2 },
       },
     ];
     const resultTotal = ref<number>(0);

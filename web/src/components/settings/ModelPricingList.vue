@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="filteredModels"
         :columns="columns"
         row-key="id"
+        :loading="loading"
         :selected-ids="selectedIds"
         selection="multiple"
         pagination="client"
@@ -325,9 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <OSpinner v-if="loading" size="lg" />
           <div
-            v-else
             class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-y-3"
           >
             <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
@@ -612,7 +611,7 @@ const columns: OTableColumnDef[] = [
     pinned: "right",
     size: 200,
     minSize: 180,
-    meta: { align: "center" },
+    meta: { align: "center", actionCount: 4 },
   },
 ];
 

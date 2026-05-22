@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <OIcon
-                          :name="copiedField === 'incident-id' ? 'check' : 'content-copy'" size="sm"
+                          :name="copiedField === 'incident_id' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <OIcon
-                          :name="copiedField === 'incident-title' ? 'check' : 'content-copy'" size="sm"
+                          :name="copiedField === 'incident_title' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -542,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <OIcon
-                          :name="copiedField === 'key-type' ? 'check' : 'content-copy'" size="sm"
+                          :name="copiedField === 'key_type' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -976,17 +976,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:p-2.5 tw:overflow-y-auto tw:flex-1">
                       <!-- SQL Query -->
                       <div v-if="alerts[selectedAlertIndex]?.query_condition?.sql">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                       </div>
 
                       <!-- PromQL Query -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.promql">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                       </div>
 
                       <!-- Custom Conditions -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.conditions">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
                       </div>
 
                       <!-- No conditions -->

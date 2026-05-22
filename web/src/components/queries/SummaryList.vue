@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data="rows"
     :columns="columns"
     row-key="row_id"
+    :loading="loadingState"
     pagination="client"
     selection="multiple"
     v-model:selected-ids="selectedIds"
@@ -29,11 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-global-filter="false"
   >
     <template #empty>
-      <div v-if="!loadingState" class="tw:text-center tw:w-full full-height">
+      <div class="tw:text-center tw:w-full full-height">
         <NoData />
-      </div>
-      <div v-else class="tw:text-center tw:w-full full-height tw:mt-4">
-        <OSpinner size="md" />
       </div>
     </template>
     <template #cell-actions="{ row }">
@@ -125,7 +123,7 @@ export default defineComponent({
       { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
       { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", cell: " ", sortable: true, meta: { align: "left" } },
       { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center" } },
+      { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 
     const selectedIds = computed({

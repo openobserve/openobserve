@@ -858,7 +858,12 @@
     "groups": "Groepen",
     "customRole": "Rollen op maat",
     "description": "Omschrijving",
-    "revoke_invite": "Uitnodiging intrekken"
+    "revoke_invite": "Uitnodiging intrekken",
+    "authType": "Auth",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Inheems",
+    "noCustomRolesHint": "Geen aangepaste rollen gedefinieerd — maak er een in IAM → Rollen",
+    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd"
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",
@@ -2633,6 +2638,7 @@
     "serviceAccounts": "Serviceaccounts",
     "serviceAccountsName": "Naam van serviceaccounts",
     "basicUsers": "Gebruikers",
+    "organizationMembers": "Organisatieleden",
     "quota": "Quota",
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",

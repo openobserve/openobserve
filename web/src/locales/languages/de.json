@@ -858,7 +858,12 @@
     "groups": "Gruppen",
     "customRole": "Benutzerdefinierte Rollen",
     "description": "Beschreibung",
-    "revoke_invite": "Einladung widerrufen"
+    "revoke_invite": "Einladung widerrufen",
+    "authType": "Auth",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Einheimisch",
+    "noCustomRolesHint": "Keine benutzerdefinierten Rollen definiert — erstellen Sie eine in IAM → Rollen",
+    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -2622,6 +2627,7 @@
     "serviceAccounts": "Dienstkonten",
     "serviceAccountsName": "Name des Dienstkontos",
     "basicUsers": "Nutzer",
+    "organizationMembers": "Organisationsmitglieder",
     "quota": "Kontingente",
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",

@@ -956,7 +956,7 @@ const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:flex tw:flex-col tw:w-full";
   }
-  return "tw:flex tw:flex-col scroll tw:w-full";
+  return "scroll tw:w-full";
 });
 
 // After slot inner div style
@@ -972,7 +972,11 @@ const layoutPanelContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
-  return {};
+  // height: auto overrides the tw:h-full class so the container sizes to its
+  // content instead of filling afterSlotInner. This also makes the chart area
+  // wrapper's tw:h-full resolve to auto, matching the inner chart div's
+  // explicit height and eliminating the empty space below the legends.
+  return { height: "auto" };
 });
 
 // Field list wrapper class - logs/build doesn't need padding-bottom

@@ -264,20 +264,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="inspector-error-banner"
       />
 
-      <!-- Loading State -->
-      <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
-        <div class="tw:flex flex-center tw:h-full">
-          <OSpinner size="lg" />
-        </div>
-      </div>
-
-      <!-- Profile Data Table -->
-      <div v-if="!loading  && profileData && profileData.events" class="tw:w-full tw:h-full">
+      <!-- Profile Data Table (OTable handles loading skeleton) -->
+      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-242px)]">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"
             row-key="id"
+            :loading="loading"
             pagination="none"
             :show-global-filter="false"
             tree

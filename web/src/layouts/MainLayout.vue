@@ -657,6 +657,12 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
+          // IAM is org-setup, not data consumption — don't bounce out
+          // of IAM screens just because no streams exist yet.
+          const currentPath = router.currentRoute.value.path || "";
+          if (currentPath.indexOf("/iam") !== -1) {
+            return;
+          }
           toast({
             variant: "warning",
             message:

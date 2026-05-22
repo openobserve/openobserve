@@ -349,6 +349,7 @@ class APICleanup {
         }
     }
 
+
     /**
      * Fetch all pipelines
      * @returns {Promise<Array>} Array of pipeline objects
@@ -829,6 +830,109 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Reports cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all report folders (type=reports)
+     * @returns {Promise<Array>} Array of folder objects with folderId and name
+     */
+    async fetchReportFolders() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch report folders', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch report folders', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a report folder by ID
+     * @param {string} folderId - The folder ID to delete
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteReportFolder(folderId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports/${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const text = await response.text();
+
+            try {
+                const jsonResult = JSON.parse(text);
+                return { code: response.ok ? 200 : response.status, message: jsonResult.message || text };
+            } catch {
+                return { code: response.status, message: text };
+            }
+        } catch (error) {
+            testLogger.error('Failed to delete report folder', { folderId, error: error.message });
+            return { code: 500, message: error.message, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up report folders matching specified name prefixes
+     * @param {Array<string>} namePrefixes - Array of folder name prefixes to match (e.g., ['test_folder_', 'test_special_'])
+     */
+    async cleanupReportFolders(namePrefixes = []) {
+        testLogger.info('Starting report folders cleanup', { prefixes: namePrefixes });
+
+        try {
+            const folders = await this.fetchReportFolders();
+            testLogger.info('Fetched report folders', { total: folders.length });
+
+            const matchingFolders = folders.filter(f =>
+                namePrefixes.some(prefix => f.name.startsWith(prefix))
+            );
+            testLogger.info('Found report folders matching prefixes', { count: matchingFolders.length });
+
+            if (matchingFolders.length === 0) {
+                testLogger.info('No report folders to clean up');
+                return;
+            }
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const folder of matchingFolders) {
+                const result = await this.deleteReportFolder(folder.folderId);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted report folder', { name: folder.name, folderId: folder.folderId });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete report folder', { name: folder.name, folderId: folder.folderId, result });
+                }
+            }
+
+            testLogger.info('Report folders cleanup completed', { deletedCount, failedCount });
+
+            if (failedCount > 0) {
+                throw new Error(`Failed to delete ${failedCount} report folder(s)`);
+            }
+        } catch (error) {
+            testLogger.error('Report folders cleanup failed', { error: error.message });
+            throw error;
         }
     }
 

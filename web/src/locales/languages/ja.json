@@ -858,7 +858,12 @@
     "groups": "グループ",
     "customRole": "カスタムロール",
     "description": "[説明]",
-    "revoke_invite": "招待を取り消す"
+    "revoke_invite": "招待を取り消す",
+    "authType": "認証",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "ネイティブ",
+    "noCustomRolesHint": "カスタムロールは定義されていません — IAM → ロールで作成",
+    "externalUserCustomRoleHint": "外部ユーザーはソースシステム経由でのみ変更できます"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
@@ -2644,6 +2649,7 @@
     "quota": "クォータ",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
+    "organizationMembers": "組織メンバー",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
     "invitations": "招待状"

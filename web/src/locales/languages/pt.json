@@ -858,7 +858,12 @@
     "groups": "Grupos",
     "customRole": "Funções personalizadas",
     "description": "Descrição",
-    "revoke_invite": "Revogar convite"
+    "revoke_invite": "Revogar convite",
+    "authType": "Autenticação",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "Nenhuma função personalizada definida — crie uma no IAM → Funções",
+    "externalUserCustomRoleHint": "Usuários externos só podem ser modificados por meio do sistema de origem"
   },
   "ticket": {
     "header": "Tickets de suporte",
@@ -2622,6 +2627,7 @@
     "serviceAccounts": "Contas de serviço",
     "serviceAccountsName": "Nome das contas de serviço",
     "basicUsers": "Usuários",
+    "organizationMembers": "Membros da Organização",
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",

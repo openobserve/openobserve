@@ -257,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="dashboards"
             :columns="columns"
             row-key="id"
+            :loading="loading"
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -670,7 +671,7 @@ export default defineComponent({
           header: t("dashboard.actions"),
           sortable: false,
           isAction: true,
-          meta: { align: "center", cellClass: "actions-column" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ];
 
@@ -919,11 +920,13 @@ export default defineComponent({
       });
     };
     const dashboardList = ref([]);
+    const loading = ref(false);
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading dashboards...",
       });
+      loading.value = true;
       try {
         const response = await getAllDashboards(
           store,
@@ -934,6 +937,7 @@ export default defineComponent({
         showErrorNotification(err?.message || "Failed to load dashboards.");
       } finally {
         dismiss();
+        loading.value = false;
       }
     };
 
@@ -1307,6 +1311,7 @@ export default defineComponent({
       dashboards,
       dashboard,
       columns,
+      loading,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,

@@ -411,15 +411,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-menu-histogram-btn"
             @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
-            <div
-              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
-            >
+            <template #icon-left>
               <OSwitch
                 v-model="searchObj.meta.showHistogram"
                 size="sm"
                 @click.stop
               />
-            </div>
+            </template>
             {{ t("search.showHistogramLabel") }}
           </ODropdownItem>
 
@@ -429,16 +427,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-menu-sql-mode-btn"
             @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
-            <div
-              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
-            >
+            <template #icon-left>
               <OSwitch
                 v-model="searchObj.meta.sqlMode"
                 :disabled="isSqlModeDisabled"
                 size="sm"
                 @click.stop
               />
-            </div>
+            </template>
             {{ t("search.sqlModeLabel") }}
           </ODropdownItem>
 
@@ -447,16 +443,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-quick-mode-toggle-btn"
             @select.prevent="handleQuickMode"
           >
-            <div
-              class="tw:w-7 tw:flex tw:items-center tw:mr-3"
-            >
+            <template #icon-left>
               <OSwitch
                 :model-value="searchObj.meta.quickMode"
                 size="sm"
                 data-test="logs-search-bar-quick-mode-toggle"
                 @click.stop="handleQuickMode"
               />
-            </div>
+            </template>
             {{ t("search.quickModeLabel") }}
           </ODropdownItem>
 
@@ -469,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="openSavedViewsList"
           >
             <template #icon-left>
-              <OIcon name="saved-search" size="xs" />
+              <OIcon name="saved-search" size="sm" />
             </template>
             {{ t("search.listSavedViews") }}
           </ODropdownItem>
@@ -480,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="fnSavedView"
           >
             <template #icon-left>
-              <OIcon name="add-circle-outline" size="xs" />
+              <OIcon name="add-circle-outline" size="sm" />
             </template>
             {{ t("search.createSavedView") }}
           </ODropdownItem>
@@ -494,22 +488,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="resetFilters"
           >
             <template #icon-left>
-              <OIcon name="restart-alt" size="xs" />
+              <OIcon name="restart-alt" size="sm" />
             </template>
             {{ t("search.resetFilters") }}
           </ODropdownItem>
 
           <ODropdownSeparator v-if="shouldMoveSavedViewToMenu" />
 
-          <!-- Syntax Guide (inline component) -->
-          <div class="tw:p-2 syntax-guide-menu-item">
+          <!-- Syntax Guide -->
+          <ODropdownItem @select.prevent>
             <syntax-guide
               data-test="logs-search-bar-sql-mode-toggle-btn"
               :sqlmode="searchObj.meta.sqlMode"
               no-border
               :label="t('search.syntaxGuideLabel')"
             />
-          </div>
+          </ODropdownItem>
         </ODropdown>
       </div>
 

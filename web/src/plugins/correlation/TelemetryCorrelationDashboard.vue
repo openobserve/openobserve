@@ -616,12 +616,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="activeTab == 'metrics'"
-        class="tw:h-full tw:flex tw:flex-col metrics-correlation-dashboard"
+        class="tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:min-h-0 metrics-correlation-dashboard"
       >
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
         <OSplitter
           v-model="splitterModel"
-          class="tw:flex-1 full-height tw:w-full"
+          class="tw:flex-1 tw:min-h-0 full-height tw:w-full"
         >
           <!-- -- Left sidebar -- -->
           <template #before>
@@ -3117,7 +3117,7 @@ body.body--dark {
   }
 
   .metric-group-header {
-    background: rgba(255, 255, 255, 0.06) !important;
+    background: #202223 !important;
     border-bottom-color: rgba(255, 255, 255, 0.1);
   }
 

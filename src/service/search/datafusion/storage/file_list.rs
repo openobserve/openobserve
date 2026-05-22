@@ -23,7 +23,16 @@ use parking_lot::RwLock;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
-type SegmentData = HashMap<String, Arc<BitVec>>;
+#[derive(Clone)]
+pub struct SegmentInfo {
+    pub segment_ids: Arc<BitVec>,
+    /// Parquet row group size that was in effect when the tantivy index for
+    /// this file was built. `None` for files written before this property
+    /// existed; callers should fall back to the legacy value.
+    pub row_group_size: Option<u32>,
+}
+
+type SegmentData = HashMap<String, SegmentInfo>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
 static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default::default);
@@ -58,7 +67,13 @@ pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<File
             version: None,
         });
         if let Some(bin_data) = file.segment_ids {
-            segment_data.insert(file.key, bin_data);
+            segment_data.insert(
+                file.key,
+                SegmentInfo {
+                    segment_ids: bin_data,
+                    row_group_size: file.row_group_size,
+                },
+            );
         }
     }
     FILES.write().insert(key.clone(), values);
@@ -91,7 +106,7 @@ pub fn clear(trace_id: &str) {
     drop(w);
 }
 
-pub fn get_segment_ids(file_key: &str) -> Option<Arc<BitVec>> {
+pub fn get_segment_info(file_key: &str) -> Option<SegmentInfo> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
     let r = SEGMENTS.read();
     let data = r.get(trace_id)?;
@@ -115,14 +130,14 @@ mod tests {
     }
 
     #[test]
-    fn test_get_segment_ids_nonexistent_returns_none() {
-        let result = get_segment_ids("nonexistent_trace_file_list/$$/filename.parquet");
+    fn test_get_segment_info_nonexistent_returns_none() {
+        let result = get_segment_info("nonexistent_trace_file_list/$$/filename.parquet");
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_get_segment_ids_no_separator_returns_none() {
-        let result = get_segment_ids("no-separator-here");
+    fn test_get_segment_info_no_separator_returns_none() {
+        let result = get_segment_info("no-separator-here");
         assert!(result.is_none());
     }
 }

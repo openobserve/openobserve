@@ -210,6 +210,12 @@ async fn adapt_tantivy_result(
                 num_buckets,
             )?]
         }
+        IndexOptimizeMode::SimpleMultiHistogram(..) => {
+            vec![create_multi_histogram_arrow_array(
+                &schema,
+                &result.multi_histogram(),
+            )?]
+        }
         IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
             create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
         }
@@ -218,7 +224,7 @@ async fn adapt_tantivy_result(
         }
         _ => {
             return internal_err!(
-                "Only count, histogram and topn optimize modes are supported by TantivyOptimizeExec"
+                "Only count, histogram, multi_histogram and topn optimize modes are supported by TantivyOptimizeExec"
             );
         }
     };
@@ -360,6 +366,86 @@ fn create_histogram_arrow_array(
     };
 
     Ok(vec![timestamp_array, count_array])
+}
+
+/// Creates a RecordBatch containing multi-histogram data with timestamps, breakdown values, and
+/// counts
+///
+/// Parameters:
+/// - schema: The expected schema for the result (3 fields: ts, breakdown, count)
+/// - multi_histogram: Vector of (timestamp, breakdown_value, count) tuples
+fn create_multi_histogram_arrow_array(
+    schema: &SchemaRef,
+    multi_histogram: &[(i64, String, u64)],
+) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+    // Validate schema has 3 fields
+    if schema.fields().len() != 3 {
+        return Err(DataFusionError::Internal(format!(
+            "Expected schema with 3 fields for multi-histogram, got {}",
+            schema.fields().len()
+        )));
+    }
+
+    let timestamp_field = &schema.fields()[0];
+    let breakdown_field = &schema.fields()[1];
+    let count_field = &schema.fields()[2];
+
+    let total_rows = multi_histogram.len();
+    let mut timestamp_values = Vec::with_capacity(total_rows);
+    let mut breakdown_values = Vec::with_capacity(total_rows);
+    let mut count_values = Vec::with_capacity(total_rows);
+
+    for &(ts, ref breakdown, count) in multi_histogram {
+        timestamp_values.push(ts);
+        breakdown_values.push(breakdown.clone());
+        count_values.push(count as i64);
+    }
+
+    // Create timestamp array
+    let timestamp_array = match timestamp_field.data_type() {
+        arrow_schema::DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, _) => {
+            Arc::new(TimestampMicrosecondArray::from(timestamp_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::Timestamp(arrow_schema::TimeUnit::Nanosecond, _) => {
+            let nano_values = timestamp_values
+                .iter()
+                .map(|&ts| {
+                    ts.checked_mul(1000).ok_or_else(|| {
+                        DataFusionError::Internal(
+                            "Timestamp conversion to nanoseconds would overflow".to_string(),
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, DataFusionError>>()?;
+            Arc::new(TimestampNanosecondArray::from(nano_values)) as Arc<dyn Array>
+        }
+        _ => {
+            return Err(DataFusionError::Internal(format!(
+                "Unexpected timestamp type in multi-histogram schema: {:?}",
+                timestamp_field.data_type()
+            )));
+        }
+    };
+
+    // Create breakdown array using the existing helper
+    let breakdown_array = create_field_array(breakdown_field, breakdown_values)?;
+
+    // Create count array
+    let count_array = match count_field.data_type() {
+        arrow_schema::DataType::Int64 => Arc::new(Int64Array::from(count_values)) as Arc<dyn Array>,
+        arrow_schema::DataType::UInt64 => {
+            let u64_values = count_values.iter().map(|&c| c as u64).collect::<Vec<_>>();
+            Arc::new(UInt64Array::from(u64_values)) as Arc<dyn Array>
+        }
+        _ => {
+            return Err(DataFusionError::Internal(format!(
+                "Unexpected count type in multi-histogram schema: {:?}",
+                count_field.data_type()
+            )));
+        }
+    };
+
+    Ok(vec![timestamp_array, breakdown_array, count_array])
 }
 
 fn create_top_n_arrow_array(
@@ -985,6 +1071,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1027,6 +1114,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 2,
@@ -1035,6 +1123,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 3,
@@ -1043,6 +1132,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 4,
@@ -1051,6 +1141,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 5,
@@ -1059,6 +1150,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
             FileKey {
                 id: 6,
@@ -1067,6 +1159,7 @@ mod tests {
                 meta: FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
+                row_group_size: None,
             },
         ];
         let index_condition = None;
@@ -1115,6 +1208,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1156,6 +1250,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
@@ -1198,6 +1293,7 @@ mod tests {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }];
         let index_condition = None;
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;

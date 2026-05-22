@@ -83,28 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Source Maps List -->
     <div class="source-maps-list tw:flex-1 tw:min-h-0">
-      <!-- Loading State -->
-      <template v-if="isLoading">
-        <div class="tw:p-4 tw:flex tw:items-center tw:justify-center tw:text-center">
-          <div>
-            <OSpinner
-              size="md"
-              class="tw:mx-auto tw:block"
-              data-test="source-maps-loading-indicator"
-            />
-            <div class="tw:text-center tw:w-full tw:mt-3">
-              Loading source maps...
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Source Maps Table -->
-      <template v-else>
+      <!-- Source Maps Table (OTable handles loading skeleton) -->
         <OTable
           :data="groupedSourceMaps"
           :columns="columns"
           row-key="id"
+          :loading="isLoading"
           pagination="client"
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
@@ -169,7 +153,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
-      </template>
     </div>
 
     <!-- Delete Confirmation Dialog -->
@@ -197,7 +180,6 @@ import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -369,7 +351,7 @@ const columns: OTableColumnDef[] = [
     id: "actions",
     header: "Actions",
     accessorKey: "actions",
-    meta: { align: "center" },
+    meta: { align: "center", actionCount: 1 },
     isAction: true,
     size: 80,
   },

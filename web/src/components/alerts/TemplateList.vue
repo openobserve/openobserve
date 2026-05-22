@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="visibleRows"
         :columns="columns"
         row-key="name"
+        :loading="loading"
         :selected-ids="selectedTemplateIds"
         selection="multiple"
         pagination="client"
@@ -208,7 +209,7 @@ const columns: OTableColumnDef[] = [
     isAction: true,
     pinned: "right",
     size: 120,
-    meta: { align: "center" },
+    meta: { align: "center", actionCount: 3 },
   },
 ];
 const showTemplateEditor = ref(false);
@@ -249,12 +250,14 @@ watch(
   },
 );
 
+const loading = ref(false);
 const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading templates...",
   });
 
+  loading.value = true;
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -279,6 +282,7 @@ const getTemplates = () => {
     })
     .finally(() => {
       dismiss();
+      loading.value = false;
     });
 };
 const updateRoute = () => {

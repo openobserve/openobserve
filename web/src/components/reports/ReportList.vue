@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="visibleRows"
                 :columns="columns"
                 row-key="report_id"
+                :loading="isLoadingReports"
                 pagination="client"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
@@ -374,7 +375,7 @@ const columns = computed<OTableColumnDef[]>(() => {
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, size: 150, meta: { align: "center" } },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, size: 300, meta: { align: "center" } },
     { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, size: 220, meta: { align: "left" } },
-    { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column" } },
+    { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
 
   if (searchAcrossFolders.value && searchQuery.value !== "") {
@@ -417,7 +418,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       store.state.selectedOrganization.identifier,
       folder,
       undefined,
-      isCache || undefined,
+      isCache,
       nameQuery || undefined,
     );
 

@@ -138,6 +138,9 @@ pub async fn get_trace_dag(
                     org_id: org_id.clone(),
                     bypass_check: false,
                     parent_id: "".to_string(),
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: true,
                 },
                 user.role,
                 user.is_external,
@@ -176,10 +179,28 @@ pub async fn get_trace_dag(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    // Check whether reference_parent_span_id exists in the stream schema.
+    // If missing, omit it from the SELECT to avoid query errors; the DAG
+    // will still show all spans but without parent-child edges.
+    let has_ref_parent_id = infra::schema::get_stream_schema_from_cache(
+        org_id.as_str(),
+        stream_name.as_str(),
+        StreamType::Traces,
+    )
+    .await
+    .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+    .unwrap_or(true);
+
+    let ref_parent_col = if has_ref_parent_id {
+        "reference_parent_span_id, "
+    } else {
+        ""
+    };
+
     // Query all spans for this trace_id
     let query_sql = format!(
         "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         reference_parent_span_id, start_time, end_time, gen_ai_operation_name \
+         {ref_parent_col}start_time, end_time, gen_ai_operation_name \
          FROM {stream_name} \
          WHERE trace_id = '{trace_id}'"
     );

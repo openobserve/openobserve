@@ -594,14 +594,25 @@ body.body--dark [data-destructive-icon="true"]:hover {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 13. Misc Utilities
+// 13. Table Footer Title
+// ═══════════════════════════════════════════════════════════════
+// Count label shown at the bottom-left of every listing table
+// e.g. "107 Incidents", "62 Alerts", "20 Dashboards".
+.o2-table-footer-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1rem;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 14. Misc Utilities
 // ═══════════════════════════════════════════════════════════════
 .no-data-image {
   color: var(--o2-primary-btn-bg);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 14. Print Overrides
+// 15. Print Overrides
 // ═══════════════════════════════════════════════════════════════
 @media print {
   .tw\:h-full,

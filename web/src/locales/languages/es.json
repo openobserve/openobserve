@@ -858,7 +858,12 @@
     "groups": "Grupos",
     "customRole": "Funciones personalizadas",
     "description": "Descripción",
-    "revoke_invite": "Revocar invitación"
+    "revoke_invite": "Revocar invitación",
+    "authType": "Autenticación",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "No hay roles personalizados definidos: cree uno en IAM → Roles",
+    "externalUserCustomRoleHint": "Los usuarios externos solo se pueden modificar a través del sistema fuente"
   },
   "ticket": {
     "header": "Tickets de soporte",
@@ -2620,6 +2625,7 @@
     "serviceAccounts": "Cuentas de servicio",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
     "basicUsers": "Usuarios",
+    "organizationMembers": "Miembros de la Organización",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",

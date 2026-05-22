@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="rows"
       :columns="columns"
       row-key="trace_id"
+      :loading="loadingState"
       :selected-ids="selectedRowIds"
       selection="multiple"
       pagination="client"
@@ -32,11 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <div v-if="!loadingState" class="tw:text-center tw:w-full full-height">
+        <div class="tw:text-center tw:w-full full-height">
           <NoData />
-        </div>
-        <div v-else class="tw:text-center tw:w-full full-height tw:mt-4">
-          <OSpinner size="md" />
         </div>
       </template>
       <template #cell-actions="{ row }">
@@ -203,7 +201,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2 },
       },
     ];
 

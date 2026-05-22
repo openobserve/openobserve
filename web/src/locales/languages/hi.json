@@ -2229,6 +2229,7 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
+    "organizationMembers": "संगठन के सदस्य",
     "invitations": "Invitations",
     "quota": "Quotas",
     "externalUserWarningTitle": "External user warning",

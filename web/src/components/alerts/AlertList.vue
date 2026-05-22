@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="filteredResults || []"
                 :columns="columns"
                 row-key="alert_id"
+                :loading="loading"
                 pagination="client"
                 :page-size="pageSize"
                 :page-size-options="pageSizeOptions"
@@ -769,6 +770,7 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+    const loading = ref(false);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -1114,7 +1116,7 @@ export default defineComponent({
           isAction: true,
           sortable: false,
           size: 150,
-          meta: { align: "center", cellClass: "actions-column" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
@@ -1272,6 +1274,7 @@ export default defineComponent({
       if (query) {
         folderId = "";
       }
+      loading.value = true;
       try {
         const res = await alertsService.listByFolderId(
           1,
@@ -1399,6 +1402,8 @@ export default defineComponent({
           message: "Error while pulling alerts.",
           timeout: 2000,
         });
+      } finally {
+        loading.value = false;
       }
     };
     const getAlertById = async (id: string) => {
@@ -1722,6 +1727,7 @@ export default defineComponent({
               stream_type: toBeClonestreamType.value,
               stream_name: toBeClonestreamName.value,
             },
+            folderIdToBeCloned.value,
           );
           dismiss();
           toast({
@@ -2691,6 +2697,7 @@ export default defineComponent({
       indexOptions,
       streams,
       isFetchingStreams,
+      loading,
       isSubmitting,
       filterQuery,
       getImageURL,
@@ -2897,28 +2904,4 @@ export default defineComponent({
   min-width: 0 !important;
 }
 
-.alert-search-input {
-  :deep(.q-field__control) {
-    padding: 0 2px !important;
-  }
-
-  :deep(.q-field__prepend) {
-    padding-left: 2px !important;
-    padding-right: 0 !important;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-}
-
-.all-folders-toggle {
-  :deep(.q-toggle__inner) {
-    height: 1.1em !important;
-  }
-  :deep(.q-toggle__label) {
-    margin-top: 2px !important;
-  }
-}
 </style>

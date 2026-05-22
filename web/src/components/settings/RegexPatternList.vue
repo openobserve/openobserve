@@ -233,7 +233,7 @@ export default defineComponent({
         header: t("regex_patterns.actions"),
         isAction: true,
         pinned: "right",
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 3 },
       },
     ];
 

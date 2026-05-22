@@ -49,14 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading && models.length === 0" class="tw:text-center tw:p-6">
-      <OSpinner size="lg" />
-      <div class="tw:mt-3">{{ t("modelPricing.loadingModels") }}</div>
-    </div>
-
     <!-- Error State -->
-    <div v-else-if="error" class="tw:text-center tw:p-6">
+    <div v-if="error" class="tw:text-center tw:p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
       <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
       <span class="tw:mt-2">
@@ -71,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="filteredModels"
         :columns="columns"
         row-key="name"
+        :loading="loading"
         pagination="none"
         :bordered="false"
         selection="multiple"
