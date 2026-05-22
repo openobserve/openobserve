@@ -375,7 +375,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.locator('#date-time-menu').waitFor({ state: "visible", timeout: 5000 });
 
     // Step 5: Click outside to close
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Step 6: Click picker again and select time
@@ -610,7 +610,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result1.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 9: Change Panel A time to "Last 1d"
@@ -629,7 +629,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result2.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 12: Test global variable uses global time (not panel time)
@@ -647,7 +647,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result3.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 14: Change global time to verify global variable tracks it

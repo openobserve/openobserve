@@ -31,12 +31,11 @@ export class PipelinesEP {
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
-        // Stream picker is OSelect (Reka Listbox) post-migration; legacy q-select
-        // uses .q-menu.scroll. Match both so the helper works during the migration.
-        this.quasarMenuScroll = '.q-menu.scroll';
-        this.quasarMenuItem = '.q-menu .q-item';
-        this.quasarVirtualScrollContent = '.q-menu.scroll .q-virtual-scroll__content';
-        this.notifyContainer = '#q-notify';
+        // Stream picker is OSelect (Reka Listbox) post-migration.
+        this.quasarMenuScroll = '[data-test$="-popover"], [role="listbox"]';
+        this.quasarMenuItem = '[data-test$="-option"]';
+        this.quasarVirtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
+        this.notifyContainer = '[role="alert"]';
         this.monacoViewLines = '.view-lines';
     }
 

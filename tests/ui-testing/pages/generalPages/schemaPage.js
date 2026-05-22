@@ -312,8 +312,8 @@ class SchemaPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
 
-        // Close the dropdown by pressing Escape or clicking outside
-        await this.page.keyboard.press('Escape');
+        // Close the dropdown by clicking outside
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.schemaLocators.logSearchIndexFieldsTable).getByTitle('_timestamp').click();

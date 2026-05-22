@@ -72,7 +72,7 @@ test.describe("dashboard UI testcases", () => {
     await page.getByRole('checkbox', { name: 'Render Data as JSON / Array' }).click();
 
     // Close the field options popover so it doesn't block Apply
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Set date-time and timezone for table chart
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
@@ -154,7 +154,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Non-timestamp checkbox is visible and toggleable in custom mode');
 
     // Close the popup
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -211,7 +211,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('JSON/Array checkbox is visible and toggleable in custom mode');
 
     // Close the popup
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -257,12 +257,12 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.chartTypeSelector.openFieldPropertyPopup("x_axis_1", "x");
     await pm.chartTypeSelector.toggleShowFieldAsJson();
 
-    // Close the popup before applying. The popup is a q-menu portaled outside the
-    // axis-item button, so Escape must dismiss it before clicking Apply — otherwise
+    // Close the popup before applying. The popup is an ODropdown portaled outside the
+    // axis-item button; click outside to dismiss it before clicking Apply — otherwise
     // CI runs occasionally see Apply intercepted by the still-mounted menu.
     // Wait for the JSON-toggle checkbox (which only renders inside the open popup)
     // to detach before continuing, so the menu is guaranteed gone.
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page
       .locator('[data-test="dynamic-function-popup-show-field-as-json"]')
       .waitFor({ state: 'hidden', timeout: 5000 })
@@ -331,7 +331,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Build/Raw tabs hidden, checkboxes visible in custom mode');
 
     // Close the popup
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -399,7 +399,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     testLogger.info('Both checkboxes enabled simultaneously in custom mode');
 
     // Close the popup
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Save and cleanup
     await pm.dashboardPanelActions.addPanelName(panelName);

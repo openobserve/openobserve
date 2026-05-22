@@ -24,7 +24,7 @@ const QUASAR = {
 
   // Menu/Dropdown components
   MENU: '[data-test$="-popover"]',
-  MENU_ITEM: '.q-item',
+  MENU_ITEM: '[data-test$="-option"]',
 
   // Form components
   CHECKBOX: '.q-checkbox',
@@ -35,8 +35,8 @@ const QUASAR = {
   SPINNER: '[data-test*="loading-indicator"]',
   LINEAR_PROGRESS: '[data-test*="loading-indicator"]',
 
-  // Chip/Badge components
-  CHIP: '.q-chip',
+  // Chip/Badge components — OBadge replaces q-chip; use data-test or aria where available
+  CHIP: '[data-test*="chip"], [data-test*="badge"]',
 
   // Tooltip
   TOOLTIP: '.q-tooltip',

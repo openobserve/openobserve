@@ -14,7 +14,7 @@ export class IngestionConfigPage {
         this.contentText = '[data-test="rum-content-text"]';
 
         // Notification selector
-        this.notification = '.q-notification__message';
+        this.notification = '[role="alert"]';
 
         // Route tab selector (for search filtering)
         this.routeTab = '.q-route-tab';

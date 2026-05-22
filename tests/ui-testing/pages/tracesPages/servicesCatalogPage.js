@@ -83,7 +83,7 @@ export class ServicesCatalogPage {
     await option.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     await option.click().catch(() => {});
     // Dismiss the dropdown to prevent portal interference with subsequent clicks
-    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
     await this.page.waitForTimeout(300);
   }
 

@@ -120,8 +120,8 @@ export class MetricsPage {
     }
 
     async openDatePicker() {
-        // Close any open menus/modals first by pressing Escape
-        await this.page.keyboard.press('Escape');
+        // Close any open menus/modals first
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         // Wait for any overlays to disappear
@@ -214,7 +214,7 @@ export class MetricsPage {
         let streamOption = this.page.getByRole('option', { name: streamName });
         if (await streamOption.count() === 0) {
             // Try alternative selector
-            streamOption = this.page.locator(`.q-item:has-text("${streamName}")`);
+            streamOption = this.page.getByRole('option', { name: streamName });
         }
 
         if (await streamOption.count() > 0) {
@@ -247,7 +247,7 @@ export class MetricsPage {
         }
 
         // Step 2: Try to click on the metric in the filtered list
-        const metricItem = this.page.locator('.q-item, [class*="field-item"], [class*="metric-item"], [class*="stream-item"]')
+        const metricItem = this.page.locator('[role="option"], [class*="field-item"], [class*="metric-item"], [class*="stream-item"]')
             .filter({ hasText: new RegExp(`^${metricName}$|^${metricName}\\s`, 'i') }).first();
 
         if (await metricItem.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -263,7 +263,7 @@ export class MetricsPage {
             await this.page.waitForTimeout(500);
 
             // Search within dropdown if search input exists
-            const dropdownSearch = this.page.locator('.q-menu input[type="text"]').first();
+            const dropdownSearch = this.page.locator('[role="listbox"] input[type="text"], [role="combobox"] input[type="text"]').first();
             if (await dropdownSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
                 await dropdownSearch.fill(metricName);
                 await this.page.waitForTimeout(500);
@@ -281,7 +281,7 @@ export class MetricsPage {
             }
 
             // Close dropdown if metric not found
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
 
         // Step 4: If all else fails, just return false - the executeQuery will still work
@@ -308,7 +308,7 @@ export class MetricsPage {
         const options = await this.page.locator('[data-test$="-option"]').allTextContents();
 
         // Close dropdown
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
         return options.filter(o => o.trim() !== '');
     }
@@ -318,7 +318,7 @@ export class MetricsPage {
         await this.page.waitForTimeout(500);
 
         // Try to find and click the time range option
-        const rangeOption = this.page.locator(`.q-item:has-text("${range}"), button:has-text("${range}")`).first();
+        const rangeOption = this.page.locator(`[role="option"]:has-text("${range}"), button:has-text("${range}")`).first();
 
         if (await rangeOption.count() > 0) {
             await rangeOption.click();
@@ -326,7 +326,7 @@ export class MetricsPage {
         }
 
         // Close date picker if option not found
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false;
     }
 
@@ -350,7 +350,7 @@ export class MetricsPage {
             }
         }
 
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false;
     }
 
@@ -483,7 +483,7 @@ export class MetricsPage {
 
     async expectQueryError() {
         // Check for query error indicators
-        const errorIndicator = this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+        const errorIndicator = this.page.locator('[role="alert"][class*="negative"], [role="alert"][class*="error"], .error-message, [class*="error"]').first();
         return await errorIndicator.isVisible().catch(() => false);
     }
 
@@ -772,7 +772,7 @@ export class MetricsPage {
         if (await last15Min.isVisible({ timeout: 3000 }).catch(() => false)) {
           await last15Min.click();
         } else {
-          await this.page.keyboard.press('Escape');
+          await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
         await this.page.waitForTimeout(500);
     }
@@ -1002,7 +1002,7 @@ export class MetricsPage {
         }
 
         // Fallback: Try generic button text matching
-        const rangeOption = this.page.locator(`.q-item:has-text("${range}"), button:has-text("${range}")`).first();
+        const rangeOption = this.page.locator(`[role="option"]:has-text("${range}"), button:has-text("${range}")`).first();
         if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await rangeOption.click();
             return true;
@@ -1016,19 +1016,19 @@ export class MetricsPage {
         }
 
         // Close the date picker if nothing found
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false;
     }
 
     // ===== NOTIFICATION METHODS =====
 
     async isErrorNotificationVisible() {
-        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        const errorNotification = this.page.locator('[role="alert"]:has-text("Error")');
         return await errorNotification.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     async getErrorNotificationText() {
-        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        const errorNotification = this.page.locator('[role="alert"]:has-text("Error")');
         if (await errorNotification.isVisible({ timeout: 3000 }).catch(() => false)) {
             return await errorNotification.textContent();
         }
@@ -1098,7 +1098,7 @@ export class MetricsPage {
     }
 
     async getChartTypeOption(chartType) {
-        return this.page.locator(`.q-item:has-text("${chartType}")`).first();
+        return this.page.locator(`[data-test$="-option"]:has-text("${chartType}")`).or(this.page.getByRole('option', { name: chartType })).first();
     }
 
     async selectChartTypeOption(chartType) {
@@ -1405,7 +1405,7 @@ export class MetricsPage {
     }
 
     async getDatePickerDropdown() {
-        return this.page.locator('.date-time-picker-dropdown, .q-menu');
+        return this.page.locator('.date-time-picker-dropdown, [data-test$="-popover"], [role="listbox"]');
     }
 
     async getCollapsibleToggle() {
@@ -1415,7 +1415,7 @@ export class MetricsPage {
             '[class*="collapse-btn"]',
             '[class*="toggle-btn"]',
             'button[aria-expanded]',
-            '.q-expansion-item__toggle',
+            '[data-reka-accordion-trigger], [data-test*="expansion-toggle"]',
             '.collapsible-header',
             '[data-test*="collapse"]',
             '[data-test*="expand"]',
@@ -1440,7 +1440,7 @@ export class MetricsPage {
             '.fields-panel',
             '.sidebar-panel',
             '.collapsible-content',
-            '.q-expansion-item__content',
+            '[data-reka-accordion-content], [data-test*="expansion-content"]',
             '[class*="panel-content"]'
         ];
 
@@ -1487,11 +1487,11 @@ export class MetricsPage {
     }
 
     async getDashboardModal() {
-        return this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: 'Dashboard' });
+        return this.page.locator('[data-test*="dialog"], [role="dialog"]').filter({ hasText: 'Dashboard' });
     }
 
     async getErrorIndicator() {
-        return this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+        return this.page.locator('[role="alert"][class*="negative"], [role="alert"][class*="error"], .error-message, [class*="error"]').first();
     }
 
     async getNoDataIndicator() {
@@ -1533,7 +1533,7 @@ export class MetricsPage {
             '[data-test="metrics-field-list-collapsed-icon"]',
             '[aria-expanded="false"]',
             '.collapsed',
-            '.q-expansion-item:not(.q-expansion-item--expanded)',
+            '[data-reka-accordion-item]:not([data-state="open"]), [aria-expanded="false"]',
             '[class*="toggle"]:not(.expanded)'
         ];
 
@@ -1739,11 +1739,11 @@ export class MetricsPage {
 
     // Error notification methods
     async getErrorNotificationMessage() {
-        return this.page.locator('.q-notification__message:has-text("Error")');
+        return this.page.locator('[role="alert"]:has-text("Error")');
     }
 
     async expectNoErrorNotification() {
-        await expect(this.page.locator('.q-notification__message:has-text("Error")')).not.toBeVisible();
+        await expect(this.page.locator('[role="alert"]:has-text("Error")')).not.toBeVisible();
     }
 
     async hasErrorIndicator() {
@@ -1751,9 +1751,8 @@ export class MetricsPage {
         // Focus on Quasar notifications and explicit error messages
         // Only check for actual error notifications that indicate a query failure
         const errorSelectors = [
-            '.q-notification--negative',           // Quasar negative notification
-            '.q-notification.bg-negative',         // Quasar notification with negative background
-            '.q-banner--negative',                 // Quasar negative banner
+            '[role="alert"][class*="negative"]',   // Reka UI negative notification
+            '[role="alert"][class*="error"]',       // Reka UI error notification
             '[data-test="error-message"]',         // Explicit error message data-test
             '.error-notification',                 // Explicit error notification class
             '[data-test="dashboard-error"]'          // Inline error list (DashboardErrors)
@@ -1766,8 +1765,8 @@ export class MetricsPage {
             }
         }
 
-        // Also check for notification messages containing error text (more specific check)
-        const notificationMessage = this.page.locator('.q-notification__message').first();
+        // Also check for alert notifications containing error text
+        const notificationMessage = this.page.locator('[role="alert"]').first();
         if (await notificationMessage.isVisible({ timeout: 500 }).catch(() => false)) {
             const text = await notificationMessage.textContent().catch(() => '');
             const lowerText = text.toLowerCase();
@@ -1783,12 +1782,11 @@ export class MetricsPage {
         // Return the first visible error indicator
         const errorSelectors = [
             '[data-test="dashboard-error"]',
-            '.q-notification--negative',
-            '.q-notification.bg-negative',
-            '.q-banner--negative',
-            '.q-notification__message:has-text("Error")',
-            '.q-notification__message:has-text("error")',
-            '.q-notification__message:has-text("failed")',
+            '[role="alert"][class*="negative"]',
+            '[role="alert"][class*="error"]',
+            '[role="alert"]:has-text("Error")',
+            '[role="alert"]:has-text("error")',
+            '[role="alert"]:has-text("failed")',
             '[data-test="error-message"]',
             '.error-notification'
         ];
@@ -1799,7 +1797,7 @@ export class MetricsPage {
                 return element;
             }
         }
-        return this.page.locator('[data-test="dashboard-error"], .q-notification--negative, .q-notification__message').first();
+        return this.page.locator('[data-test="dashboard-error"], [role="alert"]').first();
     }
 
     // SQL mode methods

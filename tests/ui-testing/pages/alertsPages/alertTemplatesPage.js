@@ -913,7 +913,12 @@ export class AlertTemplatesPage {
                 testLogger.warn('Template in use by destination, deleting destination first', { templateName, destinationName });
 
                 // Close the error dialog
-                await this.page.keyboard.press('Escape');
+                const errDialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+                if (await errDialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await errDialogCloseBtn.click();
+                } else {
+                    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+                }
                 await this.page.waitForTimeout(500);
 
                 // Navigate to destinations and delete the destination

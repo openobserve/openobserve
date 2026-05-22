@@ -289,10 +289,9 @@ export class StreamAssociationPage {
     // Wait for dialog backdrop to disappear
     await this.page.waitForTimeout(1000);
 
-    // Wait for any dialog backdrop to be hidden
-    const backdrop = this.page.locator('.q-dialog__backdrop');
-    await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
-      testLogger.info('Dialog backdrop already hidden or not found');
+    // Wait for any dialog to be hidden
+    await this.page.locator('[role="dialog"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
+      testLogger.info('Dialog already hidden or not found');
     });
 
     testLogger.info('Pattern dialog closed successfully');

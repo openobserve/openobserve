@@ -70,7 +70,7 @@ export default class DashboardImport {
   // Click URL import tab with retry logic
   async clickUrlImportTab() {
     const urlTab = this.page.locator('[data-test="tab-import_json_url"]');
-    const urlInput = this.page.getByLabel("Add your url");
+    const urlInput = this.page.locator('[data-test="dashboard-import-url-input"] input');
     await urlTab.waitFor({ state: "visible", timeout: 30000 });
 
     let retries = 5;

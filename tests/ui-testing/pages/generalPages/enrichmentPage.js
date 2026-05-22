@@ -8,7 +8,7 @@ class EnrichmentPage {
         
         // File upload and enrichment table locators
         this.fileInput = 'input[type="file"]';
-        this.fileNameInput = '.q-input > .q-field__inner > .q-field__control';
+        this.fileNameInput = '[data-test="enrichment-table-name-input"] input';
         this.saveButton = 'Save';
         this.searchEnrichmentTable = 'Search Enrichment Table';
         this.exploreButton = 'Explore';
@@ -50,8 +50,8 @@ class EnrichmentPage {
         this.openApiMenuItem = 'text=/openapi/i';
 
         // URL-based enrichment table locators
-        this.sourceRadioGroup = '.q-option-group'; // Source selector: Upload File / From URL
-        this.urlInputField = 'label:has-text("CSV File URL") + .q-field__control .q-field__native'; // URL input field
+        this.sourceRadioGroup = '[data-test="enrichment-table-source-radio-group"]'; // Source selector: Upload File / From URL // TODO: verify data-test
+        this.urlInputField = 'label:has-text("CSV File URL") + * input'; // URL input field
         this.updateModeRadioGroup = 'text=/Update Mode/i'; // Update mode selector
         this.urlListContainer = 'text=/Existing URLs/i'; // Container showing URL list with statuses
         this.addEnrichmentTableTitle = 'text=/Add Enrichment Table/i';
@@ -222,7 +222,7 @@ class EnrichmentPage {
      * @returns {import('@playwright/test').Locator} Form input locator
      */
     getFormInput() {
-        return this.page.locator('.q-field__native').first();
+        return this.page.locator('input').first();
     }
 
     // Navigation Methods
@@ -235,7 +235,7 @@ class EnrichmentPage {
         await this.page.locator(this.enrichmentTableTab).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for the enrichment tables list to be visible
-        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.getByText('Enrichment Tables', { exact: false }).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToAddEnrichmentTable() {
@@ -772,7 +772,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async verifyBackOnEnrichmentList() {
         // Verify we're back on enrichment tables list page by checking for unique element
-        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible' });
+        await this.page.getByText('Enrichment Tables', { exact: false }).first().waitFor({ state: 'visible' });
     }
 
     async searchEnrichmentTableInList(tableName) {
@@ -972,7 +972,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Creating enrichment table from URL: ${tableName}`);
 
         // Fill in table name
-        const nameInput = this.page.locator('.q-field__native').first();
+        const nameInput = this.page.locator('input').first();
         await nameInput.waitFor({ state: 'visible', timeout: 10000 });
         await nameInput.fill(tableName);
         testLogger.debug(`Table name filled: ${tableName}`);
@@ -1003,7 +1003,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Page reloaded for fresh data');
 
         // Wait for the enrichment tables list to be visible after reload
-        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.getByText('Enrichment Tables', { exact: false }).first().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.debug('Enrichment tables list visible with fresh data');
     }
 
@@ -1201,7 +1201,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         }
 
         // Scroll the dialog content to ensure all elements are visible
-        const dialogContent = this.page.locator('.q-dialog .q-card, .q-dialog__inner');
+        const dialogContent = this.page.locator('[data-test$="-dialog"], [data-test$="-drawer"]'); // TODO: verify data-test
         await dialogContent.first().evaluate(el => {
             el.scrollTop = 0;
             // Scroll down slowly to trigger any lazy loading
@@ -1266,13 +1266,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 // Try scrolling to bottom to reveal options
                 await dialogContent.first().evaluate(el => {
                     el.scrollTop = el.scrollHeight;
-                }).catch(() => {});
+                }).catch(() => {}); // TODO: verify data-test for dialog content locator above
             }
         }
 
         if (!clicked) {
             // Log visible text in the form for debugging
-            const formText = await this.page.locator('.q-dialog, .q-card').first().textContent().catch(() => 'Unable to get form text');
+            const formText = await this.page.locator('[data-test$="-dialog"], [data-test$="-drawer"]').first().textContent().catch(() => 'Unable to get form text'); // TODO: verify data-test
             testLogger.error(`Form content: ${formText}`);
 
             // Count all radio-like elements
@@ -1328,7 +1328,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Attempting to save with invalid URL: ${invalidUrl}`);
 
         // Fill name
-        const nameInput = this.page.locator('.q-field__native').first();
+        const nameInput = this.page.locator('input').first();
         await nameInput.fill(tableName);
 
         // Select "From URL"
@@ -1390,7 +1390,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async fillNameInput(name) {
         testLogger.debug(`Filling name input: ${name}`);
 
-        const nameInput = this.page.locator('.q-field__native').first();
+        const nameInput = this.page.locator('input').first();
         await nameInput.fill(name);
 
         testLogger.debug('Name input filled');
@@ -1476,7 +1476,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.reload({ waitUntil: 'domcontentloaded' });
 
         // Wait for the enrichment tables list to be visible after reload
-        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.getByText('Enrichment Tables', { exact: false }).first().waitFor({ state: 'visible', timeout: 15000 });
 
         testLogger.debug('Update mode saved and page refreshed');
     }
@@ -1530,7 +1530,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async verifyLogDetailPanelVisible() {
         testLogger.debug('Verifying log detail panel is visible');
 
-        const logDetailPanel = this.page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
+        const logDetailPanel = this.page.locator('.log-detail-container, [data-test="log-detail-json-content"]');
         await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
 
         testLogger.debug('Log detail panel verified visible');
@@ -1559,8 +1559,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await closeBtn.click();
             await detailDrawer.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         } else {
-            // Fallback for other (non-DetailTable) dialogs that still respond to Escape
-            await this.page.keyboard.press('Escape');
+            // Fallback for other dialogs — try ODialog close button then body click
+            await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+                this.page.locator('body').click({ position: { x: 10, y: 10 } })
+            );
         }
         await this.page.waitForTimeout(500);
 
@@ -1596,7 +1598,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async closeSchemaModal() {
         testLogger.debug('Closing schema modal');
 
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+            this.page.locator('body').click({ position: { x: 10, y: 10 } })
+        );
         await this.page.waitForTimeout(500);
 
         testLogger.debug('Schema modal closed');
@@ -1636,7 +1640,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         let errorFound = false;
         for (const pattern of errorPatterns) {
-            const errorLocator = this.page.locator('.q-notification__message, .q-banner, [role="alert"], .text-negative').filter({
+            const errorLocator = this.page.locator('[role="alert"], .q-banner, .text-negative').filter({
                 hasText: pattern
             });
             if (await errorLocator.first().isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -1647,7 +1651,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         if (!errorFound) {
             // Fallback: check for any notification that appeared
-            const anyNotification = this.page.locator('.q-notification');
+            const anyNotification = this.page.locator('[role="alert"]');
             await expect(anyNotification.first()).toBeVisible({ timeout: 15000 });
         }
 
@@ -1662,7 +1666,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Attempting to save with empty URL: ${tableName}`);
 
         // Fill in table name
-        const nameInput = this.page.locator('.q-field__native').first();
+        const nameInput = this.page.locator('input').first();
         await nameInput.fill(tableName);
 
         // Select URL option
@@ -1780,7 +1784,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      */
     async checkForErrorNotification() {
         testLogger.debug('Checking for error notification');
-        const errorNotification = this.page.locator('.q-notification__message, .q-banner, [role="alert"]');
+        const errorNotification = this.page.locator('[role="alert"], .q-banner');
         const hasError = await errorNotification.first().isVisible({ timeout: 5000 }).catch(() => false);
 
         if (hasError) {
@@ -1834,7 +1838,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      */
     async waitForEnrichmentTablesList(timeout = 15000) {
         testLogger.debug('Waiting for Enrichment Tables list');
-        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout });
+        await this.page.getByText('Enrichment Tables', { exact: false }).first().waitFor({ state: 'visible', timeout });
         testLogger.debug('Enrichment Tables list is visible');
     }
 
@@ -1950,7 +1954,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Verifying job failed');
 
         // Look for the failed badge (use first() to avoid strict mode violation)
-        const failedBadge = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"] .q-badge').filter({ hasText: 'failed' }).first();
+        const failedBadge = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"] [data-test*="badge"], [data-test="enrichment-table-list-url-jobs-drawer"] [data-test*="chip"]').filter({ hasText: 'failed' }).first();
         await expect(failedBadge).toBeVisible({ timeout: 10000 });
 
         testLogger.debug('Job failed status verified');
@@ -1993,7 +1997,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
         if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();
         } else {
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+                this.page.locator('body').click({ position: { x: 10, y: 10 } })
+            );
         }
 
         await this.page.waitForTimeout(500);
@@ -2075,7 +2081,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             'input[placeholder*="http"]',
             'input[aria-label*="URL"]',
             'input[aria-label*="url"]',
-            '.q-field__native[type="text"]'
+            'input[type="text"]'
         ];
 
         let inputFilled = false;
@@ -2197,8 +2203,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Getting job status from dialog');
         const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
 
-        const failedBadge = dialog.locator('.q-badge').filter({ hasText: /failed/i }).first();
-        const completedBadge = dialog.locator('.q-badge').filter({ hasText: /completed/i }).first();
+        const failedBadge = dialog.locator('[data-test*="badge"], [data-test*="chip"]').filter({ hasText: /failed/i }).first();
+        const completedBadge = dialog.locator('[data-test*="badge"], [data-test*="chip"]').filter({ hasText: /completed/i }).first();
 
         const hasFailed = await failedBadge.isVisible({ timeout: 5000 }).catch(() => false);
         const hasCompleted = await completedBadge.isVisible({ timeout: 2000 }).catch(() => false);
@@ -2230,7 +2236,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async verifyAnyJobStatusBadgeVisible() {
         testLogger.debug('Verifying any job status badge is visible');
         const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
-        const anyBadge = dialog.locator('.q-badge').first();
+        const anyBadge = dialog.locator('[data-test*="badge"], [data-test*="chip"]').first();
         await expect(anyBadge).toBeVisible({ timeout: 10000 });
         testLogger.debug('Job status badge verified visible');
     }

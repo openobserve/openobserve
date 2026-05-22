@@ -268,7 +268,7 @@ export class StreamsPage {
         }
 
         // Final attempt: look for any element containing "histogram" in its warning message
-        const anyHistogramWarning = this.page.locator('.q-notification__message, .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
+        const anyHistogramWarning = this.page.locator('[role="alert"], .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
         await expect(anyHistogramWarning).toBeVisible({ timeout: 15000 });
     }
 
@@ -492,7 +492,7 @@ export class StreamsPage {
         // Select the checkbox for deletion
         await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
         await this.page.locator('[data-test="schema-delete-button"]').click();
-        await this.page.locator('[data-test="confirm-button"]').click();
+        await this.page.locator('[data-test="o-dialog-primary-btn"]').click();
     }
 
     async expectStreamSettingsUpdatedMessage() {
@@ -834,8 +834,8 @@ export class StreamsPage {
      */
     async expectErrorToast(message) {
         testLogger.info('Verifying error toast', { message });
-        // Wait for the Quasar notification to appear with the message
-        const toastLocator = this.page.locator('.q-notification__message').filter({ hasText: message });
+        // Wait for the notification to appear with the message
+        const toastLocator = this.page.locator('[role="alert"]').filter({ hasText: message });
         await expect(toastLocator).toBeVisible({ timeout: 10000 });
     }
 

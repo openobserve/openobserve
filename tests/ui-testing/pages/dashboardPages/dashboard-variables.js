@@ -142,7 +142,7 @@ export default class DashboardVariables {
   // Usage: this function is used for select the variable value from dropdown
   // Dynamically fill input and select the same value from dropdown
   async selectValueFromVariableDropDown(label, value) {
-    const input = this.page.getByLabel(label, { exact: true });
+    const input = this.page.locator(`[data-test="variable-selector-${label}"]`);
     await input.waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for _values_stream API call when clicking on the dropdown
@@ -244,8 +244,8 @@ export default class DashboardVariables {
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
 
-    // Fill variable name
-    const nameInput = this.page.locator('[data-test="dashboard-variable-name"]');
+    // Fill variable name — data-test is on OInput wrapper div; fill targets the inner input
+    const nameInput = this.page.locator('[data-test="dashboard-variable-name"] input');
     await nameInput.waitFor({ state: "visible", timeout: 10000 });
     await nameInput.click();
     await nameInput.fill(variableName);
@@ -399,7 +399,7 @@ export default class DashboardVariables {
    * @param {string} variableName - Variable name or label
    */
   async openVariableDropdown(variableName) {
-    const variableInput = this.page.getByLabel(variableName, { exact: true });
+    const variableInput = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
     await variableInput.waitFor({ state: "visible", timeout: 10000 });
     await variableInput.click();
 

@@ -24,24 +24,7 @@ export default class DashboardFilter {
     // Wait for options to be filtered
     await this.page.waitForTimeout(500);
 
-    // First, ensure expansion items are expanded
-    const expansionItems = dropdownMenu.locator('.q-expansion-item');
-    const expansionCount = await expansionItems.count();
-
-    for (let i = 0; i < expansionCount; i++) {
-      const expansion = expansionItems.nth(i);
-      const isExpanded = await expansion.evaluate(el => el.classList.contains('q-expansion-item--expanded'));
-
-      if (!isExpanded) {
-        await expansion.click();
-        await this.page.waitForTimeout(500);
-      }
-    }
-
-    // Wait a bit more for expansion animation to complete
-    await this.page.waitForTimeout(500);
-
-    // Now find and click the field item - use getByText which is more reliable
+    // Find and click the field item - StreamFieldSelect uses OSelect with grouped options (no expansion items)
     await dropdownMenu.getByText(fieldName, { exact: true }).click();
   }
 

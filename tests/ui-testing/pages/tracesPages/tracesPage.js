@@ -211,7 +211,7 @@ export class TracesPage {
 
     // Click the dropdown — OSelect (Reka Listbox) post-migration, q-select pre.
     await streamSelectLocator.click();
-    await this.page.locator('.q-menu').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await this.page.locator('[data-test$="-option"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Type into the internal input to trigger the @filter filterStreamFn
     await streamSelectLocator.fill('');
@@ -466,7 +466,7 @@ export class TracesPage {
 
   async expectQueryError() {
     const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('.q-banner').isVisible({ timeout: 5000 }).catch(() => false) ||
+                    await this.page.locator('[role="alert"]').isVisible({ timeout: 5000 }).catch(() => false) ||
                     await this.page.locator('[class*="error"]').isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasError).toBeTruthy();
   }

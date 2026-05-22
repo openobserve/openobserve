@@ -127,18 +127,17 @@ export default class DashboardPanelTime {
     await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-    // Select the start and end days dynamically (calendar is on current month)
-    await this.page
-      .getByRole("button", { name: String(startDay) })
-      .last()
-      .click();
-    await this.page
-      .getByRole("button", { name: String(endDay) })
-      .last()
-      .click();
+    // Select the start and end days using Reka UI calendar — scope to non-disabled, non-outside-view cells
+    const visibleCell = (day) =>
+      this.page
+        .locator('[data-test="daterangecalendar-root"] [data-reka-calendar-cell-trigger]:not([data-outside-view]):not([data-disabled])')
+        .filter({ hasText: new RegExp(`^${String(day)}$`) })
+        .first();
+    await visibleCell(startDay).click();
+    await visibleCell(endDay).click();
 
-    // Press Escape to close the date picker dropdown
-    await this.page.keyboard.press('Escape');
+    // Click Apply to confirm and close the date picker
+    await dateTimeDialog.locator('[data-test="date-time-apply-btn"]').click();
     await this.page.waitForTimeout(300);
 
     // Wait for the date picker dropdown to close
@@ -169,18 +168,17 @@ export default class DashboardPanelTime {
     await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-    // Select the start and end days dynamically (calendar is on current month)
-    await this.page
-      .getByRole("button", { name: String(startDay) })
-      .last()
-      .click();
-    await this.page
-      .getByRole("button", { name: String(endDay) })
-      .last()
-      .click();
+    // Select the start and end days using Reka UI calendar — scope to non-disabled, non-outside-view cells
+    const visibleCell = (day) =>
+      this.page
+        .locator('[data-test="daterangecalendar-root"] [data-reka-calendar-cell-trigger]:not([data-outside-view]):not([data-disabled])')
+        .filter({ hasText: new RegExp(`^${String(day)}$`) })
+        .first();
+    await visibleCell(startDay).click();
+    await visibleCell(endDay).click();
 
-    // Press Escape to close the date picker dropdown
-    await this.page.keyboard.press('Escape');
+    // Click Apply to confirm and close the date picker
+    await dateTimeDialog.locator('[data-test="date-time-apply-btn"]').click();
     await this.page.waitForTimeout(300);
 
     // Wait for the date picker dropdown to close
@@ -297,15 +295,12 @@ export default class DashboardPanelTime {
    * Click the global date time picker
    */
   async clickGlobalTimePicker() {
-    // Close any open menus/tooltips by pressing Escape
-    await this.page.keyboard.press('Escape').catch(() => {});
+    // Close any open dropdowns by clicking outside
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
     await this.page.waitForTimeout(300);
 
-    // Wait for any existing dropdowns to close (.date-time-dialog wrapper still
-    // exists post-migration on the ODropdown content wrapper; .q-menu is the
-    // legacy popup covers the new ODropdown; ODropdown content carries data-test="o-dropdown-content")
+    // Wait for any existing dropdowns to close
     await this.page.locator('.date-time-dialog').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-    await this.page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
     await this.page.locator('[data-test="o-dropdown-content"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Wait for network to settle before clicking
@@ -478,7 +473,7 @@ export default class DashboardPanelTime {
    * Dismiss the currently open date time picker by pressing Escape
    */
   async dismissDateTimePicker() {
-    await this.page.keyboard.press('Escape');
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     await this.page.waitForTimeout(500);
   }
 

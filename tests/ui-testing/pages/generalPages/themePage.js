@@ -22,7 +22,7 @@ export class ThemePage {
         // Theme Cards
         this.themeCard = '.theme-card-compact';
         this.applyThemeBtn = 'button:has-text("Apply")';
-        this.appliedBadge = '.q-badge:has-text("Applied")';
+        this.appliedBadge = '[data-test*="badge"]:has-text("Applied"), [data-test*="chip"]:has-text("Applied"), .theme-applied-badge';
 
         // Custom Color Picker
         this.customColorCard = '.theme-card-compact:has-text("Custom Color")';
@@ -50,7 +50,7 @@ export class ThemePage {
         this.bodyDarkClass = 'body--dark';
 
         // Notification
-        this.notification = '.q-notification__message';
+        this.notification = '[role="alert"]';
     }
 
     // ==================== Navigation ====================

@@ -74,8 +74,8 @@ export default class ChartTypeSelector {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Close any open dropdown first
-        await this.page.keyboard.press("Escape");
+        // Close any open dropdown first — click outside (ODropdown closes on outside click)
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
 
         await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
@@ -110,7 +110,7 @@ export default class ChartTypeSelector {
           throw error;
         }
         // Close dropdown and wait for network before retry (don't reload - loses context!)
-        await this.page.keyboard.press("Escape");
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
         await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
@@ -284,7 +284,7 @@ export default class ChartTypeSelector {
   async configureYAxisFunction(alias, functionName) {
     await this.openYAxisFunctionPopup(alias);
     await this.selectFunction(functionName);
-    await this.page.keyboard.press("Escape");
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
@@ -354,7 +354,7 @@ export default class ChartTypeSelector {
     await this.openYAxisFunctionPopup(alias);
     await this.switchToRawTab();
     await this.enterRawQuery(query);
-    await this.page.keyboard.press("Escape");
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     // Wait for popup to close
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "hidden", timeout: 10000 });

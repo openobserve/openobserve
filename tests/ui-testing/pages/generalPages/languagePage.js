@@ -30,7 +30,7 @@ class LanguagePage {
     '.q-item__label', '.o-tab__label',
     '.q-field__label', '.q-card__section', '.q-toolbar__title',
     '[class*="menu"]', '[class*="nav"]', '[class*="sidebar"]',
-    '[data-test]', '.q-dialog', '.q-modal', '[data-o2-navbar]',
+    '[data-test]', '[data-test*="dialog"]', '[role="dialog"]', '.q-modal', '[data-o2-navbar]',
     '[role="tab"]', '[role="tabpanel"]', '[role="dialog"]',
   ];
 
@@ -607,7 +607,7 @@ class LanguagePage {
         const texts = await this._extractAllVisibleText();
         const analysis = this._analyzeTranslation(texts, langCode);
 
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         results.modalResults['Add Dashboard Modal'] = analysis;

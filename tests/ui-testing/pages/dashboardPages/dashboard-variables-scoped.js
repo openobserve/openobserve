@@ -843,7 +843,7 @@ export default class DashboardVariablesScoped {
    * @returns {Promise<boolean>} - Returns true if API was called successfully
    */
   async selectValueFromVariableDropDown(label, value) {
-    const input = this.page.getByLabel(label, { exact: true });
+    const input = this.page.locator(`[data-test="variable-selector-${label}"]`);
     await input.waitFor({ state: "visible", timeout: 10000 });
 
     // Monitor API call when clicking dropdown
@@ -1102,7 +1102,7 @@ export default class DashboardVariablesScoped {
     await variableRow.waitFor({ state: "visible", timeout: 5000 });
 
     // Hover over the scope chip to see the tooltip showing "Deleted Tab" or "Deleted Panel"
-    const scopeChip = variableRow.locator('.q-chip, [class*="scope"]').first();
+    const scopeChip = variableRow.locator('[data-test*="chip"], [data-test*="badge"], [class*="scope"]').first();
     await scopeChip.hover();
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
@@ -1134,7 +1134,7 @@ export default class DashboardVariablesScoped {
     const { monitorVariableAPICalls } = await import('../../playwright-tests/utils/variable-helpers.js');
 
     // Wait for variable dropdown to be visible and ready
-    const varDropdown = this.page.getByLabel(variableName, { exact: true });
+    const varDropdown = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
     await varDropdown.waitFor({ state: "visible", timeout: 10000 });
 
     // Ensure network is idle before clicking
@@ -1262,12 +1262,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
     }
 
@@ -1282,12 +1283,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
 
       if (assignedPanels.length > 0) {
@@ -1296,17 +1298,17 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
-        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
           await this.page.waitForTimeout(500);
         }
 
-        await this.page.keyboard.press('Escape');
+        // Toggle-close the panels dropdown by clicking the trigger again
+        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
         await this.page.waitForTimeout(500);
       }
     }
@@ -1439,12 +1441,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
     }
 
@@ -1459,12 +1462,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
 
       if (assignedPanels.length > 0) {
@@ -1473,17 +1477,17 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
-        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
           await this.page.waitForTimeout(500);
         }
 
-        await this.page.keyboard.press('Escape');
+        // Toggle-close the panels dropdown by clicking the trigger again
+        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
         await this.page.waitForTimeout(500);
       }
     }
@@ -1578,12 +1582,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
     }
 
@@ -1598,12 +1603,13 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[data-test="dashboard-variable-tabs-select-popover"] [data-test="dashboard-variable-tabs-select-option"]').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
 
-      await this.page.keyboard.press('Escape');
+      // Toggle-close the tabs dropdown by clicking the trigger again
+      await this.page.locator('[data-test="dashboard-variable-tabs-select"]').click();
       await this.page.waitForTimeout(300);
 
       if (assignedPanels.length > 0) {
@@ -1612,17 +1618,17 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
-        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+        await this.page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
-          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          const panelItem = this.page.locator('[data-test="dashboard-variable-panels-select-popover"] [data-test="dashboard-variable-panels-select-option"]').filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
           await this.page.waitForTimeout(500);
         }
 
-        await this.page.keyboard.press('Escape');
+        // Toggle-close the panels dropdown by clicking the trigger again
+        await this.page.locator('[data-test="dashboard-variable-panels-select"]').click();
         await this.page.waitForTimeout(500);
       }
     }
@@ -1698,9 +1704,9 @@ export default class DashboardVariablesScoped {
     await dropdown.first().waitFor({ state: "visible", timeout });
     const count = await dropdown.count();
 
-    // Close dropdown
-    await this.page.keyboard.press('Escape');
-    await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout: 3000 });
+    // Close dropdown by clicking outside
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+    await this.page.locator(SELECTORS.MENU).waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     return count;
   }

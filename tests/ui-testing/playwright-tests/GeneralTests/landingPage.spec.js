@@ -469,7 +469,7 @@ test.describe("Landing Page Test Cases", () => {
     await pm.homePage.openProfileMenu();
     await expect(pm.homePage.logoutButton).toBeVisible();
     await expect(pm.homePage.themeManager).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     testLogger.info('Profile menu verified');
 
     // ==========================================
@@ -490,7 +490,7 @@ test.describe("Landing Page Test Cases", () => {
       const text = await firstResult.textContent();
       expect(text.toLowerCase()).toContain('default');
     }
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     testLogger.info('Organization selector verified');
 
     // ==========================================

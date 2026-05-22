@@ -240,7 +240,7 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     await pageManager.pipelinesPage.selectFirstOption();
 
     // Dismiss any open dropdown overlay
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
 
     // Click search button to apply filter

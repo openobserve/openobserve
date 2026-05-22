@@ -13,6 +13,7 @@ const { safeWaitForHidden, safeWaitForNetworkIdle, safeWaitForDOMContentLoaded }
 const {
   SELECTORS,
   getVariableSelector,
+  getVariableSelectorInner,
   getEditVariableBtn,
   getTabSelector,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
@@ -594,7 +595,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Set variable value
-    const varDropdown = page.getByLabel(variableName, { exact: true });
+    const varDropdown = page.locator(getVariableSelectorInner(variableName));
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
 
     // Ensure network is idle before clicking dropdown

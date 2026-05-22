@@ -544,7 +544,7 @@ export class SanityPage {
         }
         
         // Ensure any lingering dialogs are dismissed
-        await this.page.waitHelpers.waitForElementHidden('.q-dialog', {
+        await this.page.waitHelpers.waitForElementHidden('[data-test$="-dialog"]', {
             timeout: 5000,
             description: 'success dialog to be dismissed'
         }).catch(() => {
@@ -558,7 +558,7 @@ export class SanityPage {
             // Stream creation successful
         } else {
             // Check for error notifications
-            const notifications = this.page.locator('.q-notification__message');
+            const notifications = this.page.locator('[role="alert"]');
             const notificationCount = await notifications.count();
             if (notificationCount > 0) {
                 for (let i = 0; i < notificationCount; i++) {
@@ -581,7 +581,7 @@ export class SanityPage {
         await expect(this.page.getByText(uniqueStreamName)).toBeVisible({ timeout: 10000 });
         
         // Use framework's proper wait helpers to ensure no dialogs interfere
-        await this.page.waitHelpers.waitForElementHidden('.q-dialog__backdrop', {
+        await this.page.waitHelpers.waitForElementHidden('[data-test="o-dialog-close-btn"]', {
             timeout: 5000,
             description: 'dialog backdrop to be dismissed'
         }).catch(() => {

@@ -887,7 +887,7 @@ test.describe("Cross-Linking testcases", () => {
         await firstLogRow.waitFor({ state: 'visible', timeout: 15000 });
         await firstLogRow.click();
         await page.waitForTimeout(2000);
-        await page.locator('[data-test="dialog-box"]').waitFor({ state: 'visible', timeout: 10000 });
+        await page.locator('[data-test="dashboard-confirm-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
 
         const jsonContent = page.locator('[data-test="log-detail-json-content"]');
         await jsonContent.waitFor({ state: 'visible', timeout: 5000 });

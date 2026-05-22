@@ -201,7 +201,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(500);
     // Start watching for notification before clicking - Quasar notify has 1s timeout
     const liveNotifPromise = page.waitForFunction(
-      () => document.querySelector('.q-notification__message,.q-notification,.q-banner,[role="alert"]')?.textContent?.includes('Live mode is enabled'),
+      () => document.querySelector('[role="alert"]')?.textContent?.includes('Live mode is enabled'),
       { timeout: 15000 }
     );
     await pm.logsPage.clickLiveMode5Sec();

@@ -397,7 +397,7 @@ export class HomePage {
         const selectedLangLabel = this.page.locator('.selected-lang-label');
         await selectedLangLabel.waitFor({ state: 'visible', timeout: 5000 });
         const text = await selectedLangLabel.textContent();
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return text?.trim() || '';
     }
 

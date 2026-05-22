@@ -162,11 +162,11 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    const closeIcon = page.locator('.q-file .OIcon').filter({ hasText: 'close' });
-    await closeIcon.waitFor({ state: 'visible', timeout: 5000 });
-    await closeIcon.click();
+    const removeFileBtn = page.locator('[data-test="o-file-chip-0"] button[aria-label="Remove file"]');
+    await removeFileBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await removeFileBtn.click();
 
-    await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
+    await expect(page.locator('[data-test="o-file-chip-0"]')).not.toBeVisible();
 
     await pm.dashboardImport.clickImportButton();
 

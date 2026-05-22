@@ -255,7 +255,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last (+1 more)"
     await aggDropdown.click();
     await page.getByRole("option", { name: /^Avg/i }).first().click();
-    await page.keyboard.press("Escape");
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     testLogger.info("Table aggregations: added Avg (now last + avg)");
 
     await pm.dashboardPanelActions.applyDashboardBtn();

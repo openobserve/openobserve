@@ -58,7 +58,7 @@ export class CorrelationSettingsPage {
 
         // ==================== Common Selectors ====================
         this.loadingSpinner = '[data-test="discovered-services-loading-indicator"], [data-test="discovered-services-table-loading-indicator"]';
-        this.notification = '.q-notification__message';
+        this.notification = '[role="alert"]';
     }
 
     // ==================== Test Data Setup ====================
@@ -529,9 +529,9 @@ export class CorrelationSettingsPage {
 
     async getAvailableDimensionsCount() {
         // Count items in the available dimensions list (right side)
-        const list = this.page.locator('.q-list').nth(1);
+        const list = this.page.locator('.q-list').nth(1); // TODO: verify list container selector post-Reka migration
         await list.waitFor({ state: 'visible', timeout: 10000 });
-        const items = list.locator('.q-item');
+        const items = list.locator('[role="option"], [data-test$="-item"]'); // TODO: verify data-test for dimension list items
         return await items.count();
     }
 
@@ -554,7 +554,7 @@ export class CorrelationSettingsPage {
     }
 
     async expectPositiveNotification(timeout = 5000) {
-        const notification = this.page.locator('.q-notification--positive, .q-notification.bg-positive');
+        const notification = this.page.locator('[role="alert"][class*="bg-positive"], [role="alert"].bg-positive');
         await expect(notification).toBeVisible({ timeout });
     }
 
@@ -590,7 +590,7 @@ export class CorrelationSettingsPage {
 
     async expectAlertCorrelationSaveSuccess() {
         // Wait for positive notification about saved settings
-        const notification = this.page.locator('.q-notification__message');
+        const notification = this.page.locator('[role="alert"]');
         await expect(notification).toBeVisible({ timeout: 10000 });
         const text = await notification.textContent();
         return text?.toLowerCase().includes('saved') || text?.toLowerCase().includes('success');
@@ -610,7 +610,7 @@ export class CorrelationSettingsPage {
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
-        const item = rightList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = rightList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await item.click();
         // Wait for button to become enabled
         await this.page.waitForTimeout(300);
@@ -628,7 +628,7 @@ export class CorrelationSettingsPage {
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await item.click();
         // Wait for button to become enabled
         await this.page.waitForTimeout(300);
@@ -646,7 +646,7 @@ export class CorrelationSettingsPage {
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         // Exclude empty state items (the "No dimensions configured" message)
-        const items = leftList.locator('.q-item:not(:has-text("No"))');
+        const items = leftList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))'); // TODO: verify data-test
         return await items.count();
     }
 
@@ -659,7 +659,7 @@ export class CorrelationSettingsPage {
         // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).toBeVisible({ timeout: 5000 });
     }
 
@@ -672,7 +672,7 @@ export class CorrelationSettingsPage {
         // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).not.toBeVisible({ timeout: 5000 });
     }
 
@@ -732,7 +732,7 @@ export class CorrelationSettingsPage {
      * @param {string} expectedMessage - Expected error message (partial match)
      */
     async expectValidationErrorVisible(expectedMessage = null) {
-        const notification = this.page.locator('.q-notification--negative, .q-notification.bg-negative, .q-notification__message');
+        const notification = this.page.locator('[role="alert"][class*="bg-negative"], [role="alert"].bg-negative, [role="alert"]');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (expectedMessage) {
             const text = await notification.first().textContent();
@@ -798,7 +798,7 @@ export class CorrelationSettingsPage {
      * @param {string} message - Expected message content (optional)
      */
     async expectErrorNotificationVisible(message = null) {
-        const notification = this.page.locator('.q-notification--negative, .q-notification.bg-negative');
+        const notification = this.page.locator('[role="alert"][class*="bg-negative"], [role="alert"].bg-negative');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (message) {
             const text = await notification.first().textContent();
@@ -811,7 +811,7 @@ export class CorrelationSettingsPage {
      * @param {string} message - Expected message content (optional)
      */
     async expectSuccessNotificationVisible(message = null) {
-        const notification = this.page.locator('.q-notification--positive, .q-notification.bg-positive, .q-notification__message');
+        const notification = this.page.locator('[role="alert"][class*="bg-positive"], [role="alert"].bg-positive, [role="alert"]');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (message) {
             const text = await notification.first().textContent();
@@ -851,9 +851,9 @@ export class CorrelationSettingsPage {
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
-        const firstItem = rightList.locator('.q-item:not(:has-text("No"))').first();
+        const firstItem = rightList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test
         // Try to get just the label text
-        const label = firstItem.locator('.q-item__label').first();
+        const label = firstItem.getByText(/.+/).first();
         if (await label.isVisible().catch(() => false)) {
             return await label.textContent();
         }
@@ -875,9 +875,9 @@ export class CorrelationSettingsPage {
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
-        const firstItem = leftList.locator('.q-item:not(:has-text("No"))').first();
+        const firstItem = leftList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test
         // Try to get just the label text
-        const label = firstItem.locator('.q-item__label').first();
+        const label = firstItem.getByText(/.+/).first();
         if (await label.isVisible().catch(() => false)) {
             return await label.textContent();
         }

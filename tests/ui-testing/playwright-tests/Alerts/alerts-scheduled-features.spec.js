@@ -444,20 +444,20 @@ test.describe("Scheduled Alert Features", () => {
         await page.locator(pm.alertsPage.locators.runQueryButton).click();
         await page.waitForTimeout(3000);
 
-        // Close editor — force-click bypasses q-portal overlay
+        // Close editor — force-click bypasses portal overlay
         try {
             const closeButton = page.locator(pm.alertsPage.locators.alertBackButton).first();
             await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
-            await page.keyboard.press('Escape');
+            testLogger.warn('Close button force-click failed, dismissing via body click', { error: error.message });
+            await page.locator('body').click({ position: { x: 10, y: 10 } });
             await page.waitForTimeout(500);
         }
         await page.waitForTimeout(1500);
-        // Cleanup: remove any q-portal elements that intercept clicks
+        // Cleanup: remove any portal elements that intercept clicks
         await page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
-        }).catch(e => testLogger.warn('Failed to remove q-portals', { error: e.message }));
+        }).catch(e => testLogger.warn('Failed to remove portals', { error: e.message }));
         await page.waitForTimeout(500);
 
         testLogger.info('=== PHASE 3: Verify preview chart is visible ===');
@@ -503,7 +503,7 @@ test.describe("Scheduled Alert Features", () => {
     // 1. Open scheduled alert wizard (stays in "Alert Rules" tab, Custom/Builder mode)
     // 2. Set threshold operator (>=) and value (1) in the "Alert if row" FIRST
     // 3. Switch to SQL tab, enter query, and run it
-    // 4. Close SQL editor dialog, clean up q-portals
+    // 4. Close SQL editor dialog, clean up portal elements
     // 5. Check for evaluation status indicator
     // ========================================================================
     test("Would Trigger indicator displays for scheduled alerts", {
@@ -592,21 +592,21 @@ test.describe("Scheduled Alert Features", () => {
         await page.locator(pm.alertsPage.locators.runQueryButton).click();
         await page.waitForTimeout(3000);
 
-        // Close editor — force-click bypasses q-portal overlay
+        // Close editor — force-click bypasses portal overlay
         try {
             const closeButton = page.locator(pm.alertsPage.locators.alertBackButton).first();
             await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
-            await page.keyboard.press('Escape');
+            testLogger.warn('Close button force-click failed, dismissing via body click', { error: error.message });
+            await page.locator('body').click({ position: { x: 10, y: 10 } });
             await page.waitForTimeout(500);
         }
         await page.waitForTimeout(1500);
 
-        // Remove any residual q-portal elements that intercept clicks
+        // Remove any residual portal elements that intercept clicks
         await page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
-        }).catch(e => testLogger.warn('Failed to remove q-portals', { error: e.message }));
+        }).catch(e => testLogger.warn('Failed to remove portals', { error: e.message }));
         await page.waitForTimeout(500);
 
         testLogger.info('=== PHASE 4: Check for evaluation status indicator ===');

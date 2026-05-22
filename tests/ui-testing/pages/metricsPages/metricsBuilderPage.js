@@ -168,15 +168,15 @@ export class MetricsBuilderPage {
         // Click to focus and open dropdown — FieldList stream picker is OSelect
         // (Reka Listbox) post-migration; fall back to .q-menu for legacy q-select.
         await input.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Clear and type to filter
         await input.clear();
         await input.fill(metricName);
         await this.page.waitForTimeout(1000);
 
-        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
+        // Select from dropdown options (OSelect Reka Listbox)
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
             await this.page.waitForTimeout(1500);
@@ -231,7 +231,7 @@ export class MetricsBuilderPage {
     async openLabelFilterMenu(index) {
         const filterBtn = this.getLabelFilterButton(index);
         await filterBtn.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -243,7 +243,7 @@ export class MetricsBuilderPage {
     async selectLabel(labelName) {
         const labelDropdown = this.page.locator(this.labelSelect).last();
         await labelDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = labelDropdown.locator('input').first();
@@ -253,10 +253,10 @@ export class MetricsBuilderPage {
         }
 
         // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: labelName }).first();
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: labelName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -269,13 +269,13 @@ export class MetricsBuilderPage {
     async selectOperator(operator) {
         const operatorDropdown = this.page.locator(this.operatorSelect).last();
         await operatorDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: operator }).first();
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: operator }).first();
         if (await option.isVisible({ timeout: 3000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -288,7 +288,7 @@ export class MetricsBuilderPage {
     async selectValue(value) {
         const valueDropdown = this.page.locator(this.valueSelect).last();
         await valueDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = valueDropdown.locator('input').first();
@@ -298,10 +298,10 @@ export class MetricsBuilderPage {
         }
 
         // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: value }).first();
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: value }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -360,7 +360,7 @@ export class MetricsBuilderPage {
 
         // Close menu by pressing Escape — LabelFilterEditor chip menu = ODropdown post-migration
         await this.page.keyboard.press('Escape');
-        await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // ===== Operations =====
@@ -396,12 +396,8 @@ export class MetricsBuilderPage {
         // Structure: .q-expansion-item__content > .q-list > .q-item
         //              > .q-item__section > .q-item__label (op name, NOT caption)
         const opItem = dialog
-            .locator('.q-expansion-item__content .q-item')
-            .filter({
-                has: this.page.locator('.q-item__label').filter({
-                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
-                })
-            })
+            .locator('[data-test$="-option"], [role="option"], [data-reka-accordion-content] [role="listitem"]')
+            .filter({ hasText: new RegExp(`^\\s*${operationName}\\s*$`) })
             .first();
 
         if (await opItem.isVisible({ timeout: 3000 })) {
@@ -411,7 +407,7 @@ export class MetricsBuilderPage {
         }
 
         // Fallback: explicitly open all expansion sections, then retry
-        const expansionHeaders = dialog.locator('.q-expansion-item__container > .q-item');
+        const expansionHeaders = dialog.locator('[data-reka-accordion-trigger], [aria-expanded]');
         const headerCount = await expansionHeaders.count();
         for (let i = 0; i < headerCount; i++) {
             await expansionHeaders.nth(i).click().catch(() => {});
@@ -419,12 +415,8 @@ export class MetricsBuilderPage {
         await this.page.waitForTimeout(400);
 
         const opItemRetry = dialog
-            .locator('.q-expansion-item__content .q-item')
-            .filter({
-                has: this.page.locator('.q-item__label').filter({
-                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
-                })
-            })
+            .locator('[data-test$="-option"], [role="option"], [data-reka-accordion-content] [role="listitem"]')
+            .filter({ hasText: new RegExp(`^\\s*${operationName}\\s*$`) })
             .first();
 
         if (await opItemRetry.isVisible({ timeout: 3000 })) {
@@ -481,7 +473,7 @@ export class MetricsBuilderPage {
         // Open operation menu — OperationsList chip menu is ODropdown post-migration
         const opBtn = this.page.locator(`[data-test="promql-operation-${operationIndex}"]`);
         await opBtn.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Find and fill the parameter input
         const paramInput = this.page.locator(`[data-test="promql-operation-param-${paramIndex}"]`).last();
@@ -689,7 +681,7 @@ export class MetricsBuilderPage {
         // OSelect (Reka Listbox role=option) post-migration; q-select (.q-menu .q-item) pre.
         const rekaCount = await this.page.locator('').count();
         if (rekaCount > 0) return true;
-        const menu = this.page.locator('.q-menu:visible').filter({ has: this.page.locator('.q-item') });
+        const menu = this.page.locator('[data-test$="-popover"]').filter({ has: this.page.locator('[data-test$="-option"]') });
         const count = await menu.first().locator('.q-item').count();
         return count > 0;
     }
@@ -718,7 +710,7 @@ export class MetricsBuilderPage {
 
         await selector.click();
         // MetricSelector uses OSelect (Reka Listbox) — fall back to .q-menu legacy
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = selector.locator('input').first();
@@ -728,7 +720,7 @@ export class MetricsBuilderPage {
         }
 
         // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
             await this.page.waitForTimeout(1500);
@@ -757,7 +749,7 @@ export class MetricsBuilderPage {
         const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
         if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
 
-        const headers = dialog.locator('.q-expansion-item .q-item__label');
+        const headers = dialog.locator('[data-reka-accordion-trigger], [aria-expanded], [data-test*="category"]');
         const count = await headers.count();
         const categories = [];
         for (let i = 0; i < count; i++) {
@@ -1008,11 +1000,11 @@ export class MetricsBuilderPage {
         if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
             await folderDropdown.click();
             // SelectFolderDropDown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-            const option = this.page.locator('.q-menu .q-item').filter({ hasText: folderName }).first();
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+            const option = this.page.locator('[data-test$="-option"]').filter({ hasText: folderName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1028,7 +1020,7 @@ export class MetricsBuilderPage {
         if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
             await dashDropdown.click();
             // SelectDashboardDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
 
             // Type to filter
             const input = dashDropdown.locator('input').first();
@@ -1037,10 +1029,10 @@ export class MetricsBuilderPage {
                 await this.page.waitForTimeout(1000);
             }
 
-            const option = this.page.locator('.q-menu .q-item').filter({ hasText: dashboardName }).first();
+            const option = this.page.locator('[data-test$="-option"]').filter({ hasText: dashboardName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1077,11 +1069,11 @@ export class MetricsBuilderPage {
         // Now click the tab dropdown normally
         await tabDropdown.click();
         // SelectTabDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
+        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: tabName }).first();
         if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -1247,10 +1239,10 @@ export class MetricsBuilderPage {
             const deleteBtn = dashboardRow.locator('[data-test="dashboard-delete"]');
             if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await deleteBtn.click();
-                await this.page.locator('[data-test="confirm-button"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[data-test="o-dialog-primary-btn"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
                 // Confirm deletion
-                const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+                const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]');
                 if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await confirmBtn.click();
                     await this.page.waitForTimeout(2000);
@@ -1265,7 +1257,7 @@ export class MetricsBuilderPage {
      * Check for success notification (positive toast)
      */
     async hasSuccessNotification() {
-        const notification = this.page.locator('.q-notification--standard.bg-positive, .q-notification:has-text("success"), .q-notification:has-text("added")');
+        const notification = this.page.locator('[role="alert"]:has-text("success"), [role="alert"]:has-text("added")');
         return await notification.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -1273,7 +1265,7 @@ export class MetricsBuilderPage {
      * Check for error notification (negative toast)
      */
     async hasErrorNotification() {
-        const notification = this.page.locator('.q-notification--standard.bg-negative, .q-notification:has-text("Error"), .q-notification:has-text("error")');
+        const notification = this.page.locator('[role="alert"]:has-text("Error"), [role="alert"]:has-text("error")');
         return await notification.isVisible({ timeout: 3000 }).catch(() => false);
     }
 }

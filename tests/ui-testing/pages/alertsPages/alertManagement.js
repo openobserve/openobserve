@@ -443,9 +443,14 @@ export class AlertManagement {
             testLogger.info('Closed alert history drawer (legacy)');
             return;
         }
-        // Last resort: Escape key
-        await this.page.keyboard.press('Escape');
-        testLogger.info('Closed dialog via Escape key');
+        // Last resort: close button fallback
+        const lastResortClose = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+        if (await lastResortClose.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await lastResortClose.click();
+        } else {
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        }
+        testLogger.info('Closed dialog via close button fallback');
     }
 
     /**
@@ -537,9 +542,9 @@ export class AlertManagement {
             });
             // Try to clean up UI state, but don't fail if browser is closed
             try {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             } catch (cleanupError) {
                 // Browser may already be closed due to timeout - ignore

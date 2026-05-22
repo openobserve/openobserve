@@ -139,10 +139,10 @@ export class PipelinesPage {
         this.noteContainer = page.locator('.note-container');
         this.noteHeading = page.locator('.note-heading');
         this.noteInfo = page.locator('.note-info');
-        this.qDialog = page.locator('.q-dialog');
-        this.qDialogBackdrop = page.locator('.q-dialog__backdrop');
-        this.qNotificationMessage = page.locator('.q-notification__message');
-        this.qMenu = page.locator('.q-menu');
+        this.qDialog = page.locator('[data-test*="dialog"]');
+        this.qDialogBackdrop = page.locator('[role="dialog"]');
+        this.qNotificationMessage = page.locator('[role="alert"]');
+        this.qMenu = page.locator('[data-test$="-popover"], [role="menu"]');
 
         // Pipeline node locators
         this.pipelineNodeOutputStreamNode = page.locator('[data-test="pipeline-node-output-stream-node"]');
@@ -470,8 +470,8 @@ export class PipelinesPage {
         const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
         await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
         await optionLocator.click();
-        // Press Escape to close any open dropdown menus
-        await this.page.keyboard.press('Escape');
+        // Click away to close any open dropdown menus
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(500);
     }
 
@@ -901,7 +901,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
         
         // Ensure no dialogs are blocking the interaction
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {
             // Ignore if no backdrop exists
         });
         
@@ -1104,7 +1104,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible', timeout: 10000 });
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible', timeout: 10000 });
 
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect nodes
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -1690,7 +1690,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
         await this.page.mouse.down();
@@ -1709,7 +1709,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect input to middle node
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -2010,7 +2010,7 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {});
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {});
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     /**
@@ -2379,7 +2379,7 @@ export class PipelinesPage {
      * Bug #9498 - Preview bounds
      */
     async getPreviewBoundingBox() {
-        const preview = this.page.locator('.q-tooltip, .q-menu, .preview-popup, [class*="preview"], [class*="tooltip"]').first();
+        const preview = this.page.locator('[role="tooltip"], [role="menu"], .preview-popup, [class*="preview"], [class*="tooltip"]').first();
         if (await preview.isVisible().catch(() => false)) {
             return await preview.boundingBox();
         }
@@ -2400,7 +2400,7 @@ export class PipelinesPage {
      * Bug #10029 - Backfill
      */
     async isScheduledDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [data-test*="dialog"]');
+        const dialog = this.page.locator('[data-test*="dialog"]');
         return await dialog.isVisible().catch(() => false);
     }
 
@@ -2419,9 +2419,9 @@ export class PipelinesPage {
             await this.page.waitForTimeout(1000);
 
             // Handle confirmation dialog if it appears
-            const confirmDialog = this.page.locator('.q-dialog, [data-test*="confirm-dialog"]');
+            const confirmDialog = this.page.locator('[data-test*="confirm-dialog"], [data-test*="dialog"]');
             if (await confirmDialog.isVisible().catch(() => false)) {
-                const confirmBtn = this.page.locator('.q-dialog button:has-text("OK"), .q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm")').first();
+                const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]').first();
                 if (await confirmBtn.isVisible().catch(() => false)) {
                     await confirmBtn.click();
                     await this.page.waitForTimeout(1000);
@@ -2797,7 +2797,7 @@ export class PipelinesPage {
 
     /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
     get statusBadges() {
-        return this.page.locator('.q-badge, .status-badge, [data-test*="status"], .q-chip');
+        return this.page.locator('[data-test*="badge"], [data-test*="chip"], .status-badge, [data-test*="status"]');
     }
 
     /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
@@ -2946,7 +2946,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of jobs with status
      */
     async getJobStatusCount(status) {
-        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), .q-badge:has-text("${status}"), .status-badge:has-text("${status}")`).all();
+        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), [data-test*="badge"]:has-text("${status}"), .status-badge:has-text("${status}")`).all();
         return statusElements.length;
     }
 
@@ -2976,7 +2976,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [data-test*="error-dialog"]').first();
+        const dialog = this.page.locator('[data-test*="error-dialog"], [data-test*="dialog"]').first();
         return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2984,7 +2984,7 @@ export class PipelinesPage {
      * Close error dialog
      */
     async closeErrorDialog() {
-        const closeBtn = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog button:has-text("OK"), .q-dialog [data-test*="close"]').first();
+        const closeBtn = this.page.locator('[data-test="o-dialog-primary-btn"], [data-test*="close"]').first();
         if (await closeBtn.isVisible().catch(() => false)) {
             await closeBtn.click();
             await this.page.waitForTimeout(300);
@@ -3099,7 +3099,7 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.locator('.q-item, .q-menu .q-item').first();
+        const option = this.page.getByRole('option').first();
         if (await option.isVisible().catch(() => false)) {
             await option.click();
             await this.page.waitForTimeout(300);
@@ -3124,9 +3124,9 @@ export class PipelinesPage {
      * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
      */
     async getStatusCounts() {
-        const successCount = await this.page.locator('.q-badge:has-text("Success"), .q-badge:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
-        const errorCount = await this.page.locator('.q-badge:has-text("Error"), .q-badge:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
-        const warningCount = await this.page.locator('.q-badge:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        const successCount = await this.page.locator('[data-test*="badge"]:has-text("Success"), [data-test*="badge"]:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
+        const errorCount = await this.page.locator('[data-test*="badge"]:has-text("Error"), [data-test*="badge"]:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
+        const warningCount = await this.page.locator('[data-test*="badge"]:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
         return {
             success: successCount,
             error: errorCount,
@@ -3202,7 +3202,7 @@ export class PipelinesPage {
     async dismissOpenDialogs() {
         try {
             if (await this.qDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             }
         } catch (e) {
@@ -3274,8 +3274,8 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         const urlAfter = this.page.url();
         // Check for any error toasts/alerts on the page
-        // TODO(data-test): q-notification toasts and q-banner have no data-test; expose data-test on notify-plugin/notify component to drop these fallbacks.
-        const errorToast = await this.page.locator('.q-notification, .q-banner').allTextContents().catch(() => []);
+        // TODO(data-test): notification toasts and banners; using role="alert" which covers both Reka and legacy patterns.
+        const errorToast = await this.page.locator('[role="alert"]').allTextContents().catch(() => []);
         testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
         return pipelineName;
     }

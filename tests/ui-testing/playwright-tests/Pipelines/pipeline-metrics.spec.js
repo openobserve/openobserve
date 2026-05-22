@@ -136,12 +136,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     expect(isMetricsVisible).toBe(true);
     testLogger.info('Metrics option found in stream type dropdown');
 
-    // Close dialog by pressing Escape
-    await page.keyboard.press('Escape');
+    // Close dialog by clicking outside
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
 
     // Navigate back to pipelines list
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     testLogger.info('Test completed: Metrics stream type visibility check');
   });
@@ -393,10 +393,10 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     testLogger.info('Query generated with metrics stream name', { streamName: METRICS_STREAM });
 
     // The scheduled pipeline has a nested dialog overlay that intercepts clicks
-    // Try pressing Escape multiple times and use force click for the cancel button
-    await page.keyboard.press('Escape');
+    // Dismiss dialogs by clicking outside and use force click for the cancel button
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
 
     // Use force click to bypass the dialog overlay
@@ -456,10 +456,10 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
       testLogger.info('Second metrics stream not available, skipping stream change test');
     }
 
-    // Clean up - use force click and escape to dismiss dialogs
-    await page.keyboard.press('Escape');
+    // Clean up - dismiss dialogs by clicking outside
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
     await pageManager.pipelinesPage.clickCancelPipelineBtnForce();
 
@@ -524,7 +524,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     }
 
     // Cancel and close
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     testLogger.info('Test completed: After flattening toggle check');
   });

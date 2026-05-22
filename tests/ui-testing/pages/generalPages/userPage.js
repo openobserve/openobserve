@@ -91,7 +91,7 @@ export class UserPage {
         // getByRole('alert') alone can miss the notification when accessibility
         // tree resolution races against Quasar's notify queue + dialog portals.
         const specificAlert = this.page
-            .locator('.q-notification__message, [role="alert"]')
+            .locator('[role="alert"]')
             .filter({ hasText: expectedMessage });
         await expect(specificAlert.first()).toBeVisible({ timeout: 15000 });
     }

@@ -195,7 +195,7 @@ export class CrossLinkPage {
 
     async removeFieldChip(idx) {
         testLogger.debug('Removing field chip', { idx });
-        await this.page.locator(this.crossLinkFieldChip(idx)).locator('.q-chip__icon--remove').last().click();
+        await this.page.locator(this.crossLinkFieldChip(idx)).locator('button[aria-label^="Remove"]').last().click();
     }
 
     async clickSave() {

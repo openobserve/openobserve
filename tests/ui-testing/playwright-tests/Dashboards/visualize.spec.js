@@ -288,7 +288,7 @@ test.describe("VRL visualization support testcases", () => {
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
     // Handle discard confirmation if it appears
-    const discardConfirm = page.locator('[data-test="confirm-button"]');
+    const discardConfirm = page.locator('[data-test="o-dialog-primary-btn"]');
     if (await discardConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
       await discardConfirm.click();
     }

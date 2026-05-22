@@ -83,15 +83,15 @@ export class LogsPage {
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
-        this.savedViewByLabel = '.q-item__label';
-        this.notificationMessage = '.q-notification__message';
+        this.savedViewByLabel = '[data-test$="-option"]';
+        this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
         this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
-        this.notificationErrorMessage = '.q-notification__message:has-text("error")';
+        this.notificationErrorMessage = '[role="alert"]:has-text("error")';
         this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
@@ -101,7 +101,7 @@ export class LogsPage {
         this.saveStreamButton = '[data-test="save-stream-btn"]';
         this.streamDetail = '[title="Stream Detail"]';
         this.schemaStreamIndexSelect = ':nth-child(2) > [data-test="schema-stream-index-select"]';
-        this.fullTextSearch = '.q-virtual-scroll__content';
+        this.fullTextSearch = '[data-test$="-popover"]';
         this.schemaUpdateSettingsButton = '[data-test="schema-update-settings-button"]';
         this.colAutoButton = '.col-auto button';
         this.exploreTitle = '[title="Explore"]';
@@ -199,7 +199,7 @@ export class LogsPage {
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
         this.shareLinkTooltip = '[data-test="o-tooltip-content"]';
-        this.successNotification = '.q-notification__message';
+        this.successNotification = '[role="alert"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -209,7 +209,7 @@ export class LogsPage {
         this.expandOnFocusClass = '.expand-on-focus';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
-        this.logDetailDialogBox = '[data-test="dialog-box"]';
+        this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
         this.logDetailTitleText = '[data-test="log-detail-title-text"]';
         this.logDetailJsonTab = '[data-test="log-detail-json-tab"]';
         this.logDetailTableTab = '[data-test="log-detail-table-tab"]';
@@ -272,7 +272,7 @@ export class LogsPage {
         // Additional regression test selectors
         this.streamsSearchInputField = '[data-test="streams-search-stream-input"] input';
         // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
-        this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
+        this.errorIndicators = '[role="alert"][class*="bg-negative"], [role="alert"].bg-negative, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
 
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
@@ -306,7 +306,7 @@ export class LogsPage {
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
-        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
     }
 
@@ -428,7 +428,7 @@ export class LogsPage {
                 await defaultToggle.click({ force: true });
                 defaultSelected = true;
             } catch (e) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
                 await dropdownArrow.click({ force: true });
                 await this.page.waitForTimeout(1000);
@@ -463,7 +463,7 @@ export class LogsPage {
                 await e2eToggle.click({ force: true });
                 e2eSelected = true;
             } catch (e) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
                 await dropdownArrow.click({ force: true });
                 await this.page.waitForTimeout(1000);
@@ -713,7 +713,7 @@ export class LogsPage {
 
                 // Stream picker is OSelect (Reka Listbox) post-migration; legacy
                 // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
-                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
+                const dropdownMenu = this.page.locator('[data-test$="-popover"]').first();
 
                 // Try to click the stream toggle div directly first
                 const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
@@ -748,7 +748,7 @@ export class LogsPage {
                     }
 
                     // Try by text
-                    const streamByText = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
+                    const streamByText = this.page.locator('[data-test$="-option"]').getByText(stream, { exact: true }).first();
                     const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
 
                     if (textVisible) {
@@ -775,7 +775,7 @@ export class LogsPage {
 
                 // Stream not found in this attempt, close dropdown and retry
                 testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
 
                 if (attempt < maxRetries) {
@@ -789,7 +789,7 @@ export class LogsPage {
 
             } catch (e) {
                 testLogger.debug(`selectStream: Attempt ${attempt} failed with error: ${e.message}`);
-                await this.page.keyboard.press('Escape').catch(() => {});
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
 
                 if (attempt < maxRetries) {
                     await this.page.waitForTimeout(5000);
@@ -1278,7 +1278,7 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     async clickQuickModeToggle() {
@@ -1288,7 +1288,7 @@ export class LogsPage {
         await this.page.locator(this.quickModeToggle).click();
         // Close the utilities menu - it stays open after toggle click
         // (no v-close-popup on the quick mode item)
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
@@ -1296,9 +1296,9 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         // Click on the text label "Quick Mode" instead of the toggle switch
-        await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+        await this.page.locator(this.quickModeToggle).getByText('Quick Mode').click();
         // Close the utilities menu to match the pattern in getQuickModeState()
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     // Get the current quick mode state (true/false)
@@ -1307,7 +1307,7 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return isOn;
     }
 
@@ -1545,7 +1545,7 @@ export class LogsPage {
         // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page.waitForTimeout(500);
         const option10 = this.page
-            .locator('.q-menu .q-item')
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
             .filter({ hasText: /^10$/ })
             .first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
@@ -2248,7 +2248,7 @@ export class LogsPage {
 
     async clickSaveViewButton() {
         // Close any open dialogs/menus first (e.g., saved views dropdown)
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(200);
         return await this.page.locator('[data-test="logs-search-saved-views-btn"]').click();
     }
@@ -2390,12 +2390,11 @@ export class LogsPage {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
 
         // Close any open saved views dialog from previous operations
-        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const backdrop = this.page.locator('[data-test="o-dialog-close-btn"]');
         const isBackdropVisible = await backdrop.isVisible().catch(() => false);
         if (isBackdropVisible) {
-            await this.page.keyboard.press('Escape');
+            await backdrop.click();
             await this.waitForTimeout(500);
-            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
         }
 
         // Wait for the saved views area to be stable after navigation
@@ -3774,7 +3773,7 @@ export class LogsPage {
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
             // Dismiss any open overlay first to avoid toggle-closing on the next click
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(100);
 
             await this.page.locator(this.utilitiesMenuButton).click({ force: true });
@@ -3790,7 +3789,7 @@ export class LogsPage {
             ).catch(() => false); // Assume off if check fails — safer to try enabling
 
             if (isOn) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(200);
                 enabled = true;
                 break;
@@ -3798,7 +3797,7 @@ export class LogsPage {
 
             await quickModeItem.click({ force: true });
             await this.page.waitForTimeout(300);
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(200);
             enabled = true;
             break;
@@ -3938,7 +3937,7 @@ export class LogsPage {
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
 
         // Check if there's a direct include button (newer UI)
@@ -4166,7 +4165,7 @@ export class LogsPage {
             await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
             await this.page.waitForTimeout(500);
         }
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     async ensureHistogramToggleState(desiredState) {
@@ -4180,7 +4179,7 @@ export class LogsPage {
             await this.page.waitForTimeout(500);
             return true; // State was changed
         }
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false; // State was already correct
     }
 
@@ -4191,7 +4190,7 @@ export class LogsPage {
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return { ariaPressed, classNames };
     }
 
@@ -4200,7 +4199,7 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     async waitForUI(timeout = 500) {
@@ -5179,10 +5178,12 @@ export class LogsPage {
     }
 
     /**
-     * Close any open dialog by pressing Escape key
+     * Close any open dialog by clicking the close button
      */
     async closeDimensionSelectorDialog() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+            this.page.locator('body').click({ position: { x: 10, y: 10 } })
+        );
         await this.page.waitForTimeout(500);
         testLogger.info('Closed dimension selector dialog');
     }
@@ -5753,7 +5754,7 @@ export class LogsPage {
      * @returns {Promise<string>} The notification text
      */
     async getNotificationText() {
-        const notifications = this.page.locator('.q-notification__message');
+        const notifications = this.page.locator('[role="alert"]');
         const notificationCount = await notifications.count();
         if (notificationCount > 0) {
             return await notifications.first().textContent() || '';
@@ -5766,7 +5767,7 @@ export class LogsPage {
      * @returns {Promise<number>} The number of notifications
      */
     async getNotificationCount() {
-        return await this.page.locator('.q-notification__message').count();
+        return await this.page.locator('[role="alert"]').count();
     }
 
     /**
@@ -5783,7 +5784,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if visible
      */
     async hasErrorNotification() {
-        const errorNotifications = this.page.locator('.q-notification--negative, text=/error/i, text=/syntax/i').first();
+        const errorNotifications = this.page.locator('[role="alert"][class*="bg-negative"], text=/error/i, text=/syntax/i').first();
         return await errorNotifications.isVisible().catch(() => false);
     }
 
@@ -5792,7 +5793,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if visible
      */
     async hasStreamValidationError() {
-        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        const errorNotifications = this.page.locator('[role="alert"], text=/select.*stream/i').first();
         return await errorNotifications.isVisible().catch(() => false);
     }
 
@@ -5801,7 +5802,7 @@ export class LogsPage {
      * @returns {Promise<string>} The error text
      */
     async getStreamValidationErrorText() {
-        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        const errorNotifications = this.page.locator('[role="alert"], text=/select.*stream/i').first();
         if (await errorNotifications.isVisible().catch(() => false)) {
             return await errorNotifications.textContent() || '';
         }
@@ -5948,7 +5949,7 @@ export class LogsPage {
             await this.page.waitForTimeout(500);
             testLogger.info('Histogram enabled');
         } else {
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
     }
 
@@ -6724,7 +6725,7 @@ export class LogsPage {
      * Get wildcard chip element (for hover tests)
      * @param {string} chipClass - Optional chip class selector
      */
-    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] .q-chip') {
+    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] [data-test*="chip"]') {
         return this.page.locator(chipClass).first();
     }
 
@@ -6778,7 +6779,7 @@ export class LogsPage {
      * Get pattern details dialog content
      */
     async getPatternDetailsDialogContent() {
-        const content = await this.page.locator('.q-dialog').innerText();
+        const content = await this.page.locator('[data-test="logs-search-result-detail-dialog"]').innerText();
         testLogger.info(`Dialog content length: ${content.length} chars`);
         return content;
     }
@@ -7472,12 +7473,14 @@ export class LogsPage {
     }
 
     /**
-     * Press Escape key to close any open dialog
+     * Close any open dialog using the ODialog close button
      */
     async pressEscapeToCloseDialog() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+            this.page.locator('body').click({ position: { x: 10, y: 10 } })
+        );
         await this.page.waitForTimeout(300);
-        testLogger.info('Pressed Escape to close dialog');
+        testLogger.info('Closed dialog via close button');
     }
 
     /**

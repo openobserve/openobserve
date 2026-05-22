@@ -123,7 +123,7 @@ test.describe("Region testcases", () => {
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill(randomSavedView);
     await page.locator(`[data-test="logs-search-bar-delete-${randomSavedView}-saved-view-btn"]`).click();
-    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('[data-test="o-dialog-primary-btn"]').click();
     
     testLogger.info('Save view with 1 region test completed successfully');
   })

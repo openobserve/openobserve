@@ -188,9 +188,9 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       return;
     }
 
-    // Dismiss any open q-menu popups (e.g. from stream selection) that
+    // Dismiss any open menus/popups (e.g. from stream selection) that
     // would intercept pointer events on the Monaco editor
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(300);
 
     // Click the visible text surface to focus Monaco, then type

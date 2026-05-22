@@ -82,7 +82,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -134,7 +134,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -154,7 +154,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -179,7 +179,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -246,7 +246,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await pm.dashboardSetting.closeSettingWindow();
 
         // Wait for dialog to close completely
-        await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Reopen settings for next variable
@@ -267,7 +267,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
@@ -351,7 +351,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await pm.dashboardSetting.closeSettingWindow();
 
         // Wait for dialog to close completely
-        await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Reopen settings for next variable
@@ -372,7 +372,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
@@ -392,7 +392,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 5, timeout: 30000 });
 
     // Wait for variable dropdown to be visible and ready
-    const var0Dropdown = page.getByLabel(vars[0], { exact: true });
+    const var0Dropdown = page.locator(`[data-test="variable-selector-${vars[0]}"]`);
     await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -401,7 +401,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await var0Dropdown.click();
 
     // Wait for dropdown menu to open and options to load
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${vars[0]}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
     const options = page.locator('[role="option"]');
     await options.first().waitFor({ state: "visible", timeout: 5000 });
 
@@ -481,7 +481,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await pm.dashboardSetting.closeSettingWindow();
 
         // Wait for dialog to close completely
-        await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Reopen settings for next variable
@@ -502,7 +502,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
@@ -522,7 +522,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Scroll the first variable into view before changing it
-    const var0Dropdown = page.getByLabel(vars[0], { exact: true });
+    const var0Dropdown = page.locator(`[data-test="variable-selector-${vars[0]}"]`);
     await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
     await var0Dropdown.scrollIntoViewIfNeeded();
 
@@ -574,7 +574,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -594,7 +594,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -629,7 +629,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -694,7 +694,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -720,7 +720,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Now edit variable A to depend on B (creating circular dependency: A->B->A)
     // Close settings and reopen fresh to ensure clean state
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Reopen settings and navigate to variables tab
@@ -790,7 +790,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -810,7 +810,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Close settings and reopen fresh for next variable
     await pm.dashboardSetting.closeSettingWindow();
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await pm.dashboardSetting.openSetting();
@@ -831,7 +831,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Go back to dashboard list to ensure clean state
@@ -905,7 +905,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 30000 });
 
     await page.waitForTimeout(5000);

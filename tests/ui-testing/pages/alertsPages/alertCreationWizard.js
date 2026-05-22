@@ -43,7 +43,7 @@ export class AlertCreationWizard {
             }
 
             testLogger.warn('Stream not visible in dropdown, retrying', { streamName, attempt, maxRetries });
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(1000);
 
             if (attempt < maxRetries) {
@@ -116,10 +116,8 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(500);
 
         let columnFound = false;
-        // Condition column dropdown is OSelect (Reka Listbox) post-migration;
-        // q-select (.q-menu .q-item) pre-migration.
-        const visibleMenu = this.page.locator('.q-menu:visible').first();
-        const menuItems = this.page.locator('.q-menu:visible .q-item');
+        // Condition column dropdown is OSelect (Reka Listbox) post-migration.
+        const menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
         await expect(menuItems.first()).toBeVisible({ timeout: 5000 });
 
         const columnItems = await menuItems.allTextContents();
@@ -151,18 +149,13 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
-        const destinationSection = this.page.locator('div.flex.items-start').filter({
-            has: this.page.locator('span:has-text("Destination")')
-        }).first();
-
-        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-        const destinationDropdown = destinationSection.locator('.q-select').first();
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Destination dropdown is OSelect (Reka Listbox) post-migration; q-select pre.
-        const destMenuItems = this.page.locator('.q-menu:visible .q-item');
+        // Destination dropdown is OSelect (Reka Listbox) post-migration.
+        const destMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
         await expect(destMenuItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFound = false;
@@ -181,7 +174,7 @@ export class AlertCreationWizard {
             }
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -234,15 +227,15 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
 
         // Select first available column (more resilient than specific column)
-        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first().locator('.q-select');
+        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
         await columnSelect.click();
         await this.page.waitForTimeout(500);
-        const visibleMenuDefaultsItems = this.page.locator('.q-menu:visible .q-item');
+        const visibleMenuDefaultsItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
         await expect(visibleMenuDefaultsItems.first()).toBeVisible({ timeout: 5000 });
         await visibleMenuDefaultsItems.first().click();
         await this.page.waitForTimeout(500);
 
-        const operatorSelect = this.page.locator(this.locators.operatorSelect).first().locator('.q-select');
+        const operatorSelect = this.page.locator(this.locators.operatorSelect).first();
         await operatorSelect.click();
         await this.page.waitForTimeout(500);
         await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
@@ -258,16 +251,12 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
-        const destinationSection = this.page.locator('div.flex.items-start').filter({
-            has: this.page.locator('span:has-text("Destination")')
-        }).first();
+        const destinationSection = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-        const destinationDropdown = destinationSection.locator('.q-select').first();
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await destinationSection.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuDefItems = this.page.locator('.q-menu:visible .q-item');
+        const visibleDestMenuDefItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
         await expect(visibleDestMenuDefItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundDef = false;
@@ -281,7 +270,7 @@ export class AlertCreationWizard {
             await visibleDestMenuDefItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
         // Forcefully remove any remaining q-portal elements that intercept clicks
         await this.page.evaluate(() => {
@@ -372,15 +361,17 @@ export class AlertCreationWizard {
         } catch (error) {
             testLogger.warn('Back button click failed, using keyboard escape', { error: error.message });
         }
-        // Press Escape regardless — reka-ui DialogRoot closes on Escape for non-persistent dialogs.
-        // This is the most reliable way to close ODrawer / ODialog components.
-        await this.page.keyboard.press('Escape');
+        // Close button for ODrawer / ODialog components (reka-ui).
+        const queryEditorCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+        if (await queryEditorCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await queryEditorCloseBtn.click();
+        }
         await this.page.waitForTimeout(500);
 
         // Wait for the ODrawer panel (data-test="query-editor-dialog") to fully unmount
         await this.page.locator('[data-test="query-editor-dialog"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
-            testLogger.warn('Query editor dialog did not hide — pressing Escape again');
-            this.page.keyboard.press('Escape');
+            testLogger.warn('Query editor dialog did not hide — clicking close again');
+            this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {});
         });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
@@ -402,7 +393,7 @@ export class AlertCreationWizard {
         await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select, .q-select').first();
+        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
         // Focus the operator and use keyboard to open the dropdown (more reliable
         // than clicking when overlays may interfere).
@@ -410,14 +401,14 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(300);
         await this.page.keyboard.press('Enter');
         await this.page.waitForTimeout(1000);
-        // Find the ">=" option in the visible dropdown.
-        const dropdownOption = this.page.locator('.q-menu:visible')
+        // Find the ">=" option in the visible popover.
+        const dropdownOption = this.page.locator('[data-test$="-popover"]')
             .getByText('>=', { exact: true }).first();
         try {
             await dropdownOption.click({ timeout: 5000 });
         } catch {
-            testLogger.warn('q-menu/listbox text not found, trying broader selector');
-            await this.page.locator('.q-menu:visible, .o-select-dropdown:visible')
+            testLogger.warn('popover text not found, trying broader selector');
+            await this.page.locator('[data-test$="-popover"]')
                 .locator('text=">="').first()
                 .click({ timeout: 3000 });
         }
@@ -442,22 +433,22 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuSql = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenuSql.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleDestMenuSqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuSqlItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundSql = false;
-        const destOptionSql = visibleDestMenuSql.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOptionSql = visibleDestMenuSqlItems.filter({ hasText: destinationName }).first();
         if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOptionSql.click();
             destFoundSql = true;
         }
 
         if (!destFoundSql) {
-            await visibleDestMenuSql.locator('.q-item').first().click();
+            await visibleDestMenuSqlItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ====================
@@ -527,16 +518,16 @@ export class AlertCreationWizard {
         testLogger.info('First condition visible');
 
         // Configure first condition using first available column
-        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first().locator('.q-select');
+        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first();
         await columnSelect1.click();
         await this.page.waitForTimeout(500);
-        const visibleMenu1 = this.page.locator('.q-menu:visible');
-        await expect(visibleMenu1.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await visibleMenu1.locator('.q-item').first().click();
+        const visibleMenu1Items = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleMenu1Items.first()).toBeVisible({ timeout: 5000 });
+        await visibleMenu1Items.first().click();
         await this.page.waitForTimeout(500);
         testLogger.info('Selected column for first condition');
 
-        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first().locator('.q-select');
+        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorSelect1).toBeVisible({ timeout: 5000 });
         await operatorSelect1.click();
         await this.page.waitForTimeout(500);
@@ -558,22 +549,22 @@ export class AlertCreationWizard {
         testLogger.info('Second condition visible');
 
         // Configure second condition using second available column
-        const columnSelect2 = this.page.locator(this.locators.conditionColumnSelect).nth(1).locator('.q-select');
+        const columnSelect2 = this.page.locator(this.locators.conditionColumnSelect).nth(1);
         await columnSelect2.click();
         await this.page.waitForTimeout(500);
-        const visibleMenu2 = this.page.locator('.q-menu:visible');
-        await expect(visibleMenu2.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleMenu2Items = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleMenu2Items.first()).toBeVisible({ timeout: 5000 });
         // Use nth(1) if available, otherwise first - to get a different column
-        const columnCount = await visibleMenu2.locator('.q-item').count();
+        const columnCount = await visibleMenu2Items.count();
         if (columnCount > 1) {
-            await visibleMenu2.locator('.q-item').nth(1).click();
+            await visibleMenu2Items.nth(1).click();
         } else {
-            await visibleMenu2.locator('.q-item').first().click();
+            await visibleMenu2Items.first().click();
         }
         await this.page.waitForTimeout(500);
         testLogger.info('Selected column for second condition');
 
-        const operatorSelect2 = this.page.locator(this.locators.operatorSelect).nth(1).locator('.q-select');
+        const operatorSelect2 = this.page.locator(this.locators.operatorSelect).nth(1);
         await expect(operatorSelect2).toBeVisible({ timeout: 5000 });
         await operatorSelect2.click();
         await this.page.waitForTimeout(500);
@@ -598,34 +589,29 @@ export class AlertCreationWizard {
         }
 
         // Select destination for REAL-TIME alerts
-        const destinationSection = this.page.locator('div.flex.items-start').filter({
-            has: this.page.locator('span:has-text("Destination")')
-        }).first();
-        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-
-        const destinationDropdown = destinationSection.locator('.q-select').first();
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Use visible menu selector for destination
-        const visibleDestMenuMulti = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenuMulti.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        // Use popover selector for destination
+        const visibleDestMenuMultiItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuMultiItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundMulti = false;
-        const destOptionMulti = visibleDestMenuMulti.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOptionMulti = visibleDestMenuMultiItems.filter({ hasText: destinationName }).first();
         if (await destOptionMulti.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOptionMulti.click();
             destFoundMulti = true;
-            testLogger.info('Selected destination via visible menu', { destinationName });
+            testLogger.info('Selected destination via popover', { destinationName });
         }
 
         if (!destFoundMulti) {
             // Fallback: select first available destination
-            await visibleDestMenuMulti.locator('.q-item').first().click();
+            await visibleDestMenuMultiItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ALERT ====================
@@ -710,13 +696,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog — force-click bypasses any backdrop interception
+        // Close dialog — try back button, then close button
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
             await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
-            await this.page.keyboard.press('Escape');
+            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
+            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await dialogCloseBtn.click();
+            }
             await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -742,15 +731,14 @@ export class AlertCreationWizard {
         await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select, .q-select').first();
+        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        // Click the q-field__control area to open the dropdown (more reliable than clicking the whole component)
-        await thresholdOperator.locator('.q-field__control, .q-field').first().click({ timeout: 5000 }).catch(async () => {
-            testLogger.info('q-field click failed, clicking main element with force');
+        await thresholdOperator.click({ force: true }).catch(async () => {
+            testLogger.info('click failed, trying force click on main element');
             await thresholdOperator.click({ force: true });
         });
         // Wait for the dropdown menu to actually appear before selecting an option
-        await this.page.locator('.q-menu:visible').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         // Use role-based option selection (bypasses q-portal visibility issues)
         // Use a flag to track success so the fallback error isn't silently swallowed
         let operatorSelected = false;
@@ -758,10 +746,10 @@ export class AlertCreationWizard {
             await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
             operatorSelected = true;
         } catch {
-            testLogger.warn('Role option not found, trying q-menu fallback');
+            testLogger.warn('Role option not found, trying popover fallback');
         }
         if (!operatorSelected) {
-            await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 3000 });
+            await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click({ timeout: 3000 });
         }
         testLogger.info('Set threshold operator: >=');
 
@@ -782,25 +770,25 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Use visible menu selector for destination
-        const visibleDestMenuDedup = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenuDedup.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        // Use popover selector for destination
+        const visibleDestMenuDedupItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuDedupItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundDedup = false;
-        const destOptionDedup = visibleDestMenuDedup.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOptionDedup = visibleDestMenuDedupItems.filter({ hasText: destinationName }).first();
         if (await destOptionDedup.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOptionDedup.click();
             destFoundDedup = true;
-            testLogger.info('Selected destination via visible menu', { destinationName });
+            testLogger.info('Selected destination via popover', { destinationName });
         }
 
         if (!destFoundDedup) {
             // Fallback: select first available destination
-            await visibleDestMenuDedup.locator('.q-item').first().click();
+            await visibleDestMenuDedupItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== DEDUPLICATION (Advanced tab) ====================
@@ -829,7 +817,7 @@ export class AlertCreationWizard {
                 }
                 await this.page.waitForTimeout(300);
             }
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             testLogger.info('Configured fingerprint fields', { fields: dedupConfig.fingerprintFields });
         } else {
             testLogger.info('Skipping fingerprint fields (auto-detect)');
@@ -895,15 +883,15 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
 
         // Configure first condition
-        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first().locator('.q-select');
+        const columnSelect1 = this.page.locator(this.locators.conditionColumnSelect).first();
         await columnSelect1.click();
         await this.page.waitForTimeout(500);
-        const visibleMenuToggle = this.page.locator('.q-menu:visible');
-        await expect(visibleMenuToggle.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuToggle.locator('.q-item').first().click();
+        const visibleMenuToggleItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleMenuToggleItems.first()).toBeVisible({ timeout: 5000 });
+        await visibleMenuToggleItems.first().click();
         await this.page.waitForTimeout(500);
 
-        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first().locator('.q-select');
+        const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first();
         await operatorSelect1.click();
         await this.page.waitForTimeout(500);
         await expect(this.page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
@@ -966,7 +954,7 @@ export class AlertCreationWizard {
             }
         }
 
-        // Attempt 3: Try clicking on the operator area and selecting from dropdown
+        // Attempt 3: Try clicking on the operator area and selecting from popover
         if (!toggleSuccessful) {
             try {
                 // TODO(data-test): step-conditions AND/OR operator toggle has no stable data-test in web/src/components/alerts/conditions/; add one to the operator toggle button to drop these class/text fallbacks.
@@ -974,17 +962,17 @@ export class AlertCreationWizard {
                 if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
                     await operatorSelect.click();
                     await this.page.waitForTimeout(500);
-                    // Check if a dropdown appeared with OR option
-                    const orOption = this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'OR' }).first();
+                    // Check if a popover appeared with OR option
+                    const orOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'OR' }).first();
                     if (await orOption.isVisible({ timeout: 2000 }).catch(() => false)) {
                         await orOption.click();
                         toggleSuccessful = true;
-                        message = 'Successfully toggled via operator dropdown';
+                        message = 'Successfully toggled via operator popover';
                         testLogger.info(message);
                     }
                 }
             } catch (e) {
-                testLogger.warn('Operator dropdown fallback failed', { error: e.message });
+                testLogger.warn('Operator popover fallback failed', { error: e.message });
             }
         }
 
@@ -1059,7 +1047,7 @@ export class AlertCreationWizard {
         const timeWindowValue = await timeWindowInput.inputValue();
 
         const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
-        const chips = await fingerprintSelect.locator('.q-chip').allTextContents();
+        const chips = await fingerprintSelect.locator('[data-test*="chip"], [data-test*="badge"]').allTextContents();
 
         return {
             timeWindowMinutes: timeWindowValue ? parseInt(timeWindowValue, 10) : null,
@@ -1072,15 +1060,14 @@ export class AlertCreationWizard {
     }
 
     async _selectAlertType(typeName) {
-        const alertTypeContainer = this.page.locator('label:has-text("Alert Type")').locator('..');
-        const alertTypeSelect = alertTypeContainer.locator('.q-select');
+        const alertTypeSelect = this.page.locator(this.locators.alertTypeSelect);
         await alertTypeSelect.waitFor({ state: 'visible', timeout: 5000 });
         await alertTypeSelect.click();
         await this.page.waitForTimeout(500);
         // Use flexible text matching — the option text is "Realtime" (no hyphen) in English locale
         // Map "Real-time" to "Realtime" for the dropdown display text
         const displayName = typeName === 'Real-time' ? 'Realtime' : typeName;
-        const alertTypeOption = this.page.locator('.q-menu:visible .q-item').filter({ hasText: displayName }).first();
+        const alertTypeOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: displayName }).first();
         await alertTypeOption.waitFor({ state: 'visible', timeout: 5000 });
         await alertTypeOption.click();
         await this.page.waitForTimeout(500);
@@ -1192,13 +1179,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog — force-click bypasses any backdrop interception
+        // Close dialog — try back button, then close button
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
             await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
-            await this.page.keyboard.press('Escape');
+            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
+            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await dialogCloseBtn.click();
+            }
             await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1208,8 +1198,8 @@ export class AlertCreationWizard {
         const sqlEditorDialog = this.page.locator(this.locators.sqlEditorDialog);
         const dialogHidden = await sqlEditorDialog.isHidden({ timeout: 5000 }).catch(() => true);
         if (!dialogHidden) {
-            testLogger.warn('SQL Editor dialog still visible, pressing Escape');
-            await this.page.keyboard.press('Escape');
+            testLogger.warn('SQL Editor dialog still visible, clicking close button');
+            await this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {});
             await this.page.waitForTimeout(1000);
         }
         testLogger.info('Closed SQL Editor dialog');
@@ -1238,8 +1228,8 @@ export class AlertCreationWizard {
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdOperator.click({ force: true });
         await this.page.waitForTimeout(500);
-        // Scope to visible menu to avoid strict mode violation (selected value + dropdown option)
-        await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+        // Scope to visible popover to avoid strict mode violation (selected value + dropdown option)
+        await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click();
         testLogger.info('Set threshold operator: >=');
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();
@@ -1260,16 +1250,16 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Use visible menu selector for destination
-        const visibleDestMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        // Use popover selector for destination
+        const visibleDestMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFound = false;
-        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOption = visibleDestMenuItems.filter({ hasText: destinationName }).first();
         if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOption.click();
             destFound = true;
-            testLogger.info('Selected destination via visible menu', { destinationName });
+            testLogger.info('Selected destination via popover', { destinationName });
         }
 
         if (!destFound) {
@@ -1278,12 +1268,12 @@ export class AlertCreationWizard {
                 await this.commonActions.scrollAndFindOption(destinationName, 'template');
                 testLogger.info('Found destination by scrolling', { destinationName });
             } catch (scrollError) {
-                await visibleDestMenu.locator('.q-item').first().click();
+                await visibleDestMenuItems.first().click();
                 testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
             }
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== DEDUPLICATION (Advanced tab) ====================
@@ -1312,7 +1302,7 @@ export class AlertCreationWizard {
                 }
                 await this.page.waitForTimeout(300);
             }
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             testLogger.info('Configured fingerprint fields', { fields: fingerprintFields });
         }
 
@@ -1391,8 +1381,8 @@ export class AlertCreationWizard {
         const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
         await columnSelect.click();
         await this.page.waitForTimeout(500);
-        const visibleMenu = this.page.locator('.q-menu:visible');
-        const levelOption = visibleMenu.locator('.q-item').filter({ hasText: 'level' });
+        const visibleMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        const levelOption = visibleMenuItems.filter({ hasText: 'level' });
         await expect(levelOption.first()).toBeVisible({ timeout: 5000 });
         await levelOption.first().click();
         await this.page.waitForTimeout(500);
@@ -1414,7 +1404,7 @@ export class AlertCreationWizard {
         await functionDropdown.click();
         await this.page.waitForTimeout(500);
         // Click a measure function (e.g., "count") to enable group-by and having threshold
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'count' }).first().click();
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'count' }).first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Switched from total_events to count (aggregation ON)');
 
@@ -1422,13 +1412,13 @@ export class AlertCreationWizard {
         // Must select a measure column or validateAndFocus() will reject with
         // "Column is required when using an aggregate function."
         // The field selector is the 2nd q-select in the "Alert if" row (after function dropdown)
-        const measureColumnSelect = alertIfSection.locator('.q-select').nth(1);
+        const measureColumnSelect = alertIfSection.locator('.alert-v3-select').nth(1);
         await measureColumnSelect.waitFor({ state: 'visible', timeout: 5000 });
         await measureColumnSelect.click();
         await this.page.waitForTimeout(500);
-        const measureColumnMenu = this.page.locator('.q-menu:visible');
-        await expect(measureColumnMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await measureColumnMenu.locator('.q-item').first().click();
+        const measureColumnMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(measureColumnMenuItems.first()).toBeVisible({ timeout: 5000 });
+        await measureColumnMenuItems.first().click();
         await this.page.waitForTimeout(500);
         testLogger.info('Selected measure column for count aggregation');
 
@@ -1455,13 +1445,13 @@ export class AlertCreationWizard {
         await addGroupByBtn.click();
         await this.page.waitForTimeout(800);
         // Now the q-select should be rendered by the v-for — select from it
-        const groupBySelect = groupBySection.locator('.q-select').first();
+        const groupBySelect = groupBySection.locator('.alert-v3-select').first();
         await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
         await groupBySelect.click();
         await this.page.waitForTimeout(500);
-        const groupByMenu = this.page.locator('.q-menu:visible');
-        await expect(groupByMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await groupByMenu.locator('.q-item').first().click();
+        const groupByMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(groupByMenuItems.first()).toBeVisible({ timeout: 5000 });
+        await groupByMenuItems.first().click();
         await this.page.waitForTimeout(500);
         testLogger.info('Selected group-by field');
 
@@ -1472,12 +1462,12 @@ export class AlertCreationWizard {
         //   q-input: threshold value
         const aggThresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'Having groups' }).first();
         // Operator q-select (first/only q-select in this section)
-        const aggOperatorSelect = aggThresholdSection.locator('.q-select').first();
+        const aggOperatorSelect = aggThresholdSection.locator('.alert-v3-select').first();
         await aggOperatorSelect.waitFor({ state: 'visible', timeout: 5000 });
         await aggOperatorSelect.click();
         await this.page.waitForTimeout(500);
-        const aggOperatorMenu = this.page.locator('.q-menu:visible');
-        await aggOperatorMenu.locator('.q-item').filter({ hasText: '>=' }).first().click();
+        const aggOperatorMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await aggOperatorMenuItems.filter({ hasText: '>=' }).first().click();
         await this.page.waitForTimeout(300);
 
         // Value input for aggregation threshold
@@ -1503,18 +1493,18 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleDestMenuAggItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuAggItems.first()).toBeVisible({ timeout: 5000 });
 
-        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
-        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOption.click();
+        const destOptionAgg = visibleDestMenuAggItems.filter({ hasText: destinationName }).first();
+        if (await destOptionAgg.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOptionAgg.click();
         } else {
-            await visibleDestMenu.locator('.q-item').first().click();
+            await visibleDestMenuAggItems.first().click();
             testLogger.warn('Selected first available destination (fallback)');
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Configured alert settings');
 
         // Remaining advanced features (CompareWithPast, Dedup) are in Advanced tab
@@ -1624,13 +1614,16 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
-        // Close PromQL editor dialog — force-click bypasses any backdrop interception
+        // Close PromQL editor dialog — try back button, then close button
         try {
             const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
             await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
-            await this.page.keyboard.press('Escape');
+            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
+            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await dialogCloseBtn.click();
+            }
             await this.page.waitForTimeout(500);
         }
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1657,14 +1650,14 @@ export class AlertCreationWizard {
         // The outer flex container holds both the label div and controls div as siblings
         const promqlConditionRow = promqlConditionLabel.locator('..');
 
-        // Select operator (portals are hidden so Q-Select receives click)
-        const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
-        await promqlOperatorSelect.locator('.q-field__control').click({ timeout: 10000 });
+        // Select operator
+        const promqlOperatorSelect = promqlConditionRow.locator('.alert-v3-select').first();
+        await promqlOperatorSelect.click({ timeout: 10000 });
         await this.page.waitForTimeout(800);
-        // Pick operator from the now-visible q-menu popup
-        const visibleMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await visibleMenu.locator('.q-item').filter({ hasText: operator }).first().click();
+        // Pick operator from the now-visible popover
+        const visibleMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
+        await visibleMenuPromqlItems.filter({ hasText: operator }).first().click();
         await this.page.waitForTimeout(300);
         testLogger.info('Set PromQL condition operator', { operator });
 
@@ -1693,23 +1686,23 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleDestMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(visibleDestMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFound = false;
-        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOption = visibleDestMenuPromqlItems.filter({ hasText: destinationName }).first();
         if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOption.click();
             destFound = true;
-            testLogger.info('Selected destination via visible menu', { destinationName });
+            testLogger.info('Selected destination via popover', { destinationName });
         }
 
         if (!destFound) {
-            await visibleDestMenu.locator('.q-item').first().click();
+            await visibleDestMenuPromqlItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
         // Remaining advanced features (CompareWithPast, Dedup) are in Advanced tab

@@ -379,7 +379,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Click the Tab1 option
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).click();
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     // Wait for dropdown to close
     await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
 
@@ -488,7 +488,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Click the Default tab option
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).waitFor({ state: "visible" });
     await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).click();
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     // Wait for dropdown to close
     await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
 
