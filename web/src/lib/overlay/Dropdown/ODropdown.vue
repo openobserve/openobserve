@@ -10,8 +10,11 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
-import { computed, provide, ref, watch } from "vue";
-import { O_DROPDOWN_NESTED_KEY } from "./ODropdown.context";
+import { computed, inject, onBeforeUnmount, provide, ref, watch } from "vue";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  type DropdownNestedRegistry,
+} from "./ODropdown.context";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
@@ -42,6 +45,43 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
+// Register with the nearest ancestor ODropdown while this dropdown is open
+// so the ancestor's pointer-down-outside handler ignores clicks from our portal.
+const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(
+  O_DROPDOWN_NESTED_KEY,
+  null,
+);
+let closeNestedRegistration: ((skipGrace?: boolean) => void) | null = null;
+// Set to true in handlePointerDownOutside when this dropdown is about to close
+// from a real outside click so the parent skips the grace period and also closes.
+let closingFromOutside = false;
+
+// flush:'sync' is required so the parent's nestedOverlayCount increments
+// before reka-ui auto-focuses the new portal content (which would otherwise
+// fire focus-outside on the parent and close it).
+watch(
+  internalOpen,
+  (open) => {
+    if (!parentDropdownRegistry) return;
+    if (open && !closeNestedRegistration) {
+      closeNestedRegistration = parentDropdownRegistry.open();
+    } else if (!open && closeNestedRegistration) {
+      const skipGrace = closingFromOutside;
+      closingFromOutside = false;
+      closeNestedRegistration(skipGrace);
+      closeNestedRegistration = null;
+    }
+  },
+  { flush: "sync" },
+);
+
+onBeforeUnmount(() => {
+  if (closeNestedRegistration) {
+    closeNestedRegistration();
+    closeNestedRegistration = null;
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Nested-overlay coordination
 // ═══════════════════════════════════════════════════════════════════════════
@@ -58,9 +98,11 @@ const NESTED_CLOSE_GRACE_MS = 50;
 provide(O_DROPDOWN_NESTED_KEY, {
   open: () => {
     nestedOverlayCount.value++;
-    return () => {
+    return (skipGrace?: boolean) => {
       nestedOverlayCount.value = Math.max(0, nestedOverlayCount.value - 1);
-      lastNestedCloseAt.value = Date.now();
+      // Skip grace when the child closed because of a real outside click —
+      // the parent should honour that same click and close too.
+      if (!skipGrace) lastNestedCloseAt.value = Date.now();
     };
   },
 });
@@ -110,10 +152,21 @@ function handlePointerDownOutside(event: Event) {
   // Real outside click. Honour `persistent` (false / true / number).
   if (shouldSwallowRealOutsideClick()) {
     event.preventDefault();
+    return;
   }
+  // This dropdown is closing from a real outside click. Signal to the parent
+  // (if any) to skip the grace period so it also closes on this same click.
+  closingFromOutside = true;
 }
 
 function handleFocusOutside(event: Event) {
+  // When nested inside a parent ODropdown, reka-ui focuses parent items on
+  // pointermove (hover), stealing focus from this portal. Suppress focus-outside
+  // so the inner dropdown only closes via click-outside or Escape.
+  if (parentDropdownRegistry) {
+    event.preventDefault();
+    return;
+  }
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }

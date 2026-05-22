@@ -14,8 +14,9 @@ export const O_DROPDOWN_NESTED_KEY = Symbol("o-dropdown-nested-overlay");
 
 export interface DropdownNestedRegistry {
   /**
-   * Call when a nested overlay opens. Returns a function to call when
-   * the same overlay closes.
+   * Call when a nested overlay opens. Returns a close function to call when
+   * the same overlay closes. Pass `skipGrace = true` when the close was caused
+   * by a real outside click so the parent doesn't swallow that same click.
    */
-  open: () => () => void;
+  open: () => (skipGrace?: boolean) => void;
 }
