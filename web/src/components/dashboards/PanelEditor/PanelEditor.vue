@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor tw:px-[0.625rem]!" data-test="panel-editor-container">
+  <div class="panel-editor tw:px-[0.625rem]! tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
@@ -80,15 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:flex-col scroll card-container"
                 :style="fieldListContainerStyle"
               >
-                <div class="column" style="height: 100%">
-                  <div class="col-auto tw:p-2">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
-                  <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
-                    <PanelFieldList :editMode="editMode" />
-                  </div>
+                <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
+                  <PanelFieldList :editMode="editMode" />
                 </div>
               </div>
             </div>
@@ -340,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- HTML Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'html'"
-        class="tw:flex tw:flex-col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -375,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Markdown Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'markdown'"
-        class="tw:flex tw:flex-col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -450,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Field List for custom chart -->
           <template #before>
-            <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+            <div class="tw:w-full tw:h-full">
               <div
                 class="tw:flex tw:flex-col scroll card-container"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
@@ -460,11 +453,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="column"
                   style="height: 100%"
                 >
-                  <div class="col-auto tw:p-2">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
                   <div class="tw:flex tw:flex-col" style="width: 100%">
                     <PanelFieldList :editMode="editMode" />
                   </div>
@@ -859,15 +847,15 @@ const showCustomChartTypeSelector = ref(false);
 const contentHeight = computed(() => {
   switch (props.pageType) {
     case "dashboard":
-      return "calc(100vh - var(--navbar-height) - 74px)";
+      return "100%";
     case "metrics":
-      return "calc(100vh - var(--navbar-height) - 70px)";
+      return "100%";
     case "logs":
       return "calc(100% - 36px)";
     case "build":
       return "calc(100vh - var(--navbar-height) - 24px)";
     default:
-      return "calc(100vh - var(--navbar-height) - 74px)";
+      return "100%";
   }
 });
 
@@ -895,15 +883,15 @@ const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
     return "tw:flex card-container";
   }
-  return "tw:flex card-container";
+  return "tw:flex card-container tw:h-full tw:overflow-y-hidden";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
 const rowStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return { height: "100%" };
+    return { height: "100%", width: "100%" };
   }
-  return { overflowY: "auto" };
+  return { overflowY: "auto", width: '100%' };
 });
 
 // Main content container class - logs/build uses vertical flex, others use horizontal
@@ -992,7 +980,7 @@ const fieldListWrapperClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:w-full tw:h-full";
   }
-  return "tw:w-full tw:h-full tw:pb-[0.625rem]";
+  return "tw:w-full tw:h-full";
 });
 
 // Field list container style

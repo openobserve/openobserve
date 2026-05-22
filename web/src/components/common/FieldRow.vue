@@ -16,40 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Simple field without expansion (FTS keys or fields without values) -->
-  <div
+  <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
-    class="field-container tw:flex content-center tw:truncate tw:w-full hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
+    :data-test="`logs-field-list-item-${field.name}`"
+    class="tw:pl-[1.5rem]"
   >
-    <div
-      class="field_label tw:flex-1 tw:min-w-0 tw:flex! tw:items-center!"
-      :data-test="`logs-field-list-item-${field.name}`"
-    >
-      <div
-        class="tw:truncate tw:flex-1 tw:min-w-0 tw:pl-[1.5rem] tw:leading-relaxed"
-      >
-        {{ field.label || field.name }}
-      </div>
-      <OIcon
-        :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-        v-if="showQuickMode && field.name !== timestampColumn"
-        :name="field.isInterestingField ? 'info' : 'info-outline'"
-        size="sm"
-        :title="
-          field.isInterestingField
-            ? 'Remove from interesting fields'
-            : 'Add to interesting fields'
-        "
-        class="tw:cursor-pointer tw:flex-shrink-0"
-        @click.stop="
-          $emit('toggle-interesting', field, field.isInterestingField)
-        "
-      />
-    </div>
-    <div
-      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem] tw:overflow-hidden"
-      v-if="field.name !== timestampColumn"
-    >
+    <OFieldLabel :field="field" :show-type-icon="false" />
+    <OIcon
+      :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+      v-if="showQuickMode && field.name !== timestampColumn"
+      :name="field.isInterestingField ? 'info' : 'info-outline'"
+      size="sm"
+      :title="
+        field.isInterestingField
+          ? 'Remove from interesting fields'
+          : 'Add to interesting fields'
+      "
+      class="tw:cursor-pointer tw:flex-shrink-0"
+      @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+    />
+
+    <template v-if="field.name !== timestampColumn" #actions>
       <OButton
         v-if="field.isSchemaField && field.name != timestampColumn"
         variant="ghost-primary"
@@ -61,11 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OIcon
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
-        v-if="
-          showVisibilityToggle &&
-          !isFieldSelected &&
-          field.name !== timestampColumn
-        "
+        v-if="showVisibilityToggle && !isFieldSelected && field.name !== timestampColumn"
         name="visibility"
         size="sm"
         title="Add field to table"
@@ -81,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
       />
-    </div>
-  </div>
+    </template>
+  </OFieldRow>
 
   <!-- Field with expansion for values -->
   <slot v-else name="expansion" :field="field"></slot>
@@ -92,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 
 interface Props {
   field: any;
@@ -119,27 +105,3 @@ const isFieldSelected = computed(() =>
 );
 </script>
 
-<style scoped lang="scss">
-.field-container {
-  position: relative;
-
-  .field_overlay {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    display: none;
-    align-items: center;
-    padding: 0 0.25rem;
-    gap: 0.375rem;
-  }
-
-  &:hover .field_overlay {
-    display: flex;
-  }
-}
-
-.field_label {
-  padding: 0.25rem 0;
-}
-</style>

@@ -102,6 +102,7 @@ watch(
         variant === 'sidebar'
           ? 'tw:px-3 tw:py-0 tw:min-h-[36px] tw:rounded-none'
           : 'tw:px-2 tw:py-2 tw:rounded-md',
+        triggerClass,
       ]"
     >
       <!-- Sidebar: left-side chevron (always before slot or label) -->

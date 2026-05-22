@@ -172,9 +172,22 @@
   --color-collapsible-label: var(--color-text-primary);
   --color-collapsible-caption: var(--color-text-secondary);
   --color-collapsible-icon: var(--color-text-secondary);
-  --color-collapsible-trigger-hover-bg: var(--color-primary-50);
+  --color-collapsible-trigger-hover-bg: var(--color-primary-100);
   --color-collapsible-trigger-active-bg: var(--color-primary-100);
   --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+
+  /* OFieldList / OFieldRow / OFieldLabel */
+  --color-field-list-row-hover-bg:     var(--color-primary-100);
+  --color-field-list-group-text:       var(--color-text-secondary);
+  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-icon:       var(--color-text-secondary);
+  --color-field-list-drag-icon:        var(--color-text-secondary);
+  --color-field-list-expand-icon:      var(--color-text-secondary);
+  --color-field-list-empty-text:       var(--color-text-muted);
+  --color-field-list-actions-bg:       var(--color-primary-100);
+  --color-field-list-actions-border:   var(--color-border-default);
+  --color-field-list-expansion-bg:     var(--color-surface-subtle);
+  --color-field-list-expansion-border: var(--color-border-default);
 
   /* Stepper */
   --color-stepper-indicator-default: var(--color-border-strong);
@@ -934,6 +947,19 @@
   --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
   --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
   --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
+
+  /* OFieldList / OFieldRow / OFieldLabel */
+  --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
+  --color-field-list-group-text:       var(--color-field-list-group-text);
+  --color-field-list-label-text:       var(--color-field-list-label-text);
+  --color-field-list-label-icon:       var(--color-field-list-label-icon);
+  --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
+  --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
+  --color-field-list-empty-text:       var(--color-field-list-empty-text);
+  --color-field-list-actions-bg:       var(--color-field-list-actions-bg);
+  --color-field-list-actions-border:   var(--color-field-list-actions-border);
+  --color-field-list-expansion-bg:     var(--color-field-list-expansion-bg);
+  --color-field-list-expansion-border: var(--color-field-list-expansion-border);
 
   /* Dialog */
   --color-dialog-overlay: var(--color-dialog-overlay);

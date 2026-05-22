@@ -29,6 +29,8 @@ export interface OCollapsibleProps {
    * - `'sidebar'` — chevron on the left, flush trigger (sidebar/config panel sections)
    */
   variant?: "default" | "sidebar";
+  /** Extra classes applied directly to the trigger button element. */
+  triggerClass?: string;
 }
 
 export interface OCollapsibleEmits {

@@ -48,7 +48,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header"
+          class="o-field-list__group-header tw:h-7"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -61,7 +61,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row"
+          class="o-field-list__row tw:mt-[0.25rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -79,24 +79,21 @@
               :draggable="draggable"
               :is-drag-enabled="isDragEnabled(row, row._index ?? 0)"
             >
-              <OIcon
-                v-if="draggable"
-                name="drag-indicator"
-                size="sm"
-                :class="[
-                  'o-field-list__drag-icon',
-                  isDragEnabled(row, row._index ?? 0)
-                    ? 'o-field-list__drag-icon--enabled'
-                    : 'o-field-list__drag-icon--disabled',
-                ]"
-                data-test="o-field-list-drag-indicator"
-              />
-              <OIcon
-                :name="getTypeIcon(row.type)"
-                size="xs"
-                class="o-field-list__type-icon"
-              />
-              <span class="o-field-list__field-name">{{ row.name }}</span>
+              <OFieldRow>
+                <OIcon
+                  v-if="draggable"
+                  name="drag-indicator"
+                  size="sm"
+                  :class="[
+                    'o-field-list__drag-icon',
+                    isDragEnabled(row, row._index ?? 0)
+                      ? 'o-field-list__drag-icon--enabled'
+                      : 'o-field-list__drag-icon--disabled',
+                  ]"
+                  data-test="o-field-list-drag-indicator"
+                />
+                <OFieldLabel :field="row" :show-type-icon="true" />
+              </OFieldRow>
             </slot>
           </div>
           <div v-if="$slots['field-actions']" class="o-field-list__actions">
@@ -125,6 +122,8 @@
 import { computed, ref, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFieldRow from "./OFieldRow.vue";
+import OFieldLabel from "./OFieldLabel.vue";
 import { type FieldItem } from "./OFieldList.types";
 
 const props = withDefaults(
@@ -357,29 +356,6 @@ function onScroll(event: Event) {
   }, 150);
 }
 
-// ── Type icon helper ────────────────────────────────────────────────
-
-function getTypeIcon(type: string | undefined): string {
-  if (!type) return "text-fields";
-  switch (type.toLowerCase()) {
-    case "utf8":
-    case "string":
-    case "text":
-      return "text-fields";
-    case "boolean":
-    case "bool":
-      return "toggle-off";
-    case "int64":
-    case "float64":
-    case "int":
-    case "float":
-    case "number":
-      return "tag";
-    default:
-      return "text-fields";
-  }
-}
-
 // ── Expose ──────────────────────────────────────────────────────────
 
 function scrollToTop() {
@@ -427,7 +403,7 @@ defineExpose({ scrollToTop });
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    color: var(--o2-text-muted);
+    color: var(--color-field-list-empty-text);
     font-size: 0.75rem;
   }
 
@@ -443,7 +419,7 @@ defineExpose({ scrollToTop });
     justify-content: space-between;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: var(--o2-text-secondary);
+    color: var(--color-field-list-group-text);
     cursor: default;
     user-select: none;
     letter-spacing: 0.01em;
@@ -478,12 +454,14 @@ defineExpose({ scrollToTop });
     cursor: pointer;
     border-radius: 0.1875rem;
     font-size: 0.75rem;
-    transition: background-color 0.1s ease;
     line-height: 0.8rem;
 
+    // No background-color here — each slot consumer owns its own hover highlight.
+    // __row:hover is kept solely to reveal __actions (PanelFieldList +X/+Y buttons).
+    // Hovering any child (including expanded slot content) propagates :hover up to
+    // __row, so __actions appear correctly without the background bleeding into
+    // expansion panels or value rows.
     &:hover {
-      background-color: var(--o2-hover-accent);
-
       .o-field-list__actions {
         visibility: visible;
         opacity: 1;
@@ -507,19 +485,7 @@ defineExpose({ scrollToTop });
     justify-content: center;
     flex-shrink: 0;
     width: 1rem;
-    color: var(--o2-text-muted);
-  }
-
-  // ---------- type icon ----------
-  // Light + xs to keep the field name as the primary visual anchor; the type icon is metadata.
-  &__type-icon {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 0.875rem;
-    color: var(--o2-text-muted);
-    opacity: 0.6;
+    color: var(--color-field-list-expand-icon);
   }
 
   // ---------- drag icon ----------
@@ -529,7 +495,7 @@ defineExpose({ scrollToTop });
     align-items: center;
     justify-content: center;
     width: 1rem;
-    color: var(--o2-text-muted);
+    color: var(--color-field-list-drag-icon);
 
     &--enabled {
       cursor: grab;
@@ -539,17 +505,6 @@ defineExpose({ scrollToTop });
       cursor: not-allowed;
       opacity: 0.4;
     }
-  }
-
-  // ---------- field name (truncated) ----------
-  &__field-name {
-    font-size: 0.75rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 1;
-    min-width: 0;
-    color: var(--o2-text-primary);
   }
 
   // ---------- row actions (overlay on hover) ----------
@@ -576,13 +531,10 @@ defineExpose({ scrollToTop });
     right: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
-    // `--o2-border` (light: #E8ECF0, dark: #868A91 — subtle mid-gray) instead
-    // of `--o2-border-color` whose dark value is rgba(255,255,255,0.40) and
-    // renders as a glaring white hairline.
-    border: 1px solid var(--o2-border);
+    border: 1px solid var(--color-field-list-actions-border);
     border-radius: 0.1875rem;
     overflow: hidden;
-    background-color: var(--o2-bg-gray);
+    background-color: var(--color-field-list-actions-bg);
 
     // Make each chip flush (no individual border, no rounded corners),
     // and put a vertical separator between adjacent chips.
@@ -594,7 +546,7 @@ defineExpose({ scrollToTop });
       background-color: transparent !important;
     }
     :deep(> *:not(:first-child)) {
-      border-left: 1px solid var(--o2-border) !important;
+      border-left: 1px solid var(--color-field-list-actions-border) !important;
     }
   }
 
@@ -602,8 +554,8 @@ defineExpose({ scrollToTop });
   &__expansion {
     width: 100%;
     padding: 0.25rem 0 0.375rem;
-    background-color: var(--o2-card-background);
-    border: 1px solid var(--o2-border-color);
+    background-color: var(--color-field-list-expansion-bg);
+    border: 1px solid var(--color-field-list-expansion-border);
     border-top: none;
     border-radius: 0 0 0.1875rem 0.1875rem;
     margin-bottom: 0.375rem;
