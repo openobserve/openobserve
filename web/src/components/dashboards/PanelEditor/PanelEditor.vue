@@ -1295,6 +1295,7 @@ defineExpose({
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-weight: bold;
+  font-size: 1rem;
 }
 
 .warning {

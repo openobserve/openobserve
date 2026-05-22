@@ -1,7 +1,10 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:p-[0.375rem]!">
+  <div class="tw:w-full tw:h-full tw:p-1.5!">
+    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold">
+      {{ t("panel.fields") }}
+    </div>
     <OFieldList
       ref="fieldListRef"
       :fields="flattenGroupedFields"
@@ -29,6 +32,7 @@
             :options="streamTypeOptions"
             data-test="index-dropdown-stream_type"
             class="tw:mb-1"
+            label-position="inside"
             :readonly="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
@@ -42,6 +46,7 @@
             value-key="name"
             :icon-key="currentStreamType === 'metrics' ? '_icon' : undefined"
             searchable
+            label-position="inside"
             :readonly="dashboardPanelDataPageKey === 'logs'"
             :title="currentStream"
             @search="onStreamSearch"
