@@ -33,7 +33,7 @@ use std::ops::Range;
 use hashbrown::HashMap;
 
 use super::{
-    ALGO_SBBF_XXHASH64, MAGIC, VERSION,
+    ALGO_SBBF_GXHASH, MAGIC, VERSION,
     sbbf::{BLOCK_BYTES, block_index, check_block, hash_value},
 };
 
@@ -141,7 +141,7 @@ impl BloomReader {
                 .to_string();
             p += name_len;
             let algo = read_u8(suffix, &mut p)?;
-            if algo != ALGO_SBBF_XXHASH64 {
+            if algo != ALGO_SBBF_GXHASH {
                 return Err(ReadError::BadAlgo(algo));
             }
             let file_count = read_u32(suffix, &mut p)? as usize;
@@ -197,7 +197,7 @@ impl BloomReader {
     ///
     /// Returns `Some((range, hash))` where:
     /// - `range` is the absolute byte range inside the `.bf` to fetch (always exactly 32 bytes)
-    /// - `hash` is the xxhash64 of the value; pass it to [`check_block_with_hash`] together with
+    /// - `hash` is the gxhash64 of the value; pass it to [`check_block_with_hash`] together with
     ///   the fetched bytes
     ///
     /// Returns `None` when this `.bf` has no info for `(field, file_id)` —

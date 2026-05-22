@@ -56,20 +56,12 @@ const BLOOM_SUFFIX_PROBE_BYTES: u64 = 16 * 1024;
 
 /// Outer concurrency cap on `.bf` buckets processed in parallel.
 ///
-/// Mirrors the tantivy search path (`storage.rs`): use
-/// `query_index_thread_num` when local file cache is enabled, otherwise
-/// `query_thread_num`. Both default to `cpu_num * 4` (cluster) or
-/// `cpu_num` (local mode). No hardcoded constant — large multi-day
+/// Mirrors the tantivy search path (`storage.rs`): use the same
+/// `query_thread_num` knob (defaults to `cpu_num * 4` in cluster mode,
+/// `cpu_num` in local). No hardcoded constant — large multi-day
 /// trace_id lookups need to fan out far beyond 32 buckets.
 fn bloom_prefetch_concurrency() -> usize {
-    let cfg = config::get_config();
-    let cache_enabled = cfg.disk_cache.enabled || cfg.memory_cache.enabled;
-    let n = if cache_enabled {
-        cfg.limit.query_index_thread_num
-    } else {
-        cfg.limit.query_thread_num
-    };
-    n.max(1)
+    config::get_config().limit.query_thread_num.max(1)
 }
 
 /// Prune `files` against `predicates`, returning the surviving subset.

@@ -24,14 +24,20 @@
 //! rest of the bitmap.
 //!
 //! Self-consistent: writer and reader use the same `SALT` constants,
-//! the same `xxh64(seed=0)`, the same fastmap block-index function. The
-//! on-disk body is just `num_blocks × 32` raw little-endian bytes — no
-//! thrift header, no framing.
+//! the same `gxhash64(seed=0)` from `config::utils::hash`, the same
+//! fastmap block-index function. The on-disk body is just
+//! `num_blocks × 32` raw little-endian bytes — no thrift header, no
+//! framing.
 //!
-//! Reference: Apache Parquet bloom-filter spec
+//! **Hash choice note**: we deviate from the Parquet spec on hash
+//! function (Parquet specifies XxHash64). We don't interop with any
+//! external SBBF reader — only our own writer/reader pair — so the only
+//! requirement is that the same hash runs on both sides of the binary,
+//! which `gxhash` satisfies. We reuse the codebase's existing
+//! `config::utils::hash` rather than pulling in a separate xxhash crate.
+//!
+//! Reference: Apache Parquet bloom-filter spec (block layout only)
 //! <https://github.com/apache/parquet-format/blob/master/BloomFilter.md>.
-
-use xxhash_rust::xxh64::xxh64;
 
 /// One SBBF block is 8 × u32 words = 32 bytes.
 pub const BLOCK_BYTES: usize = 32;
@@ -43,10 +49,14 @@ pub const SALT: [u32; 8] = [
     0x47b6137b, 0x44974d91, 0x8824ad5b, 0xa2b7289d, 0x705495c7, 0x2df1424b, 0x9efc4947, 0x5c6bfb31,
 ];
 
-/// Per Parquet spec — XxHash64 with seed 0.
+/// 64-bit hash used by both writer and reader. Reuses the project-wide
+/// gxhash util — on platforms without the `gxhash` cargo feature (e.g.
+/// Raspberry Pi without AES), this transparently degrades to
+/// `DefaultHasher`. The writer and reader always run in the same
+/// binary, so the two sides agree.
 #[inline]
 pub fn hash_value(value: &[u8]) -> u64 {
-    xxh64(value, 0)
+    config::utils::hash::sum64_bytes(value)
 }
 
 /// Map a hash to a block index using the "fastmap" trick from the spec:

@@ -479,6 +479,5 @@ vrl = { version = "0.31", features = [
     "compiler",
     "test",
 ] }
-xxhash-rust = { version = "0.8", features = ["xxh64"] }
 zip = "8.0"
 zstd = "0.13"

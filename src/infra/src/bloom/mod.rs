@@ -37,7 +37,7 @@
 //!         per field:
 //!           name_len    u16 LE
 //!           name        bytes
-//!           algo        u8           (0x01 = SBBF/xxhash64)
+//!           algo        u8           (0x01 = SBBF + gxhash64)
 //!           file_count  u32 LE
 //!           per file:
 //!             file_id     u64 LE
@@ -84,8 +84,11 @@ pub const MAGIC: &[u8; 4] = b"O2BF";
 /// Current `.bf` format version.
 pub const VERSION: u8 = 0x02;
 
-/// Algorithm tag for SBBF + XxHash64 (matches Parquet spec).
-pub const ALGO_SBBF_XXHASH64: u8 = 0x01;
+/// Algorithm tag for SBBF + gxhash64 (the project-wide default 64-bit
+/// hash from `config::utils::hash`). Block layout follows the Parquet
+/// SBBF spec; the hash function does not — we own both sides of the
+/// `.bf` format so spec compatibility on the hash isn't required.
+pub const ALGO_SBBF_GXHASH: u8 = 0x01;
 
 // `file_list.id` is the per-file key used inside the `.bf` footer. The
 // compactor's post-merge bloom builder runs *after* the file_list INSERT,

@@ -28,7 +28,7 @@
 
 use std::io::Write;
 
-use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION, sbbf::Sbbf};
+use super::{ALGO_SBBF_GXHASH, MAGIC, VERSION, sbbf::Sbbf};
 
 /// Default false-positive probability for new SBBFs.
 const DEFAULT_FPP: f64 = 0.01;
@@ -104,7 +104,7 @@ impl BloomBuilder {
         self.filters.len() - 1
     }
 
-    /// Insert raw bytes — xxhash64(seed=0) is applied inside `Sbbf::insert`.
+    /// Insert raw bytes — gxhash64(seed=0) is applied inside `Sbbf::insert`.
     pub fn insert(&mut self, idx: usize, value: &[u8]) {
         let entry = &mut self.filters[idx];
         entry.sbbf.insert(value);
@@ -233,7 +233,7 @@ impl BloomWriter {
                 })?;
             out.write_all(&name_len.to_le_bytes()).unwrap();
             out.write_all(name_bytes).unwrap();
-            out.push(ALGO_SBBF_XXHASH64);
+            out.push(ALGO_SBBF_GXHASH);
             // checked above when building `files`
             out.write_all(&(sec.files.len() as u32).to_le_bytes())
                 .unwrap();

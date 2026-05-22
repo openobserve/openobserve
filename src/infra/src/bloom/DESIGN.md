@@ -130,7 +130,7 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
      per field:
        name_len    u16 LE
        name        bytes
-       algo        u8           (0x01 = SBBF + xxhash64, parquet spec)
+       algo        u8           (0x01 = SBBF + gxhash64)
        file_count  u32 LE
        per file:
          file_id     u64 LE  (file_list.id cast to u64)
@@ -143,7 +143,7 @@ files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf
 EOF─────────────────────────────────────────
 ```
 
-Bloom algorithm: SBBF + xxhash64 (seed=0), Parquet spec. Implementation lives in `infra::bloom::sbbf` — ~120 LOC of `Sbbf` struct + the standalone `check_block(block_bytes, hash)` and `block_index(hash, num_blocks)` primitives. The split-block design is the key property that makes single-block point reads possible.
+Bloom algorithm: SBBF block layout from the Parquet spec, but the hash function is gxhash64 (seed=0) from `config::utils::hash` rather than the spec's xxhash64. We don't interop with external SBBF readers, so this swap is invisible outside `.bf` files and saves an extra direct dependency. Implementation lives in `infra::bloom::sbbf` — ~120 LOC of `Sbbf` struct + the standalone `check_block(block_bytes, hash)` and `block_index(hash, num_blocks)` primitives. The split-block design is the key property that makes single-block point reads possible.
 
 Width-overflow checks at write time return `WriteError::{FieldNameTooLong, TooManyFields, TooManyFiles, BloomBodyTooLarge}` instead of silent `as` casts.
 
@@ -325,14 +325,11 @@ Search-side concurrency is config-driven, mirroring the tantivy search path (`gr
 
 ```rust
 fn bloom_prefetch_concurrency() -> usize {
-    let cfg = config::get_config();
-    let cache_enabled = cfg.disk_cache.enabled || cfg.memory_cache.enabled;
-    if cache_enabled { cfg.limit.query_index_thread_num }
-    else             { cfg.limit.query_thread_num }
+    config::get_config().limit.query_thread_num.max(1)
 }
 ```
 
-Both knobs default to `cpu_num * 4` (cluster) / `cpu_num` (local). No hardcoded constant — large multi-day trace_id lookups need to fan out far beyond 32 buckets, and tantivy's path already tunes against the same env vars.
+Defaults to `cpu_num * 4` (cluster) / `cpu_num` (local). No hardcoded constant — large multi-day trace_id lookups need to fan out far beyond 32 buckets, and tantivy's path already tunes against the same env var.
 
 Internal tuning constants (not currently exposed as env vars):
 
@@ -452,8 +449,8 @@ probe fails to cover the footer and the bucket degrades to "keep all".
 
 **Fix later:** add `ZO_BLOOM_DEFAULT_FPP` and
 `ZO_BLOOM_SUFFIX_PROBE_BYTES` env vars. The search-side concurrency
-is already config-driven (mirrors tantivy's `query_index_thread_num`
-/ `query_thread_num`, see §9).
+is already config-driven (mirrors tantivy's `query_thread_num`,
+see §9).
 
 ### 12.3 Semantic / coverage gaps
 
