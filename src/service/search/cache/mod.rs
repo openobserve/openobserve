@@ -34,7 +34,7 @@ use config::{
         base64,
         hash::Sum64,
         json,
-        sql::{is_aggregate_query, is_eligible_for_histogram},
+        sql::{is_complex_query, is_eligible_for_histogram},
         time::{format_duration, now_micros, second_micros},
     },
 };
@@ -124,7 +124,7 @@ pub async fn search(
 
     // get the modified original sql from req
     let origin_sql = in_req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
         // result cache doesn't support multiple stream names
         Ok(v) => (v[0].clone(), v.join(",")),
@@ -345,7 +345,7 @@ pub async fn search(
     res.set_took(took_time as usize);
     res.set_cache_took(cache_took);
 
-    if is_aggregate
+    if is_complex_query
         && res.histogram_interval.is_none()
         && !c_resp.ts_column.is_empty()
         && c_resp.histogram_interval > 0
@@ -465,7 +465,7 @@ pub async fn search(
             req.query.end_time,
             deep_copy_response(&res),
             file_path,
-            is_aggregate,
+            is_complex_query,
             c_resp.is_descending,
             req.clear_cache,
             is_histogram_non_ts_order,
@@ -503,7 +503,7 @@ pub async fn prepare_cache_response(
     use_cache: bool,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
     let mut origin_sql = req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
         // result cache doesn't support multiple stream names
         Ok(v) => {
@@ -554,17 +554,17 @@ pub async fn prepare_cache_response(
 
     // Normalize histogram interval in SQL before computing hash
     // This ensures the hash is consistent regardless of when handle_histogram is called
-    if is_aggregate && sql.histogram_interval.is_some() {
+    if is_complex_query && sql.histogram_interval.is_some() {
         let mut req_time_range = (req.query.start_time, req.query.end_time);
         // If end_time is 0, it means "now" (current time)
         if req_time_range.1 == 0 {
             req_time_range.1 = now_micros();
         }
 
-        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
+        let meta_time_range_is_empty = sql.time_range == (0, 0);
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-                Some(req_time_range)
+                req_time_range
             } else {
                 sql.time_range
             };
@@ -593,13 +593,13 @@ pub async fn prepare_cache_response(
     let hashed_query = h.sum64(&hash_body.join(","));
 
     let (mut ts_column, mut is_descending) =
-        cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
+        cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).unwrap_or_default();
 
-    // Refine ts_column for non-aggregate queries with SELECT * or missing _timestamp
+    // Refine ts_column for non-complex queries with SELECT * or missing _timestamp
     // Also modify the SQL to add _timestamp to SELECT clause if missing
-    if !is_aggregate && origin_sql.contains('*') {
+    if !is_complex_query && origin_sql.contains('*') {
         ts_column = TIMESTAMP_COL_NAME.to_string();
-    } else if !is_aggregate
+    } else if !is_complex_query
         && sql.group_by.is_empty()
         && sql.order_by.is_empty()
         && !origin_sql.contains('*')
@@ -623,7 +623,7 @@ pub async fn prepare_cache_response(
     let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let file_path = cacher::compute_cache_file_path(
         &base_file_path,
-        is_aggregate,
+        is_complex_query,
         sql.histogram_interval,
         &ts_column,
     );
@@ -638,7 +638,7 @@ pub async fn prepare_cache_response(
             req,
             &mut origin_sql,
             &file_path,
-            is_aggregate,
+            is_complex_query,
             &sql,
             &ts_column,
             is_descending,
@@ -649,7 +649,7 @@ pub async fn prepare_cache_response(
         // if cache is not used, return the parsed metadata
         MultiCachedQueryResponse {
             ts_column,
-            is_aggregate,
+            is_aggregate: is_complex_query,
             is_descending,
             order_by: sql.order_by,
             limit: sql.limit,

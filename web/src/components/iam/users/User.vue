@@ -246,8 +246,8 @@ import NoData from "@/components/shared/grid/NoData.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
-import { getRoles } from "@/services/iam";
+import { computed, nextTick } from "vue";
+import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -310,6 +310,7 @@ export default defineComponent({
       await getOrgMembers();
       updateUserActions();
       await getRoles();
+      await getCustomRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
@@ -456,14 +457,24 @@ export default defineComponent({
           .finally(() => resolve(true));
       });
     };
-    const getCustomRoles = async () => {
-      await getRoles(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          customRoles.value = res.data;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+    const getCustomRoles = async (options: { silent?: boolean } = {}) => {
+      if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+      try {
+        const res = await getCustomRolesApi(
+          store.state.selectedOrganization.identifier,
+        );
+        customRoles.value = Array.isArray(res.data) ? res.data : [];
+      } catch (err: any) {
+        if (!options.silent && err?.response?.status !== 403) {
+          toast({
+            variant: "error",
+            message:
+              err?.response?.data?.message ||
+              "Failed to load custom roles.",
+            timeout: 3000,
+          });
+        }
+      }
     };
 
     const getInvitedMembers = () => {
@@ -490,6 +501,71 @@ export default defineComponent({
           });
       });
     }
+
+    let hydrateGeneration = 0;
+
+    const clearLoading = (targets: any[]) => {
+      for (const u of targets) {
+        u.custom_roles_loading = false;
+      }
+    };
+
+    // Inverts OFGA per-role memberships into per-user role lists.
+    // Cost: O(R) HTTP calls where R is the number of custom roles,
+    // independent of the user count.
+    const hydrateCustomRoles = async () => {
+      const myGen = ++hydrateGeneration;
+      const orgId = store.state.selectedOrganization.identifier;
+      const targets = usersState.users.filter(
+        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
+      );
+      if (targets.length === 0) return;
+
+      const byEmail = new Map<string, any>();
+      for (const u of targets) {
+        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
+      }
+
+      try {
+        // Always fetch a fresh role list scoped to this hydration run so we
+        // don't race with concurrent picker loads mutating the shared ref.
+        // Silent mode: hydration is a background operation; surface fetch
+        // errors via the per-row loading state, not a toast.
+        let roleNames: string[] = [];
+        try {
+          const res = await getCustomRolesApi(orgId);
+          roleNames = Array.isArray(res.data) ? res.data : [];
+        } catch {
+          roleNames = [];
+        }
+        if (myGen !== hydrateGeneration) return;
+        if (roleNames.length === 0) return;
+
+        const results = await Promise.all(
+          roleNames.map((role) =>
+            getRoleUsers(role, orgId)
+              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
+              .catch(() => ({ role, emails: [] as string[] })),
+          ),
+        );
+        if (myGen !== hydrateGeneration) return;
+
+        for (const { role, emails } of results) {
+          for (const email of emails) {
+            const row = byEmail.get(String(email).toLowerCase());
+            if (!row) continue;
+            const next = Array.isArray(row.custom_roles)
+              ? row.custom_roles
+              : [];
+            if (next.indexOf(role) === -1) {
+              row.custom_roles = [...next, role];
+            }
+          }
+        }
+      } finally {
+        clearLoading(targets);
+      }
+    };
 
     const getOrgMembers = () => {
       const dismiss = toast({
@@ -539,9 +615,11 @@ export default defineComponent({
               }
               const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
 
+
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
+                rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
@@ -1213,5 +1291,44 @@ export default defineComponent({
 .inputHint {
   font-size: 11px;
   color: $light-text;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: transparent;
+  white-space: nowrap;
+}
+
+.role-badge-system {
+  color: #8a6a1f;
+  border: 1px solid #8a6a1f;
+}
+
+.role-badge-custom {
+  color: #a04545;
+  border: 1px solid #a04545;
+  font-weight: 700;
+}
+
+.role-badge-more {
+  color: #a04545;
+  border: 1px solid #a04545;
+  cursor: pointer;
+}
+
+.role-badge-sso {
+  color: #1f6f8b;
+  border: 1px solid #1f6f8b;
+}
+
+.role-badge-local {
+  color: #4a4a4a;
+  border: 1px solid #4a4a4a;
 }
 </style>

@@ -858,7 +858,12 @@
     "groups": "Groepen",
     "customRole": "Rollen op maat",
     "description": "Omschrijving",
-    "revoke_invite": "Uitnodiging intrekken"
+    "revoke_invite": "Uitnodiging intrekken",
+    "authType": "Auth",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Inheems",
+    "noCustomRolesHint": "Geen aangepaste rollen gedefinieerd — maak er een in IAM → Rollen",
+    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd"
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",

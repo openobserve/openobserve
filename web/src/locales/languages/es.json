@@ -858,7 +858,12 @@
     "groups": "Grupos",
     "customRole": "Funciones personalizadas",
     "description": "Descripción",
-    "revoke_invite": "Revocar invitación"
+    "revoke_invite": "Revocar invitación",
+    "authType": "Autenticación",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "No hay roles personalizados definidos: cree uno en IAM → Roles",
+    "externalUserCustomRoleHint": "Los usuarios externos solo se pueden modificar a través del sistema fuente"
   },
   "ticket": {
     "header": "Tickets de soporte",

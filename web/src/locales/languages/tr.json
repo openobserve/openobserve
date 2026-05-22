@@ -858,7 +858,12 @@
     "groups": "Gruplar",
     "customRole": "Özel Roller",
     "description": "Açıklama",
-    "revoke_invite": "Daveti İptal Et"
+    "revoke_invite": "Daveti İptal Et",
+    "authType": "Yetkilendirme",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Yerli",
+    "noCustomRolesHint": "Özel rol tanımlanmadı - IAM → Roller'de bir tane oluşturun",
+    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir"
   },
   "ticket": {
     "header": "Destek Talepleri",

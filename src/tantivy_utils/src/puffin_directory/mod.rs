@@ -39,6 +39,11 @@ const EMPTY_FILE_EXT: &[&str] = &["fieldnorm", "store"];
 const META_JSON: &str = "meta.json";
 const FOOTER_CACHE: &str = "footer_cache";
 
+/// Puffin file-level property name carrying the parquet row group size in
+/// effect when the index was built. Lets readers map tantivy doc_ids back to
+/// parquet row groups even if `PARQUET_MAX_ROW_GROUP_SIZE` changes later.
+pub const PROP_ROW_GROUP_SIZE: &str = "row_group_size";
+
 // Lazy loaded global instance of RAM directory which will contain
 // all the files of an empty tantivy index. This instance will be used to fill the missing files
 // from the `.ttv` file, as tantivy needs them regardless of the configuration of a field.

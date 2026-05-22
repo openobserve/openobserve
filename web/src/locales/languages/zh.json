@@ -858,7 +858,12 @@
     "groups": "群组",
     "customRole": "自定义角色",
     "description": "描述",
-    "revoke_invite": "撤销邀请"
+    "revoke_invite": "撤销邀请",
+    "authType": "身份验证",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "本地人",
+    "noCustomRolesHint": "未定义自定义角色——在 IAM → 角色中创建一个",
+    "externalUserCustomRoleHint": "只能通过源系统修改外部用户"
   },
   "ticket": {
     "header": "工单",

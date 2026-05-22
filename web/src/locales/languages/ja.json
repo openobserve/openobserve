@@ -858,7 +858,12 @@
     "groups": "グループ",
     "customRole": "カスタムロール",
     "description": "[説明]",
-    "revoke_invite": "招待を取り消す"
+    "revoke_invite": "招待を取り消す",
+    "authType": "認証",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "ネイティブ",
+    "noCustomRolesHint": "カスタムロールは定義されていません — IAM → ロールで作成",
+    "externalUserCustomRoleHint": "外部ユーザーはソースシステム経由でのみ変更できます"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
