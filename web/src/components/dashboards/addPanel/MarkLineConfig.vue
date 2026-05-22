@@ -28,7 +28,7 @@
           border-bottom: 1px solid gray;
         "
       >
-        <div style="width: 90%">
+        <div style="width: 90%" class="tw:flex tw:flex-col tw:gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"

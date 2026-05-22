@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="activeFolderId === selectedFolder.value"
+    :primary-button-disabled="isSameFolder"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
@@ -94,6 +94,28 @@ export default defineComponent({
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
+    // Reset selection to current folder whenever the drawer reopens so the
+    // same-folder comparison is always accurate.
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          const folder = store.state.organizationData.folders.find(
+            (item: any) => item.folderId === props.activeFolderId,
+          );
+          selectedFolder.value = {
+            label: folder?.name,
+            value: props.activeFolderId,
+          };
+        }
+      },
+    );
+
+    // Disable Move when the selected folder is the same as the current one.
+    const isSameFolder = computed(
+      () => props.activeFolderId === selectedFolder.value?.value,
+    );
+
     const onSubmit = useLoading(async () => {
       // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
       try {
@@ -124,6 +146,7 @@ export default defineComponent({
       store,
       getImageURL,
       selectedFolder,
+      isSameFolder,
       onSubmit,
     };
   },

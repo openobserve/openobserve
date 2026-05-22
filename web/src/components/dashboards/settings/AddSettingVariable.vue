@@ -21,10 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <OForm greedy ref="addVariableForm" @submit="onSubmit" class="tw:px-0.5">
+        <OForm
+          greedy
+          ref="addVariableForm"
+          @submit="onSubmit"
+          class="tw:px-0.5"
+        >
           <div class="tw:mt-3">
             <div class="tw:mb-3">
-            <OSelect
+              <OSelect
                 helpText="Variables will be applied to all tabs and panels if global is selected."
                 v-model="variableData.scope"
                 :options="scopeOptions"
@@ -49,7 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchable
                 :error-message="fieldErrors.tabs"
                 :error="!!fieldErrors.tabs"
-                @update:model-value="updatePanels(); fieldErrors.tabs = ''"
+                @update:model-value="
+                  updatePanels();
+                  fieldErrors.tabs = '';
+                "
                 data-test="dashboard-variable-tabs-select"
               />
             </div>
@@ -87,11 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="tw:text-base tw:font-bold tw:mt-3">
+            <div class="tw:text-base tw:font-bold tw:mt-4">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="tw:flex tw:gap-4">
-              <div class="textbox tw:flex tw:flex-col">
+            <div class="tw:flex tw:gap-4 tw:mt-3">
+              <div class="tw:flex-1 tw:flex tw:flex-col">
                 <OInput
                   v-model="variableData.name"
                   :label="t('dashboard.nameOfVariable') + ' *'"
@@ -101,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-name"
                 />
               </div>
-              <div class="textbox tw:flex tw:flex-col">
+              <div class="tw:flex-1 tw:flex tw:flex-col">
                 <OInput
                   v-model="variableData.label"
                   :label="t('dashboard.labelOfVariable')"
@@ -110,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw:flex tw:justify-between tw:w-full tw:text-base tw:font-bold tw:mt-3"
+              class="tw:flex tw:justify-between tw:w-full tw:text-base tw:font-bold tw:mt-4"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -127,7 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex-1"
                   :error-message="fieldErrors.streamType"
                   :error="!!fieldErrors.streamType"
-                  @update:model-value="streamTypeUpdated(); fieldErrors.streamType = ''"
+                  @update:model-value="
+                    streamTypeUpdated();
+                    fieldErrors.streamType = '';
+                  "
                   data-test="dashboard-variable-stream-type-select"
                 />
                 <OSelect
@@ -140,75 +151,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex-1"
                   :error-message="fieldErrors.stream"
                   :error="!!fieldErrors.stream"
-                  @update:model-value="streamUpdated(); fieldErrors.stream = ''"
+                  @update:model-value="
+                    streamUpdated();
+                    fieldErrors.stream = '';
+                  "
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
                     <OTooltip max-width="250px">
                       <template #content>
                         Select a stream or use a variable like $streamVariable
-                        to dynamically choose the stream based on another
-                        value.
+                        to dynamically choose the stream based on another value.
                       </template>
                     </OTooltip>
                   </template>
                 </OSelect>
               </div>
-              <div class="tw:flex">
-              <OSelect
-                v-model="variableData.query_data.field"
-                :label="t('dashboard.selectField') + ' *'"
-                :options="mergedFieldOptionsWithLabel"
-                labelKey="_displayLabel"
-                valueKey="name"
-                searchable
-                class="tw:flex-1"
-                data-test="dashboard-variable-field-select"
-              >
-                <template #tooltip>
-                  <OTooltip max-width="250px">
-                    <template #content>
-                      Select a field or use a variable like $fieldVariable. If
-                      stream uses a variable, field list will be empty - type
-                      field name manually.
-                    </template>
-                  </OTooltip>
-                </template>
-              </OSelect>
+              <div class="tw:flex tw:mt-4">
+                <OSelect
+                  v-model="variableData.query_data.field"
+                  :label="t('dashboard.selectField') + ' *'"
+                  :options="mergedFieldOptionsWithLabel"
+                  labelKey="_displayLabel"
+                  valueKey="name"
+                  searchable
+                  class="tw:flex-1"
+                  data-test="dashboard-variable-field-select"
+                >
+                  <template #tooltip>
+                    <OTooltip max-width="250px">
+                      <template #content>
+                        Select a field or use a variable like $fieldVariable. If
+                        stream uses a variable, field list will be empty - type
+                        field name manually.
+                      </template>
+                    </OTooltip>
+                  </template>
+                </OSelect>
               </div>
-              <div>
+              <div class="tw:mt-4">
                 <OInput
                   type="number"
                   v-model.number="variableData.query_data.max_record_size"
                   :label="t('dashboard.DefaultSize')"
                   data-test="dashboard-variable-max-record-size"
                 >
-                  <template #tooltip><OTooltip :content="t('dashboard.maxRecordSize')" /></template>
+                  <template #tooltip
+                    ><OTooltip :content="t('dashboard.maxRecordSize')"
+                  /></template>
                 </OInput>
               </div>
-              <div>
-                <div class="tw:flex tw:flex-row">
+              <div class="tw:mt-4">
+                <div class="tw:flex tw:flex-row tw:items-center tw:gap-1.5">
                   <div
                     data-test="dashboard-query-values-filter"
-                    class="tw:text-base tw:font-bold tw:mt-4"
+                    class="tw:text-base tw:font-bold"
                   >
                     Filters
                   </div>
-                  <OIcon
-                    class=""
-                    style="margin-top: 25px; margin-left: 5px"
-                    size="md"
-                    name="info-outline"
-                    data-test="dashboard-variables-setting-filter-info"
-                   />
-                    <OTooltip max-width="250px">
-                      <template #content>
-                        In filters, you can use the value of another variable to
-                        filter the current variable's value. This can be done by
-                        using the other variable's name. For example:
-                        <span class="bg-highlight">$variableName</span>.
-                      </template>
-                    </OTooltip>
+                  <OTooltip max-width="250px">
+                    <OIcon
+                      size="sm"
+                      name="info-outline"
+                      data-test="dashboard-variables-setting-filter-info"
+                      class="tw:cursor-help"
+                    />
+                    <template #content>
+                      In filters, you can use the value of another variable to
+                      filter the current variable's value. This can be done by
+                      using the other variable's name. For example:
+                      <span class="bg-highlight">$variableName</span>.
+                    </template>
+                  </OTooltip>
                 </div>
                 <div>
                   <div
@@ -226,12 +240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="filter.name || undefined"
                       :error-message="filterNameErrors[index as number]"
                       :error="!!filterNameErrors[index as number]"
-                      @update:model-value="filterUpdated(index, $event); filterNameErrors[index as number] = ''"
+                      @update:model-value="
+                        filterUpdated(index, $event);
+                        filterNameErrors[index as number] = '';
+                      "
                       data-test="dashboard-query-values-filter-name-selector"
                       class="tw:flex-[2] tw:min-w-0"
                     >
                       <template #empty>
-                        <span class="tw:italic tw:text-gray-400">No Data Found</span>
+                        <span class="tw:italic tw:text-gray-400"
+                          >No Data Found</span
+                        >
                       </template>
                     </OSelect>
                     <OSelect
@@ -239,7 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="operator tw:flex-[1.5] tw:min-w-0"
                       :error-message="filterOperatorErrors[index as number]"
                       :error="!!filterOperatorErrors[index as number]"
-                      @update:model-value="filterOperatorErrors[index as number] = ''"
+                      @update:model-value="
+                        filterOperatorErrors[index as number] = ''
+                      "
                       data-test="dashboard-query-values-filter-operator-selector"
                       :options="[
                         '=',
@@ -338,7 +359,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
                 >
-                  <template #tooltip><OTooltip content="Default - Select All" /></template>
+                  <template #tooltip
+                    ><OTooltip content="Default - Select All"
+                  /></template>
                 </OCheckbox>
               </div>
               <div class="tw:w-[2.62rem]"></div>
@@ -387,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="sm"
-                class="tw:mt-3"
+                class="tw:mt-3 tw:w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
                 icon-left="add"
@@ -399,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- multiselect toggle for query values and custom variables-->
           <div
             v-if="['query_values', 'custom'].includes(variableData.type)"
-            class="tw:mt-3"
+            class="tw:mt-4"
           >
             <OSwitch
               v-model="variableData.multiSelect"
@@ -415,23 +438,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="multi-select-default-value">By Default Select:</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
-                @update:model-value="variableData.selectAllValueForMultiSelect = ($event as string)"
+                @update:model-value="
+                  variableData.selectAllValueForMultiSelect = $event as string
+                "
               >
                 <OToggleGroupItem
                   value="first"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
-                >First value</OToggleGroupItem>
+                  >First value</OToggleGroupItem
+                >
                 <OToggleGroupItem
                   value="all"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
-                >All values</OToggleGroupItem>
+                  >All values</OToggleGroupItem
+                >
                 <OToggleGroupItem
                   value="custom"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
-                >Custom</OToggleGroupItem>
+                  >Custom</OToggleGroupItem
+                >
               </OToggleGroup>
             </div>
             <!-- if selectAllValueForMultiSelect is custom then show this input -->
@@ -485,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- hide on dashboard toggle -->
-          <div class="tw:mt-3">
+          <div class="tw:mt-4">
             <OSwitch
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
@@ -495,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- escape single quotes toggle -->
-          <div class="tw:mt-2">
+          <div class="tw:mt-4">
             <OSwitch
               v-model="variableData.escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"
@@ -583,9 +611,20 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, OCombobox, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip, OForm,
+  components: {
+    DashboardHeader,
+    OCombobox,
+    OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    OSelect,
+    OInput,
+    OSwitch,
+    OCheckbox,
+    OTooltip,
+    OForm,
     OIcon,
-},
+  },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data
@@ -642,7 +681,7 @@ export default defineComponent({
       const options = dashboardData.value.tabs
         .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
         .flatMap((tab: any) => {
-          const panelOptions = [{ label: tab.name, isTab: true }];
+          const panelOptions: any[] = [{ label: tab.name, isTab: true }];
 
           // Add "Current Panel" option first if from Add Panel
           // But only if NOT editing an existing panel
@@ -1287,8 +1326,8 @@ export default defineComponent({
       }
       // Validate custom option labels
       if (variableData.type === "custom") {
-        optionLabelErrors.value = (variableData.options ?? []).map(
-          (o: any) => (o.label?.trim() ? "" : "Label is required."),
+        optionLabelErrors.value = (variableData.options ?? []).map((o: any) =>
+          o.label?.trim() ? "" : "Label is required.",
         );
       } else {
         optionLabelErrors.value = [];
@@ -1527,7 +1566,7 @@ export default defineComponent({
       mergedStreamOptions.value.map((o: any) => ({
         ...o,
         _displayLabel:
-          o.name?.startsWith('$') || o.name?.startsWith('{{')
+          o.name?.startsWith("$") || o.name?.startsWith("{{")
             ? `${o.name} (variable)`
             : o.name,
       })),
@@ -1545,7 +1584,7 @@ export default defineComponent({
       mergedFieldOptions.value.map((o: any) => ({
         ...o,
         _displayLabel:
-          o.name?.startsWith('$') || o.name?.startsWith('{{')
+          o.name?.startsWith("$") || o.name?.startsWith("{{")
             ? `${o.name} (variable)`
             : o.name,
       })),
