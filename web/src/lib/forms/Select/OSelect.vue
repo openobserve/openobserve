@@ -262,7 +262,10 @@ const selectedLabels = computed(() => {
       const option = normalizedOptions.value.find(
         (opt) => opt.value === selectedValue,
       );
-      return option?.label ?? String(selectedValue);
+      if (option) return option.label;
+      // Don't render "null" for unmatched null values — treat as empty/placeholder
+      if (selectedValue === null) return null;
+      return String(selectedValue);
     })
     .filter(Boolean);
 });

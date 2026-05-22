@@ -18,9 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
     <div class="tw:flex tw:justify-between tw:items-center">
       <div>
-        <span class="o2-page-title">{{ t("billing.title") }}</span
-        ><br />
-        <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
+        <h1 class="page-title">{{ t("billing.title") }}</h1>
+        <p class="page-subtitle">{{ t("billing.subtitle") }}</p>
       </div>
     </div>
     <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
@@ -70,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="warning" size="sm" class="tw:pt-2" />
       >{{ store.state.selectedOrganization.note }}
     </div>
-    <div v-if="loading">
-      <OSpinner size="md" class="tw:mx-auto tw:block" />
+    <div v-if="loading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
+      <OSpinner size="md" class="tw:mx-auto tw:block tw:text-center tw:mt-3" />
     </div>
-    <div v-else class="tw:flex tw:gap-3 tw:justify-center">
+    <div v-else class="tw:grid tw:grid-cols-2 tw:gap-3 tw:mt-3">
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"
@@ -384,7 +383,79 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 2.25rem;
+  color: var(--o2-text-heading);
+  margin: 0 0 0.5rem 0;
+  display: block;
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.375rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
+  display: block;
+}
+
 .subtitle {
   color: $primary;
+}
+
+.feature-card {
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.body--dark .feature-card {
+  background: var(--o2-card-background);
+  border-color: var(--o2-border);
+}
+
+.tile-content {
+  min-height: 100%;
+  border-radius: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.usage-tile-title {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  color: var(--o2-text-heading);
+  text-align: left;
+}
+
+.usage-data-to-display {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  color: var(--o2-text-heading);
+  text-align: left;
+}
+
+.warning-message {
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plans-grid {
+  width: 100%;
+}
+
+.plans-grid > * {
+  width: 100%;
+  min-width: 0;
 }
 </style>

@@ -2691,13 +2691,13 @@ export default defineComponent({
 }
 
 .panel-time-picker-container {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .panel-time-picker-btn {
   flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 
   :deep(.date-time-button) {
     width: fit-content;

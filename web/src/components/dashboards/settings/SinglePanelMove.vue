@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <ODialog data-test="single-panel-move-dialog" v-model:open="open" size="sm" :title="title"
+  <ODialog
+    data-test="single-panel-move-dialog"
+    v-model:open="open"
+    size="sm"
+    :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
     primary-button-label="Move"
     :primary-button-disabled="selectedMoveTabId === null"
@@ -33,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="moveTabOptions"
           class="tw:flex-1"
           data-test="dashboard-tab-move-select"
+          label-position="inside"
         />
 
         <OButton
@@ -80,9 +85,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton, OSelect, ODialog, OTooltip,
-    OIcon,
-},
+  components: { AddTab, OButton, OSelect, ODialog, OTooltip, OIcon },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
@@ -148,7 +151,9 @@ export default defineComponent({
       await getTabOptions();
       // set selectedMoveTabId to first tab from move tab options
       selectedMoveTabId.value =
-        moveTabOptions.value.length > 0 ? moveTabOptions.value[0] : null;
+        moveTabOptions.value.length > 0
+          ? (moveTabOptions.value[0] as any).value
+          : null;
     });
 
     const onCancel = () => {
