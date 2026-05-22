@@ -32,7 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="opt.value"
           :value="opt.value"
           size="sm"
-          :data-test="`${dataTestPrefix}-user-defined-fields-btn`"
+          :data-test="
+            opt.slot === 'all_fields_slot'
+              ? `${dataTestPrefix}-all-fields-btn`
+              : opt.slot === 'interesting_fields_slot'
+                ? `${dataTestPrefix}-interesting-fields-btn`
+                : `${dataTestPrefix}-user-defined-fields-btn`
+          "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
             <OIcon name="person" size="xs" class="tw:text-[12px]!"></OIcon>

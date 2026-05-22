@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
     :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
+    data-test="home-page"
   >
     <div
       class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"

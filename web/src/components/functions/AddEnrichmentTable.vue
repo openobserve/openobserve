@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-col tw:gap-4 tw:max-w-[40rem]">
           <OInput
             v-model="formData.name"
+            data-test="add-enrichment-table-name"
             :label="t('function.name')"
             :readonly="isUpdating"
             :disabled="isUpdating"
@@ -56,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-gray-500 tw:font-bold">{{ t('function.dataSource') }}</div>
             <OOptionGroup
               v-model="formData.source"
+              data-test="add-enrichment-table-source"
               :options="sourceOptions"
               orientation="horizontal"
             />
@@ -65,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFile
             v-if="!isUpdating && formData.source === 'file'"
             v-model="formData.file"
+            data-test="add-enrichment-table-file"
             :label="t('function.uploadCSVFile')"
             accept=".csv"
             :error="!!fileError"
@@ -76,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFile
             v-if="isUpdating && formData.source === 'file'"
             v-model="formData.file"
+            data-test="add-enrichment-table-file"
             :label="t('function.uploadCSVFile')"
             accept=".csv"
             :error="!!fileError"
@@ -87,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             v-if="isUpdating && formData.source === 'file'"
             v-model="formData.append"
+            data-test="add-enrichment-table-append-switch"
             :label="t('function.appendData')"
           />
 
@@ -95,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-gray-500 tw:font-bold">Update Mode</div>
             <OOptionGroup
               v-model="formData.updateMode"
+              data-test="add-enrichment-table-update-mode"
               :options="updateModeOptions"
               orientation="horizontal"
             />
@@ -164,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')"
             v-model="formData.url"
+            data-test="add-enrichment-table-new-url"
             :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
             placeholder="https://example.com/data.csv"
             :error="!!urlError"
@@ -186,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-if="!isUpdating && formData.source === 'url'"
             v-model="formData.url"
+            data-test="add-enrichment-table-url"
             label="CSV File URL"
             placeholder="https://example.com/data.csv"
             :error="!!urlError"
@@ -336,7 +344,13 @@ export default defineComponent({
         fileError.value = "CSV File is required!";
         return;
       }
-      if (formData.value.source === 'url' && formData.value.updateMode !== 'reload') {
+      if (
+        formData.value.source === 'url' &&
+        (!props.isUpdating || formData.value.updateMode !== 'reload')
+      ) {
+        // New tables always require a URL. In update mode the URL field is
+        // only shown for non-reload modes (append / replace_failed / replace),
+        // so validation is skipped for reload-only updates.
         const url = formData.value.url;
         if (!url) {
           urlError.value = "URL is required!";

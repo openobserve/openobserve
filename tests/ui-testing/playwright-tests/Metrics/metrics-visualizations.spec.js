@@ -44,7 +44,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     if (timeRangeSelected) {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
-      await page.keyboard.press('Escape');
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
       testLogger.warn('Could not select 15 minutes time range, using default');
     }
     await page.waitForTimeout(500);
@@ -519,7 +519,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       if (hasSvg) testLogger.info('SVG export option available');
       if (hasCsv) testLogger.info('CSV export option available');
 
-      await page.keyboard.press('Escape');
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     // Test chart customization options
@@ -545,7 +545,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       if (hasGrid) testLogger.info('Grid toggle option available');
       if (hasTooltip) testLogger.info('Tooltip toggle option available');
 
-      await page.keyboard.press('Escape');
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     testLogger.info('Chart interaction features tested successfully');

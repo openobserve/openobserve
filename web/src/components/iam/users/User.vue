@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               class="tw:w-[12.5rem]"
               :placeholder="t('user.search')"
+              data-test="iam-users-search-input"
             >
               <template #icon-left>
                 <OIcon name="search" size="sm" />

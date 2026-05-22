@@ -260,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Error State -->
                 <div
                   v-else-if="error"
+                  data-test="traces-analysis-dashboard-error"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
                   <OIcon
@@ -273,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm-action"
                     class="tw:mt-4"
+                    data-test="traces-analysis-dashboard-retry-btn"
                     @click="loadAnalysis"
                   >
                     {{ t('latencyInsights.retryButton') }}

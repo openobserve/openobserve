@@ -22,6 +22,14 @@ export default class DashboardCreate {
     );
     this.applyQueryBtn = this.page.locator('[data-test="dashboard-apply"]');
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+    this.defaultFolderTab = this.page.locator(
+      '[data-test="dashboard-folder-tab-default"]'
+    );
+  }
+
+  // Wait for the default folder tab on the dashboard list to be visible
+  async waitForDefaultFolderTabVisible() {
+    await this.defaultFolderTab.waitFor({ state: "visible" });
   }
 
   // Wait for dashboard UI to be fully stable before any interaction
@@ -101,6 +109,11 @@ export default class DashboardCreate {
   async backToDashboardList() {
     await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.backBtn.click();
+  }
+
+  //wait for back button to be visible (no click)
+  async waitForBackBtnVisible() {
+    await this.backBtn.waitFor({ state: "visible" });
   }
 
   //Search the Folder

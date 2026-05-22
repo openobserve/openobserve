@@ -49,7 +49,7 @@ export class MetricsQueryEditorPage {
         this.testLogger.info('Switching to PromQL Custom mode...');
 
         // Close any dialogs first
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         // Primary selector — the Custom builder-mode button in QueryTypeSelector.vue
@@ -117,7 +117,7 @@ export class MetricsQueryEditorPage {
      */
     async enterPromQLQuery(query) {
         // Close any open dialogs first
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(500);
 
         this.testLogger.info(`Attempting to enter query: ${query}`);
@@ -281,7 +281,7 @@ export class MetricsQueryEditorPage {
      */
     async switchToTab(tabNumber) {
         // Close any dialogs first
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         this.testLogger.info(`Attempting to switch to tab ${tabNumber}`);
@@ -339,7 +339,7 @@ export class MetricsQueryEditorPage {
      */
     async addQueryTab() {
         // Close any dialogs first
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         this.testLogger.info('Looking for Add Query button...');

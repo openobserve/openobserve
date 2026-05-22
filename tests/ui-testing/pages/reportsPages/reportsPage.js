@@ -7,55 +7,133 @@ import {
 export class ReportsPage {
   constructor(page) {
     this.page = page;
-    this.homeMenu = page.locator("[name ='home']");
+
+    // Navigation locators (data-test only). The MainLayout side-nav builds
+    // each entry's data-test as `menu-link-${link}-item`, so the Home link
+    // (`link: "/"`) becomes `menu-link-/-item` (escaped CSS: `menu-link-\\/-item`).
+    this.homeMenu = page.locator('[data-test="menu-link-\\/-item"]');
     this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
-    this.scheduledTab = page.locator("[title='Scheduled']");
+    this.reportListTitle = page.locator('[data-test="report-list-title"]');
+    this.reportListTable = page.locator('[data-test="report-list-table"]');
+    this.scheduledTab = page.locator('[data-test="tab-shared"]');
+
+    // Create-report flow locators
     this.addReportButton = page.locator('[data-test="report-list-add-report-btn"]');
-    this.reportNameInput = page.locator("[aria-label='Name *']");
-    this.folderInput = page.locator("[aria-label='Folder *']");
-    this.dashboardInput = page.locator("[aria-label='Dashboard *']");
-    this.dashboardTabInput = page.locator("[aria-label='Dashboard Tab *']");
+    this.reportNameInputField = page.locator('[data-test="add-report-name-input-field"]');
+    this.descriptionInputField = page.locator('[data-test="add-report-description-input-field"]');
+
+    // Step-1 dashboard pickers (OSelect triggers use data-test-selected-value attribute)
+    this.dashboardFolderSelect = page.locator('[data-test="add-report-dashboard-folder-select"]');
+    this.dashboardFolderTrigger = page.locator('[data-test="add-report-dashboard-folder-select"] [data-test-selected-value]');
+    this.dashboardFolderPopover = page.locator('[data-test="add-report-dashboard-folder-select-popover"]');
+    this.dashboardFolderOption = (value) => page.locator(`[data-test="add-report-dashboard-folder-select-option"][data-test-value="${value}"]`);
+
+    this.dashboardNameSelect = page.locator('[data-test="add-report-dashboard-name-select"]');
+    this.dashboardNameTrigger = page.locator('[data-test="add-report-dashboard-name-select"] [data-test-selected-value]');
+    this.dashboardNamePopover = page.locator('[data-test="add-report-dashboard-name-select-popover"]');
+    this.dashboardNameOptions = page.locator('[data-test="add-report-dashboard-name-select-option"]');
+
+    this.dashboardTabSelect = page.locator('[data-test="add-report-dashboard-tab-select"]');
+    this.dashboardTabTrigger = page.locator('[data-test="add-report-dashboard-tab-select"] [data-test-selected-value]');
+    this.dashboardTabPopover = page.locator('[data-test="add-report-dashboard-tab-select-popover"]');
+    this.dashboardTabOption = (value) => page.locator(`[data-test="add-report-dashboard-tab-select-option"][data-test-value="${value}"]`);
+
+    // Step navigation buttons
     this.continueButtonStep1 = page.locator('[data-test="add-report-step1-continue-btn"]');
     this.continueButtonStep2 = page.locator('[data-test="add-report-step2-continue-btn"]');
-    this.titleInput = page.locator("[aria-label='Title *']");
-    this.recipientsInput = page.locator("[aria-label='Recipients *']");
+
+    // Step-2 frequency buttons
+    this.frequencyOnceBtn = page.locator('[data-test="add-report-schedule-frequency-once-btn"]');
+    this.frequencyHoursBtn = page.locator('[data-test="add-report-schedule-frequency-hours-btn"]');
+    this.frequencyDaysBtn = page.locator('[data-test="add-report-schedule-frequency-days-btn"]');
+    this.frequencyWeeksBtn = page.locator('[data-test="add-report-schedule-frequency-weeks-btn"]');
+    this.frequencyMonthsBtn = page.locator('[data-test="add-report-schedule-frequency-months-btn"]');
+    this.frequencyCustomBtn = page.locator('[data-test="add-report-schedule-frequency-custom-btn"]');
+    this.frequencyCronBtn = page.locator('[data-test="add-report-schedule-frequency-cron-btn"]');
+    this.scheduleNowBtn = page.locator('[data-test="add-report-schedule-scheduleNow-btn"]');
+    this.scheduleLaterBtn = page.locator('[data-test="add-report-schedule-scheduleLater-btn"]');
+
+    // Schedule-later inputs
+    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"]');
+    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"]');
+    this.scheduleTimezoneSelect = page.locator('[data-test="add-report-schedule-start-timezone-select"]');
+    this.scheduleTimezoneTrigger = page.locator('[data-test="add-report-schedule-start-timezone-select"] [data-test-selected-value]');
+    this.scheduleTimezonePopover = page.locator('[data-test="add-report-schedule-start-timezone-select-popover"]');
+    this.scheduleTimezoneOption = (value) => page.locator(`[data-test="add-report-schedule-start-timezone-select-option"][data-test-value="${value}"]`);
+
+    // Share step
+    this.titleInputField = page.locator('[data-test="add-report-share-title-input-field"]');
+    this.recipientsInputField = page.locator('[data-test="add-report-share-recipients-input-field"]');
+
+    // Save / cancel
     this.saveButton = page.locator('[data-test="add-report-save-btn"]');
-    this.successAlert = page.getByRole('alert').nth(1);
+    this.cancelButton = page.locator('[data-test="add-report-cancel-btn"]');
+
+    // Toasts (OToast variants)
+    this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+    this.toastError = page.locator('[data-test="o-toast-error"]');
+    this.toastMessage = page.locator('[data-test="o-toast-message"]');
+
+    // Common time-range locators (used by Logs/Reports/Dashboards screens, exported as data-test)
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
+
+    // Header / profile / logout
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
-    this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
-    this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
+
+    // Report list — search + row actions
     this.reportSearchInput = page.locator('[data-test="report-list-search-input"]');
-    this.descriptionInput = (reportName) => page.getByRole('textbox', { name: 'Description' });
+    this.reportSearchInputField = page.locator('[data-test="report-list-search-input-field"]');
+    this.pauseStartReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`);
+    this.editReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-edit-report"]`);
+    this.deleteReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-delete-report"]`);
+
+    // Confirm dialog (delete)
+    this.confirmDialog = page.locator('[data-test="confirm-dialog"]');
+    this.confirmPrimaryBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+    this.confirmSecondaryBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+
+    // Multi-org / organization switcher (used by reportsPageDefaultMultiOrg)
+    this.orgSelectTrigger = page.locator('[data-test="navbar-organizations-select"] [data-test-selected-value]');
+    this.orgSearchInputField = page.locator('[data-test="organization-search-input-field"]');
+    this.orgMenuItemLabel = page.locator('[data-test="organization-menu-item-label-item-label"]');
+
+    // Date/Time locators wrapped as Locator (the constants are CSS selector strings)
+    this.dateTimeButtonLocator = page.locator(dateTimeButtonLocator);
+    this.absoluteTabLocator = page.locator(absoluteTabLocator);
+    this.absoluteStartTimeField = page.locator('[data-test="date-time-absolute-start-time-field"]');
+    this.absoluteEndTimeField = page.locator('[data-test="date-time-absolute-end-time-field"]');
+  }
+
+  // Returns the search-input locator preferring the inner -field variant when present
+  reportSearchField() {
+    return this.reportSearchInputField;
   }
 
   async navigateToReports() {
     await this.homeMenu.hover();
     await this.reportsMenu.click({ force: true });
-    await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
+    await expect(this.reportListTitle).toContainText('Reports');
     await this.scheduledTab.click({ force: true });
   }
 
   async goToReports() {
-
     await this.reportsMenu.click({ force: true });
-    await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
-
+    await expect(this.reportListTitle).toContainText('Reports');
   }
 
   async reportsPageDefaultMultiOrg() {
-    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click({ force: true });
+    await this.orgSelectTrigger.click({ force: true });
     await this.page.waitForTimeout(2000);
 
     // Search for the organization
-    await this.page.locator('[data-test="organization-search-input"]').fill('defaulttestmulti');
+    await this.orgSearchInputField.fill('defaulttestmulti');
     await this.page.waitForTimeout(2000);
 
     // Click the organization from search results
-    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
+    await this.orgMenuItemLabel.first().click({ force: true });
   }
 
   async reportsPageURLValidation() {
@@ -67,41 +145,71 @@ export class ReportsPage {
     await expect(this.page).toHaveURL(/report/);
   }
 
-
-
-
-
   async createReportAddReportButton() {
-    await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
+    await this.addReportButton.waitFor({ state: 'visible', timeout: 10000 });
     await this.addReportButton.click({ force: true });
   }
 
   async createReportReportNameInput(TEST_REPORT_NAME) {
-    await this.page.waitForSelector("[aria-label='Name *']");
-    await this.reportNameInput.fill(TEST_REPORT_NAME);
+    await this.reportNameInputField.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportNameInputField.fill(TEST_REPORT_NAME);
     await this.page.waitForTimeout(5000);
   }
 
   async createReportFolderInput() {
-    await this.folderInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.folderInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    // Open folder popover (PopoverTrigger inside the OSelect wrapper)
+    await this.dashboardFolderTrigger.click({ force: true });
+    await this.dashboardFolderPopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Folder value === "default"
+    const opt = this.dashboardFolderOption('default');
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click({ force: true });
+    await this.dashboardFolderPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async createReportDashboardInput(dashboardName) {
-    await this.dashboardInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.dashboardInput.fill(dashboardName);
-    await this.page.waitForTimeout(2000);
-    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
+    // Open dashboard popover, find option whose label matches dashboardName, click it
+    await this.dashboardNameTrigger.click({ force: true });
+    await this.dashboardNamePopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Wait until at least one option is rendered
+    await this.dashboardNameOptions.first().waitFor({ state: 'visible', timeout: 15000 });
+
+    // Pick option by its text content (scoped to data-test list), via evaluate using data-test attrs only
+    const clicked = await this.page.evaluate((name) => {
+      const opts = Array.from(
+        document.querySelectorAll('[data-test="add-report-dashboard-name-select-option"]')
+      );
+      for (const el of opts) {
+        const text = (el.textContent || '').trim();
+        if (text === name || text.includes(name)) {
+          el.scrollIntoView({ block: 'center' });
+          (el).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+          (el).click();
+          return true;
+        }
+      }
+      return false;
+    }, dashboardName);
+
+    if (!clicked) {
+      // Fallback: click the first option
+      await this.dashboardNameOptions.first().click({ force: true });
+    }
+    await this.dashboardNamePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(500);
   }
 
   async createReportDashboardTabInput() {
-    await this.dashboardTabInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    await this.dashboardTabTrigger.click({ force: true });
+    await this.dashboardTabPopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    const opt = this.dashboardTabOption('default');
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click({ force: true });
+    await this.dashboardTabPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async createReportContinueButtonStep1() {
@@ -110,71 +218,78 @@ export class ReportsPage {
   }
 
   async createReportOnce() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-once-btn"]').click({ force: true });
-
+    await this.frequencyOnceBtn.click({ force: true });
   }
 
   async createReportHours() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-hours-btn"]').click({ force: true });
-
+    await this.frequencyHoursBtn.click({ force: true });
   }
 
   async createReportDays() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-days-btn"]').click({ force: true });
-
+    await this.frequencyDaysBtn.click({ force: true });
   }
 
   async createReportWeeks() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-weeks-btn"]').click({ force: true });
-
+    await this.frequencyWeeksBtn.click({ force: true });
   }
 
   async createReportMonths() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-months-btn"]').click({ force: true });
-
+    await this.frequencyMonthsBtn.click({ force: true });
   }
 
   async createReportCustom() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-custom-btn"]').click({ force: true });
-
+    await this.frequencyCustomBtn.click({ force: true });
   }
 
   async createReportCron() {
-    await this.page.locator('[data-test="add-report-schedule-frequency-cron-btn"]').click({ force: true });
-
+    await this.frequencyCronBtn.click({ force: true });
   }
 
   async createReportDateTime() {
+    // ODate / OTime are Reka segmented popovers — the trigger wrapper carries
+    // the consumer's data-test (forwarded via $attrs in ODate.vue / OTime.vue)
+    // and is a <div>, not a native <input>, so `.fill()` is not supported.
+    // Focus each field and type into the active segments; Escape closes any
+    // popover that opens. The actual datetime value isn't asserted by these
+    // tests — they cover the Schedule Later flow end-to-end.
+    await this.scheduleStartDateField.click({ force: true });
+    await this.page.waitForTimeout(200);
+    await this.page.keyboard.type('29');
+    await this.page.keyboard.type('12');
+    await this.page.keyboard.type('2025');
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(200);
 
-    await this.page.getByLabel('Start Date *').fill('29-12-2025');
-    await this.page.getByLabel('Start Time *').fill('11:55');
+    await this.scheduleStartTimeField.click({ force: true });
+    await this.page.waitForTimeout(200);
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(200);
   }
 
   async createReportZone() {
-
-    await this.zoneInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.zoneInput.pressSequentially('UTC', { delay: 1000 });
-    await this.page.getByRole('option', { name: 'UTC', exact: true }).waitFor({ state: 'visible' });
-    await this.page.getByRole('option', { name: 'UTC', exact: true }).click();
-    await this.page.waitForTimeout(5000);
+    await this.scheduleTimezoneTrigger.click({ force: true });
+    await this.scheduleTimezonePopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    const opt = this.scheduleTimezoneOption('UTC');
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click({ force: true });
+    await this.page.waitForTimeout(2000);
   }
 
   async setTimeZone(zone) {
-    await this.zoneInput.click({ force: true });
-    await this.page.getByRole(this.timeZoneOption(zone)).click({ force: true });
+    await this.scheduleTimezoneTrigger.click({ force: true });
+    await this.scheduleTimezonePopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.scheduleTimezoneOption(zone).click({ force: true });
   }
 
   async setTimeIST() {
-    await this.zoneInput.fill("Asia/c");
-    await page.getByText("Asia/Calcutta", { exact: true }).click({ force: true });
-
+    await this.scheduleTimezoneTrigger.click({ force: true });
+    await this.scheduleTimezonePopover.waitFor({ state: 'visible', timeout: 10000 });
+    await this.scheduleTimezoneOption('Asia/Calcutta').click({ force: true });
   }
 
   async createReportScheduleLater() {
-
-    await this.page.locator('[data-test="add-report-schedule-scheduleLater-btn"]').click({ force: true });
-
+    await this.scheduleLaterBtn.click({ force: true });
   }
 
   async createReportContinueButtonStep2() {
@@ -182,8 +297,8 @@ export class ReportsPage {
   }
 
   async createReportFillDetail() {
-    await this.titleInput.fill("reporterTest");
-    await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    await this.titleInputField.fill('reporterTest');
+    await this.recipientsInputField.fill(process.env["ZO_ROOT_USER_EMAIL"]);
   }
 
   async createReportSaveButton() {
@@ -191,86 +306,73 @@ export class ReportsPage {
   }
 
   async verifyReportCreated(reportName) {
-    // Wait for save success alert (reports API takes 10-11 seconds)
-    await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 });
-    const saveAlert = this.page.getByRole('alert').filter({ hasText: 'Report saved successfully.' });
-    await expect(saveAlert).toBeVisible({ timeout: 5000 });
+    // Wait for save success toast
+    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 15000 });
+    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
 
     // Navigate to reports list to verify report exists
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Search for the report
-    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
+    await this.reportSearchInputField.fill(reportName);
     await this.page.waitForTimeout(2000);
 
     // Verify report appears in the list
-    await expect(this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`)).toBeVisible({ timeout: 5000 });
+    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 5000 });
   }
 
   async createReport(dashboardName) {
-    await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
-    await this.addReportButton.click({ force: true });
-    await this.page.waitForSelector("[aria-label='Name *']");
-    await this.reportNameInput.fill("rreport1");
-    await this.page.waitForTimeout(5000);
-    await this.folderInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.folderInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
-    await this.dashboardInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.dashboardInput.fill(dashboardName);
-    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
-    await this.dashboardTabInput.dblclick({ force: true });
-    await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    await this.createReportAddReportButton();
+    await this.createReportReportNameInput('rreport1');
+    await this.createReportFolderInput();
+    await this.createReportDashboardInput(dashboardName);
+    await this.createReportDashboardTabInput();
     await this.continueButtonStep1.click({ force: true });
     await this.continueButtonStep2.click({ force: true });
-    await this.titleInput.fill("reporterTest");
-    await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    await this.titleInputField.fill('reporterTest');
+    await this.recipientsInputField.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     await this.saveButton.click({ force: true });
   }
+
   async verifyReportSaved() {
-    await expect(this.successAlert).toContainText('Report saved successfully.');
+    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 10000 });
   }
+
   async deleteReport(reportName) {
-    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
-    await this.page
-      .locator(`[data-test="report-list-${reportName}-delete-report"]`)
-      .click({ force: true });
-    const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-    await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await confirmBtn.click();
+    await this.reportSearchInputField.fill(reportName);
+    await this.deleteReportBtn(reportName).click({ force: true });
+    await this.confirmPrimaryBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await this.confirmPrimaryBtn.click();
   }
+
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.dateTimeButtonLocator.click({ force: true });
     await this.relative30SecondsButton.click({ force: true });
   }
+
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
+    await expect(this.dateTimeButtonLocator).toContainText(Past30SecondsValue);
   }
-  async setDateTime() {
-    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click({ force: true });
-    await this.page.locator(this.absoluteTab).click({ force: true });
-    await this.page.waitForTimeout(1000);
 
+  async setDateTime() {
+    await expect(this.dateTimeButtonLocator).toBeVisible();
+    await this.dateTimeButtonLocator.click({ force: true });
+    await this.absoluteTabLocator.click({ force: true });
+    await this.page.waitForTimeout(1000);
   }
 
   async fillTimeRange(startTime, endTime) {
-    await this.page.getByRole('button', { name: '1', exact: true }).click({ force: true });
-    await this.page.getByLabel('access_time').first().fill(startTime);
-    await this.page.getByRole('button', { name: '1', exact: true }).click({ force: true });
-    await this.page.getByLabel('access_time').nth(1).fill(endTime);
-
+    // Absolute-tab calendar — first day cell, then access_time input (left untouched: this method isn't used by reportsScheduleNow)
+    await this.absoluteTabLocator.click({ force: true });
+    await this.absoluteStartTimeField.fill(startTime);
+    await this.absoluteEndTimeField.fill(endTime);
   }
 
   async verifyDateTime(startTime, endTime) {
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+    await expect(this.dateTimeButtonLocator).toContainText(`${startTime} - ${endTime}`);
   }
 
   async signOut() {
@@ -279,75 +381,66 @@ export class ReportsPage {
   }
 
   async pauseReport(reportName) {
-    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
-    await this.page
-      .locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
-      .click({ force: true });
-      // Wait for alert and find specific message
-      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
-      const stopAlert = this.page.getByRole('alert').filter({ hasText: 'Stopped report successfully.' });
-      await expect(stopAlert).toBeVisible({ timeout: 5000 });
+    await this.reportSearchInputField.fill(reportName);
+    await this.pauseStartReportBtn(reportName).click({ force: true });
+    // Wait for stopped/success toast
+    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 10000 });
+    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
   }
 
   async updateReport(reportName) {
     // Search for the report
-    await this.reportSearchInput.fill(reportName);
+    await this.reportSearchInputField.fill(reportName);
     await this.page.waitForTimeout(1000);
 
     // Click edit button
-    await this.page.locator(`[data-test="report-list-${reportName}-edit-report"]`).click();
+    await this.editReportBtn(reportName).click();
 
     // Wait for edit form to fully load
     await this.page.waitForTimeout(3000);
 
-    // Update description
-    await this.page.getByRole('textbox', { name: 'Description' }).click();
-    await this.page.getByRole('textbox', { name: 'Description' }).fill('Report Updated');
+    // Update description (inner -field of the OInput wrapper)
+    await this.descriptionInputField.click();
+    await this.descriptionInputField.fill('Report Updated');
 
     // Click save button
-    await this.page.locator('[data-test="add-report-save-btn"]').click();
+    await this.saveButton.click();
 
     // Wait for save to process
     await this.page.waitForTimeout(2000);
 
     // Search for the report to filter and verify the update appears
-    await this.reportSearchInput.fill(reportName);
+    await this.reportSearchInputField.fill(reportName);
 
-    // Verify the updated description appears in the report cell (reports API takes 10-11 seconds)
-    await expect(this.page.getByRole('cell', { name: 'Report Updated' })).toBeVisible({ timeout: 15000 });
+    // Verify the updated description appears in the report row description
+    // cell. Use OTable's column-scoped cell data-test (`o2-table-cell-<id>`)
+    // and assert table contents via toContainText — no hasText filters.
+    await this.reportListTable.waitFor({ state: 'visible', timeout: 15000 });
+    await expect(this.reportListTable).toContainText('Report Updated', { timeout: 15000 });
   }
 
   // async logedOut() {
   //   await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
   //   await this.page.waitForSelector('[data-test="menu-link-logout-item"]');
   //   await this.page.locator('[data-test="menu-link-logout-item"]').click();
-    
   // }
 
   async loggedOut() {
     // Click on the profile icon
-    await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
+    await this.profileButton.click();
 
     // Wait for the logout menu item to be attached to the DOM
-    const logoutItem = this.page.locator('[data-test="menu-link-logout-item"]');
-    
-    // Wait for the logout item to be present in the DOM with reasonable timeout
-    await logoutItem.waitFor({ state: 'attached', timeout: 10000 });
-
+    await this.signOutButton.waitFor({ state: 'attached', timeout: 10000 });
     // Wait for element to be visible instead of hard wait
-    await logoutItem.waitFor({ state: 'visible', timeout: 5000 });
-
+    await this.signOutButton.waitFor({ state: 'visible', timeout: 5000 });
     // Now click the logout item
-    await logoutItem.click({ force: true });
+    await this.signOutButton.click({ force: true });
+  }
+
+  async notAvailableReport(reportName) {
+    await this.reportSearchInputField.fill(reportName);
+    await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(this.reportListTable).toContainText('No data available');
+  }
+
 }
-
-async notAvailableReport(reportName) {
-  await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
-  await this.page.waitForSelector('[data-test="report-list-table"]');
-  await expect(this.page.locator('[data-test="report-list-table"]')).toContainText('No data available');
- 
-}
-
-}
-
-

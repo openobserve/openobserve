@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('settings.nodes')"
                 />
                 <ORouteTab
+                  data-test="general-settings-tab"
                   name="general"
                   :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
                   icon="settings"
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </ORouteTab>
                 <ORouteTab
+                  data-test="organization-settings-tab"
                   name="organization"
                   :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
                   icon="business"

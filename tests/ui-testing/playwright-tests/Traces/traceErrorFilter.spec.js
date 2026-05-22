@@ -61,10 +61,10 @@ test.describe("Trace Error Filter testcases", () => {
       testLogger.info(`Error indicator text: ${errorText}`);
 
       // Verify error count is displayed with proper format
-      expect(errorText).toMatch(/Errors\s*:\s*\d+/);
+      expect(errorText).toMatch(/\d+\s+Error\s+Spans?/);
 
       // Extract and validate error count
-      const match = errorText.match(/Errors\s*:\s*(\d+)/);
+      const match = errorText.match(/(\d+)\s+Error\s+Spans?/);
       if (match) {
         const errorCount = parseInt(match[1]);
         expect(errorCount).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ test.describe("Trace Error Filter testcases", () => {
       // Verify multiple error traces if available using POM method
       if (errorTraceCount > 1) {
         const secondErrorText = await pm.tracesPage.getErrorTraceTextAt(1);
-        expect(secondErrorText).toMatch(/Errors\s*:\s*\d+/);
+        expect(secondErrorText).toMatch(/\d+\s+Error\s+Spans?/);
         testLogger.info('Multiple error traces verified');
       }
     } else {

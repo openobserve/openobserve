@@ -31,7 +31,12 @@
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="tw:text-sm tw:font-medium tw:font-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div
+              class="tw:text-sm tw:font-medium tw:font-bold tw:truncate"
+              :title="link.name"
+              style="color: var(--o2-text-primary)"
+              :data-test="`cross-link-item-name-${idx}`"
+            >
               {{ link.name }}
               <OBadge
                 v-if="link._source"
@@ -42,7 +47,12 @@
               </OBadge>
             </div>
             <!-- URL -->
-            <div class="tw:text-xs tw:truncate tw:mt-1" :title="link.url" style="color: var(--o2-text-muted)">
+            <div
+              class="tw:text-xs tw:truncate tw:mt-1"
+              :title="link.url"
+              style="color: var(--o2-text-muted)"
+              :data-test="`cross-link-item-url-${idx}`"
+            >
               {{ link.url }}
             </div>
             <!-- Fields -->

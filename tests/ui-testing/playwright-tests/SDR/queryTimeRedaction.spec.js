@@ -3,7 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 async function closeStreamDetailSidebar(page) {
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
+  const cancelButton = page.locator('[data-test="schema-cancel-button"]');
   const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
   if (cancelVisible) {
     await cancelButton.click();

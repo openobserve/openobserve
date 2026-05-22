@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
       v-if="noResults"
+      data-test="logs-search-result-not-found-text"
       class="tw:text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
       <OIcon name="info" size="md" />

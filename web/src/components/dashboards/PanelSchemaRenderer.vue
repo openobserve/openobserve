@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             class="crosslink-drilldown-menu-item"
-            data-test="drilldown-menu-item"
+            :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
             <OIcon

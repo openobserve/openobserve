@@ -743,7 +743,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     // Perform custom value search in variable dropdown to trigger _values API calls
-    const variableInput = page.getByLabel("variablename", { exact: true });
+    const variableInput = page.locator('[data-test="variable-selector-variablename-inner"]');
     await variableInput.waitFor({ state: "visible", timeout: 10000 });
     await variableInput.click();
 

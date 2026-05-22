@@ -239,6 +239,7 @@ const fieldClasses = computed(() => [
         :aria-disabled="disabled || undefined"
         :class="fieldClasses"
         :data-disabled="disabled || undefined"
+        :data-test="parentDataTest"
         @focus.capture="emit('focus', $event)"
         @blur.capture="emit('blur', $event)"
       >

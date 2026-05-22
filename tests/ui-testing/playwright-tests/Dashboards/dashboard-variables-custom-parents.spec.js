@@ -368,7 +368,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
 
     // Wait a bit and close dropdown without selecting
     await page.waitForTimeout(2000);
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // Check API monitoring result
     const apiResult = await apiMonitorPromise;

@@ -5,44 +5,129 @@ export class ReportFoldersPage {
     this.page = page;
 
     // Navigation
-    this.reportsMenu = '[data-test="menu-link-\\/reports-item"]';
+    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
 
     // Folder sidebar
-    this.addFolderBtn = '[data-test="dashboard-new-folder-btn"]';
-    this.folderSearchInput = '[data-test="folder-search"]';
-    this.folderTabsContainer = '[data-test="dashboards-folder-tabs"]';
-    this.moreIcon = '[data-test="dashboard-more-icon"]';
-    this.editFolderIcon = '[data-test="dashboard-edit-folder-icon"]';
-    this.deleteFolderIcon = '[data-test="dashboard-delete-folder-icon"]';
+    this.addFolderBtn = page.locator('[data-test="dashboard-new-folder-btn"]');
+    // OInput wrapper carries `folder-search`; the actual input is auto-forwarded
+    // onto `folder-search-field` (see OInput parent-data-test → -field convention).
+    this.folderSearchInput = page.locator('[data-test="folder-search-field"]');
+    this.folderTabsContainer = page.locator('[data-test="dashboards-folder-tabs"]');
+    this.moreIconSelector = '[data-test="dashboard-more-icon"]';
+    this.editFolderIcon = page.locator('[data-test="dashboard-edit-folder-icon"]');
+    this.deleteFolderIcon = page.locator('[data-test="dashboard-delete-folder-icon"]');
 
-    // Add/Edit folder dialog
-    this.folderDialog = '[data-test="dashboard-folder-dialog"]';
-    this.folderNameInput = '[data-test="dashboard-folder-add-name"]';
-    this.folderDescInput = '[data-test="dashboard-folder-add-description"]';
-    this.folderSaveBtn = '[data-test="dashboard-folder-add-save"]';
-    this.folderCancelBtn = '[data-test="dashboard-folder-add-cancel"]';
+    // Add/Edit folder dialog — ODrawer with parent data-test = "dashboard-folder-dialog";
+    // primary/secondary buttons come from ODrawer footer (forwarded via parentDataTest).
+    this.folderDialog = page.locator('[data-test="dashboard-folder-dialog"]');
+    // OFormInput → OInput → inner native input is auto-suffixed with `-field`.
+    // Always fill the `-field` variant per OInput convention.
+    this.folderNameInput = page.locator('[data-test="dashboard-folder-add-name-field"]');
+    this.folderDescInput = page.locator('[data-test="dashboard-folder-add-description-field"]');
+    this.folderSaveBtn = page.locator(
+      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
+    this.folderCancelBtn = page.locator(
+      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
+    );
 
     // Delete confirmation dialog
-    this.confirmDeleteDialog = '[data-test="dashboard-confirm-delete-folder-dialog"]';
-    this.confirmButton = '[data-test="confirm-button"]';
+    this.confirmDeleteDialog = page.locator('[data-test="dashboard-confirm-delete-folder-dialog"]');
+    this.confirmButton = page.locator(
+      '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
 
-    // Move dialog
-    this.moveDialogHeader = '[data-test="reports-folder-move-header"]';
-    this.moveFolderSelect = '[data-test="reports-index-dropdown-stream_type"]';
-    this.moveSubmitBtn = '[data-test="reports-folder-move"]';
-    this.moveCancelBtn = '[data-test="reports-folder-move-cancel"]';
+    // Move dialog — MoveAcrossFolders renders an ODrawer; the outer consumer
+    // (<MoveAcrossFolders data-test="report-move-to-another-folder-dialog">)
+    // overrides the inner ODrawer's data-test via Vue attr inheritance, so
+    // the resolved data-test on the dialog content is the consumer's slug.
+    // Primary = Move, Secondary = Cancel (forwarded via ODrawer parentDataTest pattern).
+    this.moveDialog = page.locator('[data-test="report-move-to-another-folder-dialog"]');
+    // OSelect inside MoveAcrossFolders (via SelectFolderDropDown) carries the
+    // `reports-index-dropdown-stream_type` parent data-test.
+    this.moveFolderSelectTrigger = page.locator('[data-test="reports-index-dropdown-stream_type"]');
+    this.moveFolderSelectPopover = page.locator(
+      '[data-test="reports-index-dropdown-stream_type-popover"]'
+    );
+    this.moveSubmitBtn = page.locator(
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
+    this.moveCancelBtn = page.locator(
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
+    );
 
     // Report list
-    this.reportSearchInput = '[data-test="report-list-search-input"]';
-    this.allFoldersToggle = '[data-test="report-list-search-across-folders-toggle"]';
-    this.moveReportBtn = (name) => `[data-test="report-list-${name}-move-report"]`;
+    // OInput wrapper for the report search; fill the inner `-field` variant.
+    this.reportSearchInput = page.locator('[data-test="report-list-search-input-field"]');
+    this.allFoldersToggle = page.locator(
+      '[data-test="report-list-search-across-folders-toggle"]'
+    );
 
     // Page title
-    this.pageTitle = '[data-test="report-list-title"]';
+    this.pageTitle = page.locator('[data-test="report-list-title"]');
   }
 
-  getTabByName(folderName) {
-    return this.page.locator(`${this.folderTabsContainer} [role="tab"]`).filter({ hasText: folderName });
+  // ───────────────────────────────────────────────────────────────────
+  // Per-name / per-index factory helpers — allowed by POM rule §3 since
+  // the value is runtime-dynamic; still return Locator instances scoped
+  // to data-test attributes only (no role/text/class selectors).
+  // ───────────────────────────────────────────────────────────────────
+
+  // Folder tabs are keyed by folderId (which differs from display name) in
+  // their `data-test="dashboard-folder-tab-<folderId>"` attribute. To find a
+  // tab by user-visible name we resolve folderId via the vuex store using
+  // `page.evaluate`. Per §2 this is allowed: the lookup keys off store data
+  // (not role/text/class), and the resulting Locator targets the existing
+  // data-test attribute on the OTab.
+  async getTabByName(folderName) {
+    const folderId = await this.resolveFolderIdByName(folderName);
+    if (!folderId) {
+      // Best-effort fallback — store may not be populated yet. Returns a
+      // Locator that won't match anything stable; calling code should treat
+      // it as "not present" for visibility assertions.
+      return this.page.locator(
+        `[data-test="dashboard-folder-tab-__missing__:${folderName}"]`
+      );
+    }
+    return this.page.locator(`[data-test="dashboard-folder-tab-${folderId}"]`);
+  }
+
+  // Move button per report row — `data-test="report-list-${name}-move-report"`.
+  moveReportBtn(reportName) {
+    return this.page.locator(`[data-test="report-list-${reportName}-move-report"]`);
+  }
+
+  // Pause/start indicator (used in expectReportVisibleInTable as a stable
+  // per-report hook in the actions column).
+  reportPauseStartBtn(reportName) {
+    return this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`);
+  }
+
+  // Resolve folderId from a folder name via the vuex store. Allowed by §2
+  // because the lookup is scoped to store data (data-test space upstream),
+  // not role/text/class DOM selectors.
+  async resolveFolderIdByName(folderName) {
+    if (folderName === 'default') return 'default';
+    return await this.page.evaluate((name) => {
+      // The Vue 3 app instance exposes `$store` via the root component.
+      // window.__APP__ is set by main.ts after `app.mount`; fall back to
+      // walking #app's __vue_app__ when needed.
+      const root = document.querySelector('#app');
+      const app =
+        // @ts-ignore — these are runtime-only globals exposed by Vue.
+        window.__APP__ || (root && root.__vue_app__);
+      const store =
+        app && app.config && app.config.globalProperties && app.config.globalProperties.$store;
+      if (!store) return null;
+      const list =
+        store.state &&
+        store.state.organizationData &&
+        store.state.organizationData.foldersByType &&
+        store.state.organizationData.foldersByType.reports;
+      if (!Array.isArray(list)) return null;
+      const match = list.find((item) => item && item.name === name);
+      return match ? match.folderId : null;
+    }, folderName);
   }
 
   async navigateToReports() {
@@ -53,31 +138,31 @@ export class ReportFoldersPage {
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
       console.warn('navigateToReports: networkidle timed out, continuing');
     });
-    await expect(this.page.locator(this.pageTitle)).toContainText('Reports');
-    await this.page.locator(this.folderTabsContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+    await expect(this.pageTitle).toContainText('Reports');
+    await this.folderTabsContainer.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
       console.warn('navigateToReports: folderTabsContainer not visible, continuing');
     });
   }
 
   async clickAddFolder() {
-    await this.page.locator(this.addFolderBtn).click();
-    await expect(this.page.locator(this.folderNameInput)).toBeVisible({ timeout: 5000 });
+    await this.addFolderBtn.click();
+    await expect(this.folderNameInput).toBeVisible({ timeout: 5000 });
   }
 
   async fillFolderName(name) {
-    await this.page.locator(this.folderNameInput).fill(name);
+    await this.folderNameInput.fill(name);
   }
 
   async fillFolderDescription(desc) {
-    await this.page.locator(this.folderDescInput).fill(desc);
+    await this.folderDescInput.fill(desc);
   }
 
   async clickSaveFolder() {
-    await this.page.locator(this.folderSaveBtn).click();
+    await this.folderSaveBtn.click();
   }
 
   async clickCancelFolder() {
-    await this.page.locator(this.folderCancelBtn).click();
+    await this.folderCancelBtn.click();
   }
 
   async createFolder(name, description = '') {
@@ -88,136 +173,173 @@ export class ReportFoldersPage {
     }
     await this.clickSaveFolder();
     // Wait for the dialog to close after save
-    await this.page.locator(this.folderDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.folderDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async expectFolderTabVisible(folderName) {
-    await expect(this.getTabByName(folderName)).toBeVisible({ timeout: 10000 });
+    // Allow the store time to populate after folder-creation requests so the
+    // tab resolution can succeed. Then assert visibility on the resolved tab.
+    await expect.poll(async () => {
+      const id = await this.resolveFolderIdByName(folderName);
+      return id ? 'ready' : 'pending';
+    }, { timeout: 10000 }).toBe('ready');
+    const tab = await this.getTabByName(folderName);
+    await expect(tab).toBeVisible({ timeout: 10000 });
   }
 
   async expectFolderTabNotVisible(folderName) {
-    await expect(this.getTabByName(folderName)).not.toBeVisible({ timeout: 5000 });
+    // If we cannot resolve the folderId (the folder doesn't exist in the
+    // store) then the tab is definitively absent.
+    const folderId = await this.resolveFolderIdByName(folderName);
+    if (!folderId) return;
+    const tab = this.page.locator(`[data-test="dashboard-folder-tab-${folderId}"]`);
+    await expect(tab).not.toBeVisible({ timeout: 5000 });
   }
 
   async clickFolderTab(folderName) {
-    await this.getTabByName(folderName).click();
+    const tab = await this.getTabByName(folderName);
+    await tab.click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async clickMoreIcon(folderName) {
-    const tab = this.getTabByName(folderName);
+    const tab = await this.getTabByName(folderName);
     await tab.hover();
-    const moreBtn = tab.locator(this.moreIcon);
+    const moreBtn = tab.locator(this.moreIconSelector);
     await moreBtn.waitFor({ state: 'visible', timeout: 3000 });
     await moreBtn.click();
   }
 
   async clickEditFolder(folderName) {
     await this.clickMoreIcon(folderName);
-    await this.page.locator(this.editFolderIcon).click({ force: true });
-    await expect(this.page.locator(this.folderNameInput)).toBeVisible({ timeout: 5000 });
+    await this.editFolderIcon.click({ force: true });
+    await expect(this.folderNameInput).toBeVisible({ timeout: 5000 });
   }
 
   async clickDeleteFolder(folderName) {
     await this.clickMoreIcon(folderName);
-    await this.page.locator(this.deleteFolderIcon).click({ force: true });
-    await expect(this.page.locator(this.confirmDeleteDialog)).toBeVisible({ timeout: 5000 });
+    await this.deleteFolderIcon.click({ force: true });
+    await expect(this.confirmDeleteDialog).toBeVisible({ timeout: 5000 });
   }
 
   async confirmDelete() {
-    await this.page.locator(this.confirmButton).click();
-    await this.page.locator(this.confirmDeleteDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.confirmButton.click();
+    await this.confirmDeleteDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async searchFolders(query) {
-    await this.page.locator(this.folderSearchInput).fill(query);
+    await this.folderSearchInput.fill(query);
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   async clearFolderSearch() {
-    await this.page.locator(this.folderSearchInput).clear();
+    await this.folderSearchInput.clear();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   async expectFolderSaveDisabled() {
-    await expect(this.page.locator(this.folderSaveBtn)).toBeDisabled();
+    await expect(this.folderSaveBtn).toBeDisabled();
   }
 
   async expectFolderSaveEnabled() {
-    await expect(this.page.locator(this.folderSaveBtn)).toBeEnabled();
+    await expect(this.folderSaveBtn).toBeEnabled();
   }
 
   async openMoveDialog(reportName) {
-    await this.page.locator(this.moveReportBtn(reportName)).click({ force: true });
-    await expect(this.page.locator(this.moveDialogHeader)).toBeVisible({ timeout: 5000 });
+    await this.moveReportBtn(reportName).click({ force: true });
+    await expect(this.moveDialog).toBeVisible({ timeout: 5000 });
   }
 
   async expectMoveButtonDisabled() {
-    await expect(this.page.locator(this.moveSubmitBtn)).toBeDisabled();
+    await expect(this.moveSubmitBtn).toBeDisabled();
   }
 
   async expectMoveButtonEnabled() {
-    await expect(this.page.locator(this.moveSubmitBtn)).toBeEnabled();
+    await expect(this.moveSubmitBtn).toBeEnabled();
   }
 
+  // Pick a destination folder in the move dialog by visible name. The OSelect's
+  // options are keyed by folderId (via `data-test-value="<folderId>"`); we
+  // resolve the folderId via the Vuex store (see resolveFolderIdByName), then
+  // click the matching option in the popover.
   async selectMoveDestination(folderName) {
-    await this.page.locator(this.moveFolderSelect).click();
-    // Quasar q-select popup — wait for the target option to appear
-    await this.page.getByRole('option', { name: folderName }).waitFor({ state: 'visible', timeout: 5000 });
-    await this.page.getByRole('option', { name: folderName }).click();
-    // Wait for the q-select popup to close
-    await this.page.getByRole('listbox').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    // The folder tab for the destination must already exist in the sidebar
+    // (the move dialog reuses the same store-driven folder list).
+    const folderId = await this.resolveFolderIdByName(folderName);
+    if (!folderId) {
+      throw new Error(`selectMoveDestination: could not resolve folderId for "${folderName}"`);
+    }
+
+    await this.moveFolderSelectTrigger.click();
+    // Wait for the OSelect popover (Reka popover content) to mount.
+    await this.moveFolderSelectPopover
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
+
+    // Click the option by data-test-value matching the resolved folderId.
+    const option = this.page.locator(
+      `[data-test="reports-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`
+    );
+    await option.waitFor({ state: 'visible', timeout: 5000 });
+    await option.click();
+
+    // Popover closes after selection — wait for it to detach.
+    await this.moveFolderSelectPopover
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .catch(() => {});
   }
 
   async clickMove() {
-    await this.page.locator(this.moveSubmitBtn).click();
-    await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.moveSubmitBtn.click();
+    await this.moveDialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
   }
 
   async cancelMove() {
-    await this.page.locator(this.moveCancelBtn).first().click();
-    await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.moveCancelBtn.first().click();
+    await this.moveDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async expectDefaultFolderExists() {
-    await expect(this.getTabByName('default')).toBeVisible({ timeout: 10000 });
+    const tab = await this.getTabByName('default');
+    await expect(tab).toBeVisible({ timeout: 10000 });
   }
 
   async expectMoreIconNotVisible(folderName) {
-    const tab = this.getTabByName(folderName);
+    const tab = await this.getTabByName(folderName);
     await tab.hover();
-    await expect(tab.locator(this.moreIcon)).not.toBeVisible({ timeout: 3000 });
+    await expect(tab.locator(this.moreIconSelector)).not.toBeVisible({ timeout: 3000 });
   }
 
   async expectMoreIconVisible(folderName) {
-    const tab = this.getTabByName(folderName);
+    const tab = await this.getTabByName(folderName);
     await tab.hover();
-    await expect(tab.locator(this.moreIcon)).toBeVisible({ timeout: 3000 });
+    await expect(tab.locator(this.moreIconSelector)).toBeVisible({ timeout: 3000 });
   }
 
   async toggleAllFolders() {
-    await this.page.locator(this.allFoldersToggle).click();
+    await this.allFoldersToggle.click();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   async searchReports(query) {
-    await this.page.locator(this.reportSearchInput).fill(query);
+    await this.reportSearchInput.fill(query);
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   async clearReportSearch() {
-    await this.page.locator(this.reportSearchInput).clear();
+    await this.reportSearchInput.clear();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
   async expectReportVisibleInTable(reportName) {
-    await expect(
-      this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
-    ).toBeVisible({ timeout: 10000 });
+    await expect(this.reportPauseStartBtn(reportName)).toBeVisible({ timeout: 10000 });
   }
 
   async getFolderCount() {
-    return await this.page.locator(`${this.folderTabsContainer} [role="tab"]`).count();
+    // Every OTab in the sidebar carries a `data-test="dashboard-folder-tab-<id>"`.
+    return await this.page
+      .locator('[data-test^="dashboard-folder-tab-"]')
+      .count();
   }
 
   async getFirstReportWithMoveButton() {
@@ -228,11 +350,16 @@ export class ReportFoldersPage {
   }
 
   async expectAllFoldersToggleVisible() {
-    await expect(this.page.locator(this.allFoldersToggle)).toBeVisible();
+    await expect(this.allFoldersToggle).toBeVisible();
   }
 
   async isFolderTabPresent(folderName) {
-    return await this.getTabByName(folderName).isVisible({ timeout: 2000 }).catch(() => false);
+    const folderId = await this.resolveFolderIdByName(folderName);
+    if (!folderId) return false;
+    return await this.page
+      .locator(`[data-test="dashboard-folder-tab-${folderId}"]`)
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
   }
 
   async deleteFolderIfExists(folderName) {

@@ -82,8 +82,8 @@ test.describe("Anomaly Detection Alerts", () => {
       // Set retrain interval - it should already be set to "Never" by default, skip if not critical
       testLogger.info('Skipping retrain interval (default is Never)');
 
-      // Close any open menus by pressing Escape
-      await page.keyboard.press('Escape');
+      // Close any open menus by clicking outside
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
       await page.waitForTimeout(1000);
 
       // Disable alerting using POM method (alerting is enabled by default with no destination)

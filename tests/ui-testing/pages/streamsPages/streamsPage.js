@@ -268,7 +268,7 @@ export class StreamsPage {
         }
 
         // Final attempt: look for any element containing "histogram" in its warning message
-        const anyHistogramWarning = this.page.locator('.q-notification__message, .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
+        const anyHistogramWarning = this.page.locator('[role="alert"], .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
         await expect(anyHistogramWarning).toBeVisible({ timeout: 15000 });
     }
 
@@ -311,8 +311,12 @@ export class StreamsPage {
     }
 
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput exposes the fillable inner <input> via `${parent}-field`. The
+        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
+        // which page.fill() rejects.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     async selectFullTextSearch() {
@@ -492,7 +496,7 @@ export class StreamsPage {
         // Select the checkbox for deletion
         await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
         await this.page.locator('[data-test="schema-delete-button"]').click();
-        await this.page.locator('[data-test="confirm-button"]').click();
+        await this.page.locator('[data-test="o-dialog-primary-btn"]').click();
     }
 
     async expectStreamSettingsUpdatedMessage() {
@@ -834,8 +838,8 @@ export class StreamsPage {
      */
     async expectErrorToast(message) {
         testLogger.info('Verifying error toast', { message });
-        // Wait for the Quasar notification to appear with the message
-        const toastLocator = this.page.locator('.q-notification__message').filter({ hasText: message });
+        // Wait for the notification to appear with the message
+        const toastLocator = this.page.locator('[role="alert"]').filter({ hasText: message });
         await expect(toastLocator).toBeVisible({ timeout: 10000 });
     }
 
@@ -1000,8 +1004,11 @@ export class StreamsPage {
      * Search for a specific field in the schema view
      */
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput convention: the fillable inner <input> is auto-derived at
+        // `${parent}-field`. Filling the wrapper data-test (a <div>) throws.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     /**

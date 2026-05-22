@@ -4,7 +4,7 @@
 export default class DashboardPanelConfigs {
   constructor(page) {
     this.page = page;
-    this.configBtn = page.locator('[data-test="dashboard-sidebar"]');
+    this.configBtn = page.locator('[data-test="panel-sidebar-header-collapsed"]');
     this.legend = page.locator(
       '[data-test="dashboard-config-legend-position"]'
     );

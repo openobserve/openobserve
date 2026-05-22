@@ -580,6 +580,12 @@ export default defineComponent({
       const monacoModule = await loadMonaco();
       monaco = monacoModule;
 
+      // Expose Monaco on window for e2e tests (read-only assertions against editor model).
+      // Tests use: window.monaco.editor.getModels()[0].getValue()
+      if (typeof window !== "undefined") {
+        (window as any).monaco = monacoModule;
+      }
+
       // Initialize Monaco constants after loading
       initializeMonacoConstants();
 

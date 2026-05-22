@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:w-full"
                         v-model="selectedTime.startTime"
                         with-seconds
+                        data-test="datetime-start-time"
                         @blur="
                           resetTime(
                             selectedTime.startTime,
@@ -203,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
+                        data-test="datetime-end-time"
                         @blur="
                           resetTime(
                             selectedTime.startTime,

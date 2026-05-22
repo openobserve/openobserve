@@ -138,7 +138,7 @@ test.describe("dashboard UI testcases", () => {
             .map((row) =>
               Array.from(row.querySelectorAll("td"), (cell) => {
                 // Get the span element that contains the actual text, excluding the button
-                const textSpan = cell.querySelector('span.q-mr-xs');
+                const textSpan = cell.querySelector('[data-test="dashboard-table-cell-value"]');
                 return textSpan ? textSpan.textContent.trim() : cell.textContent.trim().replace(/content_copy/g, '').trim();
               })
             )

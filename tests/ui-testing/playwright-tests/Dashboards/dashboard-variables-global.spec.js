@@ -60,7 +60,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
@@ -131,7 +131,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
@@ -206,7 +206,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
@@ -264,7 +264,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard and be fully initialized
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
@@ -332,14 +332,14 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Click dropdown
-    const variableDropdown = page.getByLabel(variableName, { exact: true });
+    const variableDropdown = page.locator(`[data-test="variable-selector-${variableName}"]`);
     await variableDropdown.click();
     // Wait for dropdown menu to open and options to load
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
 
     // Count options
@@ -390,7 +390,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
@@ -438,7 +438,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });

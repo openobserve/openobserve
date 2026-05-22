@@ -292,7 +292,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('✓ Full text search option exists in index type dropdown');
 
     // Close the dropdown
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // PART 2: Verify Quick Mode fields from env variables show icon
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');

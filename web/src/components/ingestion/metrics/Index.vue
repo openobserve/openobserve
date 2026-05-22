@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ORouteTab
               name="prometheus"
+              data-test="ingestion-metrics-tab-prometheus"
               :to="{
                 name: 'prometheus',
                 query: {

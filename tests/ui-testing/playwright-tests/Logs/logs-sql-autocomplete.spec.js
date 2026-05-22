@@ -43,7 +43,7 @@ async function enableSqlMode(page, pm) {
     if (!isChecked) {
         await pm.logsPage.enableSQLMode();
         // Dismiss any confirmation dialog that may appear
-        const confirmBtn = page.locator('[data-test="confirm-button"]');
+        const confirmBtn = page.locator('[data-test="o-dialog-primary-btn"]');
         if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await confirmBtn.click();
         }

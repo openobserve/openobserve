@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="tw:px-3 tw:py-3">
-      <div class="general-page-title">
+      <div class="general-page-title" data-test="settings-general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>
       <div class="general-page-subtitle">

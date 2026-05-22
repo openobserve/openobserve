@@ -3,126 +3,80 @@ import { expect } from '@playwright/test';
 class UnflattenedPage {
     constructor(page) {
         this.page = page;
+
+        // Sidebar / navigation
+        this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
+
+        // Streams list (LogStream.vue)
+        // OInput inner native input — always target the `-field` variant for fill
+        this.searchStreamInput = page.locator('[data-test="streams-search-stream-input-field"]');
+
+        // Schema dialog (schema.vue)
+        this.configurationTab = page.locator('[data-test="schema-configuration-tab"]');
+        // Store Original Data toggle wrapper — OSwitch renders an inner button with data-state="checked|unchecked"
+        this.storeOriginalDataToggle = page.locator('[data-test="log-stream-store-original-data-toggle-btn"]');
+        this.storeOriginalDataToggleInner = page.locator('[data-test="log-stream-store-original-data-toggle-btn"] [data-state]');
+        this.schemaUpdateButton = page.locator('[data-test="schema-update-settings-button"]');
+        this.closeButton = page.locator('[data-test="schema-cancel-button"]').first();
+        // OToast success message body
+        this.streamSettingsUpdatedSnackbar = page.locator('[data-test="o-toast-message"]');
+
+        // Logs explorer
+        this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
+        this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        this.logTableRowExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.logSourceColumn = page.locator('[data-test="log-table-column-0-source"]');
+        this.o2IdText = page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
+        this.unflattenedTab = page.locator('[data-test="log-detail-json-content"] [data-test="tab-unflattened"]');
+        this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
+        // OFieldList inner search input — scope under the logs index list to avoid
+        // collision with the dashboard panel-editor field list also on the page.
+        this.indexFieldSearchInput = page.locator('[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]');
+        this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+        // FieldListPagination receives data-test-prefix="logs-page" from IndexList.vue,
+        // so the rendered data-test is `${prefix}-all-fields-btn`.
+        this.allFieldsButton = page.locator('[data-test="logs-page-all-fields-btn"]');
+        this.logsSearchBarRefreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        this.logDetailJsonContent = page.locator('[data-test="log-detail-json-content"]');
+        this.allLogDetailKeys = page.locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]');
+        this.timestampDropdown = page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_timestamp"]');
+        // Explore action on the streams table row — when only one row is filtered, .first() is deterministic
+        this.exploreButton = page.locator('[data-test="log-stream-explore-btn"]').first();
     }
 
-    get streamsMenu() {
-        return this.page.locator('[data-test="menu-link-\\/streams-item"]');
-    }
-
-    get searchStreamInput() {
-        return this.page.getByPlaceholder('Search Stream');
-    }
-
+    /**
+     * Open the stream schema/detail dialog for the named stream from the
+     * Streams list. Walks up from the per-name name cell (deterministic
+     * data-test) to the OTable row, hovers to reveal the action buttons,
+     * then clicks the schema button.
+     */
     async openStreamDetail(streamName) {
         // Wait for stream list to populate after search
         await this.page.waitForTimeout(2000);
 
-        // The Stream Detail button is hidden until the row is hovered.
+        // Resolve the row containing the named stream via the per-name cell data-test,
+        // then walk up the DOM to the OTable row (data-test^="o2-table-row-").
+        const nameCell = this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`).first();
+        const row = nameCell.locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`).first();
+
+        // The schema button is hidden until the row is hovered.
         // Hover first to make it visible, then click with force as a fallback.
-        const row = this.page.getByRole('row').filter({ hasText: streamName }).first();
         await row.hover();
-        const detailBtn = row.locator('[title="Stream Detail"]').first();
+        const detailBtn = row.locator('[data-test="log-stream-schema-btn"]').first();
         await detailBtn.click({ force: true, timeout: 15000 });
 
-        // Wait for the dialog to render — the Schema tab signals the dialog is ready
-        await this.page.getByRole('tab', { name: 'Schema' }).first().waitFor({ state: 'visible', timeout: 15000 });
-    }
-
-    get storeOriginalDataToggle() {
-        return this.page.locator('[data-test="log-stream-store-original-data-toggle-btn"] div').nth(2);
-    }
-
-    get storeOriginalDataToggleInner() {
-        return this.page.locator('[data-test="log-stream-store-original-data-toggle-btn"] .q-toggle__inner');
-    }
-
-    get schemaUpdateButton() {
-        return this.page.locator('[data-test="schema-update-settings-button"]');
-    }
-
-    get closeButton() {
-        return this.page.locator('[data-test="schema-cancel-button"]').first()
-    }
-
-    get exploreButton() {
-        return this.page.getByRole('button', { name: 'Explore' }).first();
-    }
-
-    get dateTimeButton() {
-        return this.page.locator('[data-test="date-time-btn"]');
-    }
-
-    get relativeTab() {
-        return this.page.locator('[data-test="date-time-relative-tab"]');
-    }
-
-    get logTableRowExpandMenu() {
-        return this.page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
-    }
-
-    get logSourceColumn() {
-        return this.page.locator('[data-test="log-table-column-0-source"]');
-    }
-
-    get o2IdText() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
-    }
-
-    get unflattenedTab() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test="tab-unflattened"]');
-    }
-
-    get closeDialog() {
-        return this.page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
-    }
-
-    get indexFieldSearchInput() {
-        return this.page.locator('[data-cy="index-field-search-input"]');
-    }
-
-    get sqlModeToggle() {
-        return this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2)
-    }
-
-    get logsSearchBarQueryEditor() {
-        return this.page.locator('[data-test="logs-search-bar-query-editor"]');
-    }
-
-    get allFieldsButton() {
-        return this.page.locator('[data-test="logs-all-fields-btn"]');
-    }
-
-    get configurationTab() {
-        return this.page.getByRole('tab', { name: 'Configuration' });
-    }
-
-    get streamSettingsUpdatedSnackbar() {
-        return this.page.getByText('Stream settings updated');
-    }
-
-    get logsSearchBarRefreshButton() {
-        return this.page.locator("[data-test='logs-search-bar-refresh-btn']");
-    }
-
-    get logDetailJsonContent() {
-        return this.page.locator('[data-test="log-detail-json-content"]');
-    }
-
-    get allLogDetailKeys() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]');
-    }
-
-    get timestampDropdown() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_timestamp"]');
+        // Wait for the dialog to render — the Schema settings tab signals the dialog is ready
+        await this.page.locator('[data-test="schema-settings-tab"]').first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async isStoreOriginalDataEnabled() {
-        const classList = await this.storeOriginalDataToggleInner.evaluate((node) =>
-            Array.from(node.classList)
-        );
-        const isEnabled = classList.includes("q-toggle__inner--truthy");
+        // OSwitch exposes `data-state="checked"` when ON, `"unchecked"` when OFF.
+        await this.storeOriginalDataToggleInner.first().waitFor({ state: 'visible', timeout: 10000 });
+        const state = await this.storeOriginalDataToggleInner.first().getAttribute('data-state');
+        const isEnabled = state === 'checked';
 
-        console.log('DEBUG: Toggle classList:', classList);
+        console.log('DEBUG: Toggle data-state:', state);
         console.log('DEBUG: Is enabled?', isEnabled);
 
         return isEnabled;
@@ -148,13 +102,20 @@ class UnflattenedPage {
     }
 
     async clickInterestingFieldButton(fieldName) {
-        const btn = this.page.locator(`[data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`).first();
+        // Scope under the logs index list to avoid potential collision with the
+        // dashboard panel-editor field list (which also exposes interesting-field
+        // controls in some layouts).
+        const btn = this.page
+            .locator(`[data-test="logs-search-index-list"] [data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`)
+            .first();
         await btn.waitFor({ state: 'visible' });
-        await btn.click();
+        // Force-click: an adjacent tooltip icon path intermittently intercepts
+        // pointer events at the moment of click; force bypasses the overlay.
+        await btn.click({ force: true });
     }
 
     async expectQueryEditorContainsText(textOrRegex) {
-        await this.logsSearchBarQueryEditor.locator('.monaco-editor').last().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        await this.logsSearchBarQueryEditor.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await expect(this.logsSearchBarQueryEditor).toContainText(textOrRegex, { timeout: 10000 });
     }
 
@@ -178,4 +139,3 @@ class UnflattenedPage {
     }
 }
 export default UnflattenedPage;
-

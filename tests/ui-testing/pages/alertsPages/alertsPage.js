@@ -89,7 +89,7 @@ export class AlertsPage {
 
             // Step 5: Deduplication (Scheduled only, v3 UI — in Advanced tab)
             stepDeduplication: '.step-deduplication',
-            stepDeduplicationFingerprintSelect: '.step-deduplication .q-select',
+            stepDeduplicationFingerprintSelect: '.step-deduplication .alert-v3-select',
             stepDeduplicationTimeWindowInput: '.step-deduplication input[type="number"]',
 
             // Step 6: Advanced settings
@@ -210,7 +210,7 @@ export class AlertsPage {
             relatedAlertItem: '[class*="tw:py-2"]',
             relatedAlertName: '.tw\\:truncate',
             relatedAlertCountText: '[style*="width: 120px"]',
-            severityBadge: '.q-badge',
+            severityBadge: '[data-test*="badge"], [data-test*="chip"], .severity-badge',
 
             // Incident detail — tab selectors (data-test on OTab in IncidentDetailDrawer.vue)
             serviceGraphTab: '[data-test="incident-alert-graph-tab"]',
@@ -257,11 +257,12 @@ export class AlertsPage {
             // Alert settings inline locators
             silenceNotificationInput: '.silence-notification-input input',
             stepAlertConditions: '.step-alert-conditions',
-            stepAlertConditionsQSelect: '.step-alert-conditions .q-select',
+            stepAlertConditionsSelect: '.step-alert-conditions .alert-v3-select',
             stepAlertConditionsNumberInput: '.step-alert-conditions input[type="number"]',
             alertSettingsRow: '.alert-settings-row',
             viewLineLocator: '.view-line',
-            qDialogLocator: '.q-dialog',
+            // TODO: replace with context-specific dialog data-test attribute
+            qDialogLocator: '[data-test$="-dialog"]',
 
             // v3 list page tab locators
             // Note: AppTabs.vue generates data-test="tab-{value}" (not alert-list-tab-*)
@@ -518,8 +519,10 @@ export class AlertsPage {
             await this.page.waitForTimeout(500);
             testLogger.info('Closed alert details dialog');
         } else {
-            await this.page.keyboard.press('Escape');
-            testLogger.info('Closed alert details dialog via Escape');
+            await this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {
+                this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            });
+            testLogger.info('Closed alert details dialog via close button');
         }
     }
 
@@ -583,7 +586,7 @@ export class AlertsPage {
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
 
         // Also check page-level error toasts/banners rendered outside the chart container
-        const pageError = this.page.locator('.q-notification--negative, .q-banner--negative').first();
+        const pageError = this.page.locator('[role="alert"][class*="bg-negative"], .q-banner--negative').first();
         await expect(pageError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('No chart error detected');
@@ -595,7 +598,7 @@ export class AlertsPage {
      */
     async getChartErrorMessage() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, .text-negative').first();
+        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, [role="alert"][class*="bg-negative"]').first();
         if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
             return await errorEl.textContent();
         }
@@ -1020,7 +1023,7 @@ export class AlertsPage {
         //   C) Submit successfully (if optional fields have defaults)
         // Wait for any of these outcomes within the timeout window.
         const errorFields = this.page.locator('.q-field--error');
-        const anyToast = this.page.locator('.q-notification, .q-alert, .notifications');
+        const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
         const successMsg = this.page.getByText(this.locators.alertSuccessMessage);
 
         const outcomes = await Promise.race([
@@ -1042,11 +1045,9 @@ export class AlertsPage {
      * Handles cases where dialog backdrops may intercept clicks
      */
     async _closeAlertWizard() {
-        // First dismiss any potential error dialogs or overlays
+        // First dismiss any potential open dropdowns/popovers
         await this.page.waitForTimeout(500);
-
-        // Try pressing Escape first to dismiss any popups/tooltips
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         try {
@@ -1059,11 +1060,14 @@ export class AlertsPage {
             await backButton.click({ force: true, timeout: 10000 });
             testLogger.info('Closed alert wizard via back button');
         } catch (error) {
-            testLogger.warn('Back button click failed, using keyboard escape', { error: error.message });
-            // Multiple escapes to ensure we exit
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(300);
-            await this.page.keyboard.press('Escape');
+            testLogger.warn('Back button click failed, trying close button', { error: error.message });
+            // Try dialog close button as fallback
+            const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+            if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await closeBtn.click();
+            } else {
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            }
         }
 
         await this.page.waitForTimeout(500);
@@ -1555,8 +1559,8 @@ export class AlertsPage {
      * Wait for incident status update notification
      */
     async waitForStatusUpdateNotification() {
-        // Wait for Quasar success notification to appear, with fixed timeout fallback
-        const notification = this.page.locator('.q-notification__message');
+        // Wait for notification to appear, with fixed timeout fallback
+        const notification = this.page.locator('[role="alert"]');
         try {
             await notification.first().waitFor({ state: 'visible', timeout: 5000 });
             testLogger.info('Status update notification appeared');
@@ -2300,16 +2304,15 @@ export class AlertsPage {
             }
 
             testLogger.warn('Metrics stream not found, retrying', { streamName, attempt, maxRetries });
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(1000);
         }
 
-        // Final fallback: try first available option (stream picker is OSelect
-        // post-migration, q-select pre-migration)
+        // Final fallback: try first available option
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+        const anyStreamOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').first();
         if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await anyStreamOption.click();
             testLogger.info('Using first available metrics stream (fallback)');
@@ -2343,8 +2346,8 @@ export class AlertsPage {
                 testLogger.info('Selected logs stream on retry', { stream: streamName });
                 return true;
             } else {
-                // Use first available logs stream from dropdown (OSelect post-migration)
-                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+                // Use first available logs stream from dropdown
+                const anyStreamOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').first();
                 if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await anyStreamOption.click();
                     testLogger.info('Using first available logs stream');
@@ -2407,8 +2410,7 @@ export class AlertsPage {
      * Expect the alert type select dropdown to be visible (v3 UI)
      */
     async expectRealtimeRadioVisible(timeout = 5000) {
-        const alertTypeContainer = this.page.locator('label:has-text("Alert Type")').locator('..');
-        const alertTypeSelect = alertTypeContainer.locator('.q-select');
+        const alertTypeSelect = this.page.locator(this.locators.alertTypeSelect);
         await expect(alertTypeSelect).toBeVisible({ timeout });
         testLogger.info('Alert type select dropdown is visible (v3 UI)');
     }
@@ -2449,17 +2451,17 @@ export class AlertsPage {
     }
 
     /**
-     * Get the visible dropdown menu (.q-menu:visible)
+     * Get the visible dropdown popover
      */
     getVisibleMenu() {
-        return this.page.locator(this.locators.visibleDropdownMenu);
+        return this.page.locator('[data-test$="-popover"]');
     }
 
     /**
-     * Get menu items from the visible dropdown menu
+     * Get menu items from the visible dropdown popover
      */
     getMenuItems() {
-        return this.getVisibleMenu().locator('.q-item');
+        return this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
     }
 
     /**
@@ -2492,11 +2494,11 @@ export class AlertsPage {
 
     /**
      * Close the query editor dialog via its back button, scoped to the dialog container.
-     * Uses .q-dialog to avoid ambiguity with the wizard back button
+     * Uses the query-editor-dialog data-test to avoid ambiguity with the wizard back button
      * (both share data-test="add-alert-back-btn").
      */
     async closeEditorDialog() {
-        const dialog = this.page.locator('.q-dialog').first();
+        const dialog = this.page.locator('[data-test="query-editor-dialog"]').first();
         const dialogBackBtn = dialog.locator('[data-test="add-alert-back-btn"]').first();
         await dialogBackBtn.waitFor({ state: 'visible', timeout: 10000 });
         await dialogBackBtn.click();
@@ -2566,7 +2568,7 @@ export class AlertsPage {
         let streamSelected = false;
         for (let attempt = 0; attempt < 3 && !streamSelected; attempt++) {
             if (attempt > 0) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             }
             await this.page.locator(this.locators.streamNameDropdown).click();
@@ -3132,7 +3134,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getNotification() {
-        return this.page.locator('.q-notification');
+        return this.page.locator('[role="alert"]');
     }
 
     /**
@@ -3181,7 +3183,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
-        return this.page.locator('.q-menu .q-item .q-item, .autocomplete-dropdown .q-item');
+        return this.page.locator('[data-test$="-popover"] [data-test$="-option"], .autocomplete-dropdown [data-test$="-option"]');
     }
 
     /**
@@ -3190,9 +3192,9 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getGroupByInput() {
-        // Primary: Find input/select near "Group by" label (most reliable)
+        // Primary: Find input near "Group by" label (most reliable)
         // Fallback: data-test attributes
-        return this.page.locator('.step-query-config div:has-text("Group by") .q-select, .step-query-config div:has-text("Group by") input, [data-test*="group-by"] input, [data-test*="groupby"] input').first();
+        return this.page.locator('.step-query-config div:has-text("Group by") input, [data-test*="group-by"] input, [data-test*="groupby"] input').first();
     }
 
     /**
@@ -3218,9 +3220,8 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page
-            .locator('.q-menu:visible .q-item')
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
             .filter({ hasText: 'count' })
             .first()
             .click();
@@ -3237,9 +3238,8 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page
-            .locator('.q-menu:visible .q-item')
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
             .filter({ hasText: 'total events' })
             .first()
             .click();
@@ -3260,7 +3260,7 @@ export class AlertsPage {
         await toggle.click();
         await this.page.waitForTimeout(500);
         await this.page
-            .locator('.q-menu:visible .q-item')
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
             .filter({ hasText: functionName })
             .first()
             .click();
@@ -3291,7 +3291,7 @@ export class AlertsPage {
         await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
-        const menuItems = this.page.locator('.q-menu:visible .q-item, ');
+        const menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
         const count = await menuItems.count();
         const fields = [];
         for (let i = 0; i < count; i++) {
@@ -3301,8 +3301,8 @@ export class AlertsPage {
             }
         }
 
-        // Click away to close the dropdown
-        await this.page.keyboard.press('Escape');
+        // Click away to close the popover
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         testLogger.info('Available fields in aggregation dropdown', { count: fields.length, fields });
@@ -3371,10 +3371,8 @@ export class AlertsPage {
     async findGroupByInputWithFallback(queryConfigSection) {
         const possibleSelectors = [
             'div:has-text("Group by") input',
-            'div:has-text("Group by") .q-select',
             '.group-by-input',
-            '[data-test*="group-by"] input',
-            '[data-test*="group-by"] .q-select'
+            '[data-test*="group-by"] input'
         ];
 
         for (const selector of possibleSelectors) {

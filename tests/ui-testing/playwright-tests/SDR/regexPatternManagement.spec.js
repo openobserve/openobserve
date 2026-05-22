@@ -72,7 +72,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
 
     // Verify the specific error message
     await page.waitForTimeout(1000);
-    const errorVisible = await page.getByText('Error in creating block db for given pattern : check if given pattern is correct').isVisible({ timeout: 3000 }).catch(() => false);
+    const errorVisible = await page.locator('[data-test="o-toast"]').filter({ hasText: /Error in creating block db/i }).first().isVisible({ timeout: 3000 }).catch(() => false);
     expect(errorVisible).toBeTruthy();
     testLogger.info('Invalid regex error message verified');
   });
@@ -131,7 +131,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     await pm.sdrPatternsPage.cancelButton.click();
 
     await page.waitForTimeout(500);
-    const patternVisible = await page.locator('text="cancelled_pattern"').isVisible({ timeout: 2000 }).catch(() => false);
+    const patternVisible = await pm.sdrPatternsPage.checkPatternExists('cancelled_pattern');
     expect(patternVisible).toBeFalsy();
   });
 

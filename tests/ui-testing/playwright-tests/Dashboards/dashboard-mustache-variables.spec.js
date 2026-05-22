@@ -462,7 +462,7 @@ test.describe(
         await page.waitForTimeout(3000);
 
         // Verify no error toast or error state
-        const errorToast = page.locator('.q-notification--standard').filter({ hasText: /error/i });
+        const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
         const errorCount = await errorToast.count();
 
         // We expect no errors since the mustache variable should be substituted
@@ -907,7 +907,7 @@ test.describe(
 
         // Verify no error toast or error state
         const errorToast = page
-          .locator(".q-notification--standard")
+          .locator("[role="alert"]")
           .filter({ hasText: /error/i });
         const errorCount = await errorToast.count();
 

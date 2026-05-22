@@ -50,7 +50,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
 
       if (!hasStreamOptions) {
         testLogger.warn('Stream options not visible after clicking selector - may be single stream or UI changed');
-        await page.keyboard.press('Escape');
+        await page.locator('body').click({ position: { x: 10, y: 10 } });
       } else {
         expect(hasStreamOptions).toBe(true); // Should have stream options available
 
@@ -89,7 +89,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         successfulSelections++;
       } else {
         testLogger.warn(`Failed to select time range: ${range}`);
-        await page.keyboard.press('Escape');
+        await page.locator('body').click({ position: { x: 10, y: 10 } });
       }
 
       await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');

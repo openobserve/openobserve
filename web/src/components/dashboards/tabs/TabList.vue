@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
+            :data-test-tab-name="tab?.name"
             >{{ tab?.name }}</span
           >
         </div>

@@ -1,6 +1,7 @@
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
 
+const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 
 export default class ChartTypeSelector {
@@ -24,6 +25,11 @@ export default class ChartTypeSelector {
 
     // Custom query editor
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+
+    // JSON renderer locators (source-defined data-tests in JsonFieldRenderer.vue)
+    this.jsonFieldRenderer = page.locator('[data-test="json-field-renderer"]');
+    this.jsonKey = page.locator('[data-test="json-key"]');
+    this.jsonValue = page.locator('[data-test="json-value"]');
   }
 
   // Chart Type select
@@ -74,8 +80,8 @@ export default class ChartTypeSelector {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Close any open dropdown first
-        await this.page.keyboard.press("Escape");
+        // Close any open dropdown first — click outside (ODropdown closes on outside click)
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
 
         await streamInput.waitFor({ state: "visible", timeout: 5000 });
         await streamInput.click();
@@ -110,7 +116,7 @@ export default class ChartTypeSelector {
           throw error;
         }
         // Close dropdown and wait for network before retry (don't reload - loses context!)
-        await this.page.keyboard.press("Escape");
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
         await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
@@ -284,7 +290,7 @@ export default class ChartTypeSelector {
   async configureYAxisFunction(alias, functionName) {
     await this.openYAxisFunctionPopup(alias);
     await this.selectFunction(functionName);
-    await this.page.keyboard.press("Escape");
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
@@ -354,7 +360,7 @@ export default class ChartTypeSelector {
     await this.openYAxisFunctionPopup(alias);
     await this.switchToRawTab();
     await this.enterRawQuery(query);
-    await this.page.keyboard.press("Escape");
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     // Wait for popup to close
     const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
     await menuLocator.waitFor({ state: "hidden", timeout: 10000 });
@@ -402,12 +408,28 @@ export default class ChartTypeSelector {
   }
 
   /**
-   * Toggle "Render Data as JSON / Array" checkbox
+   * Toggle "Render Data as JSON / Array" checkbox.
+   * Waits for `isChecked()` to flip so the underlying field model
+   * (fields.showFieldAsJson) is guaranteed propagated before Apply.
+   * (`isChecked()` works on Radix-style OCheckbox via the role="checkbox"
+   * descendant, so this stays selector-policy compliant.)
    */
   async toggleShowFieldAsJson() {
-    await this.showFieldAsJsonCheckbox.waitFor({ state: "visible", timeout: 10000 });
+    await this.showFieldAsJsonCheckbox.waitFor({
+      state: "visible",
+      timeout: 10000,
+    });
+    const beforeChecked = await this.showFieldAsJsonCheckbox.isChecked();
     await this.showFieldAsJsonCheckbox.click();
-    testLogger.debug('Toggled show field as JSON checkbox');
+    // Poll isChecked() until it flips, confirming the v-model update
+    // propagated to the parent panel before any subsequent Apply.
+    await expect
+      .poll(
+        async () => await this.showFieldAsJsonCheckbox.isChecked(),
+        { timeout: 5000 },
+      )
+      .toBe(!beforeChecked);
+    testLogger.debug("Toggled show field as JSON checkbox");
   }
 
   /**
@@ -420,12 +442,123 @@ export default class ChartTypeSelector {
   }
 
   /**
-   * Enter a custom SQL query in the Monaco editor
+   * Enter a custom SQL query in the Monaco editor.
+   * Clicks the editor wrapper (data-test) then types via the page keyboard,
+   * avoiding class/role selectors that violate the PO selector policy.
    * @param {string} query - The SQL query to enter
    */
   async enterCustomSQL(query) {
-    await this.queryEditor.getByRole('code').click();
-    await this.queryEditor.locator(".inputarea").fill(query);
+    await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
+    await this.queryEditor.click();
+    // Clear any placeholder/default content, then type the new query
+    await this.page.keyboard.press("Control+a");
+    await this.page.keyboard.press("Delete");
+    await this.page.keyboard.type(query);
     testLogger.debug('Entered custom SQL query', { query });
+  }
+
+  /**
+   * End-to-end helper: switch to SQL → Custom query mode and enter the query.
+   * @param {string} query - The SQL query to enter
+   */
+  async setCustomSQL(query) {
+    await this.sqlQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.sqlQueryTypeBtn.click();
+    await this.customQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.customQueryTypeBtn.click();
+    await this.enterCustomSQL(query);
+  }
+
+  /**
+   * Dismiss the field property popup (ODropdown portal) by pressing Escape.
+   * Waits for the JSON-toggle checkbox (which only renders inside the open popup)
+   * to detach so the menu is guaranteed gone before subsequent actions.
+   */
+  async dismissFieldPropertyPopup() {
+    await this.page.keyboard.press('Escape');
+    await this.showFieldAsJsonCheckbox
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .catch(() => {});
+    testLogger.debug('Dismissed field property popup');
+  }
+
+  /**
+   * Verify the JSON renderer element is visible after JSON-rendering is enabled.
+   * Waits up to 60s for the renderer to attach + become visible; the panel
+   * re-renders asynchronously after Apply, so we poll on attach first to
+   * ride out the column-meta hydration that triggers JsonFieldRenderer.
+   */
+  async verifyJsonRendererVisible() {
+    // Wait for at least one renderer to attach (mount) — this rides out
+    // the panel-schema → TenstackTable column-meta → JsonFieldRenderer
+    // hydration cycle that happens just after Apply.
+    await expect
+      .poll(
+        async () => await this.jsonFieldRenderer.count(),
+        { timeout: 60000 },
+      )
+      .toBeGreaterThan(0);
+    // TenstackTable virtualises rows — the FIRST renderer in DOM order may be
+    // a buffered (off-viewport) row reporting `hidden` per Playwright's
+    // visibility test even though it's mounted and laid out. Poll for ANY
+    // attached `json-field-renderer` to have a non-zero bounding box, which
+    // matches the spec's downstream `verifyJsonContainsKey/Value` calls that
+    // succeed when even one renderer has rendered content.
+    await expect
+      .poll(
+        async () =>
+          await this.page.evaluate(() => {
+            const nodes = document.querySelectorAll(
+              '[data-test="json-field-renderer"]',
+            );
+            return Array.from(nodes).some((n) => {
+              const r = n.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            });
+          }),
+        { timeout: 30000 },
+      )
+      .toBe(true);
+  }
+
+  /**
+   * Get the count of attached json-field-renderer elements (may be in overflow)
+   * @returns {Promise<number>} count of JSON renderer elements
+   */
+  async getJsonRendererCount() {
+    await this.jsonFieldRenderer.first().waitFor({ state: 'attached', timeout: 30000 });
+    return await this.jsonFieldRenderer.count();
+  }
+
+  /**
+   * Verify that at least one JSON key element contains the expected key text.
+   * Uses page.evaluate against data-test="json-key" elements (no text=/has-text selectors).
+   * @param {string} expectedKey - The JSON key to find (e.g., "domain")
+   */
+  async verifyJsonContainsKey(expectedKey) {
+    await this.jsonKey.first().waitFor({ state: 'attached', timeout: 30000 });
+    const found = await this.page.evaluate((key) => {
+      const nodes = document.querySelectorAll('[data-test="json-key"]');
+      return Array.from(nodes).some((n) => (n.textContent || '').trim() === key);
+    }, expectedKey);
+    if (!found) {
+      throw new Error(`Expected JSON key "${expectedKey}" was not rendered`);
+    }
+  }
+
+  /**
+   * Verify that at least one JSON value element contains the expected value text.
+   * Uses page.evaluate against data-test="json-value" elements (no text=/has-text selectors).
+   * @param {string} expectedValue - The JSON value substring to find (e.g., "service.local")
+   */
+  async verifyJsonContainsValue(expectedValue) {
+    await this.jsonValue.first().waitFor({ state: 'attached', timeout: 30000 });
+    const found = await this.page.evaluate((val) => {
+      const nodes = document.querySelectorAll('[data-test="json-value"]');
+      return Array.from(nodes).some((n) => (n.textContent || '').includes(val));
+    }, expectedValue);
+    if (!found) {
+      throw new Error(`Expected JSON value "${expectedValue}" was not rendered`);
+    }
   }
 }

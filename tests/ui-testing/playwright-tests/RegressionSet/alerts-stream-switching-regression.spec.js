@@ -455,14 +455,14 @@ test.describe("Alerts Stream Switching Regression", () => {
     await firstDest.click();
     testLogger.info(`Selected destination`);
     await page.waitForTimeout(500);
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
-    // Remove interfering q-portal elements
+    // Remove interfering portal elements
     await page.evaluate(() => {
       document.querySelectorAll('div[id^="q-portal"]').forEach(el => {
         if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none';
       });
-    }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+    }).catch(e => testLogger.warn('Failed to remove portal elements', { error: e.message }));
     await page.waitForTimeout(300);
 
     // Submit — button is clipped in scroll container, use evaluate() same as createScheduledAlertWithSQL

@@ -27,12 +27,21 @@ export class LogsPage {
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+        // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
+        // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
+        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
         this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
+        // OSwitch renders the wrapper data-test on a div and the state on an inner
+        // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling
+        // OTooltip grace-area span also carries `data-state="closed"`, so we filter on the
+        // OSwitch states explicitly to avoid the strict-mode collision.
+        this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
+        this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
         this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
         this.resultText = '[data-test="logs-search-search-result"]';
@@ -83,15 +92,15 @@ export class LogsPage {
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
-        this.savedViewByLabel = '.q-item__label';
-        this.notificationMessage = '.q-notification__message';
+        this.savedViewByLabel = '[data-test$="-option"]';
+        this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
         this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
-        this.notificationErrorMessage = '.q-notification__message:has-text("error")';
+        this.notificationErrorMessage = '[role="alert"]:has-text("error")';
         this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
@@ -101,12 +110,17 @@ export class LogsPage {
         this.saveStreamButton = '[data-test="save-stream-btn"]';
         this.streamDetail = '[title="Stream Detail"]';
         this.schemaStreamIndexSelect = ':nth-child(2) > [data-test="schema-stream-index-select"]';
-        this.fullTextSearch = '.q-virtual-scroll__content';
+        this.fullTextSearch = '[data-test$="-popover"]';
         this.schemaUpdateSettingsButton = '[data-test="schema-update-settings-button"]';
         this.colAutoButton = '.col-auto button';
         this.exploreTitle = '[title="Explore"]';
         this.streamsSearchStreamInput = '[data-test="streams-search-stream-input"]';
-        this.logSearchIndexListFieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
+        // Post-OFieldList migration the IndexList search box renders via OInput with
+        // data-test="o-field-list-search" (wrapper) and "-field" (inner native input).
+        // Fill the -field variant so input events fire correctly. Scope under the
+        // logs index list so we don't collide with the panel-editor-container's own
+        // OFieldList search input (visible from Visualize-tab panel layouts).
+        this.logSearchIndexListFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.expandCode = 'Expand "code"';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
         this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
@@ -127,6 +141,11 @@ export class LogsPage {
         this.resultPagination = '[data-test="logs-search-result-pagination"]';
         this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
+        // OSelect-based records-per-page dropdown (logs SearchResult.vue:138)
+        this.recordsPerPageDropdown = '[data-test="logs-search-result-records-per-page"]';
+        this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
+        // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
+        this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
@@ -150,6 +169,7 @@ export class LogsPage {
         this.logsToggle = '[data-test="logs-logs-toggle"]';
         this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+        this.buildQueryPage = '[data-test="logs-build-query-page"]';
 
         // Query type selector (Auto/Custom mode)
         this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
@@ -168,6 +188,11 @@ export class LogsPage {
         this.xAxisItemRemove = (alias) => `[data-test="dashboard-x-item-${alias}-remove"]`;
         this.yAxisItemRemove = (alias) => `[data-test="dashboard-y-item-${alias}-remove"]`;
         this.breakdownItemRemove = (alias) => `[data-test="dashboard-b-item-${alias}-remove"]`;
+        // Collective axis-item selectors used to detect "any items present" — data-test prefix
+        // matches dashboard-x-item-{alias}, *-drag, *-menu, *-remove suffixes alike (count is
+        // 4x inflated, callers check >=1 so that's acceptable).
+        this.xAxisItemsAny = `${this.xAxisLayout} [data-test^="dashboard-x-item-"]`;
+        this.yAxisItemsAny = `${this.yAxisLayout} [data-test^="dashboard-y-item-"]`;
 
         // Field list for builder
         this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
@@ -176,7 +201,12 @@ export class LogsPage {
         this.addToYAxis = '[data-test="dashboard-add-y-data"]';
         this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
         this.addToFilter = '[data-test="dashboard-add-filter-data"]';
-        this.fieldListSearchInput = '[data-test="index-field-search-input"]';
+        // PanelFieldList uses OFieldList which renders an OInput with data-test="o-field-list-search".
+        // OInput convention: wrapper carries data-test, inner native <input> carries `-field` suffix.
+        this.fieldListSearchInput = '[data-test="o-field-list-search-field"]';
+        this.fieldListSearchInputWrapper = '[data-test="o-field-list-search"]';
+        // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
+        this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
 
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
@@ -195,11 +225,13 @@ export class LogsPage {
         this.chartRenderer = '[data-test="chart-renderer"]';
         this.noDataMessage = '[data-test="no-data"]';
         this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
+        // Composite: any of the three indicates the build/visualize tab finished initial render.
+        this.buildInitIndicator = `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`;
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
         this.shareLinkTooltip = '[data-test="o-tooltip-content"]';
-        this.successNotification = '.q-notification__message';
+        this.successNotification = '[role="alert"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -209,7 +241,7 @@ export class LogsPage {
         this.expandOnFocusClass = '.expand-on-focus';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
-        this.logDetailDialogBox = '[data-test="dialog-box"]';
+        this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
         this.logDetailTitleText = '[data-test="log-detail-title-text"]';
         this.logDetailJsonTab = '[data-test="log-detail-json-tab"]';
         this.logDetailTableTab = '[data-test="log-detail-table-tab"]';
@@ -272,7 +304,7 @@ export class LogsPage {
         // Additional regression test selectors
         this.streamsSearchInputField = '[data-test="streams-search-stream-input"] input';
         // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
-        this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
+        this.errorIndicators = '[role="alert"][class*="bg-negative"], [role="alert"].bg-negative, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
 
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
@@ -306,7 +338,7 @@ export class LogsPage {
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
-        this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
     }
 
@@ -410,87 +442,51 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
-        // Select both default and e2e_automate streams for join queries
-        // Retry loop with force-click fallback for cloud stability (Pattern 3)
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-        const defaultToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
-        const e2eToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
+        // Select both default and e2e_automate streams for join queries.
+        // Retry loop with force-click fallback for cloud stability (Pattern 3).
+        //
+        // Post-OSelect-migration the legacy `log-search-index-list-stream-toggle-*`
+        // data-tests are gone; OSelect emits each option with `data-test-value="<stream>"`.
+        // Clicking the wrapper itself bubbles into the inner reka-ui PopoverTrigger and
+        // opens the popover (we avoid `[role="button"]` because native `<button>` has an
+        // implicit role that attribute selectors don't match).
+        const selectWrapper = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const defaultOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="default"]',
+        );
+        const e2eOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="e2e_automate"]',
+        );
 
-        // Open dropdown
-        await selectTrigger.click({ force: true });
-        await this.page.waitForTimeout(2000);
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+        await selectWrapper.click({ force: true });
 
-        // Select default stream with retry
-        let defaultSelected = false;
-        for (let attempt = 1; attempt <= 3 && !defaultSelected; attempt++) {
-            try {
-                await defaultToggle.waitFor({ state: 'visible', timeout: 5000 });
-                await defaultToggle.click({ force: true });
-                defaultSelected = true;
-            } catch (e) {
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(500);
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
+        // Select default stream with retry — re-open popover on miss.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await defaultOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await defaultOption.first().click({ force: true });
+                break;
             }
-        }
-        if (!defaultSelected) {
-            // Last-resort fallback: ensure the dropdown is open before clicking;
-            // after 3 retries through the Escape path, it may be closed and
-            // a force-click on a hidden toggle silently does nothing.
-            if (!(await defaultToggle.isVisible().catch(() => false))) {
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-            }
-            await defaultToggle.click({ force: true, timeout: 10000 });
-        }
-        await this.page.waitForTimeout(1000);
-
-        // The dropdown auto-closes after selecting default — re-open it
-        // before attempting to click e2e_automate, otherwise e2eToggle is
-        // never visible and we burn time in the retry loop.
-        const isDropdownStillOpen = await e2eToggle.isVisible().catch(() => false);
-        if (!isDropdownStillOpen) {
-            await selectTrigger.click({ force: true });
-            await this.page.waitForTimeout(1000);
+            await selectWrapper.click({ force: true });
         }
 
-        // Select e2e_automate stream with retry
-        let e2eSelected = false;
-        for (let attempt = 1; attempt <= 3 && !e2eSelected; attempt++) {
-            try {
-                await e2eToggle.waitFor({ state: 'visible', timeout: 5000 });
-                await e2eToggle.click({ force: true });
-                e2eSelected = true;
-            } catch (e) {
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(500);
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-                // Re-select default only if it's no longer marked as selected
-                // (clicking an already-on Quasar toggle would deselect it)
-                const isDefaultOn = await defaultToggle
-                    .locator('.q-toggle__inner')
-                    .first()
-                    .evaluate(el => el.classList.contains('q-toggle__inner--truthy'))
-                    .catch(() => true); // treat transient DOM errors as "already on" — safer than deselecting
-                if (!isDefaultOn) {
-                    await defaultToggle.click({ force: true });
-                    await this.page.waitForTimeout(500);
-                }
-            }
-        }
-        if (!e2eSelected) {
-            // Last-resort fallback: same dropdown-open guard as above
-            if (!(await e2eToggle.isVisible().catch(() => false))) {
-                await selectTrigger.click({ force: true });
-                await this.page.waitForTimeout(1000);
-            }
-            await e2eToggle.click({ force: true, timeout: 10000 });
+        // OSelect multi-mode keeps the popover open after toggle, but be defensive —
+        // if the popover closed, re-open it before picking the second stream.
+        if (!(await e2eOption.first().isVisible({ timeout: 2000 }).catch(() => false))) {
+            await selectWrapper.click({ force: true });
         }
 
-        // Close dropdown
-        await selectTrigger.click({ force: true });
+        // Select e2e_automate stream with retry.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await e2eOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await e2eOption.first().click({ force: true });
+                break;
+            }
+            await selectWrapper.click({ force: true });
+        }
+
+        // Close the popover so the field list can render under it.
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     /**
@@ -535,61 +531,105 @@ export class LogsPage {
         });
         await this.page.waitForTimeout(2000);
 
-        // Open dropdown
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
+        // Open dropdown — OSelect wrapper carries the data-test; clicking the
+        // wrapper hits the inner PopoverTrigger button.
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').first();
         await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
         await selectTrigger.click();
         await this.page.waitForTimeout(2000);
 
-        // Use search box to filter for first stream (much faster than scrolling)
-        const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
-        const searchVisible = await searchInput.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+        // Use the popover's ListboxFilter input to filter for the first stream.
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-popover"] input').first();
+        const searchVisible = await popoverSearch
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        // Helper: click the option in the OSelect popover whose label matches the
+        // given stream name. OSelect renders every option with the SAME
+        // `${parentDataTest}-option` data-test, so we must walk those options and
+        // click the one whose visible text matches. This is the approved
+        // page.evaluate pattern from the audit (`json-field-renderer` etc).
+        const selectOptionByLabel = async (streamName) => {
+            await this.page.waitForFunction(
+                (name) => {
+                    const opts = document.querySelectorAll(
+                        '[data-test="log-search-index-list-select-stream-popover"] [data-test="log-search-index-list-select-stream-option"]'
+                    );
+                    return Array.from(opts).some(
+                        (el) => (el.textContent || '').trim() === name
+                    );
+                },
+                streamName,
+                { timeout: 20000 }
+            );
+            await this.page.evaluate((name) => {
+                const opts = document.querySelectorAll(
+                    '[data-test="log-search-index-list-select-stream-popover"] [data-test="log-search-index-list-select-stream-option"]'
+                );
+                for (const el of opts) {
+                    if ((el.textContent || '').trim() === name) {
+                        el.click();
+                        return;
+                    }
+                }
+            }, streamName);
+        };
 
         // Select first stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamA}`);
-            await searchInput.click();
-            await searchInput.fill(streamA);
+            await popoverSearch.click();
+            await popoverSearch.fill(streamA);
+            await this.page.waitForTimeout(800);
         }
 
-        const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
-        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
-        const streamAToggle = this.page.locator(streamASelector).first();
-        await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
-        await streamAToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selecting option for stream ${streamA}`);
+        await selectOptionByLabel(streamA);
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
         await this.page.waitForTimeout(2000);
 
         // Clear search and filter for second stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
-            await searchInput.click();
+            await popoverSearch.click();
             await this.page.waitForTimeout(500);
-            await searchInput.fill('');
+            await popoverSearch.fill('');
             await this.page.waitForTimeout(500);
-            await searchInput.fill(streamB);
+            await popoverSearch.fill(streamB);
             await this.page.waitForTimeout(1000);
         }
 
-        // Select second stream
-        const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
-        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
-        const streamBToggle = this.page.locator(streamBSelector).first();
-        await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
-        await streamBToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selecting option for stream ${streamB}`);
+        await selectOptionByLabel(streamB);
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
         await this.page.waitForTimeout(2000);
 
-        // Close dropdown
+        // Close dropdown — click the wrapper trigger again
         await selectTrigger.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
     async selectIndexStreamDefault() {
-        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-        await selectTrigger.click();
-        await this.page.waitForTimeout(3000);
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+        // Post-OSelect-migration: pick the `default` option by data-test-value
+        // instead of the legacy `log-search-index-list-stream-toggle-default` toggle.
+        // Click the wrapper to open the popover (the inner reka-ui PopoverTrigger is a
+        // native <button> with implicit role — [role="button"] attribute selector
+        // doesn't match it).
+        const selectWrapper = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const defaultOption = this.page.locator(
+            '[data-test="log-search-index-list-select-stream-option"][data-test-value="default"]',
+        );
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+        await selectWrapper.click({ force: true });
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await defaultOption.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+                await defaultOption.first().click({ force: true });
+                break;
+            }
+            await selectWrapper.click({ force: true });
+        }
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async selectIndexStream(streamName) {
@@ -691,111 +731,89 @@ export class LogsPage {
             testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
         }
 
+        // Post-OSelect-migration IndexList contract (see web/src/plugins/logs/IndexList.vue):
+        //  - Wrapper: [data-test="log-search-index-list-select-stream"]   (OSelect outer div)
+        //  - Trigger: the inner native <button> that Reka UI's PopoverTrigger renders. A
+        //    `[role="button"]` attribute selector does NOT match a native <button> — the
+        //    role is implicit, not declared as an attribute — so we scope from the data-test
+        //    wrapper down to its single `button` child instead.
+        //  - Option:  [data-test="log-search-index-list-select-stream-option"]
+        //             [data-test-value="<stream>"]   (rendered into a portalled popover by OSelect).
+        // The legacy q-select `log-search-index-list-stream-toggle-*` data-test is no longer
+        // emitted, so we open the popover and pick the option directly. The retry loop
+        // re-opens the popover on miss to handle the case where the stream list streams in
+        // late after page navigation — matching the original 5-attempt retry semantic.
+        const selectWrapper = this.page.locator(this.indexDropDown);
+        await selectWrapper.waitFor({ state: 'visible', timeout: 15000 });
+
+        // OSelect's PopoverTrigger is an inner element — clicking the outer wrapper div does
+        // not always reach it. Prefer the explicit `-trigger` data-test (added on OSelect.vue
+        // PopoverTrigger). Fall back to the wrapper for environments that pre-date that attr.
+        const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        const popoverNode = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+        // OSelect virtualises the option list. When the streamList is large (e.g. pentest
+        // env with 1000+ streams) the target option is not rendered initially. Typing into
+        // the popover's filter narrows the list so the option becomes the only renderable row.
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-search"]');
+
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`,
+        );
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
 
             try {
-                // Click the OSelect trigger button to open the stream list
-                testLogger.info(`selectStream: Clicking OSelect trigger button`);
-                const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-                await selectTrigger.waitFor({ state: 'visible', timeout: 10000 });
-                await selectTrigger.click();
-                await this.page.waitForTimeout(2000);
+                testLogger.info(`selectStream: Clicking OSelect wrapper to open stream popover`);
+                // Click the inner PopoverTrigger when available; fall back to the wrapper.
+                if (await selectTrigger.count() > 0) {
+                    await selectTrigger.first().click();
+                } else {
+                    await selectWrapper.click();
+                }
+                // Wait for the popover to actually open (deterministic — no timeout).
+                await popoverNode.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-                // Use search box to filter streams for faster finding
-                const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
-                const searchVisible = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
-                if (searchVisible) {
-                    testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
-                    await searchInput.click();
-                    await searchInput.fill(''); // Clear any previous filter first
-                    await searchInput.fill(stream);
-                    await this.page.waitForTimeout(1500);
+                // OSelect popover renders a search/filter input; type the stream name to
+                // narrow the virtualised option list to just the target row.
+                if (await popoverSearch.count() > 0) {
+                    await popoverSearch.fill(stream).catch(() => {});
                 }
 
-                // Stream picker is OSelect (Reka Listbox) post-migration; legacy
-                // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
-                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
-
-                // Try to click the stream toggle div directly first
-                const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
-                testLogger.info(`selectStream: Looking for: ${streamToggleSelector}`);
-
-                // Scroll through the dropdown to find the stream
-                let maxScrolls = 20;
-                let scrollAmount = 200;
-                let foundStream = false;
-
-                while (maxScrolls > 0 && !foundStream) {
-                    // Check if stream toggle is visible
-                    const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
-                    const toggleDivVisible = await streamToggleDiv.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleDivVisible) {
-                        await streamToggleDiv.click();
-                        testLogger.info(`selectStream: Selected stream: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Try the toggle itself
-                    const streamToggle = this.page.locator(streamToggleSelector);
-                    const toggleVisible = await streamToggle.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (toggleVisible) {
-                        await streamToggle.click();
-                        testLogger.info(`selectStream: Selected stream via toggle: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Try by text
-                    const streamByText = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
-                    const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
-
-                    if (textVisible) {
-                        await streamByText.click();
-                        testLogger.info(`selectStream: Selected stream by text: ${stream}`);
-                        foundStream = true;
-                        return;
-                    }
-
-                    // Scroll down in the dropdown if stream not found yet
-                    const menuVisible = await dropdownMenu.isVisible({ timeout: 500 }).catch(() => false);
-                    if (menuVisible) {
-                        try {
-                            await dropdownMenu.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                            testLogger.debug(`selectStream: Scrolled dropdown by ${scrollAmount}px`);
-                        } catch (scrollError) {
-                            testLogger.debug(`selectStream: Scroll failed: ${scrollError.message}`);
-                        }
-                    }
-
+                testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
+                const visible = await option
+                    .first()
+                    .isVisible({ timeout: 3000 })
+                    .catch(() => false);
+                if (visible) {
+                    await option.first().click();
+                    await this.page.waitForTimeout(500);
+                    // Dismiss the popover — OSelect in multi mode stays open after toggle.
+                    await this.page.keyboard.press('Escape').catch(() => {});
                     await this.page.waitForTimeout(300);
-                    maxScrolls--;
+                    testLogger.info(`selectStream: Selected stream: ${stream}`);
+                    return;
                 }
 
-                // Stream not found in this attempt, close dropdown and retry
-                testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(500);
+                testLogger.info(`selectStream: Stream ${stream} not visible on attempt ${attempt}, retrying`);
+                await this.page.keyboard.press('Escape').catch(() => {});
+                await this.page.waitForTimeout(1500);
 
-                if (attempt < maxRetries) {
-                    testLogger.debug(`selectStream: Waiting 10s before retry...`);
-                    await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
-
-                    // Navigate to logs page again to refresh stream list
+                if (attempt < maxRetries && !skipNavigation) {
+                    testLogger.debug(`selectStream: Reloading logs page to refresh stream list`);
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
                     await this.page.waitForTimeout(3000);
+                } else if (attempt < maxRetries) {
+                    // skipNavigation: stay on the current page, just let the stream list catch up.
+                    await this.page.waitForTimeout(3000);
                 }
-
             } catch (e) {
-                testLogger.debug(`selectStream: Attempt ${attempt} failed with error: ${e.message}`);
+                testLogger.debug(`selectStream: Attempt ${attempt} failed: ${e.message}`);
                 await this.page.keyboard.press('Escape').catch(() => {});
-
-                if (attempt < maxRetries) {
-                    await this.page.waitForTimeout(5000);
+                if (attempt < maxRetries && !skipNavigation) {
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                } else if (attempt < maxRetries) {
                     await this.page.waitForTimeout(3000);
                 }
             }
@@ -807,26 +825,38 @@ export class LogsPage {
 
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
+        // Legacy q-select used `log-search-index-list-stream-toggle-<name> div`;
+        // post-OSelect migration that data-test is gone. Pick the same option
+        // by `data-test-value` — toggling an already-selected option deselects
+        // it in OSelect's multi-mode (selectionBehavior=toggle).
         const streamDropdown = this.page.locator(this.indexDropDown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
-        if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await streamToggle.click();
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        );
+        if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+            await option.first().click();
             testLogger.info(`Deselected stream: ${streamName}`);
         }
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async addStreamToSelection(streamName) {
         testLogger.info(`Adding stream to selection: ${streamName}`);
+        // Legacy `log-search-index-list-stream-toggle-<name>` is gone post-OSelect
+        // migration. Click the wrapper to open the popover, then pick the option
+        // by data-test-value.
         const searchInput = this.page.locator(this.indexDropDown);
         await searchInput.click();
         await this.page.waitForTimeout(500);
         await searchInput.fill(streamName);
         await this.page.waitForTimeout(1000);
-        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
-        if (await streamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await streamToggle.click();
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        );
+        if (await option.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+            await option.first().click();
             testLogger.info(`Selected additional stream: ${streamName}`);
         }
     }
@@ -1011,22 +1041,20 @@ export class LogsPage {
 
     async clearAndFillQueryEditor(query) {
         // Wait for query editor to be ready
-        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(1000);
+        const editor = this.page.locator(this.queryEditor);
+        await editor.waitFor({ state: 'visible', timeout: 10000 });
 
         // Click to focus the editor
-        await this.page.locator(this.queryEditor).click();
-        await this.page.waitForTimeout(500);
-
-        // Select all existing content
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.waitForTimeout(300);
+        await editor.click();
 
         // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
         // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
         // The .fill() method will replace the selected content
-        const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
+        const inputArea = editor.locator('.inputarea');
         await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Select all existing content
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await inputArea.fill(query);
     }
 
@@ -1282,7 +1310,7 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     async clickQuickModeToggle() {
@@ -1292,7 +1320,7 @@ export class LogsPage {
         await this.page.locator(this.quickModeToggle).click();
         // Close the utilities menu - it stays open after toggle click
         // (no v-close-popup on the quick mode item)
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
@@ -1300,9 +1328,9 @@ export class LogsPage {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
         // Click on the text label "Quick Mode" instead of the toggle switch
-        await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+        await this.page.locator(this.quickModeToggle).getByText('Quick Mode').click();
         // Close the utilities menu to match the pattern in getQuickModeState()
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     // Get the current quick mode state (true/false)
@@ -1311,7 +1339,7 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return isOn;
     }
 
@@ -1350,8 +1378,8 @@ export class LogsPage {
 
     async verifyHistogramState() {
         // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-        const isChecked = await this.page.locator(this.histogramToggle).getAttribute('aria-checked');
-        expect(isChecked).toBe('false');
+        // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
+        await expect(this.page.locator(this.histogramToggleUncheckedBtn)).toBeVisible({ timeout: 5000 });
     }
 
     // Error handling methods
@@ -1542,23 +1570,21 @@ export class LogsPage {
     async clickResultsPerPage() {
         // Wait for results to load first — cloud may be slower
         await this.page.waitForTimeout(2000);
-        // Click the dropdown using the data-test attribute on the results-per-page dropdown
-        const resultsDropdown = this.page.locator('[data-test="logs-search-result-records-per-page"]');
+        // Click the dropdown using the data-test attribute on the records-per-page OSelect wrapper
+        const resultsDropdown = this.page.locator(this.recordsPerPageDropdown);
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
         // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page.waitForTimeout(500);
-        const option10 = this.page
-            .locator('.q-menu .q-item')
-            .filter({ hasText: /^10$/ })
-            .first();
+        // Target option by data-test-value (OSelect emits `${parent}-option` + data-test-value).
+        const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await option10.click({ force: true });
         // Wait for the per-page change to take effect — cloud wildcard queries
         // can take 5s+ to re-run after changing results-per-page
         await this.page.waitForTimeout(5000);
         // Retry the pagination assertion — slow cloud re-runs can miss the first check
-        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
@@ -1590,15 +1616,12 @@ export class LogsPage {
                 expectedPattern = expectedText;
         }
 
-        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        const searchResult = this.page.locator(this.searchResultText);
         // Quasar pagination buttons can be slow to respond on cloud — retry
         // the click up to 3 times if the expected text doesn't appear.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            const pageBtn = this.page
-                .locator(this.resultPagination)
-                .locator('button:not(:has(.OIcon))')
-                .filter({ hasText: resultsPerPage })
-                .first();
+            // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
+            const pageBtn = this.page.locator(this.resultPaginationPageBtn(resultsPerPage));
             await pageBtn.click({ force: true }).catch(() => {});
             await this.page.waitForTimeout(3000);
 
@@ -1616,8 +1639,9 @@ export class LogsPage {
     }
 
     async pageNotVisible() {
-        const fastRewindElement = this.page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
-        await expect(fastRewindElement).not.toBeVisible();
+        // When LIMIT caps results below per-page floor, OSelect records-per-page dropdown hides.
+        const recordsDropdown = this.page.locator(this.recordsPerPageDropdown);
+        await expect(recordsDropdown).not.toBeVisible();
     }
 
     // Validation methods
@@ -2047,7 +2071,25 @@ export class LogsPage {
     }
 
     async clickQueryEditor() {
-        return await this.page.locator(this.queryEditor).click();
+        // Dismiss any lingering Reka popper / tooltip / dropdown content that could
+        // intercept pointer events.
+        await this.page.keyboard.press('Escape').catch(() => {});
+
+        // Focus the Monaco editor through its public API. Clicking the outer wrapper
+        // doesn't reliably focus the editor's hidden inputarea — focus() does.
+        const focused = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            ed.focus();
+            return true;
+        }, this.queryEditor).catch(() => false);
+
+        if (!focused) {
+            // Fallback when Monaco isn't ready yet — click the wrapper directly.
+            await this.page.locator(this.queryEditor).click({ force: true });
+        }
     }
 
     async clickQueryEditorTextbox() {
@@ -2079,6 +2121,23 @@ export class LogsPage {
      */
     async runQueryAndWaitForResults(timeout = 60000) {
         const btn = this.page.locator(this.queryButton);
+
+        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
+        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
+        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                if (!el) return false;
+                const text = (el.textContent || '').trim();
+                const title = (el.getAttribute('title') || '').trim();
+                return !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
+            },
+            this.queryButton,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, continuing');
+        });
 
         // Click Run query
         await btn.click({ force: true });
@@ -2191,7 +2250,12 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        return await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').first().click();
+        // SearchBar.vue:97 / 501 emits an OSwitch with data-test="logs-search-bar-sql-mode-toggle-btn"
+        // (either on the toolbar or inside the utilities menu depending on viewport).
+        // Click the wrapper directly — OSwitch handles toggle on the wrapper click.
+        const toggle = this.page.locator(this.sqlModeToggle).first();
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        return await toggle.click({ force: true });
     }
 
     async clickShowQueryToggle() {
@@ -2252,7 +2316,7 @@ export class LogsPage {
 
     async clickSaveViewButton() {
         // Close any open dialogs/menus first (e.g., saved views dropdown)
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(200);
         return await this.page.locator('[data-test="logs-search-saved-views-btn"]').click();
     }
@@ -2390,16 +2454,32 @@ export class LogsPage {
         return await this.page.waitForSelector(`:text("${text}")`);
     }
 
+    /**
+     * Wait briefly for the success OToast after creating a saved view.
+     * Resolves true on toast visible, false on timeout. Non-throwing — toasts may
+     * have appeared and disappeared by the time we check.
+     */
+    async expectSavedViewCreatedToast(timeout = 3000) {
+        try {
+            await this.page
+                .locator('[data-test="o-toast-success"], [data-test="o-toast-message"]')
+                .first()
+                .waitFor({ state: 'visible', timeout });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
 
         // Close any open saved views dialog from previous operations
-        const backdrop = this.page.locator('.q-dialog__backdrop');
+        const backdrop = this.page.locator('[data-test="o-dialog-close-btn"]');
         const isBackdropVisible = await backdrop.isVisible().catch(() => false);
         if (isBackdropVisible) {
-            await this.page.keyboard.press('Escape');
+            await backdrop.click();
             await this.waitForTimeout(500);
-            await backdrop.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
         }
 
         // Wait for the saved views area to be stable after navigation
@@ -2434,9 +2514,19 @@ export class LogsPage {
     }
 
     async getQueryEditorText() {
+        // Drive value via window.monaco.editor.getEditors() (AGENT_RULES §5)
+        // Falls back to null when monaco hasn't loaded yet
         return await this.page.evaluate((selector) => {
-            const editor = document.querySelector(selector).querySelector('.monaco-editor').querySelector('.view-lines');
-            return editor ? editor.textContent : null;
+            const host = document.querySelector(selector);
+            if (!host) return null;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const domNode = ed.getDomNode?.();
+                if (domNode && host.contains(domNode)) {
+                    return ed.getValue();
+                }
+            }
+            return null;
         }, this.queryEditor);
     }
 
@@ -2924,7 +3014,9 @@ export class LogsPage {
             await inputLocator.click({ clickCount: 3, force: true });
             await inputLocator.pressSequentially(text, { delay: 30 });
         }
-        await this.page.waitForTimeout(500);
+        // Wait deterministically for the input value to reflect the typed text —
+        // this confirms Quasar's debounced model-value chain has settled.
+        await expect(inputLocator).toHaveValue(text || '', { timeout: 5000 });
     }
 
     async clickExpandLabel(label) {
@@ -3257,7 +3349,8 @@ export class LogsPage {
             await inputLocator.fill('');
             await inputLocator.click({ force: true });
             await inputLocator.pressSequentially(field, { delay: 30 });
-            await this.page.waitForTimeout(500);
+            // Wait deterministically for the debounced filter to reflect the typed value
+            await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
         await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
         await btnLocator.click({ force: true });
@@ -3758,7 +3851,24 @@ export class LogsPage {
     }
 
     async clickAllFieldsButton() {
-        await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+        // FieldListPagination.vue renders one of two toggle groups:
+        //  - When user-defined-schema toggle is shown: per-slot data-tests like
+        //    "logs-user-defined-fields-btn-all_fields_slot".
+        //  - When only Quick Mode is on: data-test="logs-all-fields-btn" directly on
+        //    the "all_fields" OToggleGroupItem.
+        // Try the dedicated all-fields button first, then the user-defined "all_fields_slot".
+        const allFieldsBtn = this.page.locator('[data-test="logs-all-fields-btn"]').first();
+        const userDefAllFieldsBtn = this.page
+            .locator('[data-test="logs-user-defined-fields-btn-all_fields_slot"]')
+            .first();
+        if (await allFieldsBtn.isVisible().catch(() => false)) {
+            await allFieldsBtn.click();
+        } else if (await userDefAllFieldsBtn.isVisible().catch(() => false)) {
+            await userDefAllFieldsBtn.click();
+        } else {
+            // Neither toggle exposes "all_fields" — the field list is already in the
+            // default state; nothing to click.
+        }
         // Wait for interesting field items to populate (cloud may load slowly)
         await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
@@ -3766,20 +3876,33 @@ export class LogsPage {
     async enableQuickModeIfDisabled() {
         // The "interesting fields" toggle button in FieldListPagination only renders
         // when showQuickMode = true — use it as a fast pre-check before opening the menu.
-        const quickModeIndicator = this.page.locator('[data-test="logs-interesting-fields-btn"]');
+        // Post-FieldListPagination migration the data-test gained a `logs-page-` prefix;
+        // match both so the helper works for both legacy and current builds.
+        const quickModeIndicator = this.page.locator(
+            '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"]',
+        ).first();
+        // Quick Mode may also be implicitly "on" when the user-defined-schema toggle
+        // group is rendered — in that case the interesting-fields button is intentionally
+        // hidden and there's nothing to enable.
+        const toggleGroupIndicator = this.page.locator(
+            '[data-test="logs-page-fields-list-user-defined-schema-toggle"], [data-test="logs-page-field-list-user-defined-schema-toggle"]',
+        ).first();
         if (await quickModeIndicator.isVisible().catch(() => false)) {
             return;
         }
+        if (await toggleGroupIndicator.isVisible().catch(() => false)) {
+            return;
+        }
 
-        // Quick Mode is off — open the utilities menu and enable it.
-        // Retry up to 3 times: under parallel load on alpha1, the first click may
-        // toggle the menu closed (if it was already open) or the menu may open slowly.
+        // Quick Mode is off — open the utilities dropdown and enable the OSwitch.
+        // Post-migration: the trigger is an ODropdownItem (data-test="logs-search-bar-quick-mode-toggle-btn")
+        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-toggle"). The switch reads its state
+        // from data-state="checked|unchecked".
         const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
-            // Dismiss any open overlay first to avoid toggle-closing on the next click
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(100);
+            await this.page.keyboard.press('Escape').catch(() => {});
 
             await this.page.locator(this.utilitiesMenuButton).click({ force: true });
             const menuOpened = await quickModeItem.waitFor({ state: 'visible', timeout: 4000 })
@@ -3787,23 +3910,24 @@ export class LogsPage {
 
             if (!menuOpened) continue;
 
-            // Check toggle state: Quasar adds --truthy class when toggle is ON
-            const toggleInner = quickModeItem.locator('.q-toggle__inner').first();
-            const isOn = await toggleInner.evaluate(
-                node => node.classList.contains('q-toggle__inner--truthy')
-            ).catch(() => false); // Assume off if check fails — safer to try enabling
-
-            if (isOn) {
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(200);
+            // Read OSwitch state via data-state attribute on the inner role="switch" button
+            // (the wrapper div doesn't expose data-state in this OSwitch implementation).
+            const state = await quickModeSwitch
+                .first()
+                .locator('[data-state]')
+                .first()
+                .getAttribute('data-state')
+                .catch(() => null);
+            if (state === 'checked') {
+                await this.page.keyboard.press('Escape').catch(() => {});
                 enabled = true;
                 break;
             }
 
-            await quickModeItem.click({ force: true });
-            await this.page.waitForTimeout(300);
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(200);
+            // Click the inner OSwitch — its @click.stop handler invokes handleQuickMode
+            // synchronously regardless of the ODropdownItem select event timing.
+            await quickModeSwitch.first().click({ force: true });
+            await this.page.keyboard.press('Escape').catch(() => {});
             enabled = true;
             break;
         }
@@ -3812,13 +3936,22 @@ export class LogsPage {
             throw new Error('Quick Mode could not be enabled after 3 attempts');
         }
 
-        // Wait for Quick Mode to take effect in the field list sidebar
-        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 });
+        // Wait for the utilities dropdown portal to actually close — otherwise its
+        // popper still intercepts pointer events on the page (query editor clicks fail).
+        await quickModeItem.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+
+        // Wait deterministically for either field-list branch to surface in the sidebar.
+        await Promise.any([
+            quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }),
+            toggleGroupIndicator.waitFor({ state: 'visible', timeout: 8000 }),
+        ]).catch(() => {});
     }
 
     async clickTimestampField() {
-        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
-        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // Post-OFieldList migration the field row is data-test="logs-field-list-item-<field>"
+        // (FieldRow.vue:22). Click the row directly — it dispatches the field-click event.
+        const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
+        await field.waitFor({ state: 'visible', timeout: 10000 });
         return await field.click({ force: true });
     }
 
@@ -3843,8 +3976,9 @@ export class LogsPage {
     }
 
     async expectTimestampFieldVisible() {
-        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
-        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
+        const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
+        await field.waitFor({ state: 'visible', timeout: 10000 });
         return await expect(field).toBeVisible();
     }
 
@@ -3942,7 +4076,7 @@ export class LogsPage {
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
 
         // Check if there's a direct include button (newer UI)
@@ -4163,13 +4297,17 @@ export class LogsPage {
         // Wait for the menu to render the quick mode toggle before reading or clicking
         const quickModeBtn = this.page.locator(this.quickModeToggle);
         await quickModeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        // OSwitch exposes data-state="checked|unchecked" on its inner toggle button.
+        // Wrapper data-test="logs-search-bar-quick-mode-toggle"; descendant [data-state] is the button.
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        const state = await toggleInner.getAttribute('data-state').catch(() => null);
+        const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
             await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
             await this.page.waitForTimeout(500);
         }
+        // Close menu by pressing Escape (avoid body-position click — violates §2 selector policy)
         await this.page.keyboard.press('Escape');
     }
 
@@ -4184,7 +4322,7 @@ export class LogsPage {
             await this.page.waitForTimeout(500);
             return true; // State was changed
         }
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false; // State was already correct
     }
 
@@ -4195,16 +4333,19 @@ export class LogsPage {
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return { ariaPressed, classNames };
     }
 
     async expectQuickModeToggleVisible() {
         // Quick mode is now inside the utilities hamburger menu
+        const toggle = this.page.locator(this.quickModeToggle);
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-        await this.page.keyboard.press('Escape');
+        // Wait deterministically for the toggle to surface in the open menu
+        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(toggle).toBeVisible();
+        // Dismiss the popover with Escape to avoid `body` locator usage
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async waitForUI(timeout = 500) {
@@ -5183,10 +5324,12 @@ export class LogsPage {
     }
 
     /**
-     * Close any open dialog by pressing Escape key
+     * Close any open dialog by clicking the close button
      */
     async closeDimensionSelectorDialog() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+            this.page.locator('body').click({ position: { x: 10, y: 10 } })
+        );
         await this.page.waitForTimeout(500);
         testLogger.info('Closed dimension selector dialog');
     }
@@ -5757,7 +5900,7 @@ export class LogsPage {
      * @returns {Promise<string>} The notification text
      */
     async getNotificationText() {
-        const notifications = this.page.locator('.q-notification__message');
+        const notifications = this.page.locator('[role="alert"]');
         const notificationCount = await notifications.count();
         if (notificationCount > 0) {
             return await notifications.first().textContent() || '';
@@ -5770,7 +5913,7 @@ export class LogsPage {
      * @returns {Promise<number>} The number of notifications
      */
     async getNotificationCount() {
-        return await this.page.locator('.q-notification__message').count();
+        return await this.page.locator('[role="alert"]').count();
     }
 
     /**
@@ -5787,7 +5930,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if visible
      */
     async hasErrorNotification() {
-        const errorNotifications = this.page.locator('.q-notification--negative, text=/error/i, text=/syntax/i').first();
+        const errorNotifications = this.page.locator('[role="alert"][class*="bg-negative"], text=/error/i, text=/syntax/i').first();
         return await errorNotifications.isVisible().catch(() => false);
     }
 
@@ -5796,7 +5939,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if visible
      */
     async hasStreamValidationError() {
-        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        const errorNotifications = this.page.locator('[role="alert"], text=/select.*stream/i').first();
         return await errorNotifications.isVisible().catch(() => false);
     }
 
@@ -5805,7 +5948,7 @@ export class LogsPage {
      * @returns {Promise<string>} The error text
      */
     async getStreamValidationErrorText() {
-        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        const errorNotifications = this.page.locator('[role="alert"], text=/select.*stream/i').first();
         if (await errorNotifications.isVisible().catch(() => false)) {
             return await errorNotifications.textContent() || '';
         }
@@ -5952,7 +6095,7 @@ export class LogsPage {
             await this.page.waitForTimeout(500);
             testLogger.info('Histogram enabled');
         } else {
-            await this.page.keyboard.press('Escape');
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         }
     }
 
@@ -6278,13 +6421,39 @@ export class LogsPage {
      * @param {string} query - The SQL query to set
      */
     async setQueryEditorContent(query) {
-        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
-        // Use .first() to avoid strict mode violations when multiple monaco instances exist
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea').first();
-        await inputArea.click({ force: true });
-        await inputArea.fill(query);
-        // Wait for Monaco to render the new content in the view-line
-        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        // Drive value via window.monaco.editor (AGENT_RULES §5) — no class scraping
+        // Wait for the editor host AND the monaco model to be available
+        await this.page.locator(this.queryEditor).first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            return editors.some(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+        }, this.queryEditor, { timeout: 10000 });
+        // Set value via the monaco model so undo history is preserved and Vue v-model fires
+        await this.page.evaluate(({ selector, value }) => {
+            const host = document.querySelector(selector);
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            const target = editors.find(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+            if (!target) throw new Error('Monaco editor not found for selector');
+            target.focus();
+            const model = target.getModel();
+            const fullRange = model.getFullModelRange();
+            target.executeEdits('setQueryEditorContent', [
+                { range: fullRange, text: value, forceMoveMarkers: true },
+            ]);
+            target.setSelection(model.getFullModelRange());
+        }, { selector: this.queryEditor, value: query });
+        // Verify via getValue() that the model now reflects the value (handles empty string too)
+        await expect.poll(async () => {
+            return await this.getQueryEditorText();
+        }, { timeout: 5000 }).toBe(query);
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
     }
 
@@ -6293,12 +6462,15 @@ export class LogsPage {
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
     async enableSqlModeIfNeeded() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        if (isChecked !== 'true') {
+        // Use .first() to dodge strict-mode violations when SearchBar duplicates this data-test
+        // (toolbar OSwitch + collapsed-menu syntax-guide may co-exist in the DOM).
+        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        const isOn = await this.isSqlModeOn();
+        if (!isOn) {
             await sqlModeToggle.click();
-            // Wait for the toggle to actually switch ON
-            await expect(sqlModeToggle).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+            // Wait for the toggle to actually switch ON (inner <button role="switch"> exposes data-state)
+            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -6310,11 +6482,12 @@ export class LogsPage {
      * Combines getSQLModeState() check with clickSQLModeSwitch()
      */
     async disableSqlModeIfNeeded() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        if (isChecked === 'true') {
+        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        const isOn = await this.isSqlModeOn();
+        if (isOn) {
             await sqlModeToggle.click();
-            await this.page.waitForTimeout(1000);
+            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(false);
             testLogger.info('SQL mode disabled');
         } else {
             testLogger.info('SQL mode already disabled');
@@ -6728,7 +6901,7 @@ export class LogsPage {
      * Get wildcard chip element (for hover tests)
      * @param {string} chipClass - Optional chip class selector
      */
-    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] .q-chip') {
+    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] [data-test*="chip"]') {
         return this.page.locator(chipClass).first();
     }
 
@@ -6782,7 +6955,7 @@ export class LogsPage {
      * Get pattern details dialog content
      */
     async getPatternDetailsDialogContent() {
-        const content = await this.page.locator('.q-dialog').innerText();
+        const content = await this.page.locator('[data-test="logs-search-result-detail-dialog"]').innerText();
         testLogger.info(`Dialog content length: ${content.length} chars`);
         return content;
     }
@@ -6867,10 +7040,12 @@ export class LogsPage {
     /**
      * Expect Custom SQL mode to be active
      */
-    async expectCustomModeActive() {
+    async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
-        await expect(customTypeBtn).toBeVisible();
-        testLogger.info('Custom SQL mode is available');
+        await expect(customTypeBtn).toBeVisible({ timeout });
+        // Verify "Custom" button is active (OToggleGroupItem uses data-state="on")
+        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        testLogger.info('Custom SQL mode is active');
     }
 
     /**
@@ -6893,7 +7068,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        await this.page.waitForTimeout(500);
+        // Wait for the toggle group to reflect the Custom selection (OToggleGroupItem data-state="on")
+        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 
@@ -7016,7 +7192,7 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
-    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 45000) {
         // Use waitForFunction to directly check the DOM for the bg-grey class
         // on the chart selection item. This survives Vue reactive re-renders better
         // than Playwright's locator.toHaveClass polling.
@@ -7033,7 +7209,17 @@ export class LogsPage {
                         // Check the parent q-item for the bg-grey selection class
                         const parent = section.parentElement;
                         if (!parent) continue;
-                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
+                        // Prefer data-selected attribute (added to ChartSelection.vue for clean
+                        // data-test-only selectors). Fall back to legacy bg-grey-3/5 (Quasar) and
+                        // tw:bg-gray-200/400 (Tailwind) classes for older builds.
+                        const dataSelected = parent.getAttribute('data-selected');
+                        if (dataSelected !== null) {
+                            const isSelected = dataSelected === 'true';
+                            if (isSelected === shouldBeSelected) return true;
+                            continue;
+                        }
+                        const cls = parent.className || '';
+                        const hasBgGrey = /\bbg-grey-[35]\b/.test(cls) || /\btw:bg-gray-(?:200|400)\b/.test(cls);
                         if (hasBgGrey === shouldBeSelected) return true;
                     }
                     return false;
@@ -7081,9 +7267,26 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode is ON
      */
     async isSqlModeOn() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        return isChecked === 'true';
+        // OSwitch wrapper carries data-test; inner <button role="switch"> exposes data-state="checked|unchecked".
+        // The wrapper may exist twice (toolbar OSwitch + collapsed-menu syntax-guide which forwards the
+        // same data-test). Scope to the visible OSwitch wrapper and read its inner data-state via evaluate
+        // so we never match the syntax-guide root.
+        const state = await this.page.evaluate((selector) => {
+            const wrappers = Array.from(document.querySelectorAll(selector));
+            for (const w of wrappers) {
+                // Prefer the visible wrapper (toolbar OSwitch is always in layout flow)
+                if (!/** @type {HTMLElement} */ (w).offsetParent) continue;
+                const inner = w.querySelector('[data-state]');
+                if (inner) return inner.getAttribute('data-state');
+            }
+            // Fallback: first wrapper that contains a [data-state] (works even when offsetParent is null in some layouts)
+            for (const w of wrappers) {
+                const inner = w.querySelector('[data-state]');
+                if (inner) return inner.getAttribute('data-state');
+            }
+            return null;
+        }, this.sqlModeToggle);
+        return state === 'checked';
     }
 
     /**
@@ -7117,11 +7320,11 @@ export class LogsPage {
      */
     async searchFieldInBuilder(fieldName) {
         const input = this.page.locator(this.fieldListSearchInput).first();
-        // Quasar's q-field__native input resolves in the DOM but is considered hidden
-        // by Playwright's visibility algorithm — use force to interact directly.
+        // OInput's inner native <input> is the `-field` variant per AGENT_RULES §4.
         await input.waitFor({ state: 'attached', timeout: 10000 });
         await input.fill(fieldName, { force: true });
-        await this.page.waitForTimeout(500);
+        // Confirm the input reflected the value (deterministic — fill+rerender complete)
+        await expect(input).toHaveValue(fieldName, { timeout: 5000 });
         testLogger.info(`Searched for field: ${fieldName}`);
     }
 
@@ -7140,7 +7343,18 @@ export class LogsPage {
     }
 
     async expectMonacoEditorAreaVisible(timeout = 10000) {
-        await expect(this.page.locator(`${this.logsSearchBarQueryEditor} .monaco-editor`).first()).toBeVisible({ timeout });
+        // The editor wrapper carries the data-test; wait for monaco's model to be reachable
+        // via window.monaco (AGENT_RULES §5) instead of scraping .monaco-editor class.
+        await expect(this.page.locator(this.logsSearchBarQueryEditor).first()).toBeVisible({ timeout });
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            return editors.some(ed => {
+                const node = ed.getDomNode?.();
+                return node && host.contains(node);
+            });
+        }, this.logsSearchBarQueryEditor, { timeout });
         testLogger.info('Monaco editor area visible');
     }
 
@@ -7183,7 +7397,7 @@ export class LogsPage {
     async waitForBuildTabLoaded(timeout = 30000) {
         // Phase 1: Wait for BuildQueryPage root container to be visible
         try {
-            await this.page.locator('.build-query-page').waitFor({ state: 'visible', timeout });
+            await this.page.locator(this.buildQueryPage).waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab container loaded');
         } catch (error) {
             testLogger.warn('Build tab container did not appear within timeout');
@@ -7195,7 +7409,7 @@ export class LogsPage {
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
             const initIndicator = this.page
-                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
+                .locator(this.buildInitIndicator)
                 .filter({ visible: true })
                 .first();
             await initIndicator.waitFor({ state: 'visible', timeout });
@@ -7221,10 +7435,25 @@ export class LogsPage {
             const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
             const isVisible = await chartItem.isVisible().catch(() => false);
             if (isVisible) {
-                const parentClassList = await chartItem.locator('..').getAttribute('class') || '';
-                if (parentClassList.includes('bg-grey-3') || parentClassList.includes('bg-grey-5')) {
+                const parent = chartItem.locator('..');
+                // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
+                // Fall back to legacy bg-grey-3/5 (Quasar) and tw:bg-gray-200/400 (Tailwind).
+                const dataSelected = await parent.getAttribute('data-selected');
+                if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
                     return chartType;
+                }
+                if (dataSelected === null) {
+                    const parentClassList = (await parent.getAttribute('class')) || '';
+                    if (
+                        parentClassList.includes('bg-grey-3') ||
+                        parentClassList.includes('bg-grey-5') ||
+                        parentClassList.includes('tw:bg-gray-200') ||
+                        parentClassList.includes('tw:bg-gray-400')
+                    ) {
+                        testLogger.info(`Current chart type detected: ${chartType}`);
+                        return chartType;
+                    }
                 }
             }
         }
@@ -7247,7 +7476,16 @@ export class LogsPage {
                 const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
                 for (const item of items) {
                     const classes = item.className || '';
-                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                    // Prefer data-selected attribute (ChartSelection.vue), fall back to legacy classes
+                    const dataSelected = item.getAttribute('data-selected');
+                    const matchesSelected = dataSelected === 'true' ||
+                        (dataSelected === null && (
+                            classes.includes('bg-grey-3') ||
+                            classes.includes('bg-grey-5') ||
+                            classes.includes('tw:bg-gray-200') ||
+                            classes.includes('tw:bg-gray-400')
+                        ));
+                    if (matchesSelected) {
                         // Found selected item - extract chart type from child data-test attribute
                         const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
                         if (section) {
@@ -7289,9 +7527,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode matches expected state
      */
     async verifySqlModePreservedOnBuild(expectedState) {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-        const actualState = isChecked === 'true';
+        const actualState = await this.isSqlModeOn();
         if (actualState === expectedState) {
             testLogger.info(`SQL mode preserved on Build tab: expected=${expectedState}, actual=${actualState}`);
             return true;
@@ -7306,7 +7542,7 @@ export class LogsPage {
      * Checks that at least one item exists inside the X-axis layout.
      */
     async expectXAxisHasItems() {
-        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        const xItems = this.page.locator(this.xAxisItemsAny);
         await expect(xItems.first()).toBeVisible({ timeout: 15000 });
         const count = await xItems.count();
         testLogger.info(`X-axis has ${count} item(s)`);
@@ -7318,7 +7554,7 @@ export class LogsPage {
      * Checks that at least one item exists inside the Y-axis layout.
      */
     async expectYAxisHasItems() {
-        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        const yItems = this.page.locator(this.yAxisItemsAny);
         await expect(yItems.first()).toBeVisible({ timeout: 15000 });
         const count = await yItems.count();
         testLogger.info(`Y-axis has ${count} item(s)`);
@@ -7329,8 +7565,8 @@ export class LogsPage {
      * Expect X-axis and Y-axis are empty (no items)
      */
     async expectAxesEmpty() {
-        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
-        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        const xItems = this.page.locator(this.xAxisItemsAny);
+        const yItems = this.page.locator(this.yAxisItemsAny);
         await expect(xItems).toHaveCount(0, { timeout: 5000 });
         await expect(yItems).toHaveCount(0, { timeout: 5000 });
         testLogger.info('X and Y axes are empty');
@@ -7344,15 +7580,11 @@ export class LogsPage {
      */
     async getFilterConditionCount() {
         // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
-        // Retry for up to 10s to allow builder filter parsing to complete (CI may be slower)
-        const deadline = Date.now() + 10000;
-        let count = 0;
-        while (Date.now() < deadline) {
-            count = await filterItems.count();
-            if (count > 0) break;
-            await this.page.waitForTimeout(200);
-        }
+        const filterItems = this.page.locator(this.filterConditionLabelItems);
+        // Wait for the builder filter parsing to attach at least one condition (deterministic).
+        // Some queries genuinely have zero filters — fall through to 0 after a short check.
+        await filterItems.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+        const count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
         return count;
     }
@@ -7476,12 +7708,14 @@ export class LogsPage {
     }
 
     /**
-     * Press Escape key to close any open dialog
+     * Close any open dialog using the ODialog close button
      */
     async pressEscapeToCloseDialog() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('[data-test="o-dialog-close-btn"]').click().catch(() =>
+            this.page.locator('body').click({ position: { x: 10, y: 10 } })
+        );
         await this.page.waitForTimeout(300);
-        testLogger.info('Pressed Escape to close dialog');
+        testLogger.info('Closed dialog via close button');
     }
 
     /**
