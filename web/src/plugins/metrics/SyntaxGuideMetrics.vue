@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="syntax-guide-button"
         :class="sqlmode ? 'sql-mode' : 'normal-mode'"
       >
-        <OIcon name="help" size="sm" class="tw:size-4 tw:mr-1" />
+        <OIcon name="help" size="sm" />
         {{ t('search.syntaxGuideLabel') }}
       </OButton>
     </template>
