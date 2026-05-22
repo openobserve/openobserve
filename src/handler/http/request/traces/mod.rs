@@ -1369,7 +1369,11 @@ async fn process_latest_traces_stream(
         log::info!(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order={}",
             partitions.len(),
-            if is_non_ts_order_by { format!("non-ts ({sql_order_expr}), TopKHeap") } else { "DESC".to_string() }
+            if is_non_ts_order_by {
+                format!("non-ts ({sql_order_expr}), TopKHeap")
+            } else {
+                "DESC".to_string()
+            }
         );
         partitions
     };
@@ -2266,7 +2270,10 @@ async fn process_latest_traces_stream(
                 results,
                 streaming_aggs: false,
                 streaming_id: None,
-                time_offset: TimeOffset { start_time, end_time },
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
             }))
             .await;
         let _ = sender.send(Ok(StreamResponses::Done)).await;
