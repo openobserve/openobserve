@@ -77,6 +77,7 @@
                           v-model="condition.value"
                           :items="dashboardVariablesFilterItems"
                           search-regex="(?:^|[^$])\$?(\w+)"
+                          data-test="dashboard-add-condition-value"
                         />
                       </div>
                     </OTabPanel>

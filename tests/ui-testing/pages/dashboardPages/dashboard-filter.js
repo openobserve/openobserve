@@ -169,84 +169,29 @@ export default class DashboardFilter {
 
     // Step 5: Enter value (if required)
     if (value) {
-      const valueInput =
-        index === 0
-          ? this.page.locator('[data-test="common-auto-complete"]').first()
-          : this.page.locator('[data-test="common-auto-complete"]').last();
+      // OCombobox in AddCondition.vue has data-test="dashboard-add-condition-value";
+      // OCombobox renders its inner input as [data-test="${name}-input"]
+      const valueInput = this.page.locator('[data-test="dashboard-add-condition-value-input"]');
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
-      // Click to focus and trigger onFocus → showOptions = true
       await valueInput.click();
-      // Use pressSequentially to type char-by-char, ensuring Vue reactive
-      // filtering fires for each keystroke (fill() can bypass reactivity)
+      // Use pressSequentially char-by-char to trigger OCombobox's reactive filtering
       await valueInput.pressSequentially(value, { delay: 50 });
 
-      // Retry logic for clicking autocomplete suggestion
-      const maxRetries = 5;
-      let clicked = false;
+      // Try to click a matching autocomplete suggestion if one appears
+      const optionLocator = '[data-test="dashboard-add-condition-value-option"]';
+      const optionVisible = await this.page.locator(optionLocator).first()
+        .isVisible({ timeout: 3000 }).catch(() => false);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (optionVisible) {
         try {
-          // Get a fresh reference to the suggestion each time
-          const suggestion = this.page
-            .locator('[data-test="common-auto-complete-option"]')
-            .first();
-
-          // Wait for suggestion to appear
-          await suggestion.waitFor({ state: "visible", timeout: 10000 });
-
-          // Wait for element to be attached and stable
-          await suggestion.waitFor({ state: "attached", timeout: 3000 });
-
-          // Check if still visible
-          const isVisible = await suggestion.isVisible();
-          if (!isVisible) {
-            throw new Error('Element not visible');
-          }
-
-          // Try to click
-          await suggestion.click({ timeout: 3000 });
-
-          clicked = true;
-          break;
-
-        } catch (error) {
-          const isRetryable =
-            error.message.includes('detached') ||
-            error.message.includes('not visible') ||
-            error.message.includes('not found') ||
-            error.message.includes('Target closed') ||
-            error.message.includes('Timeout');
-
-          if (isRetryable && attempt < maxRetries) {
-            // Re-click input to restore focus and show options before retrying.
-            // Wrapped in try-catch because the input may become temporarily
-            // inaccessible (e.g. the q-menu closed during the wait period).
-            try {
-              await valueInput.click();
-            } catch (retryClickError) {
-              // Input inaccessible – continue to next attempt without crashing
-            }
-            // Wait progressively longer between retries
-            await this.page.waitForTimeout(300 * attempt);
-            continue;
-          }
-
-          // All retries exhausted or non-retryable error.
-          // Value was already committed to the model via onModelValueChanged
-          // during pressSequentially, so press Tab to accept it and move on.
-          try {
-            await this.page.keyboard.press('Tab');
-          } catch (e) {
-            // ignore
-          }
-          break;
+          await this.page.locator(optionLocator).first().click({ timeout: 3000 });
+        } catch {
+          // If suggestion click fails, value is already typed — accept with Tab
+          await this.page.keyboard.press('Tab');
         }
       }
-
-      if (!clicked) {
-        // Fallback already handled above via Tab; no throw needed
-      }
+      // If no suggestions appeared, the typed value is accepted as-is
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
       const expectedError = `Filter: ${selectedField}: Condition value required`;

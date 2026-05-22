@@ -653,9 +653,9 @@ export default class DashboardVariablesScoped {
     // If no filter field is specified, try to get the current variable's field
     // This maintains backward compatibility when called from addScopedVariable with just the dependency name
     if (!filterFieldName) {
-      // Get the currently selected field value
-      const fieldInput = this.page.locator('[data-test="dashboard-variable-field-select"]');
-      filterFieldName = await fieldInput.inputValue();
+      // Get the currently selected field value from the OSelect trigger's data-test-selected-value attribute
+      const fieldTrigger = this.page.locator('[data-test="dashboard-variable-field-select-trigger"]');
+      filterFieldName = await fieldTrigger.getAttribute('data-test-selected-value') ?? '';
 
       // If still no field, default to a common field name
       if (!filterFieldName) {
