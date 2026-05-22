@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :columns="columns"
           row-key="email"
+          :loading="props.loading"
           :global-filter="userSearchKey"
           pagination="client"
           :page-size="100"
@@ -128,6 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     removedUsers: {
       type: Set,
       default: () => new Set(),
+    },
+    loading: {
+      type: Boolean,
+      default: false,
     },
   });
   

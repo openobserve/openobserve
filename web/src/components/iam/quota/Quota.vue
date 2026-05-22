@@ -133,11 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div v-if="activeTab == 'api-limits' && activeType == 'table'" class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         :data="apiLimitsRows"
         :columns="generateColumns()"
         row-key="module_name"
+        :loading="isApiLimitsLoading"
         :global-filter="searchQuery"
         pagination="client"
         :page-size="20"
@@ -173,9 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
       </div>
 
-      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
-        <OSpinner size="md" />
-      </div>
       <div
         class="card-container tw:pb-[0.625rem] tw:flex-1 tw:min-h-0"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
@@ -193,11 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+       <div v-if="activeTab == 'role-limits' && activeType == 'table'"  class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <OTable
           :data="rolesLimitRows"
           :columns="roleLimitsColumns"
           row-key="uuid"
+          :loading="isRolesLoading"
           :global-filter="searchQuery"
           pagination="client"
           :page-size="20"
@@ -248,9 +247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
-      </div>
-      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
-        <OSpinner size="md" />
       </div>
       <div
         class="card-container tw:flex-1 tw:min-h-0"

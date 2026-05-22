@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="invitations"
           :columns="columns"
           row-key="token"
+          :loading="loading"
           pagination="client"
           :page-size="25"
           sorting="client"
@@ -178,10 +179,11 @@ export default defineComponent({
         size: 180,
         minSize: 140,
         maxSize: 220,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2, actionSize: "pill" },
       },
     ];
     const resultTotal = ref<number>(0);
+    const loading = ref(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -193,6 +195,7 @@ export default defineComponent({
         message: "Loading pending invitations...",
       });
 
+      loading.value = true;
       try {
         const response = await usersService.getPendingInvites();
 
@@ -212,6 +215,8 @@ export default defineComponent({
             "Failed to load pending invitations",
           timeout: 4000,
         });
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -335,6 +340,7 @@ export default defineComponent({
       invitations,
       columns,
       resultTotal,
+      loading,
       confirmAccept,
       confirmReject,
       selectedInvitation,
