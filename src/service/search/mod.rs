@@ -629,7 +629,6 @@ pub async fn search_partition(
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
-    enable_align_histogram: bool,
     use_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
@@ -726,7 +725,7 @@ pub async fn search_partition(
         &sql.order_by,
         ts_column.as_deref(),
         is_complex_query,
-        sql.histogram_interval.is_some() || enable_align_histogram,
+        sql.histogram_interval.is_some(),
     ) {
         resp.non_ts_order_by_cols = sql
             .order_by
@@ -748,7 +747,6 @@ pub async fn search_partition(
         &sql,
         is_complex_query,
         ts_column.is_some(),
-        enable_align_histogram,
         skip_max_query_range,
         max_query_range,
     );
@@ -775,14 +773,11 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    // Add a mini partition only for histogram-aligned log searches. Actual
-    // histogram queries should keep their original interval-aligned partitions.
     let is_histogram = sql.histogram_interval.is_some();
-    let add_mini_partition = !is_histogram && enable_align_histogram;
     let generator = partition::PartitionGenerator::new(
         partition_settings.min_step,
         cfg.limit.search_mini_partition_duration_secs,
-        is_histogram || enable_align_histogram,
+        is_histogram,
     );
     let partitions = generator.generate_partitions(
         req.start_time,
@@ -790,7 +785,7 @@ pub async fn search_partition(
         partition_settings.step,
         sql_order_by,
         is_complex_query,
-        add_mini_partition,
+        false,
         #[cfg(feature = "enterprise")]
         stremaing_aggs_cache_strategy,
     );
@@ -800,10 +795,6 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
-    if enable_align_histogram {
-        let min_step_secs = partition_settings.min_step / 1_000_000;
-        resp.histogram_interval = Some(min_step_secs);
-    }
     Ok(resp)
 }
 
@@ -1126,7 +1117,6 @@ pub async fn search_partition_multi(
     user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
-    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
@@ -1151,7 +1141,6 @@ pub async fn search_partition_multi(
             },
             false,
             true,
-            enable_align_histogram,
             false, // disable aggs cache
         )
         .await

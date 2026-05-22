@@ -1335,7 +1335,6 @@ async fn process_latest_traces_stream(
         &partition_req,
         false,
         false,
-        false,
         use_cache,
     )
     .await
