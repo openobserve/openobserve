@@ -756,16 +756,6 @@ pub async fn search_partition(
         skip_max_query_range,
         max_query_range,
     );
-    let part_num = partition_settings.part_num;
-    let min_step = partition_settings.min_step;
-    let step = partition_settings.step;
-    let is_histogram = partition_settings.is_histogram;
-    let add_mini_partition = partition_settings.add_mini_partition;
-    log::info!(
-        "[trace_id {trace_id}] search_partition: original_size: {original_size}, cpu_cores: {cpu_cores}, base_speed: {}, partition_secs: {}, total_secs: {total_secs}, part_num: {part_num}, step: {step}, min_step: {min_step}, is_histogram: {is_histogram}, is_streaming_aggregate: {is_streaming_aggregate}, use_cache: {use_cache}",
-        cfg.limit.query_group_base_speed,
-        cfg.limit.query_partition_by_secs,
-    );
 
     #[cfg(feature = "enterprise")]
     let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
@@ -789,15 +779,19 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
+    // Add a mini partition only for histogram-aligned log searches. Actual
+    // histogram queries should keep their original interval-aligned partitions.
+    let is_histogram = sql.histogram_interval.is_some();
+    let add_mini_partition = !is_histogram && enable_align_histogram;
     let generator = partition::PartitionGenerator::new(
-        min_step,
+        partition_settings.min_step,
         cfg.limit.search_mini_partition_duration_secs,
         is_histogram || enable_align_histogram,
     );
     let partitions = generator.generate_partitions(
         req.start_time,
         req.end_time,
-        step,
+        partition_settings.step,
         sql_order_by,
         is_complex_query,
         add_mini_partition,
@@ -811,7 +805,7 @@ pub async fn search_partition(
 
     resp.partitions = partitions;
     if enable_align_histogram {
-        let min_step_secs = min_step / 1_000_000;
+        let min_step_secs = partition_settings.min_step / 1_000_000;
         resp.histogram_interval = Some(min_step_secs);
     }
     Ok(resp)

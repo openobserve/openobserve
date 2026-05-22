@@ -26,11 +26,8 @@ use crate::service::search::sql::{
 };
 
 pub struct PartitionSettings {
-    pub part_num: usize,
     pub min_step: i64,
     pub step: i64,
-    pub is_histogram: bool,
-    pub add_mini_partition: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -109,24 +106,11 @@ pub fn calculate_partition_settings(
         };
     }
 
-    let mut is_histogram = histogram_interval.is_some();
-    let mut add_mini_partition = false;
-    // Set this to true to generate partitions aligned with interval
-    // only for logs page when query is non-histogram
-    // and also with query param `align_histogram` is true,
-    // so that logs can reuse the same partitions
-    // for histogram query
-    if !is_histogram && enable_align_histogram {
-        is_histogram = true;
-        // add mini partition for the histogram aligned partitions in the UI search
-        add_mini_partition = true;
-    }
+    log::info!(
+        "[trace_id {trace_id}] search_partition: base_speed: {}, partition_secs: {}, total_secs: {total_secs}, part_num: {part_num}, step: {step}, min_step: {min_step}",
+        cfg.limit.query_group_base_speed,
+        cfg.limit.query_partition_by_secs,
+    );
 
-    PartitionSettings {
-        part_num,
-        min_step,
-        step,
-        is_histogram,
-        add_mini_partition,
-    }
+    PartitionSettings { min_step, step }
 }

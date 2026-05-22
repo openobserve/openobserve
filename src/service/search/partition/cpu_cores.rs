@@ -59,5 +59,7 @@ pub(crate) async fn get_cpu_cores(
     #[cfg(not(feature = "enterprise"))]
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
+    log::info!("[trace_id {trace_id}] search_partition: selected {cpu_cores} CPU cores");
+
     Ok(cpu_cores)
 }
