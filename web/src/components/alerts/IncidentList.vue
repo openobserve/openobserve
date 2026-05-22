@@ -267,7 +267,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2 },
       },
     ];
 

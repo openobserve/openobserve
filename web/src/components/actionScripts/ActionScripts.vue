@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="visibleRows"
             :columns="columns"
             row-key="id"
+            :loading="loading"
             :selected-ids="selectedActionScriptIds"
             selection="multiple"
             pagination="client"
@@ -307,6 +308,7 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+    const loading = ref(false);
     const isSubmitting = ref(false);
     const resultTotal = ref<number>(0);
     const filterQuery = ref("");
@@ -394,7 +396,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 2 },
       },
     ];
 
@@ -421,6 +423,7 @@ export default defineComponent({
         message: "Please wait while loading actions...",
       });
 
+      loading.value = true;
       getAllActions()
         .then(() => {
           var counter = 1;
@@ -481,6 +484,9 @@ export default defineComponent({
             message: "Error while pulling Actions.",
             timeout: 2000,
           });
+        })
+        .finally(() => {
+          loading.value = false;
         });
     };
 
@@ -801,6 +807,7 @@ export default defineComponent({
       indexOptions,
       streams,
       isFetchingStreams,
+      loading,
       isSubmitting,
       filterQuery,
       filterData,

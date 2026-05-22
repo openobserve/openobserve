@@ -70,6 +70,25 @@ const cellSlotColumns = computed(() =>
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
 
+// ── Skeleton row count strategy ─────────────────────────────────
+// Easy to switch between strategies — change the `SKELETON_ROW_STRATEGY`
+// constant below. Pending team discussion on which feels right.
+//
+//   "fixed"     → always show FIXED_SKELETON_ROWS rows (GitHub style).
+//                 Predictable, doesn't over-promise on tall pageSizes.
+//   "pageSize"  → match the table's pageSize (Stripe / Vercel style).
+//                 Skeleton fills the page; can feel excessive when the
+//                 real dataset turns out to be small.
+const SKELETON_ROW_STRATEGY: "fixed" | "pageSize" = "fixed";
+const FIXED_SKELETON_ROWS = 8;
+
+const skeletonRowCount = computed(() => {
+  if (SKELETON_ROW_STRATEGY === "pageSize") {
+    return props.pageSize ?? FIXED_SKELETON_ROWS;
+  }
+  return FIXED_SKELETON_ROWS;
+});
+
 // ── Skeleton hold ───────────────────────────────────────────────
 // Show the skeleton for at least 2s once loading starts, so it doesn't
 // flash-and-disappear on fast responses. If the server is slow, the
@@ -470,7 +489,7 @@ defineExpose({
         <!-- ── Skeleton Body (loading with no existing data) ───── -->
         <OTableLoading
           v-if="showLoadingOverlay"
-          :rows="props.pageSize ?? 10"
+          :rows="skeletonRowCount"
           :table-columns="table.getVisibleLeafColumns()"
           :selection-enabled="selection.isEnabled.value"
           :expansion-enabled="expansion.isEnabled.value"

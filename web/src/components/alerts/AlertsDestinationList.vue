@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           row-key="name"
+          :loading="loading"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -311,7 +312,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", actionCount: 3 },
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -382,11 +383,13 @@ export default defineComponent({
       }
     };
 
+    const loading = ref(false);
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading destinations...",
       });
+      loading.value = true;
       destinationService
         .list({
           page_num: 1,
@@ -420,7 +423,10 @@ export default defineComponent({
           }
           dismiss();
         })
-        .finally(() => dismiss());
+        .finally(() => {
+          dismiss();
+          loading.value = false;
+        });
     };
     const getTemplates = () => {
       templateService
@@ -686,6 +692,7 @@ export default defineComponent({
       columns,
       editDestination,
       getImageURL,
+      loading,
       conformDeleteDestination,
       filterQuery,
       filterData,
