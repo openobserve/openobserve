@@ -77,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.search_inspector_enabled
             "
             variant="ghost-primary"
-            size="icon-sm"
+            size="icon"
             class="analyze-button inspect-button"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
-            <OIcon name="troubleshoot" size="xs" />
+            <OIcon name="troubleshoot" size="sm" />
             <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
           <!-- Volume Analysis Button -->
@@ -92,12 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.meta.sqlMode
             "
             variant="ghost-primary"
-            size="icon-sm"
+            size="icon"
             class="analyze-button"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
-            <OIcon name="timeline" size="xs" />
+            <OIcon name="timeline" size="sm" />
             <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
           </OButton>
           <ORefreshButton
