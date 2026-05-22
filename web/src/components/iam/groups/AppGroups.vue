@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :columns="columns"
           row-key="group_name"
+          :loading="loading"
           :selected-ids="selectedGroupNames"
           :global-filter="filterQuery"
           pagination="client"
@@ -206,7 +207,7 @@ const columns: OTableColumnDef[] = [
     size: 80,
     minSize: 64,
     maxSize: 100,
-    meta: { align: "left" },
+    meta: { align: "left", actionCount: 2 },
   },
 ];
 
@@ -246,7 +247,9 @@ const editGroup = (group: any) => {
   });
 };
 
+const loading = ref(false);
 const setupGroups = async () => {
+  loading.value = true;
   await getGroups(store.state.selectedOrganization.identifier)
     .then((res) => {
       groupsState.groups = res.data.map((group: string) => ({
@@ -256,6 +259,9 @@ const setupGroups = async () => {
     })
     .catch((err) => {
       console.log(err);
+    })
+    .finally(() => {
+      loading.value = false;
     });
 };
 
