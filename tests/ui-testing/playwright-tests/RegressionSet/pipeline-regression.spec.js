@@ -534,29 +534,28 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Fill required name field
     const nameInput = pageManager.pipelinesPage.nameInput;
-    if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await nameInput.fill(`e2e_test_dest_${Date.now()}`);
-    }
+    await expect(nameInput, 'Pipeline destination name input should be visible').toBeVisible({ timeout: 5000 });
+    await nameInput.fill(`e2e_test_dest_${Date.now()}`);
 
     // Submit the form
     const submitBtn = pageManager.pipelinesPage.submitButton;
-    if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await submitBtn.click();
-      await page.waitForTimeout(3000);
-    }
+    await expect(submitBtn, 'Submit button should be visible').toBeVisible({ timeout: 5000 });
+    await submitBtn.click();
+    await page.waitForTimeout(3000);
 
     // Wait for notification to appear, then count
-    await page.waitForSelector('.q-notification.bg-positive, div[role="alert"].positive, .q-notification__message', { state: 'visible', timeout: 5000 }).catch(() => {});
+    await expect(page.locator('.q-notification.bg-positive, div[role="alert"].positive, .q-notification__message').first(),
+      'Success notification should appear after save'
+    ).toBeVisible({ timeout: 5000 });
     const successNotifications = page.locator('.q-notification.bg-positive, div[role="alert"].positive, .q-notification__message');
     const successCount = await successNotifications.count();
 
     testLogger.info(`Success notifications count: ${successCount}`);
 
-    // Bug verification: 0-1 success notifications is OK (notification may auto-dismiss).
-    // 2+ means the bug (#11483) has regressed — must be <= 1, not <= 2.
+    // Bug verification: must have exactly 1 notification (duplicates = bug)
     expect(successCount,
       'Bug #11483: Should not show duplicate notifications on pipeline destination save'
-    ).toBeLessThanOrEqual(1);
+    ).toBe(1);
 
     testLogger.info('PASSED: No duplicate notifications detected');
   });

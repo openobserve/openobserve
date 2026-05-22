@@ -78,15 +78,10 @@ test.describe("Data Sources Regression Bug Fixes", () => {
       'Bug #11682: AI Integration panel should not go blank when re-clicking its tab'
     ).toBeGreaterThan(0);
 
-    // If credential fields exist, verify they persist after re-click
-    // (credentials only appear if the user has previously configured them)
-    if (credentialCountBefore > 0) {
-      expect(credentialCountAfter,
-        'Bug #11682: Credential fields should not disappear when re-clicking AI Integration tab'
-      ).toBe(credentialCountBefore);
-    } else {
-      testLogger.info('No pre-existing credential fields — verifying content persistence instead');
-    }
+    // Credential fields must persist after re-click — same count before and after
+    expect(credentialCountAfter,
+      'Bug #11682: Credential fields should not disappear when re-clicking AI Integration tab'
+    ).toBe(credentialCountBefore);
 
     testLogger.info('✓ PASSED: AI Integration content persists on tab re-click');
   });

@@ -372,53 +372,46 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
 
     // Add a condition first so the query editor is available
     const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
-    if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await addConditionBtn.click();
-      testLogger.info('✓ Added condition');
-    }
+    await expect(addConditionBtn, 'Add Condition button should be visible').toBeVisible({ timeout: 5000 });
+    await addConditionBtn.click();
+    testLogger.info('✓ Added condition');
 
     // Switch to SQL tab in the query editor
     const sqlTab = page.locator('[data-test="step2-query-tabs"] button').filter({ hasText: /SQL/i }).first();
-    if (await sqlTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await sqlTab.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('✓ Switched to SQL tab');
-    }
+    await expect(sqlTab, 'SQL tab should be visible in query editor').toBeVisible({ timeout: 5000 });
+    await sqlTab.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Switched to SQL tab');
 
     // Look for the SQL editor — use the POM-defined selector #alert-editor-sql
     const sqlEditor = page.locator('#alert-editor-sql, .monaco-editor').first();
-    const sqlEditorVisible = await sqlEditor.isVisible({ timeout: 3000 }).catch(() => false);
+    await expect(sqlEditor, 'SQL editor should be visible in alert form').toBeVisible({ timeout: 5000 });
+    await sqlEditor.click({ force: true });
+    await page.waitForTimeout(500);
+    await page.keyboard.type('default', { delay: 50 });
+    await page.waitForTimeout(1000);
 
-    if (sqlEditorVisible) {
-      await sqlEditor.click({ force: true });
-      await page.waitForTimeout(500);
-      await page.keyboard.type('default', { delay: 50 });
-      await page.waitForTimeout(1000);
+    // Verify the editor accepted the input — Monaco uses a hidden textarea
+    // and renders to .view-lines; check both
+    const monacoTextarea = sqlEditor.locator('textarea').first();
+    const monacoLines = sqlEditor.locator('.view-lines').first();
+    const textareaValue = await monacoTextarea.inputValue().catch(() => '');
+    const linesText = await monacoLines.textContent().catch(() => '');
+    const hasContent = textareaValue.includes('default') || linesText.includes('default');
+    testLogger.info(`Monaco textarea: "${textareaValue}", view-lines: "${linesText.substring(0, 100)}"`);
 
-      // Verify the editor accepted the input — Monaco uses a hidden textarea
-      // and renders to .view-lines; check both
-      const monacoTextarea = sqlEditor.locator('textarea').first();
-      const monacoLines = sqlEditor.locator('.view-lines').first();
-      const textareaValue = await monacoTextarea.inputValue().catch(() => '');
-      const linesText = await monacoLines.textContent().catch(() => '');
-      const hasContent = textareaValue.includes('default') || linesText.includes('default');
-      testLogger.info(`Monaco textarea: "${textareaValue}", view-lines: "${linesText.substring(0, 100)}"`);
+    expect(hasContent,
+      'Bug #4288: "default" should be accepted in the SQL editor without error'
+    ).toBeTruthy();
 
-      expect(hasContent,
-        'Bug #4288: "default" should be accepted in the SQL editor without error'
-      ).toBeTruthy();
+    testLogger.info('✓ Typed "default" in SQL editor without quotes');
 
-      testLogger.info('✓ Typed "default" in SQL editor without quotes');
+    // The bug was that "default" without quotes caused errors
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"]').filter({ hasText: /error|invalid|unexpected/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
 
-      // The bug was that "default" without quotes caused errors
-      const errorVisible = await page.locator('[class*="error"], [class*="negative"]').filter({ hasText: /error|invalid|unexpected/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
-
-      expect(errorVisible,
-        'Bug #4288: "default" keyword without quotes should not cause an error in SQL editor'
-      ).toBeFalsy();
-    } else {
-      testLogger.info('SQL editor not available — skipping editor-specific checks');
-    }
+    expect(errorVisible,
+      'Bug #4288: "default" keyword without quotes should not cause an error in SQL editor'
+    ).toBeFalsy();
 
     testLogger.info('✓ PASSED: Alert SQL default keyword verified');
   });
