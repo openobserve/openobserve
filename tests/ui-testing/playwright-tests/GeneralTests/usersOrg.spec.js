@@ -264,15 +264,16 @@ test.describe("Users and Organizations", () => {
 
     test('Save button disabled if Add Organization with Empty Name', async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
         await pageManager.createOrgPage.fillOrgName('');
-        await pageManager.createOrgPage.checkSaveEnabled();
-        
+        const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
+        expect(isSaveEnabled).toBe(false);
+
         testLogger.info('Test completed successfully');
     });
 

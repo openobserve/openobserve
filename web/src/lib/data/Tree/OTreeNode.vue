@@ -104,6 +104,8 @@ function onTickChange(newVal: CheckboxModelValue) {
     v-if="visible"
     role="treeitem"
     :aria-expanded="!isLeaf ? isExpanded : undefined"
+    :data-test="`o-tree-node-${String(key)}`"
+    :data-test-checked="checkboxState === true ? 'true' : checkboxState === 'indeterminate' ? 'indeterminate' : 'false'"
     class="tw:list-none tw:m-0 tw:p-0"
   >
     <!-- Node row ────────────────────────────────────────────────────── -->

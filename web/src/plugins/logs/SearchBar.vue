@@ -604,7 +604,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <ODropdownItem @select="toggleCustomDownloadDialog">
+          <ODropdownItem
+            data-test="logs-search-bar-download-custom-range-btn"
+            @select="toggleCustomDownloadDialog"
+          >
             <template #icon-left>
               <img
                 :src="customRangeIcon"
