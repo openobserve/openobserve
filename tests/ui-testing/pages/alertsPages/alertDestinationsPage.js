@@ -722,15 +722,11 @@ export class AlertDestinationsPage {
         // Wait for the import to process and show errors/output
         await this.page.waitForTimeout(2000);
 
-        // Look for destination error items using data-test attribute pattern
-        // The errors appear with data-test="destination-import-error-{index}-{errorIndex}"
+        // Anchor on the destination-import-error data-test prefix — the corrections /
+        // error output surfaces with `data-test="destination-import-error-{index}-{errorIndex}"`.
+        // `.first()` dodges strict-mode collisions when multiple errors surface.
         const errorItem = this.page.locator('[data-test^="destination-import-error-"]').first();
-
-        // Or look for the destination count message text anywhere on the page
-        const countMessage = this.page.getByText(/Destination - \d+:/);
-
-        // Wait for either the error item or the count message to be visible
-        await expect(errorItem.or(countMessage)).toBeVisible({ timeout: 10000 });
+        await expect(errorItem).toBeVisible({ timeout: 10000 });
         testLogger.debug('Destination count/error message verified');
     }
 
