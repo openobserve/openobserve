@@ -224,18 +224,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="info"
                           size="sm"
                           class="tw:cursor-pointer tw:text-gray-400"
-                        />
-                        <OTooltip side="right" max-width="300px">
-                          <template #content>
-                            <span class="tw:text-[14px]">
-                              Based upon the condition of trigger the
-                              pipeline will get trigger <br />
-                              e.g. if the trigger value is &gt;100 and the query
-                              returns a value of 101 then the pipeline will
-                              trigger.
-                            </span>
-                          </template>
-                        </OTooltip>
+                        >
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span class="tw:text-[14px]">
+                                Based upon the condition of trigger the
+                                pipeline will get trigger <br />
+                                e.g. if the trigger value is &gt;100 and the query
+                                returns a value of 101 then the pipeline will
+                                trigger.
+                              </span>
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <OSelect
                         v-model="promqlCondition.operator"
@@ -358,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'tw:text-gray-400'
                               : 'tw:text-gray-400'
                           "
-                         />
+                        >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
@@ -370,6 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                             </template>
                           </OTooltip>
+                        </OIcon>
                       </div>
                       <div
                         style="width: calc(100% - 190px)"
@@ -523,15 +525,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="info"
                           size="sm"
                           class="tw:cursor-pointer tw:text-gray-400"
-                        />
-                        <OTooltip side="right" max-width="300px">
-                          <template #content>
-                            <span class="tw:text-[14px]">
-                              Configure the option to enable a cron
-                              expression.
-                            </span>
-                          </template>
-                        </OTooltip>
+                        >
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span class="tw:text-[14px]">
+                                Configure the option to enable a cron
+                                expression.
+                              </span>
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <OSwitch
                         data-test="scheduled-pipeline-cron-toggle-btn"
@@ -548,35 +551,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="info"
                           size="sm"
                           class="tw:cursor-pointer tw:text-gray-400"
-                        />
-                        <OTooltip side="right">
-                          <template #content>
-                            <span
-                              class="tw:text-[14px]"
-                              v-if="triggerData.frequency_type == 'minutes'"
-                              >How often the task should be executed.<br />
-                              e.g., 2 minutes means that the task will run
-                              every 2 minutes and will be processed based on
-                              the other parameters provided.</span
-                            >
-                            <span class="tw:text-[14px]" v-else>
-                              Pattern: * * * * * * means every second.
-                              <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                              1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                              Sunday].
-                              <br />
-                              Use '*' to represent any value, 'L' for the last
-                              day/weekday.
-                              <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
-                              month, month, and day of week,
-                              respectively.</span
-                            >
-                          </template>
-                        </OTooltip>
+                        >
+                          <OTooltip side="right">
+                            <template #content>
+                              <span
+                                class="tw:text-[14px]"
+                                v-if="triggerData.frequency_type == 'minutes'"
+                                >How often the task should be executed.<br />
+                                e.g., 2 minutes means that the task will run
+                                every 2 minutes and will be processed based on
+                                the other parameters provided.</span
+                              >
+                              <span class="tw:text-[14px]" v-else>
+                                Pattern: * * * * * * means every second.
+                                <br />
+                                Format: [Second (optional) 0-59] [Minute 0-59]
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                                Sunday].
+                                <br />
+                                Use '*' to represent any value, 'L' for the last
+                                day/weekday.
+                                <br />
+                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                                daily. It specifies second, minute, hour, day of
+                                month, month, and day of week,
+                                respectively.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
@@ -587,11 +591,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             name="warning"
                             size="sm"
                             class="tw:cursor-pointer tw:text-orange-500"
-                          />
-                          <OTooltip
-                            side="right"
-                            content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
-                          />
+                          >
+                            <OTooltip
+                              side="right"
+                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                            />
+                          </OIcon>
                         </template>
                       </div>
                       <div class="tw:flex tw:flex-col tw:gap-1">
@@ -671,18 +676,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="info"
                           size="sm"
                           class="tw:cursor-pointer tw:text-gray-400"
-                        />
-                        <OTooltip side="right" max-width="300px">
-                          <template #content>
-                            <span class="tw:text-[14px]">
-                              Period for which the query should run.<br />
-                              e.g. 10 minutes means that whenever the query
-                              will run it will use the last 10 minutes of
-                              data. If the query runs at 4:00 PM then it will
-                              use the data from 3:50 PM to 4:00 PM.
-                            </span>
-                          </template>
-                        </OTooltip>
+                        >
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span class="tw:text-[14px]">
+                                Period for which the query should run.<br />
+                                e.g. 10 minutes means that whenever the query
+                                will run it will use the last 10 minutes of
+                                data. If the query runs at 4:00 PM then it will
+                                use the data from 3:50 PM to 4:00 PM.
+                              </span>
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div class="tw:flex tw:flex-col tw:gap-1">
                         <div
@@ -736,18 +742,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="info"
                           size="sm"
                           class="tw:cursor-pointer tw:text-gray-400"
-                        />
-                        <OTooltip side="right" max-width="300px">
-                          <template #content>
-                            <span class="tw:text-[14px]"
-                              >Delay for which the pipeline is scheduled to
-                              run.<br />
-                              e.g. 10 minutes delay means that the pipeline
-                              will run 10 minutes after its scheduled
-                              time.</span
-                            >
-                          </template>
-                        </OTooltip>
+                        >
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span class="tw:text-[14px]"
+                                >Delay for which the pipeline is scheduled to
+                                run.<br />
+                                e.g. 10 minutes delay means that the pipeline
+                                will run 10 minutes after its scheduled
+                                time.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div
                         class="tw:flex tw:items-stretch tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:w-fit tw:overflow-hidden"

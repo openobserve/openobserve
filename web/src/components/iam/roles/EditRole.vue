@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { defineAsyncComponent, nextTick, ref, type Ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -368,26 +368,30 @@ const permissionsUiType = ref("table");
 
 const { getStreams } = useStreams();
 
-const tabs = [
-  {
-    value: "permissions",
-    label: "Permissions",
-    icon: "shield",
-  },
-  {
-    value: "users",
-    label: "Users",
-    icon: "group",
-  },
-];
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      value: "permissions",
+      label: "Permissions",
+      icon: "shield",
+    },
+    {
+      value: "users",
+      label: "Users",
+      icon: "group",
+    },
+  ];
 
-if (store.state.zoConfig.service_account_enabled) {
-  tabs.push({
-    value: "serviceAccounts",
-    label: "Service Accounts",
-    icon: "smart-toy",
-  });
-}
+  if (store.state.zoConfig.service_account_enabled) {
+    baseTabs.push({
+      value: "serviceAccounts",
+      label: "Service Accounts",
+      icon: "smart-toy",
+    });
+  }
+
+  return baseTabs;
+});
 
 const permissionDisplayOptions = [
   {

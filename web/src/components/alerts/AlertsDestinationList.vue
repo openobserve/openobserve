@@ -282,20 +282,21 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "type",
         header: "Type",
         accessorKey: "type",
         sortable: true,
-        size: 120,
+        size: 180,
         meta: { align: "left" },
       },
       {
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
+        size: 200,
         meta: { align: "left" },
       },
       {
@@ -311,7 +312,7 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 100,
+        size: 120,
         meta: { align: "center", actionCount: 3 },
       },
     ];

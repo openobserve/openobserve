@@ -342,7 +342,7 @@ export default defineComponent({
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
-        size: 150,
+        size: 190,
         meta: { align: "left" },
       },
       {

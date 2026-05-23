@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner size="lg" />
     </div>
 
-    <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
+    <div v-else-if="job" class="tw:flex tw:flex-col tw:gap-5 tw:px-6 tw:py-4">
           <!-- Status and Actions -->
           <div class="tw:flex tw:items-center tw:justify-between">
             <OBadge
               :variant="getStatusColor(job.status, job.deletion_status)"
-              class="text-lg tw:p-2"
+              size="md"
             >
               {{ getStatusLabel(job.status, job.deletion_status) }}
             </OBadge>
@@ -45,111 +45,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Job Information -->
-          <div class="tw-space-y-3">
-            <div class="tw:text-base tw:font-medium tw-font-semibold">Job Information</div>
-            <div class="tw-grid tw-grid-cols-2 tw-gap-4">
+          <section class="tw:flex tw:flex-col tw:gap-3">
+            <h3 class="tw:text-base tw:font-semibold">Job Information</h3>
+            <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3 tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4">
               <div>
-                <div class="tw:text-xs tw:text-gray-400">Job ID</div>
-                <div class="tw-font-mono tw:text-sm">{{ job.job_id }}</div>
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Job ID</div>
+                <div class="tw:font-mono tw:text-sm tw:break-all">{{ job.job_id }}</div>
               </div>
               <div>
-                <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
-                <div class="tw-font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Pipeline</div>
+                <div class="tw:text-sm tw:font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
               </div>
               <div>
-                <div class="tw:text-xs tw:text-gray-400">Time Range</div>
-                <div class="tw:text-sm">{{ formatTimestamp(job.start_time) }} - {{ formatTimestamp(job.end_time) }}</div>
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Time Range</div>
+                <div class="tw:text-sm">{{ formatTimestamp(job.start_time) }} – {{ formatTimestamp(job.end_time) }}</div>
               </div>
               <div>
-                <div class="tw:text-xs tw:text-gray-400">Created</div>
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Created</div>
                 <div class="tw:text-sm">{{ formatTimestampFull(job.created_at) }}</div>
               </div>
             </div>
-          </div>
+          </section>
 
           <!-- Progress -->
-          <div class="tw-space-y-3">
-            <div class="tw:text-base tw:font-medium tw-font-semibold">Progress</div>
-            <OCard class="tw:border tw:border-card-border q-pa-md">
-              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw-font-medium">Overall Progress</div>
-                <div class="tw:text-xl tw:font-semibold">{{ job.progress_percent }}%</div>
+          <section class="tw:flex tw:flex-col tw:gap-3">
+            <h3 class="tw:text-base tw:font-semibold">Progress</h3>
+            <div class="tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-4">
+              <div>
+                <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
+                  <div class="tw:text-sm tw:font-medium">Overall Progress</div>
+                  <div class="tw:text-xl tw:font-semibold">{{ job.progress_percent }}%</div>
+                </div>
+                <OProgressBar
+                  :value="job.progress_percent / 100"
+                  variant="default"
+                  size="sm"
+                />
               </div>
-              <OProgressBar
-                :value="job.progress_percent / 100"
-                :variant="getProgressColor(job.deletion_status) === 'positive' ? 'default' : 'default'"
-                size="sm"
-              />
 
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw:text-sm">
+              <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3">
                 <div>
-                  <div class="tw:text-xs tw:text-gray-400">Phase</div>
-                  <div>{{ getCurrentPhase }}</div>
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Phase</div>
+                  <div class="tw:text-sm">{{ getCurrentPhase }}</div>
                 </div>
                 <div v-if="job.chunks_total">
-                  <div class="tw:text-xs tw:text-gray-400">Chunks</div>
-                  <div>{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Chunks</div>
+                  <div class="tw:text-sm">{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
                 </div>
                 <div>
-                  <div class="tw:text-xs tw:text-gray-400">Current Position</div>
-                  <div>{{ formatTimestamp(job.current_position) }}</div>
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Current Position</div>
+                  <div class="tw:text-sm">{{ formatTimestamp(job.current_position) }}</div>
                 </div>
                 <div v-if="estimatedCompletion">
-                  <div class="tw:text-xs tw:text-gray-400">Estimated Completion</div>
-                  <div>{{ estimatedCompletion }}</div>
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Estimated Completion</div>
+                  <div class="tw:text-sm">{{ estimatedCompletion }}</div>
                 </div>
               </div>
-            </OCard>
-          </div>
+            </div>
+          </section>
 
           <!-- Deletion Details (if applicable) -->
-          <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
-            <div class="tw:text-base tw:font-medium tw-font-semibold">Deletion Details</div>
-            <OCard class="tw:border tw:border-card-border q-pa-md">
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw:text-sm">
+          <section v-if="job.delete_before_backfill || job.deletion_status" class="tw:flex tw:flex-col tw:gap-3">
+            <h3 class="tw:text-base tw:font-semibold">Deletion Details</h3>
+            <div class="tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-3">
+              <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3">
                 <div>
-                  <div class="tw:text-xs tw:text-gray-400">Status</div>
-                  <div>
-                    <OBadge
-                      :variant="getDeletionStatusColor(job.deletion_status)"
-                    >
-                      {{ getDeletionStatusLabel(job.deletion_status) }}
-                    </OBadge>
-                  </div>
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+                  <OBadge :variant="getDeletionStatusColor(job.deletion_status)" size="sm">
+                    {{ getDeletionStatusLabel(job.deletion_status) }}
+                  </OBadge>
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
-                  <div class="tw:text-xs tw:text-gray-400">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
-                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono tw:text-xs">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
+                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw:font-mono tw:text-xs tw:break-all">
                     {{ jobId }}
                   </div>
                 </div>
               </div>
-              <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed" class="tw-mt-3">
-                <div class="tw:text-xs tw:text-gray-400">Error</div>
+              <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error</div>
                 <div class="tw:text-sm tw:text-red-500">{{ job.deletion_status.failed }}</div>
               </div>
-            </OCard>
-          </div>
+            </div>
+          </section>
 
           <!-- Error Details (if present) -->
-          <div v-if="job.error" class="tw-space-y-3">
-            <div class="tw:text-base tw:font-medium tw-font-semibold">Error Details</div>
-            <OCard class="tw:border tw-border-red-200 q-pa-md tw-bg-red-50">
-              <div class="tw:flex tw:items-start">
-                <OIcon name="error" size="md" class="tw:mr-2 tw-mt-1" />
-                <div class="tw-flex-1">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error Message</div>
-                  <div class="tw:text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
-                    {{ job.error }}
-                  </div>
+          <section v-if="job.error" class="tw:flex tw:flex-col tw:gap-3">
+            <h3 class="tw:text-base tw:font-semibold">Error Details</h3>
+            <div class="tw:rounded-md tw:border tw:border-red-300 tw:bg-red-50 tw:p-4 tw:flex tw:items-start tw:gap-3">
+              <OIcon name="error" size="md" class="tw:text-red-500 tw:mt-0.5 tw:shrink-0" />
+              <div class="tw:flex-1 tw:min-w-0">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error Message</div>
+                <div class="tw:text-sm tw:text-red-700 tw:whitespace-pre-wrap tw:break-words">
+                  {{ job.error }}
                 </div>
               </div>
-            </OCard>
-          </div>
+            </div>
+          </section>
 
           <!-- Timeline -->
-          <div class="tw-space-y-3">
-            <div class="tw:text-base tw:font-medium tw-font-semibold">Timeline</div>
+          <section class="tw:flex tw:flex-col tw:gap-3">
+            <h3 class="tw:text-base tw:font-semibold">Timeline</h3>
             <OTimeline>
               <OTimelineItem
                 title="Job Created"
@@ -198,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="muted"
               />
             </OTimeline>
-          </div>
+          </section>
         </div>
 
     <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:p-4">
@@ -223,7 +219,6 @@ import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -498,18 +493,3 @@ const formatTimestampFull = (timestamp?: number) => {
 };
 </script>
 
-<style scoped lang="scss">
-.text-h6 {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.text-subtitle1 {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-.text-caption {
-  font-size: 0.75rem;
-}
-</style>
