@@ -36,6 +36,8 @@ export class AlertDestinationsPage {
         this.destinationImportButton = '[data-test="destination-import"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.destinationImportUrlInput = '[data-test="destination-import-url-input"]';
+        // OInput inner native input (-field) for the URL field — used for fill/click
+        this.destinationImportUrlInputField = '[data-test="destination-import-url-input-field"]';
         this.destinationImportJsonBtn = '[data-test="destination-import-json-btn"]';
         this.destinationImportNameError = '[data-test="destination-import-name-error"]';
         this.destinationImportTemplateInput = '[data-test="destination-import-template-input"]';
@@ -356,8 +358,8 @@ export class AlertDestinationsPage {
             await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 15000 });
         }
         await this.page.locator(this.importJsonUrlTab).click();
-        await this.page.locator(this.destinationImportUrlInput).click();
-        await this.page.locator(this.destinationImportUrlInput).fill(url);
+        await this.page.locator(this.destinationImportUrlInputField).click();
+        await this.page.locator(this.destinationImportUrlInputField).fill(url);
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
@@ -682,20 +684,23 @@ export class AlertDestinationsPage {
         for (const [headerKey, headerValue] of Object.entries(headers)) {
             // Click add header button
             await this.page.locator('[data-test="add-destination-add-header-btn"]').click();
-            await this.page.waitForTimeout(500);
 
             // Fill header key - use .last() to target the most recently added empty input
             // This handles cases where there might be pre-existing empty header rows
-            const keyInput = this.page.locator('[data-test="add-destination-header--key-input"]').last();
+            // OInput wrapper data-test is `...-key-input`; inner native input auto-derives `...-key-input-field` — fill the `-field` variant per §4
+            const keyInput = this.page.locator('[data-test="add-destination-header--key-input-field"]').last();
+            // Wait for the newly added header row's input to render before interacting
+            await keyInput.waitFor({ state: 'visible', timeout: 10000 });
             await keyInput.click();
             await keyInput.fill(headerKey);
-            await this.page.waitForTimeout(500);
 
-            // Fill header value (after key is filled, selector becomes add-destination-header-{key}-value-input)
-            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input"]`);
+            // Fill header value (after key is filled, the data-test becomes add-destination-header-{key}-value-input)
+            // OInput inner native field — use `-field` variant for fill/click per §4
+            // Wait for the reactive data-test rebind (header.key propagation) before clicking
+            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input-field"]`);
+            await valueInput.waitFor({ state: 'visible', timeout: 10000 });
             await valueInput.click();
             await valueInput.fill(headerValue);
-            await this.page.waitForTimeout(300);
 
             testLogger.debug('Added header to destination', { headerKey, destinationName });
         }
@@ -2052,6 +2057,8 @@ export class AlertDestinationsPage {
      */
     async updateCustomUrl(url) {
         const input = this.page.locator(this.urlInputField).first();
+        // Edit drawer may be scrolled — bring the URL field into view before waiting on visibility
+        await input.scrollIntoViewIfNeeded().catch(() => {});
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.click();
         await this.page.keyboard.press('Control+a');

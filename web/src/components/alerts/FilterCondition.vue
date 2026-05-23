@@ -31,10 +31,7 @@
           </OButton>
         </template>
       </div>
-        <div
-          data-test="alert-conditions-select-column"
-          class="tw:ml-0"
-        >
+        <div class="tw:ml-0">
           <OSelect
             v-model="condition.column"
             :options="filteredFields"
@@ -49,16 +46,14 @@
             :class="[inputWidth ? inputWidth : '']"
             :error="!!columnError"
             :error-message="columnError"
+            data-test="alert-conditions-select-column"
             @search="filterColumns"
             @update:model-value="() => { columnError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateColumn"
           />
           <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
         </div>
-        <div
-          data-test="alert-conditions-operator-select"
-          class="tw:ml-0"
-        >
+        <div class="tw:ml-0">
           <OSelect
             v-model="condition.operator"
             :options="triggerOperators"
@@ -67,21 +62,20 @@
             :error="!!operatorError"
             :searchable="false"
             :error-message="operatorError"
+            data-test="alert-conditions-operator-select"
             @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateOperator"
           />
           <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
         </div>
-        <div
-          data-test="alert-conditions-value-input"
-          class="tw:ml-0"
-        >
+        <div class="tw:ml-0">
           <OInput
             v-model="condition.value"
             :placeholder="t('common.value')"
             :error="!!valueError"
             :error-message="valueError"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
+            data-test="alert-conditions-value-input"
             @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateValue"
           />

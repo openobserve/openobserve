@@ -40,17 +40,16 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
       const response = await sendRequest(page, url, logsdata, headers);
       testLogger.debug('API response received', { response });
     }
-    await page.waitForTimeout(2000);
   });
 
   test.afterEach(async () => {
     // Add a small wait after each test to ensure operations are complete
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   });
 
   test.afterAll(async () => {
     // Add a wait before closing to ensure all operations are complete
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     if (!page.isClosed()) {
       await page.close();
     }

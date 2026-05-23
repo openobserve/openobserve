@@ -139,10 +139,13 @@ export class MetricsBuilderPage {
         // Monaco query preview editor
         this.queryEditorEl = page.locator('[data-test="dashboard-panel-query-editor"]').first();
 
-        // Table chart (dashboard panel)
-        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"]');
-        this.tableHeaderCells = this.dashboardPanelTable.locator('[data-test="dashboard-data-table-head-cell"]');
-        this.tableRows = this.dashboardPanelTable.locator('[data-test="dashboard-data-row"]');
+        // Table chart (dashboard panel) — TenstackTable header data-tests are
+        // `o2-table-th-{columnId}`; the wrapper has `dashboard-table-renderer-wrapper`.
+        // We accept either the wrapper or the inner table data-test so the locator
+        // works for both metrics PromQL tables and dashboard panel tables.
+        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="dashboard-table-renderer-wrapper"], [data-test="promql-table-chart"]').first();
+        this.tableHeaderCells = page.locator('[data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])');
+        this.tableRows = page.locator('[data-test="dashboard-data-row"]');
 
         // Chart renderer
         this.chartRenderer = page.locator('[data-test="chart-renderer"]');
@@ -360,6 +363,26 @@ export class MetricsBuilderPage {
         };
         const btn = btnMap[mode];
         if (await btn.isVisible({ timeout: 2000 })) {
+            // OToggleGroupItem (Reka UI) signals active state via data-state="on".
+            // Poll briefly because QueryTypeSelector mounts and initializes
+            // `selectedButtonType` asynchronously after the page loads.
+            const selected = await this.page.waitForFunction(
+                (testId) => {
+                    const el = document.querySelector(`[data-test="${testId}"]`);
+                    if (!el) return null;
+                    const cls = el.getAttribute('class') || '';
+                    const ds = el.getAttribute('data-state') || '';
+                    return cls.includes('selected') || ds === 'on';
+                },
+                {
+                    sql: 'dashboard-sql-query-type',
+                    promql: 'dashboard-promql-query-type',
+                    builder: 'dashboard-builder-query-type',
+                    custom: 'dashboard-custom-query-type',
+                }[mode],
+                { timeout: 3000 }
+            ).then(h => h.jsonValue()).catch(() => null);
+            if (selected === true) return true;
             const classes = await btn.getAttribute('class') || '';
             const dataState = await btn.getAttribute('data-state') || '';
             return classes.includes('selected') || dataState === 'on';
@@ -433,6 +456,20 @@ export class MetricsBuilderPage {
         // Read from the inner PopoverTrigger
         const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]');
         if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+            // OSelect populates these attrs once the model-value resolves; the
+            // metrics page auto-selects a metric on mount asynchronously, so
+            // poll briefly until at least one is non-empty.
+            const value = await this.page.waitForFunction(
+                () => {
+                    const tr = document.querySelector('[data-test="index-dropdown-stream-trigger"]');
+                    if (!tr) return null;
+                    const v = tr.getAttribute('data-test-selected-value') || '';
+                    const l = tr.getAttribute('data-test-selected-label') || '';
+                    return (v && v.length > 0) ? v : ((l && l.length > 0) ? l : null);
+                },
+                { timeout: 5000 }
+            ).then(handle => handle.jsonValue()).catch(() => null);
+            if (value) return value;
             const dtValue = await trigger.getAttribute('data-test-selected-value').catch(() => null);
             if (dtValue && dtValue.length > 0) return dtValue;
             const dtLabel = await trigger.getAttribute('data-test-selected-label').catch(() => null);
@@ -701,12 +738,24 @@ export class MetricsBuilderPage {
      */
     async setLegend(legend) {
         if (await this.legendEl.isVisible({ timeout: 3000 }).catch(() => false)) {
-            // Prefer the OInput `-field` variant
+            // Prefer the OCombobox `-input` variant (Reka ComboboxInput renders native input)
             const fieldInput = this.legendFieldInput;
             if (await fieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await fieldInput.click();
                 await fieldInput.press('ControlOrMeta+a').catch(() => {});
                 await fieldInput.press('Backspace').catch(() => {});
                 await fieldInput.fill(legend);
+                return true;
+            }
+            // Fallback: descend into the wrapper to find the native input child
+            // (covers cases where Reka's ComboboxInput rendered the native input
+            // without forwarding the explicit `-input` data-test).
+            const nestedInput = this.legendEl.locator('xpath=.//input').first();
+            if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await nestedInput.click();
+                await nestedInput.press('ControlOrMeta+a').catch(() => {});
+                await nestedInput.press('Backspace').catch(() => {});
+                await nestedInput.fill(legend);
                 return true;
             }
             // Else, the data-test is on the input element directly
@@ -722,6 +771,37 @@ export class MetricsBuilderPage {
     }
 
     /**
+     * Read the legend input value (OCombobox `-input` or fallback to nested input).
+     * Returns '' if no fillable input is present.
+     */
+    async getLegendValue() {
+        if (await this.legendFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await this.legendFieldInput.inputValue().catch(() => '');
+        }
+        const nestedInput = this.legendEl.locator('xpath=.//input').first();
+        if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await nestedInput.inputValue().catch(() => '');
+        }
+        return await this.legendEl.inputValue().catch(() => '');
+    }
+
+    /**
+     * Read the step-value input value (OInput `-field` or fallback to nested input).
+     * Spec callers used to read `stepValueEl.inputValue()` directly — that fails
+     * because the wrapper is a <div>, not an <input>. Use this helper instead.
+     */
+    async getStepValue() {
+        if (await this.stepValueFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await this.stepValueFieldInput.inputValue().catch(() => '');
+        }
+        const nestedInput = this.stepValueEl.locator('xpath=.//input').first();
+        if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await nestedInput.inputValue().catch(() => '');
+        }
+        return await this.stepValueEl.inputValue().catch(() => '');
+    }
+
+    /**
      * Set step value
      * @param {string} stepValue - e.g., "30s", "1m"
      */
@@ -729,9 +809,19 @@ export class MetricsBuilderPage {
         if (await this.stepValueEl.isVisible({ timeout: 3000 }).catch(() => false)) {
             // Prefer OInput `-field` variant
             if (await this.stepValueFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await this.stepValueFieldInput.click();
                 await this.stepValueFieldInput.press('ControlOrMeta+a').catch(() => {});
                 await this.stepValueFieldInput.press('Backspace').catch(() => {});
                 await this.stepValueFieldInput.fill(stepValue);
+                return true;
+            }
+            // Fallback: descend into the wrapper to find the native input child
+            const nestedInput = this.stepValueEl.locator('xpath=.//input').first();
+            if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await nestedInput.click();
+                await nestedInput.press('ControlOrMeta+a').catch(() => {});
+                await nestedInput.press('Backspace').catch(() => {});
+                await nestedInput.fill(stepValue);
                 return true;
             }
             // data-test is directly on the <input> element
@@ -870,12 +960,25 @@ export class MetricsBuilderPage {
      * Click Add in Add to Dashboard dialog
      */
     async clickDashboardAdd() {
-        if (await this.dashboardAddBtn.isVisible({ timeout: 3000 })) {
-            await this.dashboardAddBtn.click();
-            await this.dashboardDialogEl.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
-            return true;
-        }
-        return false;
+        if (!await this.dashboardAddBtn.isVisible({ timeout: 3000 })) return false;
+        // Add-to-Dashboard primary button is disabled until folder + dashboard
+        // + tab are picked; poll until the disabled state clears, otherwise the
+        // click is a no-op and the drawer never closes.
+        const enabled = await this.page.waitForFunction(
+            () => {
+                const btn = document.querySelector('[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]');
+                if (!btn) return false;
+                if (btn.hasAttribute('disabled')) return false;
+                if (btn.getAttribute('aria-disabled') === 'true') return false;
+                if (btn.getAttribute('data-disabled') !== null) return false;
+                return true;
+            },
+            { timeout: 5000 }
+        ).then(() => true).catch(() => false);
+        if (!enabled) return false;
+        await this.dashboardAddBtn.click();
+        await this.dashboardDialogEl.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+        return true;
     }
 
     // ===== Builder UI Visibility Checks =====
@@ -1063,17 +1166,33 @@ export class MetricsBuilderPage {
     async isValueSelectDisabled() {
         await this.valueSelectLast.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         const isDisabled = await this.valueSelectLast.evaluate(el => {
-            // OSelect/q-select disabled detection: check the element and ancestors
+            // OSelect post-migration: the PopoverTrigger button (`-trigger`) is
+            // the element that carries the disabled state when `:disabled` is
+            // set on the OSelect. We also check ancestor data-disabled, native
+            // disabled attr, and the legacy q-field--disabled class for safety.
             const hasDisabledClass = (node) => {
                 if (!node) return false;
                 const cls = node.className || '';
                 return cls.includes('q-field--disabled') || cls.includes('disabled');
             };
+            // Find the OSelect trigger inside the wrapper (post-migration) — the
+            // disabled flag binds to the PopoverTrigger button.
+            const trigger = el.querySelector('[data-test$="-trigger"]');
+            if (trigger) {
+                if (trigger.hasAttribute('disabled')) return true;
+                if (trigger.getAttribute('data-disabled') !== null) return true;
+                if (trigger.getAttribute('aria-disabled') === 'true') return true;
+                const cls = trigger.className || '';
+                if (cls.includes('data-[disabled]') || cls.includes('cursor-not-allowed') || cls.includes('disabled:')) {
+                    // class-based hint only; rely on actual attrs below
+                }
+            }
             if (hasDisabledClass(el)) return true;
             if (hasDisabledClass(el.parentElement)) return true;
             if (el.getAttribute('aria-disabled') === 'true') return true;
             if (el.getAttribute('data-disabled') === 'true') return true;
             if (el.querySelector('[aria-disabled="true"]')) return true;
+            if (el.querySelector('[data-disabled]')) return true;
             const input = el.querySelector('input');
             if (input && input.disabled) return true;
             const style = window.getComputedStyle(el);
@@ -1158,8 +1277,10 @@ export class MetricsBuilderPage {
     async verifyBuilderState() {
         const state = {};
 
-        // 1. Read metric from stream selector
-        state.metric = await this.streamSelectorInput.inputValue().catch(() => '');
+        // 1. Read metric from stream selector (OSelect — use the trigger's
+        //    `data-test-selected-value` attribute, not inputValue() on the
+        //    wrapper div).
+        state.metric = await this.getStreamSelectedValue();
 
         // 2. Read label filter chip texts
         const filterCount = await this.getLabelFilterCount();
@@ -1179,21 +1300,13 @@ export class MetricsBuilderPage {
 
         // 4. Read options
         if (await this.legendEl.isVisible({ timeout: 2000 }).catch(() => false)) {
-            if (await this.legendFieldInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-                state.legend = await this.legendFieldInput.inputValue().catch(() => '');
-            } else {
-                state.legend = await this.legendEl.inputValue().catch(() => '');
-            }
+            state.legend = await this.getLegendValue();
         } else {
             state.legend = '';
         }
 
         if (await this.stepValueEl.isVisible({ timeout: 2000 }).catch(() => false)) {
-            if (await this.stepValueFieldInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-                state.stepValue = await this.stepValueFieldInput.inputValue().catch(() => '');
-            } else {
-                state.stepValue = await this.stepValueEl.inputValue().catch(() => '');
-            }
+            state.stepValue = await this.getStepValue();
         } else {
             state.stepValue = '';
         }

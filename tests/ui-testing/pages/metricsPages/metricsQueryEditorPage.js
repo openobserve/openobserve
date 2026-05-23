@@ -127,15 +127,22 @@ export class MetricsQueryEditorPage {
         // Note: This only sets the internal model state, not the rendered view
         const modelSetSuccess = await this.page.evaluate((queryText) => {
             try {
-                const editors = window.monaco?.editor?.getEditors?.();
-
-                if (editors && editors.length > 0) {
-                    const editor = editors[0];
-                    if (editor && typeof editor.setValue === 'function') {
-                        editor.setValue(queryText);
-                        // Model set attempted - view rendering happens asynchronously
-                        return true;
+                const editors = window.monaco?.editor?.getEditors?.() || [];
+                if (editors.length === 0) return false;
+                const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+                let editor = null;
+                for (const ed of editors) {
+                    const dom = ed.getDomNode?.();
+                    if (dom && dashContainer && dashContainer.contains(dom)) {
+                        editor = ed;
+                        break;
                     }
+                }
+                editor = editor || editors[0];
+                if (editor && typeof editor.setValue === 'function') {
+                    editor.setValue(queryText);
+                    // Model set attempted - view rendering happens asynchronously
+                    return true;
                 }
             } catch (error) {
                 console.log('Monaco API failed:', error.message);
@@ -171,12 +178,20 @@ export class MetricsQueryEditorPage {
             return;
         }
 
-        // Focus the editor through the Monaco API
+        // Focus the editor through the Monaco API (target the dashboard panel
+        // editor specifically, not a logs/VRL editor that may also be present).
         await this.page.evaluate(() => {
-            const editors = window.monaco?.editor?.getEditors?.();
-            if (editors && editors.length > 0) {
-                editors[0].focus();
+            const editors = window.monaco?.editor?.getEditors?.() || [];
+            if (editors.length === 0) return;
+            const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+            for (const ed of editors) {
+                const dom = ed.getDomNode?.();
+                if (dom && dashContainer && dashContainer.contains(dom)) {
+                    ed.focus();
+                    return;
+                }
             }
+            editors[0].focus();
         });
 
         // Clear editor content: single select-all + backspace, then select-all to prepare for typing
@@ -209,13 +224,23 @@ export class MetricsQueryEditorPage {
      * @returns {Promise<string>} - The current query text
      */
     async getCurrentQueryText() {
-        // Read from Monaco editor model directly (approved §5 pattern)
+        // Read from Monaco editor model directly (approved §5 pattern).
+        // Prefer the editor whose container has data-test="dashboard-panel-query-editor"
+        // so we don't read from a VRL/logs/secondary editor in the same page.
         const text = await this.page.evaluate(() => {
             try {
-                const editors = window.monaco?.editor?.getEditors?.();
-                if (editors && editors.length > 0) {
-                    return editors[0].getValue() || '';
+                const editors = window.monaco?.editor?.getEditors?.() || [];
+                if (editors.length === 0) return '';
+                // Identify the dashboard panel query editor by its container's data-test.
+                const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+                for (const ed of editors) {
+                    const dom = ed.getDomNode?.();
+                    if (dom && dashContainer && dashContainer.contains(dom)) {
+                        return ed.getValue() || '';
+                    }
                 }
+                // Fallback: return the first editor's value.
+                return editors[0].getValue() || '';
             } catch (e) {
                 console.log('Monaco read failed:', e.message);
             }
@@ -332,13 +357,22 @@ export class MetricsQueryEditorPage {
      * @param {string} query - The query to enter
      */
     async enterQueryViaKeyboard(query) {
-        // Focus the editor via Monaco API (avoid raw .monaco-editor class selector)
+        // Focus the editor via Monaco API (avoid raw .monaco-editor class selector).
+        // Target the dashboard panel editor by container data-test so we don't
+        // hit a logs/VRL editor that may share the same page tree.
         await this.queryEditorContainer.first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.evaluate(() => {
-            const editors = window.monaco?.editor?.getEditors?.();
-            if (editors && editors.length > 0) {
-                editors[0].focus();
+            const editors = window.monaco?.editor?.getEditors?.() || [];
+            if (editors.length === 0) return;
+            const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+            for (const ed of editors) {
+                const dom = ed.getDomNode?.();
+                if (dom && dashContainer && dashContainer.contains(dom)) {
+                    ed.focus();
+                    return;
+                }
             }
+            editors[0].focus();
         });
 
         // Clear existing content

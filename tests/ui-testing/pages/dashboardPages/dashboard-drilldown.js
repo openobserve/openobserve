@@ -24,6 +24,16 @@ export default class DashboardDrilldownPage {
     // Dashboard view — drilldown trigger overlay
     this.drilldownMenu = page.locator('[data-test="drilldown-menu"]');
     this.drilldownMenuFirstItem = page.locator('[data-test="drilldown-menu-item"]').first();
+
+    // Per-name factory helpers for OSelect options (use data-test-value lookup, per §4)
+    this.folderOptionByValue = (value) =>
+      page.locator(`[data-test="dashboard-drilldown-folder-select-option"][data-test-value="${value}"]`);
+    this.dashboardOptionByValue = (value) =>
+      page.locator(`[data-test="dashboard-drilldown-dashboard-select-option"][data-test-value="${value}"]`);
+    this.tabOptionByValue = (value) =>
+      page.locator(`[data-test="dashboard-drilldown-tab-select-option"][data-test-value="${value}"]`);
+    this.tabOptionAny = () =>
+      page.locator('[data-test="dashboard-drilldown-tab-select-option"]');
   }
 
   generateUniqueDrilldownName(prefix = "u") {
@@ -110,18 +120,18 @@ export default class DashboardDrilldownPage {
     // byDashboard is the default drilldown type
     await this.folderSelect.waitFor({ state: 'visible', timeout: 10000 });
     await this.folderSelect.click();
-    await this.page.getByRole('option', { name: folderName, exact: true }).click();
+    await this.folderOptionByValue(folderName).first().click();
 
     await this.dashboardSelect.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardSelect.click();
-    await this.page.getByRole('option', { name: dashboardTitle, exact: true }).click();
+    await this.dashboardOptionByValue(dashboardTitle).first().click();
 
     await this.tabSelect.waitFor({ state: 'visible', timeout: 10000 });
     await this.tabSelect.click();
     if (tabName) {
-      await this.page.getByRole('option', { name: tabName, exact: true }).click();
+      await this.tabOptionByValue(tabName).first().click();
     } else {
-      await this.page.getByRole('option').first().click();
+      await this.tabOptionAny().first().click();
     }
 
     if (openInNewTab) {
