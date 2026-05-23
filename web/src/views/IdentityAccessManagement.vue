@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:overflow-hidden" data-test="iam-page">
+  <div class="tw:rounded-md tw:p-0 tw:overflow-hidden tw:h-[calc(100vh-var(--navbar-height))]" data-test="iam-page">
     <OSplitter
       v-model="splitterModel"
       unit="px"
