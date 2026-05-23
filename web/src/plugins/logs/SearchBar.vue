@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-visualize-toggle"
             :disabled="isVisualizeDisabled"
+            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : undefined"
             value="visualize"
             size="sm"
           >
@@ -46,10 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
-            <OTooltip
-              v-if="isVisualizeDisabled"
-              :content="t('search.enableSqlModeOrSelectSingleStream')"
-            />
           </OToggleGroupItem>
 
           <OToggleGroupItem
