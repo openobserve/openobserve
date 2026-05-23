@@ -196,6 +196,7 @@ const wrapperClasses = computed(() => [
         :id="inputId"
         ref="inputRef"
         type="file"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : 'o-file-field'"
         :name="name"
         :multiple="multiple"
         :accept="accept"
@@ -255,6 +256,7 @@ const wrapperClasses = computed(() => [
             type="button"
             tabindex="-1"
             aria-label="Remove file"
+            :data-test="`o-file-chip-${i}-remove-btn`"
             class="tw:flex tw:items-center tw:text-file-chip-remove tw:hover:opacity-80"
             @click.stop="removeFile(i, $event)"
           >
@@ -301,6 +303,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         class="tw:text-xs tw:text-file-error-text tw:leading-none"
         role="alert"
       >

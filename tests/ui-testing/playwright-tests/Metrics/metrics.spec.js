@@ -74,7 +74,7 @@ test.describe("Metrics testcases", () => {
       // If we can't find the option, close the picker and continue
       // NOTE: For P0 smoke test, time range selection is not critical -
       // the primary goal is validating query execution without errors
-      await page.keyboard.press('Escape');
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
       testLogger.warn('Could not select specific time range, using default');
     }
 
@@ -195,7 +195,7 @@ test.describe("Metrics testcases", () => {
     await expect(datePickerDropdown).toBeVisible({ timeout: 5000 });
 
     // Close date picker by clicking outside
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     testLogger.info('Date picker functionality verified');
   });
@@ -389,8 +389,8 @@ test.describe("Metrics testcases", () => {
         await expect(modal).not.toBeVisible({ timeout: 5000 });
         testLogger.info('Add to Dashboard cancel flow completed');
       } else {
-        testLogger.info('Cancel button not found, closing modal with Escape');
-        await page.keyboard.press('Escape');
+        testLogger.info('Cancel button not found, closing modal with body click');
+        await page.locator('body').click({ position: { x: 10, y: 10 } });
       }
     } else {
       testLogger.info('Add to Dashboard button not visible, skipping test');

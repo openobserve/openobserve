@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="opt.value"
           :value="opt.value"
           size="sm"
-          data-test="logs-user-defined-fields-btn"
+          :data-test="`logs-user-defined-fields-btn-${opt.slot}`"
         >
           <template v-if="opt.slot === 'user_defined_slot'">
             <OIcon name="person" size="sm" class="tw:text-[12px]!"></OIcon>

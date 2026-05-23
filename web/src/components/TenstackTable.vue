@@ -255,14 +255,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'
                       "
-                      data-test="tenstack-table-sort-icon-active"
+                      :data-test="`o2-table-sort-icon-${header.id}`"
+                      data-test-sort-state="active"
+                      :data-test-sort-direction="sortOrder"
                       size="sm"
                       class="tw:text-[var(--o2-primary-color)]"
                     />
                     <OIcon
                       v-else
                       name="unfold-more"
-                      data-test="tenstack-table-sort-icon-inactive"
+                      :data-test="`o2-table-sort-icon-${header.id}`"
+                      data-test-sort-state="inactive"
+                      data-test-sort-direction="none"
                       size="sm"
                       class="tw:opacity-40"
                     />
@@ -425,6 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
+                data-test="dashboard-data-row-cell"
                 class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
                 :class="[
                   (cell.column.columnDef.meta as any)?.align === 'center'

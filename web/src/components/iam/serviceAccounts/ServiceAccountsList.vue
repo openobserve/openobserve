@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OInput>
               <OButton
+                data-test="service-accounts-add-btn"
                 variant="primary"
                 size="sm"
                 class="tw:!h-8"
@@ -78,10 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
-                <span class="text-weight-medium">AI SRE Agent</span>
-                <OBadge variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
+                <span data-test="service-accounts-system-account-label" class="text-weight-medium">AI SRE Agent</span>
+                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
               </template>
-              <template v-else>{{ row.email }}</template>
+              <template v-else>
+                <span :data-test="`service-accounts-email-${row.email}`">{{ row.email }}</span>
+              </template>
             </template>
 
             <template #cell-first_name="{ row }">
@@ -95,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <OBadge variant="default-outline">
+                <OBadge data-test="service-accounts-system-managed-badge" variant="default-outline">
                     {{ t('serviceAccounts.systemManaged', 'System Managed') }}
                   <OTooltip v-if="row.description" :content="row.description" />
                 </OBadge>
@@ -205,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Buttons section taking 25% of the width -->
         <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
           <OButton
+            data-test="service-accounts-list-token-copy-btn"
             variant="outline"
             size="icon-md"
             :title="t('serviceAccounts.copyToken')"
@@ -214,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="content-copy" size="sm" />
           </OButton>
           <OButton
+            data-test="service-accounts-list-token-download-btn"
             variant="outline"
             size="icon-md"
             :title="t('serviceAccounts.downloadToken')"

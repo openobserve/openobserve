@@ -13,6 +13,12 @@ export class LogsQueryPage {
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
+    // OSwitch renders the wrapper data-test on a div and the state on an inner
+    // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling
+    // OTooltip grace-area span also carries `data-state="closed"`, so we filter on the
+    // OSwitch states explicitly to avoid the strict-mode collision.
+    this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
+    this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
     this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
@@ -84,9 +90,8 @@ export class LogsQueryPage {
 
   async isHistogramOn() {
     // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    const histogramToggle = this.page.locator(this.histogramToggle);
-    const isChecked = await histogramToggle.getAttribute('aria-checked');
-    return isChecked === 'true';
+    // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
+    return (await this.page.locator(this.histogramToggleCheckedBtn).count()) > 0;
   }
 
   async ensureHistogramState(desiredState) {
@@ -103,15 +108,19 @@ export class LogsQueryPage {
 
   async ensureSQLMode() {
     if (!(await this.isSQLModeOn())) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
+      const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
+      await sw.click();
+      // Wait for switch state to flip rather than time-based settle.
+      await expect.poll(async () => await sw.isChecked(), { timeout: 5000 }).toBe(true);
     }
   }
 
   async ensureFTSMode() {
     if (await this.isSQLModeOn()) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
+      const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
+      await sw.click();
+      // Wait for switch state to flip rather than time-based settle.
+      await expect.poll(async () => await sw.isChecked(), { timeout: 5000 }).toBe(false);
     }
   }
 
@@ -140,10 +149,12 @@ export class LogsQueryPage {
     await expect(toggle).toBeVisible({ timeout: 5000 });
     if (((await toggle.textContent()) || '').includes(expectedLabel)) {
       await toggle.click();
+      // After clicking, the toggle menu closes — wait for it to be detached/hidden.
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     } else {
       await this.page.keyboard.press('Escape');
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
-    await this.page.waitForTimeout(300);
   }
 
   async disableAutoRun() {

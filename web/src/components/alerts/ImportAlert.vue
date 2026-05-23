@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     :is-importing="isAlertImporting"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 308px)',
+      urlEditor: 'calc(100vh - 288px)',
+      fileEditor: 'calc(100vh - 296px)',
       outputContainer: 'calc(100vh - 130px)',
       errorReport: 'calc(100vh - 192px)',
     }"
@@ -32,20 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="tw:flex tw:mt-[0.725rem] tw:h-[64px]">
-        <div style="width: calc(69%)" class="tw:pr-2">
+      <div class="tw:flex tw:items-end tw:gap-2 tw:my-[0.725rem]">
+        <div style="width: calc(69%)">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
+            size="md"
             @update:model-value="updateUrl"
-            :placeholder="t('dashboard.addURL')"
+            :label="t('dashboard.addURL')"
           />
         </div>
 
-        <div
-          style="width: calc(30%);position: relative; bottom: 21px;"
-          data-test="alert-folder-dropdown"
-        >
+        <div style="width: calc(30%)" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -57,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div style="width: calc(100% - 10px)" class="tw:mb-1 tw:flex">
-        <div style="width: calc(69%)" class="tw:pr-2">
+      <div class="tw:mb-1 tw:flex tw:items-start tw:gap-2" style="width: calc(100% - 10px)">
+        <div style="width: calc(69%)" class="tw:pt-[6px]">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -68,9 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             multiple
             drop-zone
             help-text=".json files only"
+            size="sm"
           />
         </div>
-        <div style="width: calc(30%); position: relative; bottom: 21px;">
+        <div style="width: calc(30%)">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"

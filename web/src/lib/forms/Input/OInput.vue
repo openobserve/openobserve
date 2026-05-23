@@ -270,6 +270,7 @@ const wrapperClasses = computed(() => [
         v-if="isTextarea"
         :id="inputId"
         ref="inputRef"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
         :name="name"
         :placeholder="placeholder"
@@ -303,6 +304,7 @@ const wrapperClasses = computed(() => [
         v-else
         :id="inputId"
         ref="inputRef"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
         :type="type"
         :name="name"
@@ -340,6 +342,7 @@ const wrapperClasses = computed(() => [
         type="button"
         tabindex="-1"
         aria-label="Clear"
+        :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
         class="tw:flex tw:items-center tw:pe-2 tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover tw:transition-colors"
         @click="handleClear"
       >
@@ -380,6 +383,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         class="tw:text-xs tw:text-input-error-text tw:leading-none"
         role="alert"
       >

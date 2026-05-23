@@ -416,8 +416,8 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.waitForSelector('.q-notification__message:has-text("View created successfully")', { 
-        timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING 
+      await page.waitForSelector('[role="alert"]:has-text("View created successfully")', {
+        timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });
       testLogger.info('Success toast validated: Multistream view created successfully');
     } catch (error) {

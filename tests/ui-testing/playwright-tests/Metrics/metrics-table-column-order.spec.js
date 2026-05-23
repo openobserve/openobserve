@@ -78,7 +78,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     if (selected) {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
-      await page.keyboard.press('Escape');
+      await page.locator('body').click({ position: { x: 10, y: 10 } });
       testLogger.warn('Could not select specific time range, using default');
     }
     await page.waitForTimeout(1000);
@@ -193,7 +193,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
               await page.waitForTimeout(2500);
             } else {
               // Close the dropdown
-              await page.keyboard.press('Escape');
+              await page.locator('body').click({ position: { x: 10, y: 10 } });
               await page.waitForTimeout(500);
             }
           }

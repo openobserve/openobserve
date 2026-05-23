@@ -87,7 +87,7 @@ test.describe("Metrics Configuration Tests", () => {
       if (!foundPreset) {
         testLogger.warn('No preset options found - date picker may use different UI pattern');
         // Close the date picker if it's still open
-        await page.keyboard.press('Escape');
+        await page.locator('body').click({ position: { x: 10, y: 10 } });
       } else {
         expect(foundPreset).toBe(true);
       }
@@ -137,7 +137,7 @@ test.describe("Metrics Configuration Tests", () => {
 
       if (!isPanelVisible) {
         testLogger.warn('Settings panel not visible - may not be implemented or different UI pattern');
-        await page.keyboard.press('Escape');
+        await page.locator('body').click({ position: { x: 10, y: 10 } });
         return; // Skip rest of this test
       }
 

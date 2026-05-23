@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex-1 tw:min-w-0 tw:flex">
         <!-- Main Panel -->
         <main
+          data-test="main-content"
           class="tw:flex tw:flex-col tw:min-h-0"
           :style="{
             width:

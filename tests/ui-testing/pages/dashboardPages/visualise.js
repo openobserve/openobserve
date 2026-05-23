@@ -59,7 +59,7 @@ export default class LogsVisualise {
     // Wait for visualization tab to be fully loaded
     // Check for chart selector OR error message (in case of query errors)
     const chartSelector = this.page.locator('[data-test="selected-chart-table-item"], [data-test="selected-chart-bar-item"], [data-test="selected-chart-line-item"]').first();
-    const errorIndicator = this.page.locator('[data-test="dashboard-error"], .q-notification, .q-banner');
+    const errorIndicator = this.page.locator('[data-test="dashboard-error"], [role="alert"], [data-test*="notification"]');
 
     // Wait for either chart selectors or error indicator to appear
     await Promise.race([

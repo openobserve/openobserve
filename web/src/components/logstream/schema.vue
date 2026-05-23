@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="schemaSettings"
                         icon="settings"
                         label="Schema Settings"
+                        data-test="schema-settings-tab"
                       />
 
                       <!-- Red Button Tab -->
@@ -321,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="redButton"
                         icon="backup"
                         label="Extended Retention"
+                        data-test="schema-extended-retention-tab"
                       />
 
                       <!-- Configuration Tab -->
@@ -328,6 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="configuration"
                         icon="tune"
                         label="Configuration"
+                        data-test="schema-configuration-tab"
                       />
                       <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
                       <OTab
@@ -529,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #cell-name="{ row }">
                         <div class="tw:flex tw:items-center">
-                          <span class="field-name-text">
+                          <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
                             <OTooltip
                               v-if="row.name.length > 30"
@@ -613,6 +616,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span
                             class="tw:text-[#5960B2] tw:cursor-pointer"
+                            :data-test="`schema-field-${row.name}-pattern-action`"
                             @click="openPatternAssociationDialog(row.name)"
                           >
                             {{
@@ -922,11 +926,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:justify-end tw:gap-2"
                   >
                     <OButton
-                      v-close-popup="true"
                       data-test="schema-cancel-button"
                       variant="outline"
                       size="sm-action"
-                      @click="llmEvalFormDirty = false"
+                      @click="llmEvalFormDirty = false; $emit('close')"
                     >
                       {{ t("logStream.cancel") }}
                     </OButton>
@@ -1121,6 +1124,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1172,6 +1177,8 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OCheckbox,
+    OCard,
+    OCardSection,
   },
   setup({ modelValue }) {
     type PatternAssociation = {

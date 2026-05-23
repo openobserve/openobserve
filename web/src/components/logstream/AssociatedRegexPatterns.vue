@@ -490,6 +490,7 @@
                 variant="outline"
                 size="sm-action"
                 class="tw:mr-3"
+                :data-test="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'associated-regex-patterns-remove-pattern-btn' : 'associated-regex-patterns-add-pattern-btn'"
                 @click="handleAddOrRemovePattern"
                 :icon-left="
                   checkIfPatternIsApplied(userClickedPattern.pattern_id)

@@ -52,8 +52,8 @@ export class ServiceGraphPage {
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
-    this.correlationDashboardCard = '.correlation-dashboard-card';
-    this.correlationDialogTabs = '.q-dialog [role="tab"]';
+    this.correlationDashboardCard = '[data-test*="correlation-dashboard"]';
+    this.correlationDialogTabs = '[data-test*="dialog"] [role="tab"]';
   }
 
   // ===== NAVIGATION =====

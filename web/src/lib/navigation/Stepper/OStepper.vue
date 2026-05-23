@@ -130,7 +130,7 @@ function triggerClasses(step: StepRegistration): string {
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="tw:flex tw:flex-col tw:items-center tw:flex-1 tw:min-w-0">
+        <div role="listitem" class="tw:flex tw:flex-col tw:items-center tw:shrink-0">
           <button
             type="button"
             :class="triggerClasses(step)"
@@ -167,7 +167,7 @@ function triggerClasses(step: StepRegistration): string {
         <!-- Connector line between consecutive steps -->
         <div
           v-if="index < sortedSteps.length - 1"
-          class="tw:h-px tw:flex-1 tw:shrink tw:mt-4 tw:mx-1 tw:min-w-[8px]"
+          class="tw:h-px tw:flex-1 tw:shrink tw:mt-[22px] tw:mx-1 tw:min-w-[8px]"
           :class="step.done ? 'tw:bg-stepper-connector-done' : 'tw:bg-stepper-connector'"
           aria-hidden="true"
         />

@@ -71,6 +71,7 @@
         class="log_json_content tw:flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
+        :data-test="`log-detail-row-${key}`"
       >
         <ODropdown
           v-if="!hideFieldOptions"

@@ -89,6 +89,8 @@ function handleCheckbox(val: (string | number)[]) {
       <ORadio
         v-for="opt in options"
         :key="String(opt.value)"
+        :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
+        :data-test-value="String(opt.value)"
         :value="opt.value"
         :label="opt.label"
         :disabled="disabled || opt.disabled"
@@ -106,6 +108,8 @@ function handleCheckbox(val: (string | number)[]) {
         <OCheckbox
           v-for="opt in options"
           :key="String(opt.value)"
+          :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
+          :data-test-value="String(opt.value)"
           :value="(opt.value as string)"
           :label="opt.label"
           :disabled="disabled || opt.disabled"

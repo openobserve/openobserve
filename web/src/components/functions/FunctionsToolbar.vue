@@ -20,7 +20,7 @@
       <div class="tw:text-lg tw:w-full add-function-title tw:mr-2">
         {{ t('function.addFunction') }}
       </div>
-      <div class="o2-input tw:flex tw:items-center tw:gap-6">
+      <div class="o2-input tw:flex tw:items-end tw:gap-6">
         <div class="tw:flex tw:items-center">
           <OInput
             data-test="add-function-name-input"
@@ -53,23 +53,23 @@
           </OIcon>
         </div>
         <!-- Transform Type Radio Buttons -->
-        <div class="tw:flex tw:items-center tw:gap-4">
-          <ORadioGroup v-model="selectedTransType" class="tw:flex tw:items-center tw:gap-4">
-            <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
-              <ORadio value="0" />
+        <div class="tw:flex tw:items-center tw:gap-4 tw:h-9">
+          <ORadioGroup v-model="selectedTransType" orientation="horizontal" class="tw:items-center tw:gap-4">
+            <div class="tw:flex tw:items-center tw:gap-1">
+              <ORadio value="0" data-test="function-transform-type-vrl-radio" />
               <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
-            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
-              <ORadio value="1" />
+            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1">
+              <ORadio value="1" data-test="function-transform-type-js-radio" />
               <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </ORadioGroup>
           <!-- Info icon with tooltip -->
           <OIcon
             name="info-outline"
-            size="xs"
-            class="tw:cursor-pointer"
+            size="sm"
+            class="tw:cursor-pointer tw:text-gray-500 tw:shrink-0"
           >
             <OTooltip>
               <template #content>

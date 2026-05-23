@@ -191,18 +191,10 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Open Custom SQL editor
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();
-    // await page.locator(".cm-line").first().click();
-
-    // Fill Monaco editor directly — skip click that gets intercepted by .sql-bar
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill(
-        'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-      );
+    // Open Custom SQL editor and enter the query via the PO (no class selectors)
+    await pm.chartTypeSelector.setCustomSQL(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+    );
 
     // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
@@ -474,7 +466,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Test Share Link feature
     await pm.dashboardShareExport.shareDashboard();
-    await expect(page.getByText("Link copied successfully")).toBeHidden();
+    // Success toast (data-test) should not be visible before share completes
+    await expect(pm.dashboardShareExport.getShareSuccessToast()).toBeHidden();
 
     // Hover over the panel container to make the fullscreen button visible
     await pm.dashboardPanelEdit.fullscreenPanel(panelName);
@@ -520,7 +513,7 @@ test.describe("dashboard UI testcases", () => {
     // Attempt to save the panel without a name
     await pm.dashboardPanelActions.savePanel();
     await expect(
-      page.getByText("There are some errors, please fix them and try again").first()
+      pm.dashboardPanelActions.getErrorToast().first()
     ).toBeVisible();
 
     // Add a panel name and save again
@@ -637,7 +630,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the expected error message is shown
     await expect(
-      page.getByText("There are some errors, please fix them and try again").first()
+      pm.dashboardPanelActions.getErrorToast().first()
     ).toBeVisible();
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
@@ -691,8 +684,6 @@ test.describe("dashboard UI testcases", () => {
       await dialog.accept();
     });
     await pm.dashboardList.menuItem("logs-item");
-
-    // await page.getByRole("button", { name: "Cancel" }).click();
   });
   test("should update the chart correctly when used camel case in custom sql query", async ({
     page,
@@ -712,14 +703,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("table");
 
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
-      .fill(
-        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-      );
+    await pm.chartTypeSelector.setCustomSQL(
+      'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+    );
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -731,17 +717,13 @@ test.describe("dashboard UI testcases", () => {
       timeout: 10000,
     });
 
-    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row
-    const dataRows = page.locator(
-      '[data-test="dashboard-panel-table"] tbody tr.dashboard-data-row'
-    );
+    // TanStack table rows use data-test="dashboard-data-row" / "dashboard-data-row-cell"
+    const dataRows = pm.dashboardPanelActions.getTableDataRows();
     await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
 
     expect(await dataRows.count()).toBeGreaterThan(0);
-    await expect(dataRows.first().locator("td").first()).not.toHaveText(
-      ""
-    );
-    await expect(dataRows.first().locator("td").nth(1)).not.toHaveText("");
+    await expect(pm.dashboardPanelActions.firstRowNthCell(0)).not.toHaveText("");
+    await expect(pm.dashboardPanelActions.firstRowNthCell(1)).not.toHaveText("");
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
 
     // Save panel and cleanup
@@ -767,14 +749,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
-      .fill(
-        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-      );
+    await pm.chartTypeSelector.setCustomSQL(
+      'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+    );
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -864,14 +841,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator(".view-line").first().click({ force: true });
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
-      .fill(
-        `SELECT histogram(_timestamp, '5 minute') AS "_time",
+    await pm.chartTypeSelector.setCustomSQL(
+      `SELECT histogram(_timestamp, '5 minute') AS "_time",
        COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
        COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount",
        COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount",
@@ -879,7 +850,7 @@ test.describe("dashboard UI testcases", () => {
 FROM e2e_automate
 GROUP BY _time
 ORDER BY _time ASC`
-      );
+    );
 
     await pm.chartTypeSelector.searchAndAddField("_time", "x");
     await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");

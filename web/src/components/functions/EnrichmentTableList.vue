@@ -60,10 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OInput>
               <OButton
+                data-test="enrichment-tables-add-btn"
                 class="tw:ml-2"
                 variant="primary"
                 size="sm"
-                @click="showAddUpdateFn({})"
+                @click="showAddUpdateFn(null)"
               >
                 {{ t(`function.addEnrichmentTable`) }}
               </OButton>
@@ -96,10 +97,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <NoData />
               </template>
               <template #cell-type="{ row }">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span v-if="!row.urlJobs || row.urlJobs.length === 0">File</span>
+                <div
+                  :data-test="`${row.name}-type-cell`"
+                  class="tw:flex tw:items-center tw:gap-2"
+                >
+                  <span v-if="!row.urlJobs || row.urlJobs.length === 0" :data-test="`${row.name}-type-file`">File</span>
                   <template v-else>
                     <span
+                      :data-test="`${row.name}-type-url-trigger`"
                       class="tw:cursor-pointer"
                       @click="showUrlJobsDialog(row)"
                       :class="{'text-primary': row.urlJobs.length > 1}"
@@ -186,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
                   <OButton
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
+                    :data-test="`${row.name}-schema-btn`"
                     :title="t('logStream.schemaHeader')"
                     variant="ghost"
                     size="icon-sm"
@@ -196,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
                   <OButton
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
+                    :data-test="`${row.name}-edit-btn`"
                     :title="t('function.enrichmentTables')"
                     variant="ghost"
                     size="icon-sm"
@@ -205,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Delete button - always visible -->
                   <OButton
+                    :data-test="`${row.name}-delete-btn`"
                     :title="t('function.delete')"
                     variant="ghost-destructive"
                     size="icon-sm"
@@ -282,12 +290,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
           <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
-            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
               <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                 <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
-                  <OBadge :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'">
+                  <OBadge
+                    :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
+                    :data-test-value="job.status"
+                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
+                  >
                     {{ job.status }}
                   </OBadge>
                 </span>
@@ -295,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </span>
-                  <span v-if="job.status === 'failed'" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
+                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
                     Error: {{ job.error_message }}
                   </span>
                 </div>

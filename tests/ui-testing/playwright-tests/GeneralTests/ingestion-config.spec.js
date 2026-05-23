@@ -128,8 +128,8 @@ test.describe("Ingestion Configuration Tests", () => {
 
       // Search for 'kubernetes' using the global search — this navigates to the matching route
       await pm.ingestionConfigPage.fillSearchInput('kubernetes');
-      // Wait for navigation to settle
-      await page.waitForTimeout(1000);
+      // Wait for navigation to settle on a kubernetes route
+      await page.waitForURL(/kubernetes/i, { timeout: 10000 }).catch(() => {});
 
       // Verify the page navigated to or stayed on a kubernetes-related route
       const currentUrl = page.url();
@@ -171,7 +171,6 @@ test.describe("Ingestion Configuration Tests", () => {
 
         // Scroll to bottom
         await pm.ingestionConfigPage.scrollContentToBottom();
-        await page.waitForTimeout(500);
 
         testLogger.info('✓ Successfully scrolled to bottom of configuration');
       } else {

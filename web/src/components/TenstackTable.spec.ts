@@ -267,7 +267,9 @@ describe("TenstackTable", () => {
         sortFieldMap: {},
       });
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper
+          .find('[data-test-sort-state="active"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -281,7 +283,7 @@ describe("TenstackTable", () => {
       });
       // timestamp column is not active
       const inactiveIcons = wrapper.findAll(
-        '[data-test="tenstack-table-sort-icon-inactive"]',
+        '[data-test-sort-state="inactive"]',
       );
       expect(inactiveIcons.length).toBeGreaterThan(0);
     });
@@ -292,14 +294,10 @@ describe("TenstackTable", () => {
         rows: [],
       });
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-active"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(false);
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-inactive"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="inactive"]').exists(),
       ).toBe(false);
     });
 
@@ -320,7 +318,7 @@ describe("TenstackTable", () => {
       });
       // timestamp maps to start_time which equals sortBy → active icon
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(true);
     });
   });

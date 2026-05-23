@@ -13,7 +13,7 @@ export class LogsPageEP {
 
 
 async selectStreamDropDown() {
-  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.locator('[data-test="logs-search-index-list"]').click();
   await this.page.waitForTimeout(3000);
 }
 
@@ -54,12 +54,12 @@ async searchSchedulerSubmit() {
 
 async validateAddJob(jobId) {
   // Wait for the notification — it fires only after the job creation API call succeeds
-  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully', { timeout: 15000 });
+  await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
 
   // Navigate to the scheduler list
   await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
-  await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+  await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
   // Resolve trace_id for the specific job we created, then assert that exact row
   const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -146,14 +146,14 @@ async searchSchedulerInvalid() {
 
 
 async validateInvalidData() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Scheduler should be between 1 and 100000');
+  await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Job Scheduler should be between 1 and 100000');
   
   
 }
 
 
 async selectIndexStreamDefault() {
-  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.locator('[data-test="logs-search-index-list"]').click();
   await this.page.waitForTimeout(3000);
   await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
   await this.page.waitForTimeout(3000);
@@ -165,7 +165,7 @@ async decryptLogSQL(cipherName) {
 
   try {
     // Wait for the locator to be visible and enabled
-    const editorLocator = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
+    const editorLocator = this.page.locator('[data-test="logs-search-bar-query-editor-input"]');
     await editorLocator.waitFor({ state: 'visible', timeout: 10000 });
     console.log("SQL Query", sqlQuery);
     // Fill the query editor with the constructed SQL query

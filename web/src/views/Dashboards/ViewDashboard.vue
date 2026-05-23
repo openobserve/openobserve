@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               class="tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
+              data-test="dashboard-name-title"
             >
               {{ currentDashboardData.data?.title }}
             </span>

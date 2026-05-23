@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div data-test="add-report-name-input" class="o2-input">
                 <OInput
+                  data-test="add-report-name-input"
                   v-model.trim="formData.name"
                   :label="t('alerts.name') + ' *'"
                   color="input-border"
@@ -104,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="report-name-input o2-input tw:px-2 tw:pt-3"
             >
               <OInput
+                data-test="add-report-description-input"
                 v-model="formData.description"
                 :label="t('reports.description')"
                 color="input-border"
@@ -164,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="padding-top: 0; width: 30%"
                     >
                       <OSelect
+                        data-test="add-report-dashboard-folder-select"
                         v-model="dashboard.folder"
                         :options="folderOptions"
                         :label="t('reports.dashboardFolder') + ' *'"
@@ -180,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="padding-top: 0; width: 30%"
                     >
                       <OSelect
+                        data-test="add-report-dashboard-name-select"
                         v-model="dashboard.dashboard"
                         :options="dashboardOptions"
                         :label="t('reports.dashboard') + ' *'"
@@ -196,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="padding-top: 0; width: 30%"
                     >
                       <OSelect
+                        data-test="add-report-dashboard-tab-select"
                         v-model="dashboard.tabs"
                         :options="dashboardTabOptions"
                         :label="t('reports.dashboardTab') + ' *'"
@@ -642,6 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="report-name-input o2-input"
                   >
                     <OInput
+                      data-test="add-report-share-title-input"
                       v-model="formData.title"
                       :label="t('reports.title') + ' *'"
                       :error="!!titleError"
@@ -657,6 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="report-name-input o2-input tw:pt-3"
                   >
                     <OInput
+                      data-test="add-report-share-recipients-input"
                       v-model="emails"
                       :label="t('reports.recipients') + ' *'"
                       :error="!!recipientsError"

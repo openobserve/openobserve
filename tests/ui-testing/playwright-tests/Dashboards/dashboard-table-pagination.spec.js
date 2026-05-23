@@ -894,7 +894,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await infoIcon.hover();
 
     // Verify tooltip appears with expected text
-    const tooltip = page.locator('.q-tooltip');
+    const tooltip = page.locator('[role="tooltip"]');
     await expect(tooltip).toBeVisible();
     const tooltipText = await tooltip.textContent();
     expect(tooltipText).toContain('default number of records');

@@ -193,6 +193,22 @@ function handleClear(e: Event) {
   emit("clear");
 }
 
+// ── Native time input handler ───────────────────────────────
+function handleNativeTimeChange(e: Event) {
+  const val = (e.target as HTMLInputElement).value;
+  if (!val) {
+    emit("update:modelValue", "");
+    emit("change", "");
+    return;
+  }
+  const parts = val.split(":").map(Number);
+  internalHour.value = parts[0] ?? 0;
+  internalMinute.value = parts[1] ?? 0;
+  internalSecond.value = parts[2] ?? 0;
+  emit("update:modelValue", val);
+  emit("change", val);
+}
+
 // ── Field wrapper classes ──────────────────────────────────────
 const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-xs",
@@ -208,7 +224,7 @@ const fieldClasses = computed(() => [
     : "tw:border-datepicker-border tw:hover:border-datepicker-hover-border",
   props.disabled
     ? "tw:bg-datepicker-disabled-bg tw:border-datepicker-disabled-border tw:opacity-60 tw:cursor-not-allowed"
-    : "tw:cursor-pointer",
+    : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
@@ -231,20 +247,22 @@ const fieldClasses = computed(() => [
     </label>
 
     <PopoverRoot v-model:open="popoverOpen">
-      <PopoverTrigger
-        as="div"
+      <div
         :id="inputId"
         role="group"
         :aria-invalid="hasError || undefined"
         :aria-disabled="disabled || undefined"
         :class="fieldClasses"
         :data-disabled="disabled || undefined"
-        @focus.capture="emit('focus', $event)"
-        @blur.capture="emit('blur', $event)"
+        :data-test="parentDataTest"
       >
-        <span
-          class="tw:flex tw:items-center tw:ps-3 tw:text-datepicker-icon tw:shrink-0 tw:select-none"
-          aria-hidden="true"
+        <PopoverTrigger
+          as="button"
+          type="button"
+          tabindex="-1"
+          class="tw:flex tw:items-center tw:ps-3 tw:text-datepicker-icon tw:shrink-0 tw:select-none tw:outline-none tw:cursor-pointer tw:focus-visible:opacity-80"
+          :disabled="disabled || undefined"
+          aria-label="Open time picker"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -255,19 +273,22 @@ const fieldClasses = computed(() => [
             <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z" />
             <path d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z" />
           </svg>
-        </span>
+        </PopoverTrigger>
 
-        <span
+        <input
+          type="time"
+          :value="modelValue ?? ''"
+          :step="withSeconds ? 1 : 60"
+          :disabled="disabled || undefined"
+          :readonly="readonly || undefined"
           :class="[
-            'tw:flex-1 tw:min-w-0 tw:ps-2 tw:select-none',
+            'tw:flex-1 tw:min-w-0 tw:ps-2 tw:bg-transparent tw:outline-none tw:text-datepicker-text',
             clearable ? 'tw:pe-2' : 'tw:pe-3',
-            modelValue
-              ? 'tw:text-datepicker-text tw:tabular-nums'
-              : 'tw:text-datepicker-placeholder',
           ]"
-        >
-          {{ modelValue || (withSeconds ? "hh:mm:ss" : "hh:mm") }}
-        </span>
+          @input="handleNativeTimeChange"
+          @focus="emit('focus', $event)"
+          @blur="emit('blur', $event)"
+        />
 
         <button
           v-if="clearable && modelValue"
@@ -287,7 +308,7 @@ const fieldClasses = computed(() => [
             <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
           </svg>
         </button>
-      </PopoverTrigger>
+      </div>
 
       <PopoverContent
         :side-offset="4"
@@ -501,3 +522,10 @@ const fieldClasses = computed(() => [
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Hide the native browser clock picker dropdown */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+</style>

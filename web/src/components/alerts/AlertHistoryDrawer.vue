@@ -141,32 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- History Panel -->
         <OTabPanel
           name="history"
-          class="tw:flex tw:h-full tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
+          layout="flex-col"
+          stretch
         >
           <div
             class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
           >
-            <!-- Loading state -->
-            <div
-              v-if="isLoadingHistory"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-3"
-            >
-              <OSpinner size="sm" />
-              <div
-                class="tw:text-sm"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-500'
-                "
-              >
-                {{ t("alerts.alertDetails.loadingHistory") }}
-              </div>
-            </div>
-
             <!-- Empty state -->
             <div
-              v-else-if="alertHistory.length === 0"
+              v-if="!isLoadingHistory && alertHistory.length === 0"
               class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-2"
             >
               <div
@@ -307,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
                     >
-                      {{ totalRows }} {{ t("alerts.alertDetails.results") }}
+                      {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                     </div>
                   </div>
                 </template>
@@ -319,7 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Condition Panel -->
         <OTabPanel
           name="condition"
-          class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:p-0"
+          layout="flex-col"
+          stretch
         >
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
@@ -504,7 +488,6 @@ import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";

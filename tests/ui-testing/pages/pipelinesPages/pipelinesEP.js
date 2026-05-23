@@ -9,8 +9,8 @@ export class PipelinesEP {
         this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.functionStreamTab = '[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
-        this.createFunctionButton = this.page.getByRole('button', { name: 'New function' });
-        this.functionNameInput = '[data-test="add-function-name-input"]';
+        this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
+        this.functionNameInput = '[data-test="add-function-name-input-input"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
         this.logsSearchFieldCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
@@ -20,8 +20,8 @@ export class PipelinesEP {
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';
         this.pipelineListTitle = '[data-test="pipeline-list-title"]';
         this.importJsonButton = '[data-test="pipeline-import-json-btn"]';
-        this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input"]';
-        this.pipelineImportNameInput = '[data-test="pipeline-import-name-input"]';
+        this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input-input"]';
+        this.pipelineImportNameInput = '[data-test="pipeline-import-name-input-input"]';
         this.pipelineImportErrorDestinationFunctionNameInput = '[data-test="pipeline-import-error-0-1"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineImportErrorDestinationFunctionNameInput2 = '[data-test="pipeline-import-error-0-2"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineMoreOptionsButton = (name) => `[data-test="pipeline-list-${name}-more-options"]`;
@@ -31,12 +31,11 @@ export class PipelinesEP {
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
-        // Stream picker is OSelect (Reka Listbox) post-migration; legacy q-select
-        // uses .q-menu.scroll. Match both so the helper works during the migration.
-        this.quasarMenuScroll = '.q-menu.scroll';
-        this.quasarMenuItem = '.q-menu .q-item';
-        this.quasarVirtualScrollContent = '.q-menu.scroll .q-virtual-scroll__content';
-        this.notifyContainer = '#q-notify';
+        // Stream picker is OSelect (Reka Listbox) post-migration.
+        this.quasarMenuScroll = '[data-test$="-popover"], [role="listbox"]';
+        this.quasarMenuItem = '[data-test$="-option"]';
+        this.quasarVirtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
+        this.notifyContainer = '[data-test="o-toast"]';
         this.monacoViewLines = '.view-lines';
     }
 
@@ -223,9 +222,12 @@ export class PipelinesEP {
             // Wait for options to load
             await this.page.waitForTimeout(500);
 
-            // Try to find e2e_automate stream - it might be in a virtual scroll list
-            // First, try typing to filter (this triggers the q-select's filter)
-            await this.page.keyboard.type('e2e', { delay: 50 });
+            // Try to find e2e_automate stream - use OSelect search input to filter
+            const searchInput = this.page.locator('[data-test="pipeline-import-source-stream-name-input-search"]');
+            const searchVisible = await searchInput.isVisible().catch(() => false);
+            if (searchVisible) {
+                await searchInput.fill('e2e');
+            }
             await this.page.waitForTimeout(1000);
 
             // Look for the stream option in the dropdown
@@ -278,7 +280,7 @@ export class PipelinesEP {
             await this.page.waitForTimeout(500);
 
             // Select the function (use exact match to avoid partial matches like 'first5' matching 'first587')
-            const option = this.page.getByRole('option', { name: functionNames[i], exact: true });
+            const option = this.page.locator('[data-test="pipeline-import-destination-function-name-input-option"]', { hasText: new RegExp(`^${functionNames[i]}$`, 'i') }).first();
             try {
                 await option.scrollIntoViewIfNeeded({ timeout: 3000 });
             } catch (error) {
@@ -352,7 +354,7 @@ export class PipelinesEP {
 
         while (!functionOptionVisible && scrollAttempts < maxScrollAttempts) {
             // Check if option is visible
-            const functionOption = this.page.getByText(functionName, { exact: true });
+            const functionOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${functionName}$`, 'i') }).first();
             functionOptionVisible = await functionOption.isVisible().catch(() => false);
 
             if (!functionOptionVisible) {
@@ -388,7 +390,7 @@ export class PipelinesEP {
 
         while (!destinationOptionVisible && destinationScrollAttempts < maxDestinationScrollAttempts) {
             // Check if option is visible
-            const destinationOption = this.page.getByRole('option', { name: remoteDestination });
+            const destinationOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${remoteDestination}$`, 'i') }).first();
             destinationOptionVisible = await destinationOption.isVisible().catch(() => false);
 
             if (!destinationOptionVisible) {

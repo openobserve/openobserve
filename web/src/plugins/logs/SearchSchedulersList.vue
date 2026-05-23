@@ -31,6 +31,7 @@
               class="tw:ml-3"
               @click="fetchSearchHistory"
               :disabled="isLoading"
+              data-test="search-scheduler-get-jobs-btn"
             >
               {{ t('search_scheduler_job.get_jobs') }}
             </OButton>

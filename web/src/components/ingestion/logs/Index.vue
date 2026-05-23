@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ORouteTab
               name="curl"
+              data-test="ingestion-logs-tab-curl"
               :to="{
                 name: 'curl',
                 query: {
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="filebeat"
+              data-test="ingestion-logs-tab-filebeat"
               :to="{
                 name: 'filebeat',
                 query: {
@@ -53,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="fluentbit"
+              data-test="ingestion-logs-tab-fluentbit"
               :to="{
                 name: 'fluentbit',
                 query: {
@@ -64,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="fluentd"
+              data-test="ingestion-logs-tab-fluentd"
               :to="{
                 name: 'fluentd',
                 query: {

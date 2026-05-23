@@ -62,8 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div data-test="streams-search-stream-input">
+            <div>
               <OInput
+                data-test="streams-search-stream-input"
                 v-model="filterQuery"
                 class="tw:ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
@@ -123,6 +124,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'width: 100%'
             "
           >
+            <!--
+              Render the stream-name cell with a deterministic per-name data-test.
+              Tests can target a specific stream row via
+              `[data-test="log-stream-name-cell-<name>"]` and walk up to the OTable
+              row via `xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`
+              without needing element/text predicates. Mirrors the
+              `dashboard-name-cell-<name>` pattern in Dashboards.vue.
+            -->
+            <template #cell-name="{ row }">
+              <span :data-test="`log-stream-name-cell-${row.name}`">{{ row.name }}</span>
+            </template>
+
             <template #cell-actions="{ row }">
                <div class="tw:flex tw:items-center actions-container">
                 <OButton
@@ -144,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   icon-left="delete"
                   :title="t('logStream.delete')"
+                  data-test="log-stream-delete-btn"
                   variant="ghost-destructive"
                   size="icon-sm"
                   @click="confirmDeleteAction({ row })"
@@ -203,17 +217,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="() => { deleteStream(); confirmDelete = false; }"
     >
-      <p class="tw:text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
-      <div
-        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
-      >
-        <OCheckbox
-          class="checkbox-delete-associated-alerts-pipelines"
-          v-model="deleteAssociatedAlertsPipelines"
-        />
-        <span class="delete-associated-alerts-pipelines-text">
-          Delete all pipelines and alerts associated with the stream
-        </span>
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
+        <p class="tw:text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+        <div
+          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+        >
+          <OCheckbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all Pipelines and Alerts associated with the stream
+          </span>
+        </div>
       </div>
     </ODialog>
 
@@ -227,17 +243,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBatchDelete = false"
       @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
     >
-      <p class="tw:text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
-      <div
-        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
-      >
-        <OCheckbox
-          class="checkbox-delete-associated-alerts-pipelines"
-          v-model="deleteAssociatedAlertsPipelines"
-        />
-        <span class="delete-associated-alerts-pipelines-text">
-          Delete all pipelines and alerts associated with the selected streams
-        </span>
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
+        <p class="tw:text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+        <div
+          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+        >
+          <OCheckbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all Pipelines and Alerts associated with the selected streams
+          </span>
+        </div>
       </div>
     </ODialog>
   </div>

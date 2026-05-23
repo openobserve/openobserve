@@ -24,15 +24,15 @@ test.describe("Users and Organizations", () => {
     test("Error Message displayed if Add user with missing role", async ({ page }, testInfo) => {
         const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('Field is required');
-        
+
         testLogger.info('Test completed successfully');
     });
 
@@ -98,12 +98,12 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
-        await page.locator('[data-test="cancel-user-button"]').click();
+        await pageManager.userPage.cancelUserDrawer();
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.searchUser(uniqueEmail);
         await pageManager.userPage.verifyUserNotExists();
-        
+
         testLogger.info('Test completed successfully');
     });
 
@@ -123,7 +123,7 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await pageManager.userPage.addUserFirstLast('a', 'b');
         await page.waitForLoadState('domcontentloaded');
-        await page.locator('[data-test="cancel-user-button"]').click();
+        await pageManager.userPage.cancelUserDrawer();
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.searchUser(uniqueEmail);
@@ -264,15 +264,16 @@ test.describe("Users and Organizations", () => {
 
     test('Save button disabled if Add Organization with Empty Name', async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
         await pageManager.createOrgPage.fillOrgName('');
-        await pageManager.createOrgPage.checkSaveEnabled();
-        
+        const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
+        expect(isSaveEnabled).toBe(false);
+
         testLogger.info('Test completed successfully');
     });
 
@@ -296,16 +297,16 @@ test.describe("Users and Organizations", () => {
 
     test('Error Message displayed if Add Organization is blank', async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
         await pageManager.createOrgPage.fillOrgName('');
-        await page.locator('.q-field__bottom').click();
-        await pageManager.userPage.verifySuccessMessage('Name is required');
-        
+        await pageManager.createOrgPage.clickSaveOrg();
+        await pageManager.userPage.verifyOrgNameRequiredError('Name is required');
+
         testLogger.info('Test completed successfully');
     });
 });

@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="tab.name"
                   :default="index === 0"
                   :name="tab.name"
+                  :data-test="`ingestion-recommended-tab-${tab.name}`"
                   :to="tab.to"
                   :icon="tab.icon"
                   :label="tab.label"

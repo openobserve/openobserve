@@ -22,6 +22,17 @@ export class PipelinesPage {
         this.streamButton = page.getByRole("button", { name: "Stream" }).first();
         this.queryButton = page.getByRole("button", { name: "Query" });
         this.vueFlowPane = page.locator(".vue-flow__pane");
+        // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
+        // the wrapper opens the OSelect popover with `*-option` items.
+        this.inputNodeStreamTypeSelect = page.locator('[data-test="input-node-stream-type-select"]').first();
+        // OSelect popover for the input-node stream-type select. Per the OSelect
+        // convention (§4) the popover/options pick up `<parentDataTest>-popover`
+        // and `<parentDataTest>-option` data-test attributes.
+        this.inputNodeStreamTypePopover = page.locator('[data-test="input-node-stream-type-select-popover"]');
+        // Per-value `logs` option inside the stream-type OSelect popover.
+        this.inputNodeStreamTypeLogsOption = page.locator(
+          '[data-test="input-node-stream-type-select-option"][data-test-value="logs"]'
+        );
         this.logsDropdown = page.locator("div").filter({ hasText: /^logs$/ });
         this.logsOption = page
           .getByRole("option", { name: "logs" })
@@ -88,9 +99,18 @@ export class PipelinesPage {
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab =
-          '[data-test="function-enrichment-table-tab"] .o-tab__label';
-        this.addEnrichmentTableButton = page.getByRole('button', { name: 'New enrichment table' });
+        this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        // Added data-test "enrichment-tables-add-btn" on the New Enrichment
+        // Table OButton — prefer the data-test locator; fall back to the
+        // legacy getByRole locator for older specs still using the old PO copy.
+        this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
+        // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
+        this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        // Add / Update Enrichment Table form root
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Enrichment table tab locator (data-test prefix; the tab is rendered by
+        // OToggleGroup under the Functions section).
+        this.enrichmentTableTabLocator = page.locator('[data-test="function-enrichment-table-tab"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -119,7 +139,7 @@ export class PipelinesPage {
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
-        this.addEnrichmentTableText = page.getByRole('button', { name: 'New enrichment table' });
+        this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
@@ -139,10 +159,10 @@ export class PipelinesPage {
         this.noteContainer = page.locator('.note-container');
         this.noteHeading = page.locator('.note-heading');
         this.noteInfo = page.locator('.note-info');
-        this.qDialog = page.locator('.q-dialog');
-        this.qDialogBackdrop = page.locator('.q-dialog__backdrop');
-        this.qNotificationMessage = page.locator('.q-notification__message');
-        this.qMenu = page.locator('.q-menu');
+        this.qDialog = page.locator('[data-test*="dialog"]');
+        this.qDialogBackdrop = page.locator('[role="dialog"]');
+        this.qNotificationMessage = page.locator('[role="alert"]');
+        this.qMenu = page.locator('[data-test$="-popover"], [role="menu"]');
 
         // Pipeline node locators
         this.pipelineNodeOutputStreamNode = page.locator('[data-test="pipeline-node-output-stream-node"]');
@@ -243,8 +263,14 @@ export class PipelinesPage {
     }
 
     async selectLogs() {
-        await this.logsDropdown.click();
-        await this.logsOption.click();
+        // Open the input-node stream-type OSelect via its wrapper data-test.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        // Wait for the OSelect popover to appear (data-test forwarded from parent).
+        await this.inputNodeStreamTypePopover.waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `logs` option by its `data-test-value` value-specific attribute.
+        await this.inputNodeStreamTypeLogsOption.waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.click();
     }
 
     /**
@@ -470,8 +496,8 @@ export class PipelinesPage {
         const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
         await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
         await optionLocator.click();
-        // Press Escape to close any open dropdown menus
-        await this.page.keyboard.press('Escape');
+        // Click away to close any open dropdown menus
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(500);
     }
 
@@ -695,9 +721,14 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await this.page.locator(this.pipelineMenu).click();
-        await this.page.click(this.enrichmentTableTab, { force: true });
+        await this.pipelineMenuLink.click();
+        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
+        // visibility races when the tab list animates in.
+        await this.enrichmentTableTabLocator.click({ force: true });
         await this.addEnrichmentTableText.click();
+        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
+        // inside the same parent — wait for it to be visible before returning.
+        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
@@ -719,45 +750,54 @@ export class PipelinesPage {
         await this.page.getByPlaceholder('Search').fill(fileName);
         await this.page.waitForTimeout(3000);
     }
+    // Per-row factory helpers for enrichment table rows (data-test scoped by name)
+    getEnrichmentRowTypeCell(name) {
+        return this.page.locator(`[data-test="${name}-type-cell"]`);
+    }
+    getEnrichmentRowDeleteBtn(name) {
+        return this.page.locator(`[data-test="${name}-delete-btn"]`);
+    }
+
     async deleteEnrichmentTableByName(fileName) {
-        // First ensure we search for the specific file
+        // Wait for the enrichment tables list page to be ready
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
-        await searchBox.waitFor({ state: 'visible' });
-        await searchBox.clear();
-        await searchBox.fill(fileName);
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(1000); // Allow search to filter results
-        
-        const rows = await this.tableRowsLocator;
-        let fileFound = false;
 
-        for (let i = 0; i < (await rows.count()); i++) {
-            const row = rows.nth(i);
-            const functionName = await row
-              .locator("td.text-left")
-              .nth(1)
-              .textContent();
+        // Use the OInput search via its auto-derived `-field` native input
+        await this.enrichmentSearchField.waitFor({ state: 'visible', timeout: 30000 });
+        await this.enrichmentSearchField.clear();
+        await this.enrichmentSearchField.fill(fileName);
 
-            if (functionName?.trim() === fileName) {
-                fileFound = true;
-                testLogger.debug("Uploaded file found", { functionName });
-
-                // Click the 'Delete Function' button
-                await row.locator('[title="Delete Function"]').click();
-
-                // Confirm the deletion
-                await this.confirmButton.click();
-                break;
+        // Poll for the row's type-cell — the list may still be loading from
+        // the backend, especially after a navigation. The OTable filter is
+        // client-side so once the row arrives, the filter shows it immediately.
+        const typeCell = this.getEnrichmentRowTypeCell(fileName);
+        let visible = false;
+        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
+            visible = await typeCell.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!visible) {
+                // Re-issue the search; the list may have just hydrated
+                await this.enrichmentSearchField.clear();
+                await this.enrichmentSearchField.fill(fileName);
             }
         }
-
-        if (!fileFound) {
+        if (!visible) {
             throw new Error(
               `Uploaded file "${fileName}" not found in the enrichment table.`
             );
         }
+        testLogger.debug("Uploaded file found", { functionName: fileName });
 
+        // Click the per-row delete button — `<name>-delete-btn`
+        const deleteBtn = this.getEnrichmentRowDeleteBtn(fileName);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+
+        // Confirm the deletion via the confirm dialog's primary button
+        await this.confirmButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.confirmButton.click();
+
+        // Wait for the row to actually disappear from the list
+        await typeCell.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
     async navigateToEnrichmentTableTab() {
@@ -901,7 +941,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
         
         // Ensure no dialogs are blocking the interaction
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {
             // Ignore if no backdrop exists
         });
         
@@ -1104,7 +1144,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible', timeout: 10000 });
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible', timeout: 10000 });
 
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect nodes
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -1690,7 +1730,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
         await this.page.mouse.down();
@@ -1709,7 +1749,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect input to middle node
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -2010,7 +2050,7 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {});
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {});
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     /**
@@ -2379,7 +2419,7 @@ export class PipelinesPage {
      * Bug #9498 - Preview bounds
      */
     async getPreviewBoundingBox() {
-        const preview = this.page.locator('.q-tooltip, .q-menu, .preview-popup, [class*="preview"], [class*="tooltip"]').first();
+        const preview = this.page.locator('[role="tooltip"], [role="menu"], .preview-popup, [class*="preview"], [class*="tooltip"]').first();
         if (await preview.isVisible().catch(() => false)) {
             return await preview.boundingBox();
         }
@@ -2400,7 +2440,7 @@ export class PipelinesPage {
      * Bug #10029 - Backfill
      */
     async isScheduledDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [data-test*="dialog"]');
+        const dialog = this.page.locator('[data-test*="dialog"]');
         return await dialog.isVisible().catch(() => false);
     }
 
@@ -2419,9 +2459,9 @@ export class PipelinesPage {
             await this.page.waitForTimeout(1000);
 
             // Handle confirmation dialog if it appears
-            const confirmDialog = this.page.locator('.q-dialog, [data-test*="confirm-dialog"]');
+            const confirmDialog = this.page.locator('[data-test*="confirm-dialog"], [data-test*="dialog"]');
             if (await confirmDialog.isVisible().catch(() => false)) {
-                const confirmBtn = this.page.locator('.q-dialog button:has-text("OK"), .q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm")').first();
+                const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]').first();
                 if (await confirmBtn.isVisible().catch(() => false)) {
                     await confirmBtn.click();
                     await this.page.waitForTimeout(1000);
@@ -2462,21 +2502,42 @@ export class PipelinesPage {
     /**
      * Get pipeline row locator by name
      * Used in pipelines.spec.js
+     * Resolves via the row's update-pipeline button (per-row data-test), then
+     * walks up to the nearest table-row container via XPath ancestor with a
+     * `data-test` prefix — keeps the selector data-test-only (§2).
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
     getPipelineRowByName(pipelineName) {
-        return this.page.locator('tr').filter({ hasText: pipelineName });
+        return this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)
+            .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`)
+            .first();
     }
 
     /**
-     * Get pipeline toggle locator for a specific pipeline
+     * Get pipeline toggle (pause/start) locator for a specific pipeline.
+     * The OButton in PipelinesList exposes a unique per-row data-test:
+     * `pipeline-list-{name}-pause-start-alert`.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Toggle locator
      */
     getPipelineToggle(pipelineName) {
-        const pipelineRow = this.getPipelineRowByName(pipelineName);
-        return pipelineRow.locator('[data-test*="toggle"]');
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
+    }
+
+    /**
+     * Fallback alias for the pause/start button — `pipeline-list-{name}-pause-start-alert`
+     * is the only enable/disable control rendered per row in PipelinesList.vue.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Enable/disable button locator
+     */
+    getPipelineEnableDisableButton(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
     }
 
     /**
@@ -2797,7 +2858,7 @@ export class PipelinesPage {
 
     /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
     get statusBadges() {
-        return this.page.locator('.q-badge, .status-badge, [data-test*="status"], .q-chip');
+        return this.page.locator('[data-test*="badge"], [data-test*="chip"], .status-badge, [data-test*="status"]');
     }
 
     /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
@@ -2946,7 +3007,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of jobs with status
      */
     async getJobStatusCount(status) {
-        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), .q-badge:has-text("${status}"), .status-badge:has-text("${status}")`).all();
+        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), [data-test*="badge"]:has-text("${status}"), .status-badge:has-text("${status}")`).all();
         return statusElements.length;
     }
 
@@ -2976,7 +3037,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [data-test*="error-dialog"]').first();
+        const dialog = this.page.locator('[data-test*="error-dialog"], [data-test*="dialog"]').first();
         return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2984,7 +3045,7 @@ export class PipelinesPage {
      * Close error dialog
      */
     async closeErrorDialog() {
-        const closeBtn = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog button:has-text("OK"), .q-dialog [data-test*="close"]').first();
+        const closeBtn = this.page.locator('[data-test="o-dialog-primary-btn"], [data-test*="close"]').first();
         if (await closeBtn.isVisible().catch(() => false)) {
             await closeBtn.click();
             await this.page.waitForTimeout(300);
@@ -3099,7 +3160,7 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.locator('.q-item, .q-menu .q-item').first();
+        const option = this.page.getByRole('option').first();
         if (await option.isVisible().catch(() => false)) {
             await option.click();
             await this.page.waitForTimeout(300);
@@ -3124,9 +3185,9 @@ export class PipelinesPage {
      * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
      */
     async getStatusCounts() {
-        const successCount = await this.page.locator('.q-badge:has-text("Success"), .q-badge:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
-        const errorCount = await this.page.locator('.q-badge:has-text("Error"), .q-badge:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
-        const warningCount = await this.page.locator('.q-badge:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        const successCount = await this.page.locator('[data-test*="badge"]:has-text("Success"), [data-test*="badge"]:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
+        const errorCount = await this.page.locator('[data-test*="badge"]:has-text("Error"), [data-test*="badge"]:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
+        const warningCount = await this.page.locator('[data-test*="badge"]:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
         return {
             success: successCount,
             error: errorCount,
@@ -3202,7 +3263,7 @@ export class PipelinesPage {
     async dismissOpenDialogs() {
         try {
             if (await this.qDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             }
         } catch (e) {
@@ -3274,8 +3335,8 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         const urlAfter = this.page.url();
         // Check for any error toasts/alerts on the page
-        // TODO(data-test): q-notification toasts and q-banner have no data-test; expose data-test on notify-plugin/notify component to drop these fallbacks.
-        const errorToast = await this.page.locator('.q-notification, .q-banner').allTextContents().catch(() => []);
+        // TODO(data-test): notification toasts and banners; using role="alert" which covers both Reka and legacy patterns.
+        const errorToast = await this.page.locator('[role="alert"]').allTextContents().catch(() => []);
         testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
         return pipelineName;
     }

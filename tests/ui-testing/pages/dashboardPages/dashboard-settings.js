@@ -35,7 +35,7 @@ export default class DashboardSetting {
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
-    this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
+    this.tabName = page.locator('[data-test="dashboard-add-tab-name-field"]');
     this.saveTab = page.locator(
       '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-primary-btn"]'
     );
@@ -300,9 +300,9 @@ export default class DashboardSetting {
     const typeOption = this.page.getByRole("option", { name: type });
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
-    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').click();
     await this.page
-      .locator('[data-test="dashboard-variable-name"]')
+      .locator('[data-test="dashboard-variable-name-field"]')
       .fill(variableName);
     await this.page
       .locator('[data-test="dashboard-variable-stream-type-select"]')

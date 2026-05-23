@@ -95,9 +95,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
 
-    const variableInput = page.getByLabel("variablename", {
-      exact: true,
-    });
+    const variableInput = page.locator('[data-test="variable-selector-variablename-inner"]');
     await variableInput.waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for the _values API call when clicking on the variable input
@@ -301,7 +299,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     //wait for variable to be visible.
-    const namespaceVariable = page.getByLabel("variablename", { exact: true });
+    const namespaceVariable = page.locator('[data-test="variable-selector-variablename-inner"]');
     await namespaceVariable.waitFor({ state: 'visible', timeout: 10000 });
     await expect(namespaceVariable).toBeVisible();
 

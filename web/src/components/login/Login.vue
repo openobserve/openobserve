@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a
             class="tw:cursor-pointer login-internal-link tw:py-3"
             style="text-decoration: underline"
+            data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
             >Login as internal user</a
           >
@@ -146,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               data-cy="login-sign-in"
+              data-test="login-sign-in"
               variant="primary"
               size="sm-action"
               block

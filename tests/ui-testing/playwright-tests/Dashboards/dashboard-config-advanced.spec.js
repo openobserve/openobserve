@@ -66,7 +66,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toBeDisabled();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();

@@ -117,14 +117,14 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
 
     // Check for either success or "already exists" type messages
     const importSuccess = await pm.sdrPatternsPage.verifyImportSuccess();
-    const alreadyExistsMsg = await page.getByText(/already exists|Pattern with given id\/name/i).isVisible({ timeout: 2000 }).catch(() => false);
+    const alreadyExistsMsg = await page.locator('[data-test="o-toast"]').filter({ hasText: /already exists|Pattern with given id\/name/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
 
     if (importSuccess) {
       testLogger.info('✓ Patterns imported successfully');
     } else if (alreadyExistsMsg) {
       testLogger.info('⚠ Patterns already exist (expected if test was run before)');
       // Close any error dialog
-      const okButton = page.getByRole('button', { name: 'OK' });
+      const okButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
       if (await okButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         await okButton.click();
       }

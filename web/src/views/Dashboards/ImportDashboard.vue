@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             v-close-popup
+            data-test="dashboard-import-cancel-btn"
             @click="goBack()"
             >{{ t("function.cancel") }}</OButton
           >
@@ -86,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:pr-2"
                     >
                       <OInput
+                        data-test="dashboard-import-url-control"
                         v-model="url"
                         :placeholder="t('dashboard.addURL')"
                       />
@@ -125,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:pr-2"
                     >
                       <OFile
+                        data-test="dashboard-import-file-control"
                         v-model="jsonFiles"
                         :placeholder="t('dashboard.dropFileMsg')"
                         accept=".json"
@@ -142,11 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="tw:py-2">
+                    <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
                           class="text-red"
+                          data-test="dashboard-import-file-rejected"
                         >
                           <code
                             style="background-color: #f2f1f1; padding: 3px"
@@ -197,10 +201,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
                       class="text-red"
+                      data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div
+                        style="width: 300px"
+                        data-test="dashboard-import-error-title-input"
+                      >
                         <OInput
+                          data-test="dashboard-import-error-title-control"
                           v-model="dashboardTitles[errorIndex]"
                           label="Dashboard Title"
                           @update:model-value="
@@ -238,11 +247,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
                       class="text-red"
+                      data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
                     </span>
 
-                    <span v-else>{{
+                    <span
+                      v-else
+                      data-test="dashboard-import-error-message"
+                    >{{
                       errorMessage.message || errorMessage
                     }}</span>
                   </div>

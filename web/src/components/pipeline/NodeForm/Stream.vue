@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AddStream
             ref="addStreamRef"
             @added:stream-added="getLogStream"
-            @close="openCancelDialog"
+            @close="createNewStream = false"
             :is-in-pipeline="true"
           />
         </div>
@@ -350,10 +350,9 @@ const getLogStream = async (data: any) => {
 
   stream_name.value = data.name;
   stream_type.value = data.stream_type;
-  if (createNewStream.value) {
-    createNewStream.value = false;
-    return;
-  }
+  createNewStream.value = false;
+  // Auto-associate the newly created stream and close the node form
+  saveStream();
 };
 
 const dialog = ref({

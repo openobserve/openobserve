@@ -68,9 +68,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for the dashboard view page to load
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Get the current URL before clicking share button
     const currentURL = page.url();
@@ -86,14 +84,10 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardShareExport.shareDashboard();
 
     // Verify the success message appears
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL from clipboard
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied URL:", { copiedUrl });
 
     // The copied URL should be a short URL
@@ -103,15 +97,12 @@ test.describe("dashboard share URL button testcases", () => {
     await page.goto(copiedUrl);
 
     // Wait for dashboard to load after redirect
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Verify the dashboard name is visible
-    await expect(page.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName
+    );
 
     // Get the redirected URL and verify it contains all expected parameters
     const redirectedUrl = page.url();
@@ -142,9 +133,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Add a panel to the dashboard
     await pm.dashboardCreate.addPanel();
@@ -177,34 +166,26 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardShareExport.shareDashboard();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied URL with time:", { copiedUrl });
 
     // The copied URL should be a short URL
     expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page/context to simulate new tab
-    const context = page.context();
-    const newPage = await context.newPage();
-    await newPage.goto(copiedUrl);
+    const newPage = await pm.dashboardShareExport.openInNewPage(copiedUrl);
 
     // Wait for dashboard to load in new page
-    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded(newPage);
 
     // Verify the dashboard name is visible
-    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName,
+      newPage
+    );
 
     // Share URL converts relative time to absolute from/to timestamps
     const newPageUrl = newPage.url();
@@ -231,9 +212,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Add a panel
     await pm.dashboardCreate.addPanel();
@@ -246,8 +225,7 @@ test.describe("dashboard share URL button testcases", () => {
     );
 
     // Set absolute time range
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-absolute-tab"]').click();
+    await pm.dashboardShareExport.openAbsoluteDateTime();
 
     // Wait for absolute time inputs to be visible
     await page.waitForTimeout(1000);
@@ -270,34 +248,26 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardShareExport.shareDashboard();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied URL with absolute time:", { copiedUrl });
 
     // The copied URL should be a short URL
     expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
-    const context = page.context();
-    const newPage = await context.newPage();
-    await newPage.goto(copiedUrl);
+    const newPage = await pm.dashboardShareExport.openInNewPage(copiedUrl);
 
     // Wait for dashboard to load
-    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded(newPage);
 
     // Verify the dashboard name is visible
-    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName,
+      newPage
+    );
 
     // Verify the redirected URL contains 'from' and 'to' parameters
     const newPageUrl = newPage.url();
@@ -324,11 +294,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardShareExport.waitForEmptyDashboardView();
 
     // Generate unique variable name
     const variableName = pm.dashboardSetting.variableName();
@@ -354,7 +320,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable selector to appear on dashboard
@@ -400,43 +366,32 @@ test.describe("dashboard share URL button testcases", () => {
     expect(currentURL).toContain(`var-${variableName}`);
 
     // Click the share button
-    await page.locator('[data-test="dashboard-share-btn"]').waitFor({
-      state: "visible",
-    });
-    await page.locator('[data-test="dashboard-share-btn"]').click();
+    await pm.dashboardShareExport.clickShareButton();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied URL with variable:", { copiedUrl });
 
     // The copied URL should be a short URL
     expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page to simulate new tab
-    const context = page.context();
-    const newPage = await context.newPage();
-    await newPage.goto(copiedUrl);
+    const newPage = await pm.dashboardShareExport.openInNewPage(copiedUrl);
 
     // Wait for dashboard to load in new page
-    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded(newPage);
 
     // Wait for network to settle so variables fully render
     await newPage.waitForLoadState("networkidle");
 
     // Verify the dashboard name is visible
-    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName,
+      newPage
+    );
 
     // Verify the redirected URL contains the variable parameter
     const newPageUrl = newPage.url();
@@ -481,16 +436,10 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Open settings to add a new tab
-    await page.locator('[data-test="dashboard-setting-btn"]').click();
-    await page.waitForTimeout(1000);
-
-    // Click on Tabs section
-    await page.locator('[data-test="dashboard-settings-tab-tab"]').click();
+    await pm.dashboardShareExport.openSettingsTabSection();
     await page.waitForTimeout(500);
 
     // Add a new tab
@@ -504,11 +453,7 @@ test.describe("dashboard share URL button testcases", () => {
     await page.waitForTimeout(1000);
 
     // Click on the newly created tab
-    const tabButton = page
-      .locator("[role='tablist'] [role='tab']")
-      .filter({ hasText: newTabName });
-    await tabButton.waitFor({ state: "visible", timeout: 15000 });
-    await tabButton.click();
+    await pm.dashboardShareExport.clickTabByName(newTabName);
     await page.waitForTimeout(1000);
 
     // Get current URL to verify tab parameter
@@ -521,35 +466,23 @@ test.describe("dashboard share URL button testcases", () => {
     expect(tabParam).toBeTruthy();
 
     // Click the share button
-    await page.locator('[data-test="dashboard-share-btn"]').waitFor({
-      state: "visible",
-    });
-    await page.locator('[data-test="dashboard-share-btn"]').click();
+    await pm.dashboardShareExport.clickShareButton();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied URL with tab:", { copiedUrl });
 
     // The copied URL should be a short URL
     expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
-    const context = page.context();
-    const newPage = await context.newPage();
-    await newPage.goto(copiedUrl);
+    const newPage = await pm.dashboardShareExport.openInNewPage(copiedUrl);
 
     // Wait for dashboard to load
-    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded(newPage);
 
     // Verify the same tab is active in the new page
     const newPageURL = newPage.url();
@@ -574,11 +507,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardShareExport.waitForEmptyDashboardView();
 
     // Add a panel first (while dashboard is empty, before variable interactions)
     await pm.dashboardCreate.addPanel();
@@ -623,7 +552,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable selector to appear on dashboard
@@ -669,37 +598,29 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardShareExport.shareDashboard();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Read the copied URL
-    const copiedUrl = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const copiedUrl = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Copied complete URL:", { copiedUrl });
 
     // The copied URL should be a short URL
     expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
-    const context = page.context();
-    const newPage = await context.newPage();
-    await newPage.goto(copiedUrl);
+    const newPage = await pm.dashboardShareExport.openInNewPage(copiedUrl);
 
     // Wait for dashboard to load completely
-    await newPage.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded(newPage);
 
     // Wait for network to settle so variables and panels fully render
     await newPage.waitForLoadState("networkidle");
 
     // Verify dashboard name
-    await expect(newPage.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName,
+      newPage
+    );
 
     // Verify the URL in new page contains all parameters
     const newPageURL = newPage.url();
@@ -736,9 +657,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard view
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Add a panel with time range
     await pm.dashboardCreate.addPanel();
@@ -768,14 +687,10 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardShareExport.shareDashboard();
 
     // Verify success message
-    await expect(page.getByText("Link copied successfully")).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Get the copied short URL
-    const shortURL = await page.evaluate(() =>
-      navigator.clipboard.readText()
-    );
+    const shortURL = await pm.dashboardShareExport.getCopiedUrl();
     testLogger.info("Short URL copied:", { shortURL });
 
     // Verify it's a short URL
@@ -785,15 +700,12 @@ test.describe("dashboard share URL button testcases", () => {
     await page.goto(shortURL);
 
     // Wait for redirect and dashboard to load
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-      timeout: 15000,
-    });
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Verify dashboard name is visible
-    await expect(page.getByText(randomDashboardName)).toBeVisible({
-      timeout: 10000,
-    });
+    await pm.dashboardShareExport.verifyDashboardNameVisible(
+      randomDashboardName
+    );
 
     // Verify the final URL after redirect contains the dashboard parameters
     const redirectedURL = page.url();

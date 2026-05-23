@@ -325,7 +325,7 @@ test.describe("Deduplication Regression Tests", {
         // Remove all fingerprint field chips from the fingerprint select
         let removedCount = 0;
         while (true) {
-            const chipRemoveBtn = fingerprintSelect.locator('.q-chip__icon--remove').first();
+            const chipRemoveBtn = fingerprintSelect.locator('[data-test*="chip"] [data-test*="remove"], [data-test*="badge"] [data-test*="remove"], .o-chip__icon--remove, [aria-label="Remove"]').first();
             if (await chipRemoveBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                 await chipRemoveBtn.click();
                 await page.waitForTimeout(300);

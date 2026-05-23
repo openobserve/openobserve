@@ -167,7 +167,7 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
     // No options appeared. For variables this may happen if it's the only one;
     // for real fields this shouldn't happen (stream is real so schema loads).
     // Accept typed value by pressing Escape to close empty dropdown.
-    await page.keyboard.press("Escape");
+    await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
     await page.waitForTimeout(300);
     return;
   }
@@ -293,7 +293,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
   }
 
   // Close dropdown
-  await page.keyboard.press("Escape");
+  await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
   await page.waitForTimeout(300);
 
   return { found, hasVariableLabel };
@@ -314,7 +314,7 @@ export async function verifyFieldDropdownEmptyOrVariablesOnly(page) {
   const optionCount = await page.locator('[data-test$="-option"]').count();
 
   if (optionCount === 0) {
-    await page.keyboard.press("Escape");
+    await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
     await page.waitForTimeout(300);
     return true;
   }
@@ -327,7 +327,7 @@ export async function verifyFieldDropdownEmptyOrVariablesOnly(page) {
     );
   });
 
-  await page.keyboard.press("Escape");
+  await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
   await page.waitForTimeout(300);
 
   return optionCount === 0 || allVariables;
@@ -354,7 +354,7 @@ export async function getDropdownOptions(page, dropdownSelector) {
     return Array.from(opts).map((o) => o.textContent.trim());
   });
 
-  await page.keyboard.press("Escape");
+  await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
   await page.waitForTimeout(300);
 
   return options;
@@ -369,9 +369,9 @@ export async function getDropdownOptions(page, dropdownSelector) {
  */
 export async function hasErrorNotification(page, waitMs = 3000) {
   try {
-    // Quasar notifications use .q-notification with type danger/negative
+    // ONotification (Reka UI) uses role="alert" with bg-negative/bg-red classes
     const errorNotif = page.locator(
-      '.q-notification--standard.bg-negative, .q-notification--standard.bg-red, .q-notification.text-negative'
+      '[role="alert"][class*="bg-negative"], [role="alert"][class*="bg-red"], [data-test*="notification"][class*="negative"]'
     );
     await errorNotif.waitFor({ state: "visible", timeout: waitMs });
     return true;

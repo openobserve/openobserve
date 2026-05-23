@@ -17,19 +17,21 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
     // Wait for results to load by checking the results summary text shows non-zero records
-    await expect(page.getByText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/)).toBeVisible({ timeout: 10000 });
+    await pageManager.logsPage.expectPaginationRowCountVisible();
   }
 
   // Helper function to set up SQL mode with LIMIT 2000
   async function setupSQLMode(page) {
     await pageManager.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
     await pageManager.logsPage.clickQueryEditor();
     await pageManager.logsPage.clearQueryEditor();
     await pageManager.logsPage.fillQueryEditor('SELECT * FROM "e2e_automate" LIMIT 2000');
-    await page.waitForTimeout(1000);
+    await pageManager.logsPage.waitForQueryEditorValue('LIMIT 2000');
     await pageManager.logsPage.clickRefreshButton();
-    await page.waitForTimeout(2000);
+    // Wait deterministically for the SQL results to fully load — the download click
+    // reads `searchObj.data.queryResults.hits` directly, so we must wait until the
+    // pagination title reports >= 2000 records before triggering the download.
+    await pageManager.logsPage.expectPaginationTotalAtLeast(2000);
   }
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -61,7 +63,7 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
     // Wait for results to load by checking the results summary text shows non-zero records
-    await expect(page.getByText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/)).toBeVisible({ timeout: 10000 });
+    await pageManager.logsPage.expectPaginationRowCountVisible();
 
     // Setup download directory using page function
     downloadDir = await pageManager.logsPage.setupDownloadDirectory();
@@ -108,16 +110,7 @@ test.describe("Logs Downloads testcases", () => {
       await pageManager.logsPage.clickMoreOptionsButton();
       await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
-
-      const csvButton = page.getByText('CSV', { exact: true });
-      try {
-        await csvButton.waitFor({ state: 'visible', timeout: 3000 });
-        await csvButton.click();
-      } catch (error) {
-        await pageManager.logsPage.clickMoreOptionsButton();
-        await pageManager.logsPage.hoverDownloadResults();
-        await csvButton.click();
-      }
+      await pageManager.logsPage.clickDownloadCsv();
 
       const csvDownload = await csvDownloadPromise;
       expect(csvDownload).toBeDefined();
@@ -129,21 +122,11 @@ test.describe("Logs Downloads testcases", () => {
       await page.reload();
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await setupLogsPage(page);
-      await page.waitForTimeout(2000);
 
       await pageManager.logsPage.clickMoreOptionsButton();
       await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
-
-      const jsonButton = page.getByText('JSON', { exact: true });
-      try {
-        await jsonButton.waitFor({ state: 'visible', timeout: 3000 });
-        await jsonButton.click();
-      } catch (error) {
-        await pageManager.logsPage.clickMoreOptionsButton();
-        await pageManager.logsPage.hoverDownloadResults();
-        await jsonButton.click();
-      }
+      await pageManager.logsPage.clickDownloadJson();
 
       const jsonDownload = await jsonDownloadPromise;
       expect(jsonDownload).toBeDefined();
@@ -159,7 +142,6 @@ test.describe("Logs Downloads testcases", () => {
         await page.reload();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await setupLogsPage(page);
-        await page.waitForTimeout(2000);
 
         await pageManager.logsPage.clickMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
@@ -180,7 +162,6 @@ test.describe("Logs Downloads testcases", () => {
         await page.reload();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await setupLogsPage(page);
-        await page.waitForTimeout(2000);
 
         await pageManager.logsPage.clickMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
@@ -188,7 +169,7 @@ test.describe("Logs Downloads testcases", () => {
         await pageManager.logsPage.clickCustomDownloadRangeSelect();
         await pageManager.logsPage.selectCustomDownloadRange(range);
 
-        await page.locator('[data-test="custom-download-file-type-json-btn"]').click();
+        await pageManager.logsPage.clickCustomDownloadFileTypeJson();
 
         const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
         await pageManager.logsPage.clickConfirmDialogOkButton();
@@ -210,7 +191,7 @@ test.describe("Logs Downloads testcases", () => {
       await pageManager.logsPage.clickMoreOptionsButton();
       await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
-      await page.getByText('CSV', { exact: true }).click();
+      await pageManager.logsPage.clickDownloadCsv();
       const csvDownload = await csvDownloadPromise;
 
       expect(csvDownload).toBeDefined();
@@ -227,7 +208,7 @@ test.describe("Logs Downloads testcases", () => {
       await pageManager.logsPage.clickMoreOptionsButton();
       await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
-      await page.getByText('JSON', { exact: true }).click();
+      await pageManager.logsPage.clickDownloadJson();
       const jsonDownload = await jsonDownloadPromise;
 
       expect(jsonDownload).toBeDefined();

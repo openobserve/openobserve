@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 class="tw:ml-2"
                 @click="addCipherKey"
+                data-test="cipher-keys-add-btn"
               >
                 {{ t(`cipherKey.add`) }}
               </OButton>
