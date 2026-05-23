@@ -8,6 +8,10 @@ import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-s
 export default class DashboardVariables {
   constructor(page) {
     this.page = page;
+    this.settingsDrawer = page.locator('[data-test="dashboard-settings-drawer"]');
+    this.settingsDrawerCloseBtn = page.locator('[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]');
+    // Per-name factory: returns the edit button for a specific variable name
+    this.editVariableBtn = (name) => page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
   }
 
   // Method to add a dashboard variable
@@ -115,15 +119,14 @@ export default class DashboardVariables {
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click();
 
-    // Wait for the save action to complete and settings drawer to re-appear
-    await this.page.locator('[data-test="dashboard-settings-drawer"]').waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for save to complete — variable row appears in the list once save + handleSaveVariable finished
+    // This ensures: API call done → emit("save") → loadDashboard triggered → isAddVariable = false
+    await this.editVariableBtn(name).waitFor({ state: 'visible', timeout: 15000 });
 
-    // Use JavaScript evaluation to click the close button to avoid DOM instability issues
-    await this.page.evaluate(() => {
-      const drawer = document.querySelector('[data-test="dashboard-settings-drawer"]');
-      const closeBtn = drawer?.querySelector('[data-test="o-drawer-close-btn"]');
-      if (closeBtn) closeBtn.click();
-    });
+    // Click the close button and wait for the drawer to fully close
+    await this.settingsDrawerCloseBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await this.settingsDrawerCloseBtn.click();
+    await this.settingsDrawer.waitFor({ state: 'hidden', timeout: 10000 });
     // }
   }
 
