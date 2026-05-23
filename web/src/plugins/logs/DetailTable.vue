@@ -585,6 +585,7 @@ export default defineComponent({
         header: t("search.sourceName"),
         accessorKey: "field",
         sortable: false,
+        size: 220,
         meta: { align: "left" as const },
       },
       {
