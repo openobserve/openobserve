@@ -133,6 +133,11 @@ function onSelect(optionValue: string) {
   const option = props.items?.find((o) => o.value === optionValue);
   if (!option) return;
   const replaced = props.valueReplaceFn(option);
+  // Cancel any pending debounce so the typed value doesn't overwrite the selection
+  if (_debounceTimer !== null) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
   internalValue.value = replaced;
   emit("update:modelValue", replaced);
   emit("select", replaced);
@@ -253,6 +258,8 @@ const hasInsideLabel = computed(
               v-for="option in filteredOptions"
               :key="option.value"
               :value="option.value"
+              :data-test-value="option.value"
+              :data-test-label="option.label"
               :class="[
                 'tw:relative tw:flex tw:items-start tw:gap-2 tw:w-full',
                 'tw:ps-3 tw:pe-8 tw:py-1.5 tw:text-sm',

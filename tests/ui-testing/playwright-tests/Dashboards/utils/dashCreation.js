@@ -80,17 +80,15 @@ export async function deleteDashboard(page, dashboardName) {
     page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
   ]);
 
-  // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
-  // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
-  const dashboardRow = page
-  .locator('//tr[.//div[@title="' + dashboardName + '"]]')
-  .nth(0);
-
-  const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
+  const deleteButton = page
+    .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
+    .first()
+    .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
+    .locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
 
-  // Wait for the confirmation text to ensure dialog is fully rendered
-  await page.getByText('Are you sure you want to delete the dashboard?').waitFor({
+  // Wait for the confirmation dialog to ensure it is fully rendered
+  await page.locator('[data-test="dashboard-confirm-dialog"]').waitFor({
     state: 'visible',
     timeout: 10000
   });
@@ -119,8 +117,8 @@ export async function deleteDashboard(page, dashboardName) {
 
   testLogger.debug('Confirm button found and is stable');
 
-  // Additional small wait for any final animations
-  await page.waitForTimeout(500);
+  // Wait for confirm button to be stable before clicking
+  await page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]').waitFor({ state: 'visible', timeout: 5000 });
 
   // Set up API listener BEFORE clicking
   const deleteResponsePromise = page.waitForResponse(
@@ -174,8 +172,8 @@ export async function deleteDashboard(page, dashboardName) {
     testLogger.info('Dashboard deleted successfully');
   }
 
-  // Verify the success message appears
-  await page.getByText("Dashboard deleted successfully").waitFor({
+  // Verify the success toast appears
+  await page.locator('[data-test="o-toast-success"]').waitFor({
     state: 'visible',
     timeout: 10000
   }).catch(() => {
@@ -212,13 +210,8 @@ export async function reopenDashboardFromList(page, dashboardName) {
     page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
   ]);
 
-  // Find the dashboard row using XPath (same pattern as deleteDashboard)
-  const dashboardRow = page
-    .locator('//tr[.//div[@title="' + dashboardName + '"]]')
-    .nth(0);
-
-  // Click on the dashboard name to open it (using CSS attribute selector)
-  const dashboardNameDiv = dashboardRow.locator('div[title="' + dashboardName + '"]');
+  const dashboardNameDiv = page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`).first();
+  await dashboardNameDiv.waitFor({ state: 'visible', timeout: 10000 });
   await dashboardNameDiv.click();
 
   testLogger.debug('Clicked on dashboard name');

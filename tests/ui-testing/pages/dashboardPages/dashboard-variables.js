@@ -8,6 +8,10 @@ import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-s
 export default class DashboardVariables {
   constructor(page) {
     this.page = page;
+    this.settingsDrawer = page.locator('[data-test="dashboard-settings-drawer"]');
+    this.settingsDrawerCloseBtn = page.locator('[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]');
+    // Per-name factory: returns the edit button for a specific variable name
+    this.editVariableBtn = (name) => page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
   }
 
   // Method to add a dashboard variable
@@ -26,26 +30,23 @@ export default class DashboardVariables {
     await variableTab.waitFor({ state: "attached", timeout: 10000 });
     await variableTab.waitFor({ state: "visible", timeout: 10000 });
 
-    // Additional wait for panel animation and stability
-    await this.page.waitForTimeout(500);
-
     // Click the Variable Tab
     await variableTab.click();
 
     // Add Variable
     await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({timeout:5000});
-    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
 
     // Select Stream Type
     await this.page
       .locator('[data-test="dashboard-variable-stream-type-select"]')
       .click();
 
+    await this.page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     await this.page
-      .getByRole("option", { name: streamtype, exact: true })
-      .locator("div")
-      .nth(2)
+      .locator(`[data-test="dashboard-variable-stream-type-select-option"][data-test-value="${streamtype}"]`)
       .click();
+    await this.page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 
     // Select Stream and Field using shared utilities
     await selectStreamFromDropdown(this.page, streamName);
@@ -62,33 +63,29 @@ export default class DashboardVariables {
       const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
       await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
       await filterNameSelector.click();
-      await filterNameSelector.fill(filterConfig.filterName);
-      
+      const filterNameSearch = this.page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]');
+      await filterNameSearch.waitFor({ state: "visible", timeout: 5000 });
+      await filterNameSearch.fill(filterConfig.filterName);
+
       // Wait for and select the filter name option
-      const filterNameOption = this.page.getByRole("option", { name: filterConfig.filterName });
+      const filterNameOption = this.page.locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${filterConfig.filterName}"]`);
       await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
       await filterNameOption.click();
-      
+
       // Wait for and interact with Operator selector
       const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
       await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
       await operatorSelector.click();
-      
+
       // Wait for and select the operator option
-      const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+      const operatorOption = this.page.locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${filterConfig.operator}"]`);
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
-      
-      // Wait for and interact with value input
-      const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
-      await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-      await autoComplete.click();
-      await autoComplete.fill(filterConfig.value);
-      
-      // await this.page
-      //   .locator('[data-test="common-auto-complete-option"]')
-      //   .getByText(filterConfig.value, { exact: true })
-      //   .click();
+
+      // Wait for and interact with value input (OCombobox)
+      const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+      await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
+      await filterValueInput.fill(filterConfig.value);
     }
 
     // Toggle show multiple values based on parameter
@@ -112,10 +109,7 @@ export default class DashboardVariables {
         .locator('[data-test="dashboard-add-custom-value-btn"]')
         .click();
       await this.page
-        .locator('[data-test="dashboard-variable-custom-value-0"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-variable-custom-value-0"]')
+        .locator('[data-test="dashboard-variable-custom-value-0-field"]')
         .fill("test");
     }
 
@@ -125,16 +119,14 @@ export default class DashboardVariables {
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click();
 
-    // Wait for the save action to complete and DOM to stabilize
-    await this.page.waitForTimeout(3000);
-    // await this.page.waitForLoadState("networkidle");
+    // Wait for save to complete — variable row appears in the list once save + handleSaveVariable finished
+    // This ensures: API call done → emit("save") → loadDashboard triggered → isAddVariable = false
+    await this.editVariableBtn(name).waitFor({ state: 'visible', timeout: 15000 });
 
-    // Use JavaScript evaluation to click the close button to avoid DOM instability issues
-    await this.page.evaluate(() => {
-      const drawer = document.querySelector('[data-test="dashboard-settings-drawer"]');
-      const closeBtn = drawer?.querySelector('[data-test="o-drawer-close-btn"]');
-      if (closeBtn) closeBtn.click();
-    });
+    // Click the close button and wait for the drawer to fully close
+    await this.settingsDrawerCloseBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await this.settingsDrawerCloseBtn.click();
+    await this.settingsDrawer.waitFor({ state: 'hidden', timeout: 10000 });
     // }
   }
 
@@ -142,28 +134,21 @@ export default class DashboardVariables {
   // Usage: this function is used for select the variable value from dropdown
   // Dynamically fill input and select the same value from dropdown
   async selectValueFromVariableDropDown(label, value) {
-    const input = this.page.locator(`[data-test="variable-selector-${label}"]`);
-    await input.waitFor({ state: "visible", timeout: 10000 });
+    const trigger = this.page.locator(`[data-test="variable-selector-${label}-inner-trigger"]`);
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for _values_stream API call when clicking on the dropdown
-    // Start listening before the action to ensure we capture the stream
     const valuesStreamPromise = waitForValuesStreamComplete(this.page);
-
-    await input.click();
-
-    // Wait for the values stream to complete (waits for 'data: [[DONE]]' marker)
+    await trigger.click();
     await valuesStreamPromise;
 
-    // Wait for _values_stream API call when filling/searching
-    // Start listening before filling to capture the search stream
-    // const searchStreamPromise = waitForValuesStreamComplete(this.page);
+    const searchInput = this.page.locator(`[data-test="variable-selector-${label}-inner-search"]`);
+    const hasSearch = await searchInput.count() > 0;
+    if (hasSearch) {
+      await searchInput.waitFor({ state: "visible", timeout: 5000 });
+      await searchInput.fill(value);
+    }
 
-    await input.fill(value);
-
-    // // Wait for search stream to complete (waits for 'data: [[DONE]]' marker)
-    // await searchStreamPromise;
-
-    const option = this.page.getByRole("option", { name: value });
+    const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
   }
@@ -240,14 +225,13 @@ export default class DashboardVariables {
     await typeSelect.waitFor({ state: "visible", timeout: 10000 });
     await typeSelect.click();
 
-    const typeOption = this.page.getByRole("option", { name: "Query Values" });
+    const typeOption = this.page.locator('[data-test="dashboard-variable-type-select-option"][data-test-value="query_values"]');
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
 
-    // Fill variable name — data-test is on OInput wrapper div; fill targets the inner input
-    const nameInput = this.page.locator('[data-test="dashboard-variable-name"] input');
+    // Fill variable name — target the OInput inner field directly via -field suffix
+    const nameInput = this.page.locator('[data-test="dashboard-variable-name-field"]');
     await nameInput.waitFor({ state: "visible", timeout: 10000 });
-    await nameInput.click();
     await nameInput.fill(variableName);
 
     // Select stream type — each OSelect forwards parent data-test to popover (`*-popover`) and options (`*-option`).
@@ -255,9 +239,6 @@ export default class DashboardVariables {
 
     // Wait for options to be available
     await this.page.waitForSelector('[data-test="dashboard-variable-stream-type-select-popover"]', { state: 'visible', timeout: 15000 });
-
-    // Longer delay to ensure options are fully rendered (especially when tests run in parallel)
-    await this.page.waitForTimeout(500);
 
     // Use JavaScript evaluation to click the option to avoid DOM detachment issues
     const clicked = await this.page.evaluate((streamTypeName) => {
@@ -285,7 +266,7 @@ export default class DashboardVariables {
     await this.page.keyboard.type(stream, { delay: 50 });
 
     const streamOption = this.page
-      .locator('[data-test="dashboard-variable-stream-select-option"]', { hasText: stream })
+      .locator(`[data-test="dashboard-variable-stream-select-option"][data-test-value="${stream}"]`)
       .first();
     await streamOption.waitFor({ state: "visible", timeout: 5000 });
     await streamOption.click();
@@ -304,7 +285,7 @@ export default class DashboardVariables {
     );
 
     const fieldOption = this.page
-      .locator('[data-test="dashboard-variable-field-select-option"]', { hasText: field })
+      .locator(`[data-test="dashboard-variable-field-select-option"][data-test-value="${field}"]`)
       .first();
     await fieldOption.waitFor({ state: "visible", timeout: 5000 });
     await fieldOption.click();
@@ -331,8 +312,6 @@ export default class DashboardVariables {
     await this.page.waitForLoadState('domcontentloaded');
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Additional buffer for parallel test execution
-    await this.page.waitForTimeout(500);
   }
 
   /**

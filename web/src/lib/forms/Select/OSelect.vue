@@ -388,8 +388,8 @@ function handleListboxUpdate(value: unknown) {
 
   // Single-select: prevent deselecting the already-selected option
   if (!props.multiple) {
-    if (resolved === undefined) {
-      // Reka toggled off the current selection — ignore it
+    if (resolved === undefined || resolved === "") {
+      // Reka toggles off the current selection by emitting "" or undefined — ignore it.
       // Note: resolved === null is a valid mapped value (e.g. "None"/"Auto"/"Default"
       // options that use null as their value), so it must NOT be blocked here.
       popoverOpen.value = false;
@@ -1138,6 +1138,9 @@ const fieldWidthClass = computed(() => {
                         "
                         :data-test-value="
                           toRekaString(filteredOptions[vRow.index].value)
+                        "
+                        :data-test-label="
+                          String(filteredOptions[vRow.index].label ?? '')
                         "
                         :class="[
                           'tw:relative tw:flex tw:w-full tw:h-full tw:gap-2',

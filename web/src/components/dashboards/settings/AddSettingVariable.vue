@@ -294,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :debounce="1000"
                       class="tw:flex-[2] tw:min-w-0"
                       placeholder="Enter Value"
+                      :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
                     <OButton
                       variant="ghost"
@@ -319,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red">
+                <div v-show="filterCycleError" style="color: red" data-test="dashboard-variable-cycle-error">
                   {{ filterCycleError }}
                 </div>
               </div>
