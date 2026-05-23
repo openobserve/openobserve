@@ -300,6 +300,25 @@ export class AlertDestinationsPage {
 
         // Fallback: UI pagination (only if API is unavailable)
         testLogger.info('API unavailable, falling back to UI pagination', { destinationName });
+
+        // Prefer scoping by the OInput search field — pentest backend may have 1000+ rows,
+        // so paginating one-by-one is unreliable. The per-row delete button uses the
+        // destination name as part of its data-test, giving us a row anchor without
+        // relying on getByRole / getByText.
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await searchField.fill('');
+            await searchField.fill(destinationName);
+            const rowAnchor = this.getDeleteDestinationBtn(destinationName);
+            try {
+                await rowAnchor.waitFor({ state: 'visible', timeout: 10000 });
+                testLogger.info('Found destination via search', { destinationName });
+                return true;
+            } catch (e) {
+                testLogger.debug('Destination not found via search input', { destinationName });
+            }
+        }
+
         let destinationFound = false;
         let isLastPage = false;
 
@@ -470,23 +489,11 @@ export class AlertDestinationsPage {
         // This must run AFTER the corrections-form name/template updates because those
         // re-write the Monaco editor from `jsonArrayOfObj` — overwriting any earlier edit.
         await this.replaceImportJsonUrlIfPlaceholder('https://example.com/webhook/import');
-        const editorVal = await this.page.evaluate(() => {
-            const m = window.monaco;
-            if (!m || !m.editor) return null;
-            const eds = m.editor.getEditors();
-            return eds && eds[0] ? eds[0].getModel().getValue() : null;
-        }).catch(() => null);
-        testLogger.info('DEBUG editor state', { editorVal });
         await this.page.locator(this.destinationImportJsonBtn).click();
         // Wait for the post-import navigation back to the destinations list (router.push fires
         // ~400ms after the success toast). This replaces a fixed waitForTimeout and ensures
         // the new destination row has actually been created before downstream verification.
         await this.page.waitForURL(/\/alert_destinations(?!.*action=import)/, { timeout: 15000 }).catch(() => {});
-        // DEBUG post-state
-        const msgs = await this.page.evaluate(() => {
-            return Array.from(document.querySelectorAll('.text-red, [class*="error"]')).map(el => el.textContent.trim()).filter(Boolean).slice(0, 6);
-        }).catch(() => []);
-        testLogger.info('DEBUG post-state', { url: this.page.url(), msgs });
     }
 
     /**
