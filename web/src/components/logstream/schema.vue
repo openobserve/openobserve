@@ -80,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:text-gray-800',
                   ]"
                 >
-                  {{ indexData.stats.doc_time_min }} ?
+                  {{ indexData.stats.doc_time_min }}
+                  <span class="tw:text-base tw:leading-none">→</span>
                   {{ indexData.stats.doc_time_max }}
                 </div>
               </div>
