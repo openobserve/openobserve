@@ -5,22 +5,18 @@
   >
     <!-- Header -->
     <div class="tw:px-2 tw:py-3">
-      <OCardSection role="header">
-        <div class="tw:flex tw:items-center tw:flex-nowrap">
-          <div class="tw:flex tw:flex-col">
-            <div class="tw:text-base tw:font-bold" data-test="queryList-title-text">
-              {{ t("queries.queryList") }}
-            </div>
+      <OCardSection role="header" class="tw:w-full">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
+          <div class="tw:text-base tw:font-bold" data-test="queryList-title-text">
+            {{ t("queries.queryList") }}
           </div>
-          <div class="col-auto">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              data-test="queryList-cancel"
-              @click="$emit('close')"
-              icon-left="close"
-            />
-          </div>
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            data-test="queryList-cancel"
+            @click="$emit('close')"
+            icon-left="close"
+          />
         </div>
       </OCardSection>
       <OSeparator />

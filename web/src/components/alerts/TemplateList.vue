@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OButton
             data-test="template-list-delete-templates-btn"
-            variant="outline"
+            variant="outline-destructive"
             size="sm"
             icon-left="delete"
             @click="openBulkDeleteDialog"

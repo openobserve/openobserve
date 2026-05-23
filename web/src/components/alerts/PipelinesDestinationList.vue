@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OButton
             data-test="pipeline-destination-list-delete-destinations-btn"
-            variant="outline"
+            variant="outline-destructive"
             size="sm"
             icon-left="delete"
             @click="openBulkDeleteDialog"

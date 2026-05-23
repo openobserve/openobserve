@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="selectedPatterns.length > 0"
             data-test="regex-pattern-list-delete-patterns-btn"
-            variant="outline"
+            variant="outline-destructive"
             size="sm-action"
             icon-left="delete"
             @click="openBulkDeleteDialog"
