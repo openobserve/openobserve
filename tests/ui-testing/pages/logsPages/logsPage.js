@@ -26,6 +26,12 @@ export class LogsPage {
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
+        // FieldListPagination schema-toggle buttons (data-test set per-slot in FieldListPagination.vue).
+        // Two render paths: with user-defined-schema toggle (`logs-user-defined-fields-btn-<slot>`)
+        // or plain interesting-fields toggle (`logs-all-fields-btn` / `logs-interesting-fields-btn`).
+        this.allFieldsToggleBtn = '[data-test="logs-all-fields-btn"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
+        this.interestingFieldsToggleBtn = '[data-test="logs-interesting-fields-btn"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
+        this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
         // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
@@ -3956,21 +3962,23 @@ export class LogsPage {
     }
 
     async clickSchemaButton() {
-        // Anchor the regex so we don't accidentally click the "infoschema"
-        // button (which also matches a loose /schema/i filter)
-        const btn = this.page.getByRole('button').filter({ hasText: /^schema$/i }).first();
+        // "Schema" maps to the all-fields toggle in FieldListPagination (icon-only button
+        // with the schema icon). Constructor exposes both render-path variants.
+        const btn = this.page.locator(this.allFieldsToggleBtn).first();
         await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         return await btn.click({ force: true });
     }
 
     async clickInfoSchemaButton() {
-        const btn = this.page.getByRole('button').filter({ hasText: /infoschema/i }).first();
+        // "Infoschema" maps to the interesting-fields toggle (info-outline + schema icon).
+        const btn = this.page.locator(this.interestingFieldsToggleBtn).first();
         await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         return await btn.click({ force: true });
     }
 
     async clickClearButton() {
-        const btn = this.page.getByRole('button', { name: /clear/i }).first();
+        // "Clear" maps to the reset-fields icon at the end of FieldListPagination.
+        const btn = this.page.locator(this.fieldListResetIcon).first();
         await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         return await btn.click({ force: true });
     }

@@ -156,6 +156,24 @@ export class SanityPage {
         // Toast locators (used for success / error verification)
         // ============================================================
         this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+
+        // ============================================================
+        // Per-name factory helpers (runtime-dynamic, return Locator)
+        // ============================================================
+        // Function row name cell by function name.
+        this.getFunctionRowCellByName = (name) =>
+            page.locator(`[data-test="function-list-name-cell-${name}"]`);
+        // Dashboard folder tab name by folder name.
+        this.getDashboardFolderTabByName = (name) =>
+            page.locator(`[data-test="dashboard-folder-tab-name-${name}"]`);
+        // Per-folder more-icon (walks ancestor by data-test prefix — §2 approved xpath).
+        this.getDashboardFolderMoreIconByName = (name) =>
+            page.locator(
+                `xpath=//*[@data-test="dashboard-folder-tab-name-${name}"]/ancestor::*[starts-with(@data-test,'dashboard-folder-tab-')]//*[@data-test="dashboard-more-icon"]`,
+            );
+        // Stream row name cell by stream name.
+        this.getStreamNameCellByName = (name) =>
+            page.locator(`[data-test="log-stream-name-cell-${name}"]`);
     }
 
     // ================================================================
@@ -343,7 +361,7 @@ export class SanityPage {
         await this.functionListSearchInputField.fill(functionName);
 
         // Wait for the matching row to appear before clicking delete.
-        const functionRowCell = this.page.locator(`[data-test="function-list-name-cell-${functionName}"]`);
+        const functionRowCell = this.getFunctionRowCellByName(functionName);
         await expect(functionRowCell).toBeVisible({ timeout: 10000 });
 
         await this.functionListDeleteFirstBtn.click();
@@ -463,7 +481,7 @@ export class SanityPage {
         await this.functionListSearchInputField.fill(uniqueFunctionName);
 
         // Wait for the matching row to appear before clicking delete.
-        const functionRowCell = this.page.locator(`[data-test="function-list-name-cell-${uniqueFunctionName}"]`);
+        const functionRowCell = this.getFunctionRowCellByName(uniqueFunctionName);
         await expect(functionRowCell).toBeVisible({ timeout: 10000 });
 
         await this.functionListDeleteFirstBtn.click();
@@ -487,16 +505,14 @@ export class SanityPage {
         await this.folderAddSave.click();
 
         // Confirm the folder tab appears with the given name.
-        const folderTabName = this.page.locator(`[data-test="dashboard-folder-tab-name-${folderName}"]`);
+        const folderTabName = this.getDashboardFolderTabByName(folderName);
         await expect(folderTabName).toBeVisible({ timeout: 15000 });
         await folderTabName.click();
 
         await this.page.waitForLoadState('domcontentloaded');
 
         // Open the per-folder dropdown via its more-icon (scoped to this folder's tab).
-        const folderMoreIcon = this.page.locator(
-            `xpath=//*[@data-test="dashboard-folder-tab-name-${folderName}"]/ancestor::*[starts-with(@data-test,'dashboard-folder-tab-')]//*[@data-test="dashboard-more-icon"]`,
-        );
+        const folderMoreIcon = this.getDashboardFolderMoreIconByName(folderName);
         await folderMoreIcon.click();
         await this.deleteFolderIcon.click({ force: true });
         // ConfirmDialog renders an ODialog with data-test="confirm-dialog"; its primary
@@ -556,7 +572,7 @@ export class SanityPage {
         await this.page.waitForLoadState('domcontentloaded');
 
         // Wait for the deterministic per-name name cell to appear (added in LogStream.vue).
-        const streamNameCell = this.page.locator(`[data-test="log-stream-name-cell-${uniqueStreamName}"]`);
+        const streamNameCell = this.getStreamNameCellByName(uniqueStreamName);
         await expect(streamNameCell).toBeVisible({ timeout: 15000 });
 
         // Click the per-row delete button (data-test added on the OButton this pass).
