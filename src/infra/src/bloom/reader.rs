@@ -55,6 +55,17 @@ pub enum ReadError {
     InvalidBloomSize(String, u64, u32),
 }
 
+/// Per-field summary returned by [`BloomReader::inspect`]. Intended for
+/// diagnostic output (CLI bloom inspect, pruner debug logs); the fields
+/// are intentionally simple so the consumer can format however it likes.
+#[derive(Debug, Clone)]
+pub struct FieldInspect {
+    pub field: String,
+    pub file_count: usize,
+    pub total_body_bytes: u64,
+    pub file_ids: Vec<u64>,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct FileEntry {
     body_offset: u64,
@@ -191,6 +202,41 @@ impl BloomReader {
 
     pub fn fields(&self) -> impl Iterator<Item = &str> {
         self.by_field.keys().map(String::as_str)
+    }
+
+    /// True iff this footer has bloom data for `(field, file_id)`. Used
+    /// by the search-side diagnostic log when `block_range_for` returns
+    /// `None` to distinguish "field missing" vs "file_id missing".
+    pub fn has_entry(&self, field: &str, file_id: u64) -> bool {
+        self.by_field
+            .get(field)
+            .is_some_and(|s| s.by_file.contains_key(&file_id))
+    }
+
+    /// Snapshot of one indexed field for inspection / debug logging.
+    ///
+    /// `file_ids` is sorted ascending; `total_body_bytes` is the sum of
+    /// per-file SBBF body sizes (a quick sense of how much bitmap is
+    /// stored under this field).
+    pub fn inspect(&self) -> Vec<FieldInspect> {
+        let mut out: Vec<FieldInspect> = self
+            .by_field
+            .iter()
+            .map(|(name, section)| {
+                let total_body_bytes: u64 =
+                    section.entries.iter().map(|e| e.body_size as u64).sum();
+                let mut file_ids: Vec<u64> = section.by_file.keys().copied().collect();
+                file_ids.sort_unstable();
+                FieldInspect {
+                    field: name.clone(),
+                    file_count: section.entries.len(),
+                    total_body_bytes,
+                    file_ids,
+                }
+            })
+            .collect();
+        out.sort_by(|a, b| a.field.cmp(&b.field));
+        out
     }
 
     /// Compute the single 32-byte block range to fetch for a point check.

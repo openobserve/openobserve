@@ -68,7 +68,7 @@ fn bloom_prefetch_concurrency() -> usize {
 pub async fn prune(
     files: Vec<FileKey>,
     predicates: &[BloomPredicate],
-    _trace_id: &str,
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -78,6 +78,7 @@ pub async fn prune(
     }
 
     // 1. Split files by whether they have a bloom_ver assigned.
+    let total_input = files.len();
     let mut without_bloom: Vec<FileKey> = Vec::new();
     let mut with_bloom: Vec<FileKey> = Vec::with_capacity(files.len());
     for f in files {
@@ -88,8 +89,27 @@ pub async fn prune(
         }
     }
     if with_bloom.is_empty() {
+        log::warn!(
+            "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+             all {total_input} files have bloom_ver=0 — no `.bf` covers any of them. \
+             Likely causes: compactor hasn't built `.bf` for this hour yet, or these files \
+             produced no blooms (target field not in tantivy schema at build time, or \
+             index_size=0). Falling through, no pruning applied."
+        );
         return without_bloom;
     }
+    log::info!(
+        "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+         input={total_input} (with_bloom={}, without_bloom={}), \
+         predicates=[{}]",
+        with_bloom.len(),
+        without_bloom.len(),
+        predicates
+            .iter()
+            .map(|p| format!("{}({})", p.field, p.values.len()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // 2. Group by (date, bloom_ver) — one .bf per group.
     type Group = (String, i64);
@@ -141,12 +161,14 @@ pub async fn prune(
 
     // 4. Run each group: fetch footer → compute 32-byte ranges → batched range GETs → run
     //    check_block per target. Outer concurrency is config-driven.
+    let total_groups = specs.len();
     let with_bloom_ref = &with_bloom;
     let concurrency = bloom_prefetch_concurrency();
     let results: Vec<(Group, GroupResult)> = stream::iter(specs)
         .map(|spec| async move {
             let group = spec.group.clone();
             let res = run_group(
+                trace_id,
                 &spec.account,
                 &spec.path,
                 &spec.targets,
@@ -177,7 +199,9 @@ pub async fn prune(
                 }
             }
             GroupResult::Err(path, e) => {
-                log::warn!("[bloom-prune] group {path} failed: {e}; keeping its files");
+                log::warn!(
+                    "[bloom-prune] [trace_id {trace_id}] group `{path}` failed: {e}; keeping its files"
+                );
             }
         }
     }
@@ -199,8 +223,14 @@ pub async fn prune(
     }
 
     let mut kept = without_bloom;
+    let mut kept_no_info = 0usize;
+    let mut kept_predicate_hit = 0usize;
+    let mut dropped = 0usize;
+    let mut kept_unparseable_key = 0usize;
+    let mut kept_bucket_failed = 0usize;
     for (idx, f) in with_bloom.into_iter().enumerate() {
         if date_for[idx].is_none() {
+            kept_unparseable_key += 1;
             kept.push(f);
             continue;
         }
@@ -208,6 +238,7 @@ pub async fn prune(
             Some(m) => m,
             None => {
                 // Bucket failed entirely → keep.
+                kept_bucket_failed += 1;
                 kept.push(f);
                 continue;
             }
@@ -219,6 +250,7 @@ pub async fn prune(
 
         // AND across predicates, OR within each predicate's values. A predicate
         // with no info (unknown field / unknown file_id) counts as "match".
+        let any_pred_lacks_info = info.iter().any(|i| !*i);
         let all_match = predicates.iter().enumerate().all(|(pi, _)| {
             if !info[pi] {
                 return true; // unknown → conservatively true
@@ -226,9 +258,25 @@ pub async fn prune(
             matches[pi].iter().any(|hit| *hit)
         });
         if all_match {
+            if any_pred_lacks_info {
+                kept_no_info += 1;
+            } else {
+                kept_predicate_hit += 1;
+            }
             kept.push(f);
+        } else {
+            dropped += 1;
         }
     }
+    log::info!(
+        "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+         groups={total_groups}, input={total_input}, kept={} \
+         (predicate_hit={kept_predicate_hit}, no_info={kept_no_info}, \
+         bucket_failed={kept_bucket_failed}, unparseable_key={kept_unparseable_key}, \
+         no_bloom={}), dropped={dropped}",
+        kept.len(),
+        kept.len() - kept_predicate_hit - kept_no_info - kept_bucket_failed - kept_unparseable_key
+    );
     kept
 }
 
@@ -263,6 +311,7 @@ enum FetchError {
 }
 
 async fn run_group(
+    trace_id: &str,
     account: &str,
     path: &str,
     targets: &[TargetSpec],
@@ -293,6 +342,8 @@ async fn run_group(
         hash: u64,
     }
     let mut planned: Vec<Planned> = Vec::with_capacity(targets.len());
+    let mut missing_field_count = 0usize;
+    let mut missing_file_count = 0usize;
     for t in targets {
         let pred = &predicates[t.pred_idx];
         let value = pred.values[t.value_idx].as_bytes();
@@ -305,9 +356,46 @@ async fn run_group(
                 range,
                 hash,
             });
+        } else if reader.fields().any(|f| f == pred.field.as_str()) {
+            // Field is in the footer but this file_id isn't — most likely a
+            // file_list-row that wasn't part of the build, or a file_id-domain
+            // mismatch.
+            missing_file_count += 1;
+        } else {
+            missing_field_count += 1;
         }
     }
     if planned.is_empty() {
+        // Diagnose: dump what the footer DOES carry vs what we asked for so
+        // operators can see (a) field-name mismatch (build-time settings
+        // differed from query-time), (b) file_id domain mismatch.
+        let footer_fields: Vec<&str> = reader.fields().collect();
+        let requested_fields: Vec<&str> = predicates.iter().map(|p| p.field.as_str()).collect();
+        let sample_requested_file_ids: Vec<u64> = targets
+            .iter()
+            .take(5)
+            .map(|t| with_bloom[t.file_idx].id as u64)
+            .collect();
+        // Pick one field present in the footer to show sample file_ids from.
+        let footer_sample_file_ids: Vec<u64> = reader
+            .inspect()
+            .first()
+            .map(|fi| fi.file_ids.iter().take(5).copied().collect())
+            .unwrap_or_default();
+        log::warn!(
+            "[bloom-prune] [trace_id {trace_id}] group `{path}`: no targets resolved \
+             ({} missing-field, {} missing-file_id) — footer fields=[{}], requested=[{}], \
+             requested_file_ids_sample={:?}, footer_file_ids_sample={:?}. \
+             Likely cause: stream `bloom_filter_fields ∩ index_fields` at build time differed \
+             from current query field, or file_list ids changed since build. Keeping all files \
+             in this group.",
+            missing_field_count,
+            missing_file_count,
+            footer_fields.join(", "),
+            requested_fields.join(", "),
+            sample_requested_file_ids,
+            footer_sample_file_ids,
+        );
         return GroupResult::Ok(Vec::new());
     }
 

@@ -147,7 +147,10 @@ fn create_cli_app() -> Command {
                     arg!("stream-name", 's', "stream-name", "stream-name"),
                     arg!("top-x", 'x', "top-x", "top-x").default_value("5"),
                     arg!("org-id", 'o', "org-id", "org-id").default_value("default"),
-            ])
+            ]),
+            Command::new("bloom-inspect").about("dump fields + file_ids of a local `.bf` file").args([
+                arg!("file", 'f', "file", "path to a `.bf` file (e.g. data/.../bloom/.../{ver}.bf)", true),
+            ]),
         ])
 }
 
@@ -180,6 +183,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             .ok_or_else(|| anyhow::anyhow!("please set data path"))?;
         set_permission(path, 0o777)?;
         println!("init dir {path} successfully");
+        return Ok(true);
+    }
+    if name == "bloom-inspect" {
+        let file = command
+            .get_one::<String>("file")
+            .ok_or_else(|| anyhow::anyhow!("please set --file"))?;
+        super::bloom::inspect(file)?;
         return Ok(true);
     }
 
