@@ -70,19 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
                 {{ t("modelPricing.modelNameField") }}
-                <OIcon
-                  name="info"
-                  size="xs"
-                  class="tw:ml-1 tw:cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                  "
-                 />
+                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
+                  <OIcon
+                    name="info"
+                    size="xs"
+                    :class="
+                      store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                    "
+                  />
                   <OTooltip
                     side="right"
                     max-width="300px"
                     :content="t('modelPricing.modelNameTooltip')"
                   />
+                </OButton>
               </div>
               <OInput
                 v-model="model.name"
@@ -100,21 +101,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <OIcon
-                    name="info"
-                    size="xs"
-                    class="tw:ml-1 tw:cursor-pointer"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
-                    "
-                   />
+                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
+                    <OIcon
+                      name="info"
+                      size="xs"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-400'
+                      "
+                    />
                     <OTooltip
                       side="right"
                       max-width="300px"
                       :content="t('modelPricing.matchPatternTooltip')"
                     />
+                  </OButton>
                 </div>
                 <OInput
                   v-model="model.match_pattern"
@@ -129,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="pattern-examples-btn tw:mt-7"
+                class="pattern-examples-btn"
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
@@ -140,63 +142,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('modelPricing.patternExamplesBtn')"
                 />
               </OButton>
-
-              <!-- Pattern Examples Dialog -->
-              <ODialog
-                data-test="model-pricing-editor-examples-dialog"
-                v-model:open="showExamples"
-                size="sm"
-                :title="t('modelPricing.patternExamplesTitle')"
-                :sub-title="t('modelPricing.patternExamplesDesc')"
-              >
-                <div class="examples-table">
-                  <div class="examples-table-head">
-                    <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
-                    <span>{{
-                      t("modelPricing.patternExamplesPatternCol")
-                    }}</span>
-                  </div>
-                  <div
-                    v-for="ex in patternExamples"
-                    :key="ex.name"
-                    class="examples-table-row"
-                  >
-                    <span class="examples-model-name">{{ ex.name }}</span>
-                    <code class="examples-pattern">{{ ex.match_pattern }}</code>
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      class="examples-copy-btn"
-                      @click="copyPattern(ex.match_pattern)"
-                    >
-                      <OIcon
-                        :name="
-                          copiedPattern === ex.match_pattern
-                            ? 'check'
-                            : 'content-copy'
-                        "
-                        size="xs"
-                        :class="
-                          copiedPattern === ex.match_pattern
-                            ? 'tw:text-green-500'
-                            : ''
-                        "
-                      />
-                      <OTooltip
-                        :side-offset="4"
-                        :content="
-                          copiedPattern === ex.match_pattern
-                            ? t('modelPricing.copied')
-                            : t('modelPricing.copyPattern')
-                        "
-                      />
-                    </OButton>
-                  </div>
-                </div>
-              </ODialog>
             </div>
           </div>
         </div>
+
+        <!-- Pattern Examples Dialog -->
+        <ODialog
+          data-test="model-pricing-editor-examples-dialog"
+          v-model:open="showExamples"
+          size="sm"
+          :title="t('modelPricing.patternExamplesTitle')"
+          :sub-title="t('modelPricing.patternExamplesDesc')"
+        >
+          <div class="examples-table">
+            <div class="examples-table-head">
+              <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
+              <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
+            </div>
+            <div
+              v-for="ex in patternExamples"
+              :key="ex.name"
+              class="examples-table-row"
+            >
+              <span class="examples-model-name">{{ ex.name }}</span>
+              <code class="examples-pattern">{{ ex.match_pattern }}</code>
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+                class="examples-copy-btn"
+                @click="copyPattern(ex.match_pattern)"
+              >
+                <OIcon
+                  :name="
+                    copiedPattern === ex.match_pattern
+                      ? 'check'
+                      : 'content-copy'
+                  "
+                  size="xs"
+                  :class="
+                    copiedPattern === ex.match_pattern
+                      ? 'tw:text-green-500'
+                      : ''
+                  "
+                />
+                <OTooltip
+                  :side-offset="4"
+                  :content="
+                    copiedPattern === ex.match_pattern
+                      ? t('modelPricing.copied')
+                      : t('modelPricing.copyPattern')
+                  "
+                />
+              </OButton>
+            </div>
+          </div>
+        </ODialog>
 
         <!-- ── Pricing Tiers ── -->
         <div class="form-card">
@@ -250,26 +250,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="sub-label tw:mb-2">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
-                  <div class="tw:flex tw:gap-2 tw:items-start tw:flex-wrap">
-                    <OInput
-                      v-model="tier.condition.usage_key"
-                      :label="t('modelPricing.usageKeyCol')"
-                      class="tw:flex-1 tw:min-w-[130px]"
-                      :placeholder="t('modelPricing.usageKeyPlaceholder')"
-                    />
-                    <OSelect
-                      v-model="tier.condition.operator"
-                      :options="operators"
-                      labelKey="label"
-                      valueKey="value"
-                      class="tw:w-[90px] tw:flex-shrink-0"
-                    />
-                    <OInput
-                      v-model.number="tier.condition.value"
-                      :label="t('modelPricing.threshold')"
-                      type="number"
-                      class="tw:w-[140px] tw:flex-shrink-0"
-                    />
+                  <div class="tw:flex tw:gap-2 tw:items-end tw:flex-nowrap">
+                    <div class="tw:flex-1 tw:min-w-[130px]">
+                      <OInput
+                        v-model="tier.condition.usage_key"
+                        :label="t('modelPricing.usageKeyCol')"
+                        :placeholder="t('modelPricing.usageKeyPlaceholder')"
+                      />
+                    </div>
+                    <div class="tw:w-[90px] tw:flex-shrink-0">
+                      <OSelect
+                        v-model="tier.condition.operator"
+                        :options="operators"
+                        labelKey="label"
+                        valueKey="value"
+                      />
+                    </div>
+                    <div class="tw:w-[140px] tw:flex-shrink-0">
+                      <OInput
+                        v-model.number="tier.condition.value"
+                        :label="t('modelPricing.threshold')"
+                        type="number"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -626,6 +629,7 @@ function resetAddState(tierCount: number) {
 const usageTemplates = [
   {
     name: "OpenAI",
+    color: "#10a37f",
     keys: [
       "input",
       "output",
@@ -635,6 +639,7 @@ const usageTemplates = [
   },
   {
     name: "Anthropic",
+    color: "#d97706",
     keys: [
       "input",
       "output",
