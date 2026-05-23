@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
-        <div>
+        <div class="tw:flex tw:items-center tw:h-11">
           <OSwitch
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSelect>
             <OButton
               variant="ghost"
-              size="icon-sm"
+              size="sm"
               class="tw:ml-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               class="tw:ml-2"
               @click="openAddDestination"
             >
