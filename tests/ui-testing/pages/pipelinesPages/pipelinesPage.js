@@ -2485,21 +2485,42 @@ export class PipelinesPage {
     /**
      * Get pipeline row locator by name
      * Used in pipelines.spec.js
+     * Resolves via the row's update-pipeline button (per-row data-test), then
+     * walks up to the nearest table-row container via XPath ancestor with a
+     * `data-test` prefix — keeps the selector data-test-only (§2).
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
     getPipelineRowByName(pipelineName) {
-        return this.page.locator('tr').filter({ hasText: pipelineName });
+        return this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)
+            .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`)
+            .first();
     }
 
     /**
-     * Get pipeline toggle locator for a specific pipeline
+     * Get pipeline toggle (pause/start) locator for a specific pipeline.
+     * The OButton in PipelinesList exposes a unique per-row data-test:
+     * `pipeline-list-{name}-pause-start-alert`.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Toggle locator
      */
     getPipelineToggle(pipelineName) {
-        const pipelineRow = this.getPipelineRowByName(pipelineName);
-        return pipelineRow.locator('[data-test*="toggle"]');
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
+    }
+
+    /**
+     * Fallback alias for the pause/start button — `pipeline-list-{name}-pause-start-alert`
+     * is the only enable/disable control rendered per row in PipelinesList.vue.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Enable/disable button locator
+     */
+    getPipelineEnableDisableButton(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
     }
 
     /**

@@ -313,7 +313,6 @@ class EnrichmentPage {
         await this.pipelineMenuItem.click();
         await this.enrichmentTableTab.click();
         await listResponse;
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for the enrichment tables list page to be visible
         await this.listPage.waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -360,7 +359,8 @@ class EnrichmentPage {
 
     async searchForEnrichmentTable(fileName) {
         await this.searchInputField.fill(fileName);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Client-side filter — wait for input value to settle by checking domcontentloaded.
+        await this.page.waitForLoadState('domcontentloaded');
     }
 
     // Exploration Methods
@@ -369,8 +369,10 @@ class EnrichmentPage {
         // table name, so callers should prefer clickExploreButton(name). Kept
         // for legacy callers — finds the first explore button in the list.
         const exploreBtn = this.page.locator('[data-test$="-explore-btn"]').first();
+        // Wait for navigation to /logs after explore — keyed on URL not networkidle.
+        const navP = this.page.waitForURL(/\/web\/logs/, { timeout: 15000 }).catch(() => {});
         await exploreBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await navP;
     }
 
     async clickTimestampColumn() {
@@ -379,7 +381,8 @@ class EnrichmentPage {
 
     async closeLogDialog() {
         await this.logDetailDrawerClose.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Drawer close — wait for drawer to be hidden instead of networkidle.
+        await this.logDetailDrawerClose.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
     }
 
     async clickDateTimeButton() {
@@ -406,12 +409,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         try {
             // Wait for logs page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-            // Wait for VRL editor to be fully initialized (addressing the race condition)
-            // The original working code had a 3-second wait after "Explore" click for editor initialization
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            
             // Ensure VRL functions panel is available if needed
             try {
                 const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
@@ -422,25 +420,29 @@ abc, err = get_enrichment_table_record("${fileName}", {
             } catch (e) {
                 // Functions button may not be present, continue
             }
-            
+
             // Wait for VRL editor to be ready
-            await this.page.waitForSelector(this.vrlEditor, { 
+            await this.page.waitForSelector(this.vrlEditor, {
                 state: 'visible',
-                timeout: 30000 
+                timeout: 30000
             });
-            
+
             // Get textbox using the original working approach
             const textbox = this.page.locator(this.vrlEditor).locator('.inputarea');
             await textbox.waitFor({ state: 'visible', timeout: 15000 });
-            
+
             // Fill the VRL query
             await textbox.clear();
             await textbox.fill(fullQuery);
-            
-            // Critical: Wait for VRL query validation and processing before proceeding
-            // The VRL editor needs time to parse and validate the query syntax
-            await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+            // Critical: Wait for the Monaco model to actually contain the typed
+            // VRL query before proceeding — this replaces the prior networkidle
+            // buffer with a deterministic editor-state check.
+            await this.page.waitForFunction((expected) => {
+                const w = /** @type {any} */ (window);
+                const eds = w?.monaco?.editor?.getEditors?.() || [];
+                return eds.some((ed) => (ed.getValue?.() || '').includes(expected));
+            }, 'get_enrichment_table_record', { timeout: 10000 }).catch(() => {});
         } catch (error) {
             throw new Error(`VRL Query filling failed: ${error.message}`);
         }
@@ -460,8 +462,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const response = await search;
         await expect.poll(async () => response.status(), { timeout: 30000 }).toBe(200);
 
-        // Wait for results to render and process
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        // Results render is keyed by the search response above; no extra wait needed.
     }
 
     async waitForVRLEditorReady() {
@@ -482,19 +483,24 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Click run query button multiple times to ensure it registers (VRL test specific).
         // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
         // fire on a forced click (Reka Primitive expects a real bubble path).
+        // Key the final click to a _search response so we don't sit in a
+        // 10s networkidle wait for cross-domain background requests.
         const refreshButton = this.page.locator(this.refreshButton);
         await refreshButton.waitFor({ state: 'visible' });
 
         for (let i = 0; i < 4; i++) {
-            await refreshButton.click();
-            if (i < 3) {
+            if (i === 3) {
+                const searchResp = this.page.waitForResponse(
+                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
+                    { timeout: 30000 }
+                ).catch(() => null);
+                await refreshButton.click();
+                await searchResp;
+            } else {
+                await refreshButton.click();
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
             }
         }
-
-        // Wait for query execution to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async verifyNoQueryWarning() {
@@ -506,16 +512,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
         // Additional run query clicks to ensure VRL enrichment is fully processed.
         // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
+        // Key each click to a _search response so we don't burn 10s networkidle
+        // timeouts per iteration.
         const refreshButton = this.page.locator(this.refreshButton);
         if (await refreshButton.isVisible()) {
             for (let i = 0; i < 3; i++) {
+                const searchResp = this.page.waitForResponse(
+                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
+                    { timeout: 15000 }
+                ).catch(() => null);
                 await refreshButton.click();
-                await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await searchResp;
             }
         }
 
@@ -686,7 +695,6 @@ abc, err = get_enrichment_table_record("${fileName}", {
             // Navigate to the modified URL
             await this.page.goto(newUrl);
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             testLogger.debug('Navigated to URL with VRL editor enabled');
         }
         
@@ -873,7 +881,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async clickCancelButton() {
         await this.addCancelBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // After cancel, the Add form unmounts and the list page becomes visible.
+        await this.listPage.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     }
 
     async verifyBackOnEnrichmentList() {
@@ -882,9 +891,6 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async searchEnrichmentTableInList(tableName) {
-        // Wait for page to stabilize
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
         // Use the OInput native input via the auto-derived `-field` data-test —
         // the search input visibility indicates the list page is ready.
         await this.searchInputField.waitFor({ state: 'visible', timeout: 30000 });
@@ -892,7 +898,6 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Clear existing search first, then fill with the table name to filter
         await this.searchInputField.clear();
         await this.searchInputField.fill(tableName);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // The filter is client-side — poll until either the matching row appears
         // (success) or the input value is stable AND a known empty-state row

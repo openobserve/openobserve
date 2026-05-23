@@ -7,7 +7,6 @@ const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
 const THREE_MINUTES_MS = 180000;
-const UI_STABILIZATION_WAIT_MS = 2000;
 
 // ============================================================================
 // Alerts UI Operations — each test is self-contained with its own suffix
@@ -60,7 +59,6 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Created isolated template for deletion test', { templateName: deleteTemplateName });
 
     await pm.alertTemplatesPage.navigateToTemplates();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     await pm.alertTemplatesPage.deleteTemplateAndVerify(deleteTemplateName);
     testLogger.info('Successfully deleted isolated template', { templateName: deleteTemplateName });
@@ -79,7 +77,6 @@ test.describe("Alerts UI Operations", () => {
 
     // Ingest test data for the stream
     await pm.commonActions.ingestTestData(streamName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     // Create validation infrastructure with unique names
     const validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, suffix);
@@ -90,11 +87,9 @@ test.describe("Alerts UI Operations", () => {
     await pm.alertTemplatesPage.ensureTemplateExists(templateName);
 
     await pm.commonActions.navigateToAlerts();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     // Ingest custom test data for better query results
     await pm.commonActions.ingestCustomTestData(streamName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     // Create folder
     const folderName = 'auto_' + suffix;
@@ -114,7 +109,6 @@ test.describe("Alerts UI Operations", () => {
     // Cleanup
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     await pm.alertsPage.deleteAlertByRow(alertName);
     await pm.dashboardFolder.searchFolder(folderName);
@@ -143,7 +137,6 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Validation infrastructure ready for manual trigger test', validationInfra);
 
     await pm.commonActions.navigateToAlerts();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     // Create folder for the test
     const folderName = 'auto_trigger_' + suffix;
@@ -168,7 +161,6 @@ test.describe("Alerts UI Operations", () => {
     // Cleanup: delete the alert and folder
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertsPage.deleteAlertByRow(alertName);
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.verifyFolderVisible(folderName);
@@ -223,7 +215,6 @@ test.describe("Alerts UI Operations", () => {
     // Create a valid alert
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     const column = 'log';
     const value = 'test';
     const alertName = await pm.alertsPage.createAlert(streamName, column, value, destinationName, suffix);
@@ -239,7 +230,6 @@ test.describe("Alerts UI Operations", () => {
     // Navigate back and verify alert
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     await pm.alertsPage.verifyAlertCellVisible(alertName);
     await pm.alertsPage.verifyCloneAlertUIValidation(alertName);
@@ -258,10 +248,8 @@ test.describe("Alerts UI Operations", () => {
     await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.dashboardFolder.searchFolder(targetFolderName);
     await pm.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     await pm.alertsPage.searchAlert(alertName);
     await pm.alertsPage.verifySearchResultsUIValidation(1);

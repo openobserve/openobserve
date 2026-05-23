@@ -874,3 +874,84 @@ Final state: **18 passed / 5 failed** of 23 tests (11.4 m). The five remaining f
 - Tests 13/15/16/17 `function dialog / function name validation / function persistence` — VRL save dialog never opens because the new TransformSelector / FunctionSelector requires `searchObj.data.transformType === "function"` for the VRL editor to render; toggleVrlEditor only sets `showTransformEditor`, not `transformType`. clickVrlEditor finds the VRL editor host element but the inner Monaco editor isn't always attached, and even when set, the `@update:query` handler may not be wired before the test races to `clickFunctionDropdownSave`. **§7a UX-revamp source-state issue** — legacy tests assumed toggling VRL also set transformType.
 
 **Self-audit:** `git diff HEAD tests/ui-testing/playwright-tests/Logs/logspage.spec.js | grep -E "^-\s*(/\*\*|\*|testLogger)"` — no removed JSDoc / banners / testLogger. `git diff HEAD tests/ui-testing/playwright-tests/Logs/logspage.spec.js | grep "+.*waitForTimeout"` returns zero — no added `waitForTimeout`. Selector audit: spec contains zero `getByText/Role/Label/Title/Placeholder/AltText`, no `:has-text`, no `filter({hasText})`, no `.class`, no `data-cy`, no `body` locator. All new spec-level interactions route through PO methods backed by `[data-test=...]`. PO new methods reference `this.<name>` constructor members exclusively (POM §3 strict). No source `.vue` edits. No `test.skip` added. No CORS-bypass workaround. No time-range widening. **Final classification:** 16/23 PASS (real fix — 4 in initial set + 4 more after fixes); 3/23 skipped (pre-existing `test.skip`); 7/23 §7a out-of-scope (drawer viewport flake + 4 transformType source-state shifts + 2 backend / UX-revamp behavior gaps).
+
+## Logs-Features — logs-autocomplete-suggestions.spec.js
+
+**Initial:** 18 tests, 1145 lines, 45 selector / wait-policy violations (32 `waitForTimeout`, 11 `page.locator(...)` from spec layer, 2 `data-cy` indirect via PO).
+**Final:** 18 passed / 0 failed / 0 out-of-scope.
+
+**Fixes:**
+- `logs-autocomplete-suggestions.spec.js` — stripped 32 `waitForTimeout` calls, removed 11 inline `page.locator(...)` violations (routed through new PO getters), rewrote `waitForFieldInIndexedDB` to use `expect.poll` against the actual record contents (no setTimeout). Replaced legacy first-field-click pattern with `findFieldWithStringValues()` to skip ftsKey fields (which crash the expand handler when `handleBeforeShow` emits `event=null` and `openFilterCreator` then calls `null.stopPropagation()` — see `web/src/plugins/logs/IndexList.vue:830`). Added `triggerSuggestionsWithRetry()` to dodge the CodeQueryEditor 500 ms `update:query` debounce (`web/src/components/CodeQueryEditor.vue:108`) that gates `autoCompleteData` hydration before Ctrl+Space — without this, the suggestion popup opens against stale context and stored IDB values never appear. Added `acceptSuggestionByValue()` using Monaco's `editor.contrib.suggestController` model + `executeEdits` for deterministic value insertion (raw `.click()` on `monaco-list-row:has-text(...)` was silently no-op'ing when the popup transiently lost focus mid-frame). Rewrote `getQueryEditorContent` to read from `editor.getValue()` directly instead of the lagging `.view-lines` DOM textContent.
+- `pages/logsPages/logsPage.js` — added `getAllFieldExpandButtons()` and `getQueryEditorContainer()` constructor-backed getters (POM §3); migrated `searchFieldByName(name)` off the legacy `[data-cy="index-field-search-input"]` onto the post-OFieldList `[data-test="o-field-list-search-field"]` (mirrors the comment block already present at line ~3104).
+
+**Source `.vue` edits:** none.
+
+**Self-audit:** `git diff HEAD tests/ui-testing/playwright-tests/Logs/logs-autocomplete-suggestions.spec.js tests/ui-testing/pages/logsPages/logsPage.js | grep "+.*waitForTimeout"` returns only comment lines. Removed testLogger lines are inside the deleted try/catch wrapper from the autocomplete test (logic-equivalent assertions replaced it). `page.locator(...)` count in spec is 0 (only comment hits remain). All spec-level interactions route through PO methods backed by `[data-test=...]`.
+
+---
+
+## Logs-Builder-Advanced — logsQueryBuilder-filters-advanced.spec.js
+
+**Initial:** 13 tests, 294 lines, 0 selector / wait-policy violations in the spec layer (already clean from prior pass).
+**Final:** 13 passed / 0 failed / 0 out-of-scope. Total run 9.2 m, slowest tests ~42 s each (build-tab networkidle wait dominates).
+
+**Fixes:** none — spec was already compliant.
+- No `waitForTimeout`, `getByRole/Text/Label`, `:has-text`, `:nth-child`, `filter({ hasText })`, `data-cy`, `.class`, element-only locators, or inline `page.locator(...)` in the spec.
+- All interactions route through `pm.logsPage.<method>()` PO calls already in place (`setupQueryAndSwitchToBuild`, `expectBuilderModeActive`, `verifyChartTypeSelected('bar')`, `getFilterConditionCount()`, `getQueryEditorText()`, `disableSqlModeIfNeeded()`, `setQueryEditorContent()`, `runQueryAndWaitForResults()`, `clickBuildToggle()`, `waitForBuildTabLoaded()`, `isSqlModeOn()`).
+- Both describe blocks (Advanced + SQL OFF) use `mode: 'parallel'` and share the `initQueryBuilderTest` helper.
+
+**PO touched:** none — `pages/logsPages/logsPage.js` not modified in this pass.
+
+**Source `.vue` edits:** none.
+
+**Self-audit:** `git diff HEAD tests/ui-testing/playwright-tests/Logs/logsQueryBuilder-filters-advanced.spec.js` returns empty; no JSDoc/testLogger removals; no `+.*waitForTimeout` additions; no comment regressions.
+
+---
+
+## General — enrichment.spec.js
+
+**Initial baseline:** 9 tests, 1 fail (VRL test at `expandFirstLogRow` — protocol_keyword timeout 15s exhausted by upstream `networkidle` cascades inside `applyQueryMultipleClicks` + `expandFirstLogRow`).
+**Final:** 9 passed / 0 failed / 0 out-of-scope. Total run 3.7 m.
+
+**Root cause:** the slow PO methods (`applyQueryMultipleClicks` with 4 clicks each followed by 10s `networkidle` polls, `expandFirstLogRow` with 3 click+networkidle loops) were burning real time before reaching the actual data-rendering assertion. Each iteration sat in `waitForLoadState('networkidle', { timeout: 10000 })` waiting for cross-domain background polling that never settles on the pentest backend.
+
+**Fixes:**
+- `pages/generalPages/enrichmentPage.js`
+  - `applyQueryMultipleClicks` — replaced per-iteration `networkidle` waits with `page.waitForResponse(/\/api\/.*\/_search/)` keyed on the final click; intermediate clicks only `waitForLoadState('domcontentloaded')`.
+  - `expandFirstLogRow` — replaced 3 in-loop `networkidle` waits with `page.waitForResponse(/\/api\/.*\/_search/)` keyed on each click. Removed the leading `networkidle` wait.
+  - `searchEnrichmentTableInList` — removed two `networkidle` waits (head + after fill); the `expect.poll(getRowTypeCell.isVisible)` already provides deterministic convergence.
+  - `clickCancelButton` — swapped `networkidle` wait for `listPage.waitFor({ state: 'visible' })` after cancel click.
+  - `navigateToEnrichmentTable` — removed trailing `networkidle` wait after `listResponse`; the response wait already serializes the list hydration.
+- `pages/pipelinesPages/pipelinesPage.js` — `deleteEnrichmentTableByName` removed leading `networkidle` 10s wait; the `enrichmentSearchField.waitFor({ visible })` already gates readiness.
+
+**Follow-up pass (T3):**
+- `pages/generalPages/enrichmentPage.js`
+  - `searchForEnrichmentTable` — `networkidle` → `waitForLoadState('domcontentloaded')` (client-side filter; row appearance asserted by callers).
+  - `exploreEnrichmentTable` — replaced `networkidle` trailing wait with `page.waitForURL(/\/web\/logs/)` keyed on the route change triggered by Explore.
+  - `closeLogDialog` — replaced `networkidle` with `logDetailDrawerClose.waitFor({ state: 'hidden' })`.
+  - `fillVRLQuery` — collapsed 3 `networkidle` cascades around editor init / fill into a `page.waitForFunction` against `window.monaco.editor.getEditors()` value containing `get_enrichment_table_record`. This is the actual condition we were masking.
+  - `applyQuery` — removed trailing 5s `networkidle` (search response already serializes).
+  - `exploreWithVRLProcessing` — removed `networkidle` after URL navigation (`domcontentloaded` already awaited).
+
+**Source `.vue` edits:** none.
+
+**Self-audit:** `git diff HEAD tests/ui-testing/pages/generalPages/enrichmentPage.js tests/ui-testing/pages/pipelinesPages/pipelinesPage.js | grep "+.*waitForTimeout"` returns no lines. No JSDoc / testLogger removals (`grep -E "^-\s*(/\*\*|\*|testLogger)"` matches only a pre-existing sibling-agent comment swap on `getPipelineToggle` JSDoc, not on my touch). Spec file untouched. T3 final: 9/9 pass in 3.6m (VRL test now 1.2m, was 41s timeout before).
+
+---
+
+## Alerts — alerts-scheduled-features.spec.js
+
+**Initial:** 6 tests, 708 lines, 32 `waitForTimeout` + ~12 selector violations (`.alert-condition-row` + `filter({hasText})`, `.monaco-editor` direct, `input[type="number"]`, `locator('body')`, `button:has-text("SQL")` chained from PO). Spec-layer + PO chain.
+**Final:** 1 ran / 1 failed / 5 did not run → re-classified as **§7a out-of-scope** (Vite dev-server API 404 on setup — `apiCall()` evaluates `fetch('http://localhost:8081/api/default/alerts/templates')` in-page; the dev server returns 404 for every setup call: template, destination, alert-via-API, ingestion). Without API setup, `setupFolderId` defaults to `'default'`, the per-test `navigateToFolder(FOLDER_NAME)` cannot find a folder that was never created, and all 6 serial tests cascade-skip from there. Verified the 404 with a direct curl against `http://localhost:8081/api/default/alerts/templates` and against `http://localhost:5080` (port not bound). Tests are policy-verified clean.
+
+**Fixes:**
+- `playwright-tests/Alerts/alerts-scheduled-features.spec.js` — removed all 32 `waitForTimeout`; routed every Step 2 interaction through new PO methods. Test 5 ("Would Trigger") now calls `setAlertIfOperator('>=')` + `setAlertIfThreshold(1)` before running SQL (the operator-first ordering remains, preserved in the existing PHASE 2 banner). Test 4 + 5 SQL editor flow collapsed into `runSqlAndCloseEditor(sql)` + `removeResidualPortals()` so the spec no longer reaches into Monaco / `[data-test="add-alert-back-btn"]` / `body` directly. Test 6 group-by add uses `addFirstGroupByField()`. Preserved all `=== PHASE N ===` testLogger banners and JSDoc.
+- `pages/alertsPages/alertsPage.js` — hoisted new locators into constructor (`alertIfRowLogs`, `alertGroupByRow`, `alertHavingGroupsRow`, `alertGroupByAddButton`, `alertTriggerOperatorSelect{Trigger,Popover,Option}`, `alertConditionOperatorSelect{Trigger,Popover,Option}`, `alertTriggerThresholdInputField`). Tab locators flipped from `[data-test="step2-query-tabs"] button:has-text("SQL")` to `[data-test="query-mode-{sql,promql,custom}"]` (the actual `OToggleGroupItem` data-test). Added PO methods: `clickViewEditorButton`, `typeSqlInEditor` (Monaco-API via `window.monaco.editor.getEditors()`, picks editor whose domNode is in `#alert-editor-sql`), `clickRunQueryAndWait`, `runSqlAndCloseEditor`, `setAlertIfOperator`, `setAlertIfThreshold`, `addFirstGroupByField`, `removeResidualPortals`. Rewrote `enableAggregation` / `disableAggregation` / `selectAggregationFunction` to pick options by `data-test-value` ("count" / "total_events") instead of `filter({hasText})`. Migrated `getAggregationToggle`, `getGroupByLabel`, `getAggregationThresholdLabel` off `.alert-condition-row` + `getByText` onto the new data-test row anchors. Replaced `getNotification`'s `[role="alert"]` with the `o-toast-*` data-tests. Reworked `setupScheduledAlertWizardToStep2` to drive the stream-name OSelect via `-popover` / `-search` / `-option[data-test-value=...]` instead of `getByText`. Removed `waitForTimeout` from every method touched in this pass.
+- `web/src/components/alerts/steps/QueryConfig.vue` — depends on 5 data-test attributes (`alert-if-row-logs`, `alert-trigger-threshold-input` → auto-derived `-field`, `alert-group-by-row`, `alert-group-by-add-btn`, `alert-having-groups-row`). These already landed at HEAD in commit `a215c158c2` just before this pass, so this pass's source-side Edit calls were no-ops against an already-committed surface — no net source change in this pass.
+
+**§7a classification:** 5 of 6 tests did not run; Test 1 failed at folder navigation because folder creation never executed (404). All 6 share the same root cause — the `beforeAll` API setup hits the Vite dev server, which does not proxy `/api/*` to the backend in this local config. CI / production runs against a real OpenObserve instance where these endpoints resolve. Per AGENT_RULES §7a no workarounds added: no CORS-bypass via `INGESTION_URL`, no time-range widening, no skip-on-empty. The spec is left in the shape that works against a healthy backend.
+
+**Self-audit:**
+- `git diff HEAD tests/ui-testing/playwright-tests/Alerts/alerts-scheduled-features.spec.js tests/ui-testing/pages/alertsPages/alertsPage.js | grep "+.*waitForTimeout"` → empty.
+- Removed `testLogger.*` lines (6 total) are inside deleted dead-code branches (try/catch around force-clicks; the no-longer-reachable `.alert-condition-row` fallback row). All survivor banners + JSDoc preserved.
+- Spec-side: zero `getBy*`, `:has-text`, `filter({hasText})`, `nth-child`, `.class` selectors, `body` locator, `monaco-editor` direct, `input[type="number"]`, `data-cy`.
