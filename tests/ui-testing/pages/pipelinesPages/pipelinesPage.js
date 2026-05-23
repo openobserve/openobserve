@@ -22,6 +22,17 @@ export class PipelinesPage {
         this.streamButton = page.getByRole("button", { name: "Stream" }).first();
         this.queryButton = page.getByRole("button", { name: "Query" });
         this.vueFlowPane = page.locator(".vue-flow__pane");
+        // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
+        // the wrapper opens the OSelect popover with `*-option` items.
+        this.inputNodeStreamTypeSelect = page.locator('[data-test="input-node-stream-type-select"]').first();
+        // OSelect popover for the input-node stream-type select. Per the OSelect
+        // convention (§4) the popover/options pick up `<parentDataTest>-popover`
+        // and `<parentDataTest>-option` data-test attributes.
+        this.inputNodeStreamTypePopover = page.locator('[data-test="input-node-stream-type-select-popover"]');
+        // Per-value `logs` option inside the stream-type OSelect popover.
+        this.inputNodeStreamTypeLogsOption = page.locator(
+          '[data-test="input-node-stream-type-select-option"][data-test-value="logs"]'
+        );
         this.logsDropdown = page.locator("div").filter({ hasText: /^logs$/ });
         this.logsOption = page
           .getByRole("option", { name: "logs" })
@@ -252,8 +263,14 @@ export class PipelinesPage {
     }
 
     async selectLogs() {
-        await this.logsDropdown.click();
-        await this.logsOption.click();
+        // Open the input-node stream-type OSelect via its wrapper data-test.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        // Wait for the OSelect popover to appear (data-test forwarded from parent).
+        await this.inputNodeStreamTypePopover.waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `logs` option by its `data-test-value` value-specific attribute.
+        await this.inputNodeStreamTypeLogsOption.waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.click();
     }
 
     /**
