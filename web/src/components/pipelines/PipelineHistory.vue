@@ -38,11 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <OIcon name="info" size="sm" />
-              <OTooltip
-                content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
-                side="top"
-              />
+              <OIcon name="info" size="sm">
+                <OTooltip
+                  content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
+                  side="top"
+                />
+              </OIcon>
             </div>
           </div>
           <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
@@ -700,31 +701,21 @@ const filterPipelineOptions = (val: string, update: any) => {
 };
 
 const onPipelineSelected = (val: any) => {
-  if (val && val.value) {
-    // Store the pipeline ID for the API call
-    searchQuery.value = val.value;
-    // Automatically trigger search when an item is selected
-    pagination.value.page = 1;
-    fetchPipelineHistory();
-  }
+  // OSelect with valueKey="value" emits the primitive value (pipeline id) or null on clear
+  searchQuery.value = val ?? "";
+  pagination.value.page = 1;
+  fetchPipelineHistory();
 };
 
 const clearSearch = () => {
   searchQuery.value = "";
   selectedPipeline.value = undefined;
+  pagination.value.page = 1;
+  fetchPipelineHistory();
 };
 
 const manualSearch = () => {
-  // Update searchQuery from selectedPipeline when manually searching
-  if (selectedPipeline.value && selectedPipeline.value.value) {
-    searchQuery.value = selectedPipeline.value.value;
-  } else if (
-    selectedPipeline.value &&
-    typeof selectedPipeline.value === "string"
-  ) {
-    // Handle case where user typed a value without selecting from dropdown
-    searchQuery.value = selectedPipeline.value;
-  }
+  searchQuery.value = (selectedPipeline.value as any) ?? "";
   pagination.value.page = 1;
   fetchPipelineHistory();
 };
