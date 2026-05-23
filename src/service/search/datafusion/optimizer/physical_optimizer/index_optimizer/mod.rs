@@ -131,6 +131,21 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
+
+            // check if the query is simple topn or simple distinct
+            if config::cluster::LOCAL_NODE.is_single_node() {
+                if let Some(index_optimize_mode) =
+                    is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                } else if let Some(index_optimize_mode) =
+                    is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                }
+            }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
             // Check for SimpleCount
@@ -239,9 +254,8 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            } else {
-                return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
             }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         }
         Ok(Transformed::no(plan))
     }
