@@ -2046,27 +2046,28 @@ export class PipelinesPage {
      * @param {string} streamName - Exact name of the stream option to select
      */
     async selectStreamOption(streamName) {
-        await this.page.waitForTimeout(2000);
-        // OSelect now forwards parent data-test to ListboxItems (`*-option`); we
-        // pick the matching option by its data-test container.
+        // OSelect now forwards parent data-test to ListboxItems
+        // (`<parent>-option`) and stamps a per-value `data-test-value`. Match
+        // by value to avoid the substring match that an earlier hasText
+        // approach used (which collided with overlapping prefixes like
+        // `e2e_automate` vs `e2e_automate3`).
         const option = this.page
-            .locator('[data-test$="-option"]', { hasText: streamName })
+            .locator(`[data-test$="-option"][data-test-value="${streamName}"]`)
             .first();
-        // Wait for the option to not have disabled class
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the option to be enabled (not disabled) before clicking —
+        // pipeline source streams that are already in use are rendered
+        // disabled.
         await this.page.waitForFunction(
             (name) => {
-                const options = document.querySelectorAll('[data-test$="-option"]');
-                for (const opt of options) {
-                    if (opt.textContent?.includes(name) && !opt.classList.contains('disabled')) {
-                        return true;
-                    }
-                }
-                return false;
+                const opt = document.querySelector(
+                    `[data-test$="-option"][data-test-value="${name}"]`,
+                );
+                return !!opt && opt.getAttribute('aria-disabled') !== 'true';
             },
             streamName,
-            { timeout: 10000 }
+            { timeout: 10000 },
         ).catch(() => {
-            // If wait times out, try clicking anyway
             testLogger.debug('selectStreamOption: Wait for enabled option timed out, attempting click anyway');
         });
         await option.click();

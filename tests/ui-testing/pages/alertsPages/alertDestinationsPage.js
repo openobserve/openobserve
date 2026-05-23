@@ -501,8 +501,10 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name of the destination to delete
      */
     async deleteDestinationWithSearch(destinationName) {
-        await this.page.locator(this.destinationListSearchInput).click();
-        await this.page.locator(this.destinationListSearchInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        await searchField.click();
+        await searchField.fill(destinationName);
         await this.page.waitForTimeout(1000); // Wait for search results
         await this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName)).click();
         await this.page.locator(this.confirmButton).click();
@@ -698,13 +700,18 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify successful import message is visible
-     * Uses text content since the UI doesn't have data-test attributes for this message
+     * Verify successful import message is visible.
+     * Anchors on the OToast wrapper (`o-toast-success` or `o-toast-default`) — the success
+     * import path emits a default-variant toast, so we probe both via a CSS composite of
+     * the data-test prefix and accept the first match. Avoids `getByText` (§2).
      */
     async verifySuccessfulImportMessage() {
-        // Look for the success message text anywhere on the page (toast or dialog)
-        const successMessage = this.page.getByText('Successfully imported');
-        await expect(successMessage).toBeVisible({ timeout: 10000 });
+        // OToast renders a wrapper `[data-test^="o-toast-"]`; the visible message body has
+        // `data-test="o-toast-message"`. Use the wrapper for presence — any toast surfacing
+        // signals the import resolved (success / default variant). `.first()` dodges the
+        // sr-only / visible double-render strict-mode collision.
+        const toastWrapper = this.page.locator(this.successNotification).first();
+        await expect(toastWrapper).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -889,12 +896,14 @@ export class AlertDestinationsPage {
 
         await this.page.locator(this.importJsonFileTab).click();
 
-        // Try original locator first, fallback to new locator if it fails
+        // OFile native <input type=file> uses the `-field` derivative per §4.
+        // Try the canonical -field locator first, falling back to the OFile wrapper which
+        // some Playwright builds also accept for setInputFiles.
+        const fileInputField = this.page.locator('[data-test="destination-import-json-file-input-field"]');
         try {
-            await this.page.locator('[data-test="destination-import-json-file-input"]').setInputFiles(filePath, { timeout: 5000 });
+            await fileInputField.setInputFiles(filePath, { timeout: 5000 });
         } catch (error) {
-            // Fallback to new locator
-            await this.page.locator(this.destinationImportFileInput).setInputFiles(filePath);
+            await this.page.locator('[data-test="destination-import-json-file-input"]').setInputFiles(filePath, { timeout: 5000 });
         }
 
         await this.page.waitForTimeout(2000); // Wait for JSON to load
