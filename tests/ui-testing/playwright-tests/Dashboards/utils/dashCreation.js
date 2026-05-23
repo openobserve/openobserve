@@ -209,11 +209,8 @@ export async function reopenDashboardFromList(page, dashboardName) {
     page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
   ]);
 
-  const dashboardRow = page
-    .locator(`tr:has([data-test="dashboard-name-cell-${dashboardName}"])`)
-    .nth(0);
-
-  const dashboardNameDiv = dashboardRow.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`);
+  const dashboardNameDiv = page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`).first();
+  await dashboardNameDiv.waitFor({ state: 'visible', timeout: 10000 });
   await dashboardNameDiv.click();
 
   testLogger.debug('Clicked on dashboard name');

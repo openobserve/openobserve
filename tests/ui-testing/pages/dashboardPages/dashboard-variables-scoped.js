@@ -1591,9 +1591,10 @@ export default class DashboardVariablesScoped {
    * @param {string} newValue - New value to set
    */
   async changeTextboxVariableValue(variableName, newValue) {
-    const selector = await this.waitForVariableSelectorVisible(variableName);
-    await selector.clear();
-    await selector.fill(newValue);
+    const field = this.page.locator(`[data-test="variable-selector-${variableName}-field"]`);
+    await field.waitFor({ state: 'visible', timeout: 15000 });
+    await field.clear();
+    await field.fill(newValue);
     await this.page.keyboard.press('Enter');
   }
 

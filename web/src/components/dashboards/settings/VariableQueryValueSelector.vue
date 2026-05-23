@@ -36,9 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span class="tw:flex-1 tw:text-start tw:truncate">{{
-          displayValue
-        }}</span>
+        <span
+          class="tw:flex-1 tw:text-start tw:truncate"
+          :data-test="`variable-selector-${variableItem.name}-inner-trigger`"
+        >{{ displayValue }}</span>
       </template>
       <template #before-options>
         <template v-if="computedOptions.length > 0">
