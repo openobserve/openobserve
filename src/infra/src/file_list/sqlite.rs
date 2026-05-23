@@ -119,8 +119,8 @@ impl super::FileList for SqliteFileList {
         let meta = &file.meta;
         let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
         .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -133,6 +133,7 @@ impl super::FileList for SqliteFileList {
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
         .execute(&mut *tx)
@@ -1519,8 +1520,8 @@ impl SqliteFileList {
         }
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
         "#).as_str(),
     )
         .bind(id)
@@ -1536,6 +1537,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
         .execute(&*client)
@@ -1565,7 +1567,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1592,6 +1594,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
                 });
