@@ -225,6 +225,9 @@ export class PipelinesPage {
         this.pipelineNodeDefaultOutputHandle = page.locator('[data-test="pipeline-node-default-output-handle"]');
         this.pipelineNodeOutputInputHandle = page.locator('[data-test="pipeline-node-output-input-handle"]');
         this.addPipelineBackBtn = page.locator('[data-test="add-pipeline-back-btn"]');
+        // Backfill jobs list locators — error indicator per row + error dialog.
+        this.backfillErrorIndicatorBtn = page.locator('[data-test="error-indicator-btn"]');
+        this.backfillErrorDialog = page.locator('[data-test="backfill-jobs-list-error-dialog"]');
 
         // Additional locators for raw selector fixes
         this.functionIcon = page.getByRole("img", { name: "Function", exact: true });
@@ -3241,18 +3244,18 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of error indicators
      */
     async getErrorIndicatorCount() {
-        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .OIcon[color="negative"]').all();
-        return errorIndicators.length;
+        // Backfill rows render `data-test="error-indicator-btn"` per failed row.
+        return await this.backfillErrorIndicatorBtn.count();
     }
 
     /**
      * Click first error indicator
      */
     async clickFirstErrorIndicator() {
-        const errorIndicator = this.page.locator('[data-test*="error"], .error-indicator, .text-negative').first();
+        const errorIndicator = this.backfillErrorIndicatorBtn.first();
         if (await errorIndicator.isVisible().catch(() => false)) {
             await errorIndicator.click();
-            await this.page.waitForTimeout(500);
+            await this.backfillErrorDialog.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             testLogger.info('Clicked first error indicator');
         }
     }
@@ -3262,18 +3265,19 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('[data-test*="error-dialog"], [data-test*="dialog"]').first();
-        return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.backfillErrorDialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
      * Close error dialog
      */
     async closeErrorDialog() {
-        const closeBtn = this.page.locator('[data-test="o-dialog-primary-btn"], [data-test*="close"]').first();
+        // BackfillJobsList wires the dialog's primary button to close. The
+        // o-dialog-primary-btn lives inside the dialog data-test wrapper.
+        const closeBtn = this.backfillErrorDialog.locator('[data-test="o-dialog-primary-btn"]').first();
         if (await closeBtn.isVisible().catch(() => false)) {
             await closeBtn.click();
-            await this.page.waitForTimeout(300);
+            await this.backfillErrorDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             testLogger.info('Closed error dialog');
         }
     }
