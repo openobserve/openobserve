@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown
       v-model:open="menuOpen"
       side="bottom"
-      align="start"
+      :align="menuAlign"
       @update:open="onMenuOpenChange"
     >
       <template #trigger>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <td class="label tw:px-2">End time</td>
                   </tr>
                   <tr>
-                    <td>
+                    <td class="tw:pr-1.5">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.startTime"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </td>
-                    <td>
+                    <td class="tw:pl-1.5">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.endTime"
@@ -353,6 +353,10 @@ export default defineComponent({
     minDate: {
       type: String,
       default: null,
+    },
+    menuAlign: {
+      type: String,
+      default: "start",
     },
   },
 

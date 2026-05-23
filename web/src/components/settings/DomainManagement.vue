@@ -164,8 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
       
-      <div class="tw:flex tw:gap-3 tw:items-center">
-        <div class="tw:flex tw:gap-x-2">
+      <div class="tw:flex tw:gap-x-2 tw:items-center">
           <OInput
             v-model="newDomain"
             class="domain-input"
@@ -175,17 +174,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="domainError"
             @update:model-value="domainError = ''"
           />
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="addDomain"
-              :disabled="!newDomain || !isValidDomain(newDomain)"
-            >{{ t('settings.addDomain') }}
+          <OButton
+            variant="primary"
+            size="sm-action"
+            @click="addDomain"
+            :disabled="!newDomain || !isValidDomain(newDomain)"
+          >{{ t('settings.addDomain') }}
           </OButton>
-        </div>
+      </div>
+      <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
+        {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
 
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3" v-if="domains.length > 0">
+      <div class="tw:text-xs tw:text-gray-400 tw:mt-1 tw:mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
@@ -228,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div 
             v-if="domain.allowAllUsers"
-            class="tw:p-2 bg-blue-1 text-blue-8 tw:rounded tw:mb-3"
+            class="tw:p-2 tw:bg-blue-50 tw:text-blue-700 tw:rounded tw:mb-3"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>

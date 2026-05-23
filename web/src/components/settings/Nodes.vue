@@ -431,8 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:h-[36px] tw:mb-2">
             <OInput
               v-model="filterQuery"
-              class="tw:ml-0 tw:mb-1 tw:mr-2 o2-search-input"
-              style="width: 400px"
+              class="tw:ml-0 tw:mb-1 tw:mr-2 no-border o2-search-input"
               :placeholder="t('nodes.search')"
             >
               <template #icon-left>

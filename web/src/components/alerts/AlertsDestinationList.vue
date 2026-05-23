@@ -71,16 +71,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #actions>
+          <template #bottom="{ totalRows }">
+            <span class="o2-table-footer-title tw:text-primary">
+              {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
+            </span>
             <OButton
               v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
-              variant="outline"
+              variant="outline-destructive"
               size="sm"
               @click="openBulkDeleteDialog"
             >
-              <OIcon name="delete" size="sm" />
-              <span class="tw:ml-2">Delete</span>
+              <template #icon-left>
+                <OIcon name="delete" size="sm" />
+              </template>
+              {{ t('common.delete') }}
             </OButton>
           </template>
 
