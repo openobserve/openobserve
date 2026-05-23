@@ -19,22 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- select new folder -->
       <OSelect
         v-model="selectedFolder"
-        :label="t('dashboard.selectFolderLabel') + ' *'"
+        :label="t('dashboard.selectFolderLabel')"
         :options="store.state.organizationData.foldersByType[type]?.map((item: any) => ({ label: item.name, value: item.folderId })) ?? []"
         :data-test="`${type}-index-dropdown-stream_type`"
         labelKey="label"
         valueKey="value"
-        class="showLabelOnTop no-case tw:mr-1"
-        style="width: calc(100% - 44px)"
+        class="tw:mr-1 tw:flex-1"
         :disabled="disableDropdown"
       >
         <template #empty>{{ t("search.noResult") }}</template>
       </OSelect>
 
-      <div style="width: 40px; margin-bottom: -4px;" :style="computedStyle">
+      <div :style="computedStyle">
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-sm"
+          class="tw:h-9 tw:w-9"
           :data-test="`${type}-folder-move-new-add`"
           title="Add Folder"
           :disabled="disableDropdown"

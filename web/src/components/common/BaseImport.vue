@@ -92,13 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
                     <div class="tw:flex tw:mt-[0.725rem] tw:h-[64px]">
-                      <div style="width: 100%" class="tw:pr-2">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
+                          size="md"
                           :placeholder="t('dashboard.addURL')"
                         />
-                      </div>
+
                     </div>
                   </slot>
 
@@ -298,7 +298,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:pr-[0.625rem] tw:mb-[0.625rem]",
+      default: "tw:px-[0.625rem] tw:mb-[0.625rem]",
     },
     containerStyle: {
       type: String,
