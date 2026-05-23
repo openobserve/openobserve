@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="showLabelOnTop"
         @update:model-value="onColorModeChange"
         style="width: 100%"
-        :dropdownStyle="{ height: '300px', width: '200px' }"
+        :dropdownStyle="{ width: '240px' }"
       />
 
       <!-- color picker for fixed and shades typed color mode -->

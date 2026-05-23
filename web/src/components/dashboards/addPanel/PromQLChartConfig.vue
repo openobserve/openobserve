@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
         placeholder="latitude or lat"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
@@ -73,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
         placeholder="longitude or lon"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
@@ -90,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
         placeholder="weight"
-        class="tw:mb-3"
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
@@ -110,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
         placeholder="country or location"
-        class="tw:mb-3"
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
@@ -162,41 +158,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           multiple
           class="showLabelOnTop"
           data-test="dashboard-config-table-aggregations"
-          :display-value="getTableAggregationsDisplay"
         >
-          <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events">
-              {{ t("dashboard.tableAggregations") }}
-              <OIcon class="tw:ml-1" size="md" name="info-outline" />
-              <OTooltip max-width="350px">
-                <template #content>
-                  <b>Table Aggregations - </b>
-                  Select multiple aggregation functions to display as columns.
-                  <br /><br />
-                  Single aggregation: creates a "value" column
-                  <br />
-                  Multiple aggregations: creates "value_last", "value_sum", etc.
-                  <br /><br />
-                  Example: Selecting "last", "sum", "avg" will create three value
-                  columns.
-                </template>
-              </OTooltip>
-            </div>
-          </template>
-          <template v-slot:option="{ opt, selected, toggleOption }">
-            <div
-              class="tw:flex tw:items-center tw:gap-2 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
-              @click="toggleOption(opt)"
-            >
-              <OCheckbox
-                class="tw:shrink-0"
-                :model-value="selected"
-                @update:model-value="toggleOption(opt)"
-              />
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm">{{ opt.label }}</span>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="350px">
+              <template #content>
+                <b>Table Aggregations - </b>
+                Select multiple aggregation functions to display as columns.
+                <br /><br />
+                Single aggregation: creates a "value" column
+                <br />
+                Multiple aggregations: creates "value_last", "value_sum", etc.
+                <br /><br />
+                Example: Selecting "last", "sum", "avg" will create three value
+                columns.
+              </template>
+            </OTooltip>
           </template>
         </OSelect>
       </template>
@@ -220,110 +196,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'visible-columns')"
           v-model="visibleColumns"
-          :options="visibleColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.visibleColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterVisibleColumns"
-          @new-value="createColumnValue"
+          creatable
           class="showLabelOnTop"
           data-test="dashboard-config-visible-columns"
-          :display-value="getVisibleColumnsDisplay"
+          @create="addToVisibleColumns"
         >
-          <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events tw:mb-[-5px]">
-              {{ t("dashboard.visibleColumns") }}
-              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
-                <OTooltip max-width="400px">
-                  <template #content>
-                    <b>Visible Columns</b>
-                    <br /><br />
-                    Specify which metric label columns to show in the table.
-                    <br /><br />
-                    <b>How to use:</b><br />
-                    • Select from dropdown (loaded from stream fields)<br />
-                    • Type custom column names and press Enter<br />
-                    • Leave empty to show all columns
-                    <br /><br />
-                    <b>Note:</b> This takes precedence over "Hidden Columns" if
-                    both are set.
-                  </template>
-                </OTooltip>
-            </div>
-          </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <div
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-              style="min-height: auto; padding: 0px 4px"
-              @click="toggleOption(opt)"
-            >
-              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-                <OCheckbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </div>
-              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm">{{ opt }}</span>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="400px">
+              <template #content>
+                <b>Visible Columns</b>
+                <br /><br />
+                Specify which metric label columns to show in the table.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • Leave empty to show all columns
+                <br /><br />
+                <b>Note:</b> This takes precedence over "Hidden Columns" if
+                both are set.
+              </template>
+            </OTooltip>
           </template>
         </OSelect>
 
         <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'hidden-columns')"
           v-model="hiddenColumns"
-          :options="hiddenColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.hiddenColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterHiddenColumns"
-          @new-value="createColumnValue"
+          creatable
           class="showLabelOnTop"
           data-test="dashboard-config-hidden-columns"
-          :display-value="getHiddenColumnsDisplay"
+          @create="addToHiddenColumns"
         >
-          <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events tw:mb-[-5px]">
-              {{ t("dashboard.hiddenColumns") }}
-              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
-                <OTooltip max-width="400px">
-                  <template #content>
-                    <b>Hidden Columns</b>
-                    <br /><br />
-                    Specify which metric label columns to hide from the table.
-                    <br /><br />
-                    <b>How to use:</b><br />
-                    • Select from dropdown (loaded from stream fields)<br />
-                    • Type custom column names and press Enter<br />
-                    • All other columns will be shown
-                    <br /><br />
-                    <b>Tip:</b> Useful for hiding internal labels like __name__,
-                    le (histogram buckets), quantile, etc.
-                  </template>
-                </OTooltip>
-            </div>
-          </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <div
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-              style="min-height: auto; padding: 0px 4px"
-              @click="toggleOption(opt)"
-            >
-              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-                <OCheckbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </div>
-              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm">{{ opt }}</span>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="400px">
+              <template #content>
+                <b>Hidden Columns</b>
+                <br /><br />
+                Specify which metric label columns to hide from the table.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • All other columns will be shown
+                <br /><br />
+                <b>Tip:</b> Useful for hiding internal labels like __name__,
+                le (histogram buckets), quantile, etc.
+              </template>
+            </OTooltip>
           </template>
         </OSelect>
       </template>
@@ -367,56 +293,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'sticky-columns')"
           v-model="stickyColumns"
-          :options="stickyColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.stickyColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterStickyColumns"
-          @new-value="createColumnValue"
+          creatable
           class="showLabelOnTop"
           data-test="dashboard-config-sticky-columns"
           :disable="stickyFirstColumn"
-          :display-value="getStickyColumnsDisplay"
+          @create="addToStickyColumns"
         >
-          <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events">
-              {{ t("dashboard.stickyColumns") }}
-              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
-                <OTooltip max-width="400px">
-                  <template #content>
-                    <b>Sticky Columns</b>
-                    <br /><br />
-                    Specify which columns should remain fixed when scrolling
-                    horizontally.
-                    <br /><br />
-                    <b>How to use:</b><br />
-                    • Select from dropdown (loaded from stream fields)<br />
-                    • Type custom column names and press Enter<br />
-                    • Columns will stay visible during horizontal scroll
-                    <br /><br />
-                    <b>Note:</b> Disabled when "Sticky First Column" is enabled.
-                  </template>
-                </OTooltip>
-            </div>
-          </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <div
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-              style="min-height: auto; padding: 0px 4px"
-              @click="toggleOption(opt)"
-            >
-              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-                <OCheckbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </div>
-              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm">{{ opt }}</span>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="400px">
+              <template #content>
+                <b>Sticky Columns</b>
+                <br /><br />
+                Specify which columns should remain fixed when scrolling
+                horizontally.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • Columns will stay visible during horizontal scroll
+                <br /><br />
+                <b>Note:</b> Disabled when "Sticky First Column" is enabled.
+              </template>
+            </OTooltip>
           </template>
         </OSelect>
       </template>
@@ -431,7 +332,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('promqlTable', 'configure-column-order')
           "
-          class="tw:mb-2 tw:mt-3"
           style="font-weight: 600"
         ></div>
         <OButton
@@ -470,7 +370,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
@@ -483,7 +382,6 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
-    OCheckbox,
 },
   props: {
     chartType: {
@@ -680,72 +578,20 @@ export default defineComponent({
       return result;
     });
 
-    // Filtered options for each multiselect (for search/autocomplete)
-    const visibleColumnsFilteredOptions = ref<string[]>([]);
-    const hiddenColumnsFilteredOptions = ref<string[]>([]);
-    const stickyColumnsFilteredOptions = ref<string[]>([]);
-
-    // Filter function for visible columns autocomplete
-    const filterVisibleColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          visibleColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          visibleColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
+    // Handlers for adding user-typed custom column names (OSelect @create event)
+    const addToVisibleColumns = (val: string) => {
+      const current = [...(visibleColumns.value as string[])];
+      if (!current.includes(val)) visibleColumns.value = [...current, val];
     };
 
-    // Filter function for hidden columns autocomplete
-    const filterHiddenColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          hiddenColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          hiddenColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
+    const addToHiddenColumns = (val: string) => {
+      const current = [...(hiddenColumns.value as string[])];
+      if (!current.includes(val)) hiddenColumns.value = [...current, val];
     };
 
-    // Filter function for sticky columns autocomplete
-    const filterStickyColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          stickyColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          stickyColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
-    };
-
-    // Handler for creating new column values
-    const createColumnValue = (val: string, done: (value: string) => void) => {
-      // Trim and validate the value
-      const trimmedVal = val.trim();
-      if (trimmedVal.length > 0) {
-        done(trimmedVal);
-      }
+    const addToStickyColumns = (val: string) => {
+      const current = [...(stickyColumns.value as string[])];
+      if (!current.includes(val)) stickyColumns.value = [...current, val];
     };
 
     // Table column filters - visible columns
@@ -797,47 +643,6 @@ export default defineComponent({
         dashboardPanelData.data.config.sticky_columns =
           value && value.length > 0 ? value : undefined;
       },
-    });
-
-    // Display value for table aggregations (compact format: first item + count)
-    const getTableAggregationsDisplay = computed(() => {
-      const selected = tableAggregations.value || [];
-      if (selected.length === 0) return "";
-
-      // Map the selected values to their labels
-      const labels = selected
-        .map((val: string) => {
-          const option = aggregationOptions.find((opt) => opt.value === val);
-          return option ? option.value : val;
-        })
-        .filter(Boolean);
-
-      if (labels.length === 1) return labels[0];
-      return `${labels[0]} (+${labels.length - 1} more)`;
-    });
-
-    // Display value for visible columns (compact format: first item + count)
-    const getVisibleColumnsDisplay = computed(() => {
-      const selected = visibleColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
-    });
-
-    // Display value for hidden columns (compact format: first item + count)
-    const getHiddenColumnsDisplay = computed(() => {
-      const selected = hiddenColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
-    });
-
-    // Display value for sticky columns (compact format: first item + count)
-    const getStickyColumnsDisplay = computed(() => {
-      const selected = stickyColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
     });
 
     // Column order configuration
@@ -904,21 +709,14 @@ export default defineComponent({
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,
-      getTableAggregationsDisplay,
-      visibleColumnsFilteredOptions,
-      hiddenColumnsFilteredOptions,
-      stickyColumnsFilteredOptions,
-      filterVisibleColumns,
-      filterHiddenColumns,
-      filterStickyColumns,
-      createColumnValue,
+      addToVisibleColumns,
+      addToHiddenColumns,
+      addToStickyColumns,
       visibleColumns,
       hiddenColumns,
-      getVisibleColumnsDisplay,
-      getHiddenColumnsDisplay,
       stickyFirstColumn,
       stickyColumns,
-      getStickyColumnsDisplay,
+      availableColumnOptions,
       columnOrder,
       showColumnOrderPopup,
       filteredAvailableColumns,
@@ -932,11 +730,17 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .promql-chart-config {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
   .geomap-config,
   .maps-config,
   .table-config {
-    padding: 0px 0;
-    // border: 1px solid rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0;
   }
 
   // Fix icon cropping in labels

@@ -15,9 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center" data-test="dashboard-table-pagination-controls">
+  <div
+    class="tw:flex tw:items-center"
+    data-test="dashboard-table-pagination-controls"
+  >
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div v-if="showPagination" class="tw:flex tw:items-center tw:gap-2">
+    <div
+      v-if="showPagination"
+      class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+    >
       <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
@@ -25,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
         :options="formattedPaginationOptions"
+        size="sm"
         data-test="dashboard-table-rows-per-page-select"
       />
     </div>
@@ -158,6 +165,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Auto-size to content so "10" is narrow and "1000" is wider.
+:deep([data-test="dashboard-table-rows-per-page-select"]) {
+  width: fit-content !important;
+}
+
 // Ensure all pagination elements sit on the same baseline.
 [data-test="dashboard-table-pagination-controls"] {
   display: flex !important;

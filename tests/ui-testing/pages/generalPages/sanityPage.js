@@ -495,6 +495,7 @@ export class SanityPage {
     // ================================================================
     async createAndDeleteFolder(folderName) {
         await this.dashboardsMenuItem.click();
+        await this.dashboardsMenuItem.click();
         await this.page.waitForLoadState('domcontentloaded');
 
         await this.dashboardSearch.waitFor({ state: 'visible', timeout: 15000 });
@@ -564,6 +565,7 @@ export class SanityPage {
         }).catch(() => {
             // No dialog present, continue
         });
+
 
         await this.page.waitForLoadState('domcontentloaded');
 

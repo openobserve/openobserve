@@ -25,50 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="selectedMetric ? '' : t('search.selectIndex')"
       :options="streamOptions"
       data-cy="index-dropdown"
-      input-debounce="0"
-      behavior="menu"
-      use-input
-      hide-selected
-      fill-input
       class="metric-select-input"
-      @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
-      <template v-if="selectedMetric?.type" v-slot:prepend>
+      <template v-if="selectedMetric?.type" #icon-left>
         <OIcon
           :title="selectedMetric?.type"
           size="xs"
           :name="metricsIconMapping[selectedMetric?.type || '']"
         />
       </template>
-      <template v-slot:option="scope">
-        <div
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
-          :class="
-            store.state.theme === 'dark' &&
-            selectedMetric?.value !== scope.opt.value
-              ? 'text-white'
-              : ''
-          "
-          @click="scope.toggleOption(scope.opt)"
-        >
-          <div
-            :title="scope?.opt?.type"
-            class="metric-explore-metric-icon tw:flex tw:items-center tw:shrink-0"
-          >
-            <OIcon
-              size="xs"
-              :name="metricsIconMapping[scope?.opt?.type] || ''"
-            />
-          </div>
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-            <span class="tw:text-sm">{{ scope.opt.label }}</span>
-          </div>
-        </div>
-      </template>
-      <template #no-option>
+      <template #empty>
         <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0"> {{ t("search.noResult") }}</div>
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">{{ t("search.noResult") }}</div>
         </li>
       </template>
     </OSelect>
@@ -516,7 +485,6 @@ export default defineComponent({
       searchObj,
       streamOptions,
       getImageURL,
-      filterMetrics,
       filteredMetricLabels,
       searchMetricLabel,
       metricColumns,

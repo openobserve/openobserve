@@ -411,17 +411,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
-                    <OSelect
-                      v-model="cronTimezone"
-                      :options="filteredTimezones"
-                      searchable
-                      placeholder="timezone"
-                      class="alert-v3-select"
-                      style="min-width: 150px; max-width: 150px;"
-                      @update:model-value="onCronTimezoneChange"
-                    >
-                      <OTooltip v-if="cronTimezone" :content="cronTimezone" :delay="300" side="bottom" />
-                    </OSelect>
+                    <span class="tw:inline-block" style="min-width: 150px; max-width: 150px;">
+                      <OSelect
+                        v-model="cronTimezone"
+                        :options="filteredTimezones"
+                        searchable
+                        placeholder="timezone"
+                        class="alert-v3-select"
+                        style="min-width: 150px; max-width: 150px;"
+                        @update:model-value="onCronTimezoneChange"
+                      />
+                      <OTooltip
+                        v-if="cronTimezone"
+                        :content="cronTimezone"
+                        :delay="300"
+                        side="bottom"
+                      />
+                    </span>
                   </template>
 
                   <span class="condition-text">on these</span>
@@ -624,14 +630,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="tw:flex tw:items-center tw:gap-1">
                     <OSelect
-                      :model-value="null"
+                      v-model="selectedSavedFunctionName"
                       :options="functionsList"
                       labelKey="name"
+                      valueKey="name"
                       clearable
                       class="mini-select alert-v3-select"
                       style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
-                      @update:model-value="(fn: any) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
+                      @update:model-value="(name: any) => { const fn = functionsList.find((f: any) => f.name === name); if (fn) vrlFunctionContent = fn.function || fn.body || ''; }"
                     >
                       <template #empty>
                         <span>{{ t('alerts.queryConfig.noFunctions') }}</span>
@@ -731,17 +738,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="onFrequencyUnitChange"
                   />
                   <template v-if="frequencyMode === 'cron'">
-                    <OSelect
-                      v-model="cronTimezone"
-                      :options="filteredTimezones"
-                      searchable
-                      placeholder="timezone"
-                      class="alert-v3-select"
-                      style="min-width: 150px; max-width: 150px;"
-                      @update:model-value="onCronTimezoneChange"
-                    >
-                      <OTooltip v-if="cronTimezone" :content="cronTimezone" :delay="300" side="bottom" />
-                    </OSelect>
+                    <span class="tw:inline-block" style="min-width: 150px; max-width: 150px;">
+                      <OSelect
+                        v-model="cronTimezone"
+                        :options="filteredTimezones"
+                        searchable
+                        placeholder="timezone"
+                        class="alert-v3-select"
+                        style="min-width: 150px; max-width: 150px;"
+                        @update:model-value="onCronTimezoneChange"
+                      />
+                      <OTooltip
+                        v-if="cronTimezone"
+                        :content="cronTimezone"
+                        :delay="300"
+                        side="bottom"
+                      />
+                    </span>
                   </template>
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
@@ -1020,6 +1033,7 @@ export default defineComponent({
     const localSqlQuery = ref(props.sqlQuery);
     const localPromqlQuery = ref(props.promqlQuery);
     const vrlFunctionContent = ref(props.vrlFunction);
+    const selectedSavedFunctionName = ref<string | null>(null);
 
     // Aggregation state
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
@@ -2159,6 +2173,7 @@ export default defineComponent({
       localSqlQuery,
       localPromqlQuery,
       vrlFunctionContent,
+      selectedSavedFunctionName,
       updateSqlQuery,
       updatePromqlQuery,
       handleVrlFunctionUpdate,

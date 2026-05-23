@@ -47,6 +47,12 @@ export interface ComboboxProps {
   id?: string;
   /** name forwarded to the input element */
   name?: string;
+  /**
+   * Controls where the label is rendered.
+   * - `"outside"` (default): label renders above the input as a block element.
+   * - `"inside"`: label renders as a small floating label pinned inside the top of the input.
+   */
+  labelPosition?: "inside" | "outside";
 }
 
 export interface ComboboxEmits {

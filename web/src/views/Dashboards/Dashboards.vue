@@ -284,7 +284,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="value && value.length > 30"
                   :content="value"
                   max-width="300px"
-
                 />
               </div>
             </template>

@@ -7,11 +7,11 @@
         size="sm-action"
         class="metric-legends-button"
       >
-        <OIcon name="category" size="sm" class="tw:mr-2" />
+        <OIcon name="category" size="sm" />
         <span>{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'" class="tw:px-2 tw:pt-1.5 tw:pb-1">
       <div class="metric-legends-title">
         <div class="label">{{ t("search.legendLabel") }}</div>
       </div>
@@ -19,11 +19,10 @@
       <div class="legends">
         <div class="legend-grid">
           <div
-            class="legend-item"
             v-for="(icon, metric) in metricsIconMapping"
             :key="metric"
           >
-            <OIcon :name="icon" size="sm" class="tw:mr-2" />
+            <OIcon :name="icon" size="md" class="tw:mr-1" />
             <span>{{ metric }}</span>
           </div>
         </div>
@@ -71,12 +70,7 @@ export default defineComponent({
   grid-template-columns: repeat(2, 1fr); /* Two columns */
   gap: 10px; /* Space between items */
 }
-.legend-item {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  padding: 6px 0;
-}
+
 .q-btn:before {
   border: 0px solid #d5d5d5;
 }
@@ -87,11 +81,5 @@ export default defineComponent({
   height: 30px;
   font-weight: bold;
   border: 1px solid rgba(89, 96, 178, 0.3);
-}
-.theme-dark .legend-item {
-  color: white;
-}
-.theme-light .legend-item {
-  color: black;
 }
 </style>

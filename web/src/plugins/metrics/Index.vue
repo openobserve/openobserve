@@ -217,9 +217,14 @@ export default defineComponent({
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    onUnmounted(async () => {
-      // clear a few things
-      resetDashboardPanelData();
+    onUnmounted(() => {
+      // NOTE: Do NOT call resetDashboardPanelData() here.
+      // When org changes, Vue mounts the new component (onBeforeMount) BEFORE
+      // unmounting the old one (onUnmounted). Resetting the shared singleton
+      // dashboardPanelDataObj["metrics"] here would overwrite the "promql" state
+      // that the new instance just set, causing the PromQL query type to
+      // disappear after every org switch. The new instance's onBeforeMount
+      // already resets and re-initialises the state correctly.
     });
 
     /** Apply default SQL builder fields for metrics.

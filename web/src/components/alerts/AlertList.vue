@@ -1028,8 +1028,9 @@ export default defineComponent({
           id: "name",
           accessorKey: "name",
           header: t("alerts.name"),
-          cell: " ",
           sortable: true,
+          size: 250,
+          minSize: 200,
           meta: { align: "left" },
         },
         {
@@ -1039,7 +1040,7 @@ export default defineComponent({
           cell: " ",
           sortable: true,
           size: 150,
-          meta: { align: "center" },
+          meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
         ...(activeTab.value !== "realTime"
