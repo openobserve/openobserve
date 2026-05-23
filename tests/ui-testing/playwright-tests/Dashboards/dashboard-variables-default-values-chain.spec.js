@@ -74,7 +74,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     // Verify B has "All" value
     const varBSelector = page.locator(getVariableSelector(varB));
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
-    const varBValue = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
     // Change A and verify B still has "All"
@@ -88,7 +88,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
     // Verify B still has "All" value after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValueAfter).toContain("ALL");
 
     // Cleanup
@@ -150,7 +150,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     // Verify B has custom values
     const varBSelector = page.locator(getVariableSelector(varB));
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
-    const varBValue = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue1);
 
     // Change A and verify B still has custom values
@@ -164,7 +164,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
     // Verify B still has custom values after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValueAfter).toContain(customValue1);
 
     // Cleanup
@@ -243,12 +243,12 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
     // Verify B has "All" value
     const varBSelector = page.locator(getVariableSelector(varB));
-    const varBValue = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
     // Verify C has a value (not null)
     const varCSelector = page.locator(getVariableSelector(varC));
-    const varCValue = await varCSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varCValue = await varCSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varCValue).toBeTruthy();
     expect(varCValue.length).toBeGreaterThan(0);
 
@@ -263,11 +263,11 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
     // Verify B still has "All"
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValueAfter).toContain("ALL");
 
     // Verify C still has a value (not null)
-    const varCValueAfter = await varCSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varCValueAfter = await varCSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varCValueAfter).toBeTruthy();
     expect(varCValueAfter.length).toBeGreaterThan(0);
 
@@ -367,13 +367,13 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await page.locator(getVariableSelector(varD)).waitFor({ state: "visible", timeout: 10000 });
 
     // Verify initial values
-    const varBValue = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValue = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
-    const varCValue = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varCValue = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-value"]').textContent();
     expect(varCValue).toContain("custom_pod");
 
-    const varDValue = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varDValue = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-value"]').textContent();
     expect(varDValue).toBeTruthy();
 
     // Change A and verify the entire chain
@@ -388,13 +388,13 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     // Verify all values are maintained/loaded properly
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const varBValueAfter = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValueAfter = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-value"]').textContent();
     expect(varBValueAfter).toContain("ALL");
 
-    const varCValueAfter = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varCValueAfter = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-value"]').textContent();
     expect(varCValueAfter).toContain("custom_pod");
 
-    const varDValueAfter = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-trigger"]').textContent();
+    const varDValueAfter = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-value"]').textContent();
     expect(varDValueAfter).toBeTruthy();
     expect(varDValueAfter.length).toBeGreaterThan(0);
 
@@ -454,7 +454,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     // Verify B has custom value
     const varBSelector = page.locator(getVariableSelector(varB));
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
-    const varBValue = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue);
 
     // Change A and verify B still has custom value
@@ -468,7 +468,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
     // Verify B still has custom value after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-trigger"]').textContent();
+    const varBValueAfter = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValueAfter).toContain(customValue);
 
     // Cleanup

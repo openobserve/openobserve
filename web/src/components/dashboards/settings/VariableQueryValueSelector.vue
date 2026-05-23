@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #trigger>
         <span
           class="tw:flex-1 tw:text-start tw:truncate"
-          :data-test="`variable-selector-${variableItem.name}-inner-trigger`"
+          :data-test="`variable-selector-${variableItem.name}-inner-value`"
         >{{ displayValue }}</span>
       </template>
       <template #before-options>
