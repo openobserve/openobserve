@@ -33,6 +33,11 @@ const SKELETON_HOLD_MS = 2100;
 describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
+    // Install fake timers before mounting so OTable's skeleton-hold setTimeout
+    // is registered as a fake timer. Only fake setTimeout/clearTimeout/Date to
+    // keep MSW's fetch/http machinery on real timers.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+
     wrapper = mount(TemplateList, {
       attachTo: "#app",
       global: {
@@ -43,10 +48,8 @@ describe("Alert List", async () => {
       },
     });
 
-    // Let MSW respond and the component finish its initial data fetch using real timers.
+    // Let MSW respond and the component finish its initial data fetch.
     await flushPromises();
-    // Switch to fake timers only after promises settle so MSW/fetch plumbing is unaffected.
-    vi.useFakeTimers();
     // Advance past OTable's 2-second skeleton hold timer so real rows are visible.
     vi.advanceTimersByTime(SKELETON_HOLD_MS);
     await flushPromises();

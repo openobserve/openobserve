@@ -77,9 +77,10 @@ describe("OToast", () => {
   it("renders a spinning icon for loading variant", async () => {
     mountToast({ id: "1", open: true, message: "Loading…", variant: "loading" })
     await vueNextTick()
-    const svg = document.body.querySelector("svg")
-    expect(svg).not.toBeNull()
-    expect(svg!.classList.toString()).toContain("animate-spin")
+    // OIcon renders <span class="...animate-spin"><component(svg) class="tw:size-full" /></span>
+    // The animate-spin class is on the span (via attribute fallthrough on OIcon), not the svg
+    const spinEl = document.body.querySelector('[class*="animate-spin"]')
+    expect(spinEl).not.toBeNull()
   })
 
   it("renders action button when action prop is provided", async () => {

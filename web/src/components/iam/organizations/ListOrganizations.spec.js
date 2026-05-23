@@ -139,6 +139,10 @@ describe("ListOrganizations", () => {
       });
 
       expect(freshWrapper.vm.filterQuery).toBe("");
+      // loading is true immediately after mount because getOrganizations() is
+      // called synchronously in setup and sets loading=true before the promise resolves
+      expect(freshWrapper.vm.loading).toBe(true);
+      await flushPromises();
       expect(freshWrapper.vm.loading).toBe(false);
       freshWrapper.unmount();
     });
@@ -209,9 +213,12 @@ describe("ListOrganizations", () => {
     });
 
     it("should handle loading state correctly", async () => {
+      // After initial mount and flushPromises, loading should be false
+      await flushPromises();
       expect(wrapper.vm.loading).toBe(false);
+      // Calling getOrganizations() sets loading=true synchronously
       wrapper.vm.getOrganizations();
-      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.vm.loading).toBe(true);
       await flushPromises();
       expect(wrapper.vm.loading).toBe(false);
     });

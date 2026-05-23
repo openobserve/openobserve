@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -269,14 +269,37 @@ describe("AppGroups Component", () => {
   });
 
   describe("Group Actions", () => {
-    it("renders edit and delete icons for each group", () => {
-      // Group data is [{ group_name: "admin" }, { group_name: "developers" }, { group_name: "users" }]
-      // Data-test attributes use row.group_name: iam-groups-edit-<group_name>-role-icon
-      const editIcon = wrapper.find('[data-test="iam-groups-edit-admin-role-icon"]');
-      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-admin-role-icon"]');
+    it("renders edit and delete icons for each group", async () => {
+      // OTable holds the loading skeleton for MIN_SKELETON_MS (2000ms) even after
+      // props.loading flips to false, so we must advance fake timers past that hold
+      // to allow OTableBody to render and expose the cell-actions slot.
+      vi.useFakeTimers();
+      const { getGroups } = await import("@/services/iam");
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse(["admin", "developers", "users"]) as any
+      );
+      mockGroupsState.groups = [
+        { group_name: "admin" },
+        { group_name: "developers" },
+        { group_name: "users" },
+      ] as any;
+
+      const localWrapper = mount(AppGroups, {
+        global: { provide: { store }, plugins: [i18n, router] },
+      });
+      await flushPromises();
+      // Advance past the 2000ms minimum skeleton hold in OTable
+      vi.advanceTimersByTime(2100);
+      await flushPromises();
+
+      const editIcon = localWrapper.find('[data-test="iam-groups-edit-admin-role-icon"]');
+      const deleteIcon = localWrapper.find('[data-test="iam-groups-delete-admin-role-icon"]');
 
       expect(editIcon.exists()).toBe(true);
       expect(deleteIcon.exists()).toBe(true);
+
+      localWrapper.unmount();
+      vi.useRealTimers();
     });
 
     it("navigates to edit page when edit icon is clicked", async () => {

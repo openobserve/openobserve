@@ -380,7 +380,8 @@ describe("OTable", () => {
           loading: true,
         },
       });
-      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(
+      // OTableLoading renders a skeleton tbody with data-test="o2-table-skeleton-body"
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
         true,
       );
     });
@@ -393,11 +394,9 @@ describe("OTable", () => {
           loading: true,
         },
       });
-      // When there are rows, the loading bar should not be the full page overlay
-      // But a loading banner should appear in the table
-      const loadingEl = wrapper.find('[data-test="o2-table-loading"]');
-      // Loading may or may not be visible depending on implementation
-      expect(loadingEl.exists() || wrapper.find('[data-test="o2-table"]').exists()).toBe(true);
+      // When loading=true, heldLoading activates and the skeleton replaces the body
+      // The outer <table> element is still rendered
+      expect(wrapper.find('[data-test="o2-table"]').exists()).toBe(true);
     });
   });
 
@@ -790,12 +789,14 @@ describe("OTable", () => {
   // ── Loading Banner ──────────────────────────────────────────
 
   describe("loading banner", () => {
-    it("renders loading banner slot when loading with existing data", () => {
+    it("renders loading banner slot when streaming with existing data", () => {
+      // The loading-banner slot is rendered when streaming=true and data exists,
+      // not when loading=true (loading uses the skeleton overlay instead)
       wrapper = mount(OTable, {
         props: {
           data: makeRows(5),
           columns: makeColumns(),
-          loading: true,
+          streaming: true,
         },
         slots: {
           "loading-banner":
@@ -1175,7 +1176,7 @@ describe("OTable", () => {
   // ── Data Refresh with Loading ────────────────────────────────
 
   describe("data refresh", () => {
-    it("shows loading banner when loading is true while data exists", async () => {
+    it("shows skeleton body when loading is true while data exists", async () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(5),
@@ -1183,14 +1184,13 @@ describe("OTable", () => {
           loading: true,
         },
       });
-      // When loading with data, the table should still be visible
+      // When loading=true, heldLoading activates and the skeleton replaces rows
       expect(wrapper.find('[data-test="o2-table"]').exists()).toBe(true);
-      // Table rows should still exist (not replaced by loading overlay)
-      const rows = wrapper.findAll('[data-test^="o2-table-row-"]');
-      expect(rows.length).toBe(5);
+      // OTableLoading (skeleton) is shown instead of actual rows
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
-    it("shows loading overlay when loading with no data", () => {
+    it("shows skeleton body when loading with no data", () => {
       wrapper = mount(OTable, {
         props: {
           data: [],
@@ -1198,7 +1198,8 @@ describe("OTable", () => {
           loading: true,
         },
       });
-      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(
+      // OTableLoading skeleton renders inside the table with data-test="o2-table-skeleton-body"
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
         true,
       );
     });

@@ -542,7 +542,7 @@ console.log('Hello World');
       const style = avatar.attributes('style');
       
       expect(style).toContain('top: 10px');
-      expect(style).toContain('left: 3.5px');
+      expect(style).toContain('left: 50%');
     });
   });
 

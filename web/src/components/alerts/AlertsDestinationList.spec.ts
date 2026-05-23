@@ -81,7 +81,7 @@ const OTableStub = {
     <div data-test="o-table-stub">
       <slot name="empty" />
       <slot name="actions" />
-      <slot name="bottom" />
+      <slot name="bottom" :totalRows="data ? data.length : 0" />
       <template v-for="row in data" :key="row.name">
         <slot name="cell-type" :row="row" />
         <slot name="cell-actions" :row="row" />

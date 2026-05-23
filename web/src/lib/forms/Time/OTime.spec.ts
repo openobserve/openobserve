@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OTime from "./OTime.vue";
 
 describe("OTime", () => {
@@ -119,20 +119,25 @@ describe("OTime", () => {
       attachTo: document.body,
       props: { modelValue: "09:30" },
     });
-    expect(wrapper.find('[role="group"]').text()).toContain("09:30");
+    // The time value is bound to the native <input type="time"> via :value prop
+    // .text() does not return input values; check the input element's value attribute
+    const input = wrapper.find('input[type="time"]');
+    expect(input.exists()).toBe(true);
+    expect(input.element.value).toBe("09:30");
   });
 
   it("should render the clock face popup after opening", async () => {
     wrapper = mount(OTime, { attachTo: document.body });
-    await wrapper.find('[role="group"]').trigger("click");
-    await wrapper.vm.$nextTick();
+    // Click the PopoverTrigger button (the clock icon button), not the role="group" div
+    await wrapper.find('[aria-label="Open time picker"]').trigger("click");
+    await flushPromises();
     expect(document.body.querySelector('[data-test="otime-popup"]')).toBeTruthy();
   });
 
   it("should render the clock face SVG inside the popup", async () => {
     wrapper = mount(OTime, { attachTo: document.body });
-    await wrapper.find('[role="group"]').trigger("click");
-    await wrapper.vm.$nextTick();
+    await wrapper.find('[aria-label="Open time picker"]').trigger("click");
+    await flushPromises();
     expect(
       document.body.querySelector('[data-test="otime-clock-face"]'),
     ).toBeTruthy();
@@ -140,8 +145,8 @@ describe("OTime", () => {
 
   it("should render a Close button in the popup", async () => {
     wrapper = mount(OTime, { attachTo: document.body });
-    await wrapper.find('[role="group"]').trigger("click");
-    await wrapper.vm.$nextTick();
+    await wrapper.find('[aria-label="Open time picker"]').trigger("click");
+    await flushPromises();
     expect(
       document.body.querySelector('[data-test="otime-close"]'),
     ).toBeTruthy();
