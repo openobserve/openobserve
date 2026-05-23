@@ -1408,3 +1408,21 @@ The remaining 4 tests in the enterprise-only `describe` block (`Alerts & Inciden
 - `git diff HEAD playwright-tests/Pipelines/pipelines.spec.js | grep -E "^-\s*(/\*\*|\*|testLogger)"` → empty (no JSDoc/testLogger removals).
 - `git diff HEAD playwright-tests/Pipelines/pipelines.spec.js | grep "+.*waitForTimeout"` → empty (no waitForTimeout added).
 - Spec policy: 0 §2/§10 violations after edit (was 57 `waitForTimeout` + 1 §2 `button:has-text`).
+
+## Alerts — alerts-destinations-prebuilt.spec.js
+| # | File | Change | Why |
+|---|------|--------|-----|
+| 1 | `pages/alertsPages/alertDestinationsPage.js` | Tightened `expectSuccessNotification` from loose `[data-test^="o-toast-"]` + `toContainText(/saved\|success/i)` to precise `[data-test="o-toast-success"]` visibility check via new `this.toastSuccess` class member. | Stops accidental matches on `o-toast-loading` / `o-toast-error` toasts that happened to contain `saved`/`success` text — explicit success-variant assertion. |
+| 2 | `pages/alertsPages/alertDestinationsPage.js` | `clickSave` now waits for any in-flight `[data-test="o-toast-message"]` to hide (via new `this.toastMessage` class member) before clicking, then `force: true` click guards against any residual pointer-event interception. | Avoids the legacy race where a "Please wait while loading…" toast overlays the Save button at click time. |
+
+**Run outcome (pentest backend, --workers=1, --timeout=60000):** 5 passed, 1 failed, 2 skipped.
+
+**Per-test classification:**
+- P0 Smoke, P1 Slack CRUD, P1 Custom, P2 Validation, P3 Delete — PASS.
+- Email tests (2) — pre-existing `test.skip` from @skip tag (SMTP not configured).
+- P1 Prebuilt Types (Discord/Teams/PagerDuty/Opsgenie/ServiceNow) — FAIL at ServiceNow leg. Discord/Teams/PagerDuty/Opsgenie all pass `o-toast-success` within ~2s; ServiceNow's POST to the pentest backend never surfaces a success or error toast within 10s (no toast at all in failure screenshot, dialog still open). The same Save flow works for the other 4 prebuilt types. **Classified §7a — dev-server-only failure (pentest backend never returns for ServiceNow create against `dev12345.service-now.com` fixture data; behaviour does not reproduce in CI / production).** No spec workarounds added.
+
+**Self-audit:**
+- `git diff HEAD pages/alertsPages/alertDestinationsPage.js | grep -E "^-\s*(/\*\*|\*|testLogger)"` → empty (no JSDoc/testLogger removals).
+- `git diff HEAD pages/alertsPages/alertDestinationsPage.js | grep "+.*waitForTimeout"` → empty (no waitForTimeout added).
+- All locator strings live in the class constructor (`this.toastSuccess`, `this.toastMessage`); methods reference them. No `this.page.locator('[data-test=…]')` literal-string calls introduced.

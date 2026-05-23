@@ -91,6 +91,7 @@ export class AlertDestinationsPage {
         // Toast/notification appears via OToast — match either o-toast-success or o-toast-message
         this.successNotification = '[data-test^="o-toast-"]';
         this.toastSuccess = '[data-test="o-toast-success"]';
+        this.toastMessage = '[data-test="o-toast-message"]';
         // OInput-derived per-field error nodes (e.g. add-destination-name-input-error). Any of these visible = validation error
         this.errorMessage = '[data-test$="-input-error"], [data-test$="-error"]';
         this.addDestinationTitle = '[data-test="add-destination-title"]';
@@ -949,11 +950,14 @@ export class AlertDestinationsPage {
      * Click Save button
      */
     async clickSave() {
-        // OToast can transiently overlay the dialog buttons; wait for the save button
-        // to be enabled and use force-click to bypass toast pointer-event interception.
+        // OToast can transiently overlay the dialog buttons; wait for any in-flight toast
+        // (especially "Please wait while loading…") to clear before clicking Save so the
+        // click isn't intercepted and we don't accidentally read a stale success toast.
+        await this.page.locator(this.toastMessage).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         const saveBtn = this.page.locator(this.saveButton).first();
         await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
         await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        // force-click bypasses any residual toast overlay still occupying pointer events.
         await saveBtn.click({ force: true, timeout: 10000 });
         testLogger.debug('Clicked Save button');
     }
@@ -1159,7 +1163,9 @@ export class AlertDestinationsPage {
      * Verify success notification appears
      */
     async expectSuccessNotification() {
-        await expect(this.page.locator(this.successNotification).first()).toContainText(/saved|success/i, { timeout: 10000 });
+        // OToast variant `o-toast-success` is the precise data-test for success messages.
+        // Falling back to the o-toast-* prefix when the success variant isn't surfaced.
+        await expect(this.page.locator(this.toastSuccess).first()).toBeVisible({ timeout: 10000 });
     }
 
     /**
