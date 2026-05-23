@@ -325,19 +325,7 @@ export default defineComponent({
     watch(
       () => props.variableItem.options,
       () => {
-        // Only update input if dropdown is open AND it's a multiSelect
-        // For single-select, don't interfere as the dropdown should close after selection
-        if (isOpen.value && selectRef.value && props.variableItem.multiSelect) {
-          nextTick(() => {
-            if (selectRef.value) {
-              if (!filterText.value) {
-                (selectRef.value as any).updateInputValue();
-              } else {
-                filterOptions(filterText.value, () => {});
-              }
-            }
-          });
-        }
+        // OSelect handles its own display — nothing to do when options reload
       },
       { deep: true },
     );

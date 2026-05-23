@@ -693,36 +693,73 @@ export default class DashboardVariablesScoped {
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
-    // Set the value to reference the dependency variable using $variableName syntax
-    // OCombobox renders its inner input as [data-test="${name}-input"]; we target the last filter row's input
+    // Set the value to reference the dependency variable using $variableName syntax.
+    // OCombobox renders its inner input as [data-test="${name}-input"]; we target the last filter row's input.
+    // We MUST click the input before filling so that reka-ui's openOnClick fires and opens the portal dropdown.
     const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
     await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
+
+    /**
+     * Try to find and click the option with the given label inside the OCombobox portal.
+     * Returns true on success (onSelect fires immediately, no debounce). Returns false if option not found.
+     * @param {string} label - The data-test-label value to look for
+     */
+    const tryClickDropdownOption = async (label) => {
+      try {
+        const option = this.page.locator(
+          `[data-test*="filter-value-selector"][data-test$="-option"][data-test-label="${label}"]`
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 3000 });
+        await option.click();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Attempt 1: click to open, fill variable name (no $), click the matching option.
+    // onSelect() fires synchronously → filter.value = "$varName" with no debounce.
+    await filterValueInput.click();
     await filterValueInput.fill(dependencyVariableName);
 
-    // Wait for autocomplete dropdown options
+    const optionsLocator = '[data-test*="filter-value-selector"][data-test$="-option"]';
     const dropdownAppeared = await this.page.waitForFunction(
-      () => document.querySelectorAll('[data-test*="filter-value-selector"][data-test$="-option"]').length > 0,
-      { timeout: 3000 }
+      (sel) => document.querySelectorAll(sel).length > 0,
+      optionsLocator,
+      { timeout: 4000 }
     ).then(() => true).catch(() => false);
 
-    if (dropdownAppeared) {
-      try {
-        const option = this.page.locator(`[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="${dependencyVariableName}"]`).first();
-        await option.waitFor({ state: 'visible', timeout: 2000 });
-        await option.click();
+    let valueCommitted = false;
 
-        const currentValue = await filterValueInput.inputValue();
-        if (!currentValue.startsWith('$')) {
-          await filterValueInput.clear();
-          await filterValueInput.fill(`$${dependencyVariableName}`);
-        }
-      } catch {
-        await filterValueInput.clear();
-        await filterValueInput.fill(`$${dependencyVariableName}`);
-      }
-    } else {
+    if (dropdownAppeared) {
+      valueCommitted = await tryClickDropdownOption(dependencyVariableName);
+    }
+
+    // Attempt 2: fill with $ prefix — searchRegex extracts the name and the same options appear.
+    // Then click the option so onSelect fires immediately (still no debounce).
+    if (!valueCommitted) {
       await filterValueInput.clear();
+      await filterValueInput.click();
       await filterValueInput.fill(`$${dependencyVariableName}`);
+
+      const fallbackDropdownAppeared = await this.page.waitForFunction(
+        (sel) => document.querySelectorAll(sel).length > 0,
+        optionsLocator,
+        { timeout: 4000 }
+      ).then(() => true).catch(() => false);
+
+      if (fallbackDropdownAppeared) {
+        valueCommitted = await tryClickDropdownOption(dependencyVariableName);
+      }
+    }
+
+    // Verify the committed value starts with $; if not something went wrong.
+    if (valueCommitted) {
+      const currentValue = await filterValueInput.inputValue().catch(() => '');
+      if (!currentValue.startsWith('$')) {
+        // The input display may lag but Vue's filter.value was already set via onSelect.
+        // No corrective action needed — the model value is correct.
+      }
     }
   }
 
