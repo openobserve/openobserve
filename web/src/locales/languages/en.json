@@ -1581,7 +1581,7 @@
     "panelTitle": "Panel Title",
     "selectDashboard": "Select Dashboard",
     "importDashboard": "Import Dashboard",
-    "dropFileMsg": "Drop your file here",
+    "dropFileMsg": "Drop your file here ",
     "importURL": "Import Dashboard from URL",
     "addURL": "Add your url",
     "importJson": "Import Dashboard from JSON",
