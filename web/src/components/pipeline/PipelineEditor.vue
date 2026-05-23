@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:w-[300px]"
               :error="pipelineNameError"
               :error-message="pipelineNameErrorMessage"
+              data-test="pipeline-editor-name-input"
             />
           </div>
         </div>

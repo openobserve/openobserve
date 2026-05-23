@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OButton
         data-cy="syntax-guide-button"
+        data-test="metrics-syntax-guide-button"
         variant="ghost"
         size="sm-action"
         class="syntax-guide-button"

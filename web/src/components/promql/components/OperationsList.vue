@@ -134,6 +134,7 @@
     >
       <OInput
         v-model="searchQuery"
+        data-test="operations-list-search-input"
         clearable
       >
         <template v-slot:icon-left>
@@ -143,25 +144,30 @@
 
       <div style="max-height: 400px; overflow-y: auto">
         <div class="tw:border tw:border-border tw:rounded-md tw:divide-y tw:divide-border">
-          <OCollapsible
+          <div
             v-for="category in categories"
             :key="category"
-            :default-open="true"
-            :label="category"
+            :data-test="`operations-list-category-${category}`"
           >
-            <div>
-              <div
-                v-for="op in getFilteredOperationsForCategory(category)"
-                :key="op.id"
-                :data-test="`promql-operation-option-${op.id}`"
-                class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
-                @click="addOperation(op); showOperationSelector = false"
-              >
-                <div class="tw:font-medium">{{ op.name }}</div>
-                <div class="tw:text-xs tw:text-text-secondary tw:mt-0.5">{{ op.documentation }}</div>
+            <OCollapsible
+              :default-open="true"
+              :label="category"
+            >
+              <div>
+                <div
+                  v-for="op in getFilteredOperationsForCategory(category)"
+                  :key="op.id"
+                  :data-test="`promql-operation-option-${op.id}`"
+                  :data-test-value="op.name"
+                  class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                  @click="addOperation(op); showOperationSelector = false"
+                >
+                  <div class="tw:font-medium">{{ op.name }}</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mt-0.5">{{ op.documentation }}</div>
+                </div>
               </div>
-            </div>
-          </OCollapsible>
+            </OCollapsible>
+          </div>
         </div>
       </div>
     </ODialog>

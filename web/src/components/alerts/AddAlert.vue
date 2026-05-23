@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tab.key"
             :value="tab.key"
             size="sm"
+            :data-test="`add-alert-tab-${tab.key}`"
           >
             <template #icon-left>
               <OIcon v-if="tab.key === 'condition'" name="shield" size="sm" />

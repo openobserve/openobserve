@@ -11,6 +11,16 @@ export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, SelectValue>> =
   Symbol("SelectValueMap");
 
 /**
+ * Injection key forwarding the parent OSelect's `data-test` attribute down to
+ * OSelectItem instances. Used to auto-derive `<parent>-option` data-test
+ * values for non-listbox-mode select option rows. Provided as a ComputedRef
+ * so consumers reactively pick up data-test updates.
+ */
+import type { ComputedRef } from "vue";
+export const SELECT_PARENT_DATA_TEST_KEY: InjectionKey<ComputedRef<string | undefined>> =
+  Symbol("SelectParentDataTest");
+
+/**
  * Internal sentinel string that represents a `null` value.
  * Reka UI primitives require string values; this lets us round-trip `null`
  * through the component without corrupting the emitted model value.

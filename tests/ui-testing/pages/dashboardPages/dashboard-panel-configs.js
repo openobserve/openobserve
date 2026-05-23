@@ -119,6 +119,20 @@ export default class DashboardPanelConfigs {
     // primary/secondary buttons live inside as `o-dialog-{primary,secondary}-btn`.
     this.columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
     this.columnOrderDialog = page.locator('[data-test="dashboard-column-order-popup"]');
+    this.columnOrderRows = page.locator('[data-test^="column-order-row-"]');
+    this.columnOrderDraggableList = page.locator('[data-test="dashboard-column-order-drag"]');
+    this.columnOrderDescription = page.locator('[data-test="dashboard-column-order-description"]');
+    this.columnOrderEmptyState = page.locator('[data-test="dashboard-column-order-empty-state"]');
+    this.columnOrderDragHandles = page.locator('[data-test^="column-order-drag-handle-"]');
+    this.columnOrderDialogPrimaryBtn = page.locator(
+      '[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.columnOrderDialogSecondaryBtn = page.locator(
+      '[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.columnOrderDialogCloseBtn = page.locator(
+      '[data-test="dashboard-column-order-popup"] [data-test="o-dialog-close-btn"]'
+    );
 
     // Color By Series locators
     // ColorBySeriesPopUp is now an ODialog with parent slug `color-by-series-popup-dialog`;
@@ -772,6 +786,31 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="column-order-row-${index}"]`);
   }
 
+  /** Returns the locator for the move-up button for the column at the given index. */
+  columnOrderMoveUpBtn(index) {
+    return this.page.locator(`[data-test="column-order-move-up-${index}"]`);
+  }
+
+  /** Returns the locator for the move-down button for the column at the given index. */
+  columnOrderMoveDownBtn(index) {
+    return this.page.locator(`[data-test="column-order-move-down-${index}"]`);
+  }
+
+  /** Returns the locator for the drag handle at the given index. */
+  columnOrderDragHandle(index) {
+    return this.page.locator(`[data-test="column-order-drag-handle-${index}"]`);
+  }
+
+  /** Returns the locator for the column-name element inside the row at the given index. */
+  columnOrderColumnNameEl(index) {
+    return this.columnOrderRow(index).locator('[data-test="dashboard-column-order-column-name"]');
+  }
+
+  /** Returns the locator for the column-number element inside the row at the given index. */
+  columnOrderColumnNumberEl(index) {
+    return this.columnOrderRow(index).locator('[data-test="dashboard-column-order-column-number"]');
+  }
+
   /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
   async openColumnOrderDialog() {
     await this.scrollSidebarToElement(this.columnOrderBtn);
@@ -781,41 +820,66 @@ export default class DashboardPanelConfigs {
 
   /**
    * Returns the column NAME text (not row number or icons) of the row at the given index.
-   * Targets the `.column-name` div inside the row.
+   * Targets the `dashboard-column-order-column-name` data-test div inside the row.
    */
   async getColumnName(index) {
-    const nameEl = this.columnOrderRow(index).locator('.column-name');
+    const nameEl = this.columnOrderColumnNameEl(index);
     await nameEl.waitFor({ state: 'visible', timeout: 5000 });
     return (await nameEl.textContent() || '').trim();
   }
 
+  /** Returns the column number text (e.g. "1.") for the row at the given index. */
+  async getColumnNumber(index) {
+    const numEl = this.columnOrderColumnNumberEl(index);
+    await numEl.waitFor({ state: 'visible', timeout: 5000 });
+    return (await numEl.textContent() || '').trim();
+  }
+
+  /** Returns the number of column-order rows currently in the popup. */
+  async getColumnOrderRowCount() {
+    return await this.columnOrderRows.count();
+  }
+
+  /**
+   * Dispatch a click via native DOM event so the OTooltip's hover-on-trigger
+   * subtree (which intercepts pointer events after a prior click) cannot block
+   * the action. Works because OButton listens to @click, not pointerdown.
+   */
+  async _dispatchClickOnLocator(locator) {
+    await locator.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+  }
+
   /** Clicks the move-down button for the column at the given index. */
   async moveColumnDown(index) {
-    const btn = this.page.locator(`[data-test="column-order-move-down-${index}"]`);
+    const btn = this.columnOrderMoveDownBtn(index);
     await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
+    await this._dispatchClickOnLocator(btn);
   }
 
   /** Clicks the move-up button for the column at the given index. */
   async moveColumnUp(index) {
-    const btn = this.page.locator(`[data-test="column-order-move-up-${index}"]`);
+    const btn = this.columnOrderMoveUpBtn(index);
     await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
+    await this._dispatchClickOnLocator(btn);
   }
 
   /** Saves the column order and waits for the dialog to close. */
   async saveColumnOrder() {
-    await this.page
-      .locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]')
-      .click();
+    await this.columnOrderDialogPrimaryBtn.click();
     await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /** Cancels the column order dialog without saving. */
   async cancelColumnOrder() {
-    await this.page
-      .locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]')
-      .click();
+    await this.columnOrderDialogSecondaryBtn.click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /** Closes the column order dialog via the × close button (treated as cancel). */
+  async closeColumnOrderViaCloseIcon() {
+    await this.columnOrderDialogCloseBtn.click();
     await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
   }
 

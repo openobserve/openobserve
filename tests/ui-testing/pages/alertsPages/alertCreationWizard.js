@@ -58,7 +58,7 @@ export class AlertCreationWizard {
                 // Re-fill the alert name (it was lost when navigating back)
                 await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
                 await this.page.locator(this.locators.alertNameInput).click();
-                await this.page.locator(this.locators.alertNameInput).fill(this.currentAlertName);
+                await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
 
                 // Re-select stream type
                 await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -92,7 +92,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
         await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
@@ -202,7 +202,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
         await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
@@ -308,7 +308,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
         await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
@@ -485,7 +485,7 @@ export class AlertCreationWizard {
         // ==================== STEP 1: ALERT SETUP ====================
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -651,7 +651,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (logs)
@@ -857,7 +857,7 @@ export class AlertCreationWizard {
 
         // Fill Alert Setup
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).fill(alertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
@@ -1132,7 +1132,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (logs)
@@ -1357,7 +1357,7 @@ export class AlertCreationWizard {
             .catch(() => testLogger.debug('networkidle timeout after addAlert click — continuing'));
 
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
         await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
@@ -1564,7 +1564,7 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Add alert dialog opened');
 
-        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
         // Select stream type (metrics) - IMPORTANT: Must be metrics for PromQL tab to appear
