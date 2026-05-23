@@ -116,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="tableColumns"
             row-key="_rowKey"
             pagination="none"
-            class="o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            :default-columns="false"
+            class="o2-quasar-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">
@@ -593,6 +594,7 @@ export default defineComponent({
         header: t("search.sourceValue"),
         accessorKey: "value",
         sortable: false,
+        size: 1200,
         meta: { align: "left" as const },
       },
     ];
