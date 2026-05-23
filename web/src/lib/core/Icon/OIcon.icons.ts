@@ -22,6 +22,7 @@ import ArrowBack from "~icons/material-symbols/arrow-back";
 import ArrowBackIosNew from "~icons/material-symbols/arrow-back-ios-new";
 import ArrowDownward from "~icons/material-symbols/arrow-downward";
 import ArrowDropDown from "~icons/material-symbols/arrow-drop-down";
+import ArrowDropUp from "~icons/material-symbols/arrow-drop-up";
 import ArrowForward from "~icons/material-symbols/arrow-forward";
 import ArrowUpward from "~icons/material-symbols/arrow-upward";
 import Article from "~icons/material-symbols/article-outline";
@@ -322,6 +323,7 @@ export const iconRegistry = {
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
   "arrow-drop-down": ArrowDropDown,
+  "arrow-drop-up": ArrowDropUp,
   "arrow-forward": ArrowForward,
   "arrow-upward": ArrowUpward,
   "article": Article,

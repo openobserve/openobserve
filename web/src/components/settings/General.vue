@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                @click="editingText = !editingText"
+                @click="cancelLogoText"
                 icon-left="close"
               />
               <OButton
@@ -932,6 +932,11 @@ export default defineComponent({
       applyThemeColors(color, mode, isDefault);
     };
 
+    const cancelLogoText = () => {
+      editingText.value = false;
+      customText.value = store.state.zoConfig.custom_logo_text;
+    };
+
     const updateCustomText = () => {
       loadingState.value = true;
       let orgIdentifier = "default";
@@ -1031,6 +1036,7 @@ export default defineComponent({
       loadingState,
       customText,
       editingText,
+      cancelLogoText,
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
