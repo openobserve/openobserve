@@ -153,6 +153,11 @@ describe("ReportList Component", () => {
   let dialogMock;
 
   beforeEach(async () => {
+    // Install fake timers before mounting so OTable's 2-second skeleton-hold
+    // setTimeout is registered as a fake timer and can be advanced immediately.
+    // Only fake setTimeout/clearTimeout/Date to keep MSW and flushPromises working.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+
     // Reset mock implementations
     vi.mocked(reports.listByFolderId).mockReset();
     vi.mocked(reports.toggleReportStateById).mockReset();
@@ -237,12 +242,16 @@ describe("ReportList Component", () => {
     wrapper.vm.q.notify = notifyMock;
 
     await flushPromises();
+    // Advance past OTable's 2-second skeleton-hold timer so real rows are visible.
+    vi.advanceTimersByTime(2100);
+    await flushPromises();
   });
 
   afterEach(() => {
     if (wrapper && typeof wrapper.unmount === 'function') {
       wrapper.unmount();
     }
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 

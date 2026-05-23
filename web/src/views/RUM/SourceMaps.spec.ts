@@ -310,14 +310,35 @@ describe("SourceMaps.vue", () => {
   // -------------------------------------------------------------------------
   describe("Conditional rendering", () => {
     it("shows loading spinner while isLoading is true", async () => {
-      wrapper = await mountComponent();
-
-      (wrapper.vm as any).isLoading = true;
-      await nextTick();
-
-      expect(wrapper.find('[data-test="source-maps-loading-indicator"]').exists()).toBe(
-        true,
+      // The component delegates loading display entirely to OTable via the
+      // :loading prop — there is no separate standalone loading indicator.
+      // Capture the loading state mid-fetch by using a deferred listSourceMaps.
+      let resolveFetch!: (value: any) => void;
+      listSourceMapsMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
       );
+
+      const w = mount(SourceMaps, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+
+      // Flush getSourceMapsValuesMock (resolves immediately) so that
+      // fetchSourceMaps() has been invoked and isLoading is now true.
+      // The deferred listSourceMapsMock keeps isLoading = true.
+      await flushPromises();
+
+      const table = w.findComponent({ name: "OTable" });
+      expect(table.exists()).toBe(true);
+      expect(table.props("loading")).toBe(true);
+
+      // Resolve the deferred fetch so the component finishes mounting cleanly.
+      resolveFetch({ data: sampleSourceMaps });
+      await flushPromises();
+
+      expect(table.props("loading")).toBe(false);
+      w.unmount();
     });
 
     it("shows the empty state when no source maps exist and not loading", async () => {

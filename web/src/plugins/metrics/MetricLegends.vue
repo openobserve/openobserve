@@ -21,6 +21,7 @@
           <div
             v-for="(icon, metric) in metricsIconMapping"
             :key="metric"
+            :data-test="`metrics-legends-item-${metric}`"
           >
             <OIcon :name="icon" size="md" class="tw:mr-1" />
             <span>{{ metric }}</span>

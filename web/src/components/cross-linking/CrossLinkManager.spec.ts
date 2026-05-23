@@ -123,7 +123,14 @@ describe("CrossLinkManager Component", () => {
   describe("Rendering Links List", () => {
     it("should render all links", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      const items = wrapper.findAll('[data-test^="cross-link-item-"]');
+      // Select only the outer row elements (cross-link-item-0, cross-link-item-1),
+      // not inner descendants like cross-link-item-name-0 or cross-link-item-url-0
+      // which also start with "cross-link-item-".
+      const list = wrapper.find('[data-test="cross-link-list"]');
+      const items = list.findAll('[data-test^="cross-link-item-"]').filter((el) => {
+        const val = el.attributes('data-test') ?? '';
+        return /^cross-link-item-\d+$/.test(val);
+      });
       expect(items.length).toBe(2);
     });
 

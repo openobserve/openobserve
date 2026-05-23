@@ -310,6 +310,8 @@ describe("AlertHistorySummary.vue", () => {
 
   describe("Empty State", () => {
     it("should show no data message when no history is available", async () => {
+      vi.useFakeTimers();
+
       vi.mocked(alertsService.getHistory).mockResolvedValueOnce({
         data: { hits: [], total: 0 },
       } as any);
@@ -317,8 +319,19 @@ describe("AlertHistorySummary.vue", () => {
       await mountComponent();
       await flushPromises();
 
-      const noDataSlot = wrapper.text();
-      expect(noDataSlot).toContain("history");
+      // OTable holds the loading skeleton for at least 2 seconds (MIN_SKELETON_MS).
+      // Advance past that hold so showEmpty becomes true and the #empty slot renders.
+      vi.advanceTimersByTime(2500);
+      await flushPromises();
+
+      vi.useRealTimers();
+
+      // The #empty slot renders OTableEmpty which contains the i18n text
+      // "No alert history data available" (alerts.noHistoryData key in en.json).
+      expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-empty"]').text()).toContain(
+        "No alert history data available",
+      );
     });
   });
 

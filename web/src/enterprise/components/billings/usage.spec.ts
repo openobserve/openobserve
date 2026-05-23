@@ -224,7 +224,9 @@ describe("Usage Component", () => {
   it("should display loading message when data is loading", async () => {
     wrapper.vm.dataLoading = true;
     await nextTick();
-    expect(wrapper.text()).toContain("Loading...");
+    // Component shows an OSpinner (aria-label="Loading") when dataLoading is true,
+    // not a "Loading..." text string.
+    expect(wrapper.find('[aria-label="Loading"]').exists()).toBe(true);
   });
 
   // Test 15: Usage tiles display when data is available

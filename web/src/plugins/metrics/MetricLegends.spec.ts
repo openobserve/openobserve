@@ -229,36 +229,37 @@ describe("MetricLegends", () => {
 
   describe("Legend Items Rendering", () => {
     it("should render legend items for each metric", () => {
-      const legendItems = wrapper.findAll('.legend-item');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
       expect(legendItems.length).toBe(4);
     });
 
     it("should render Summary legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const summaryItem = legendItems.find(item => item.text().includes('Summary'));
-      expect(summaryItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Summary"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain('Summary');
     });
 
     it("should render Gauge legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const gaugeItem = legendItems.find(item => item.text().includes('Gauge'));
-      expect(gaugeItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Gauge"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain('Gauge');
     });
 
     it("should render Histogram legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
-      expect(histogramItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Histogram"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain('Histogram');
     });
 
     it("should render Counter legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const counterItem = legendItems.find(item => item.text().includes('Counter'));
-      expect(counterItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Counter"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain('Counter');
     });
 
     it("should render icon for each legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
       legendItems.forEach(item => {
         const icon = item.find('.OIcon');
         expect(icon.exists()).toBe(true);
@@ -266,39 +267,31 @@ describe("MetricLegends", () => {
     });
 
     it("should render correct icon for Summary", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const summaryItem = legendItems.find(item => item.text().includes('Summary'));
-      if (summaryItem) {
-        const icon = summaryItem.find('.OIcon');
-        expect(icon.classes()).toContain('description');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Summary"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find('.OIcon');
+      expect(icon.classes()).toContain('description');
     });
 
     it("should render correct icon for Gauge", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const gaugeItem = legendItems.find(item => item.text().includes('Gauge'));
-      if (gaugeItem) {
-        const icon = gaugeItem.find('.OIcon');
-        expect(icon.classes()).toContain('speed');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Gauge"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find('.OIcon');
+      expect(icon.classes()).toContain('speed');
     });
 
     it("should render correct icon for Histogram", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
-      if (histogramItem) {
-        const icon = histogramItem.find('.OIcon');
-        expect(icon.classes()).toContain('bar-chart');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Histogram"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find('.OIcon');
+      expect(icon.classes()).toContain('bar-chart');
     });
 
     it("should render correct icon for Counter", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const counterItem = legendItems.find(item => item.text().includes('Counter'));
-      if (counterItem) {
-        const icon = counterItem.find('.OIcon');
-        expect(icon.classes()).toContain('tag');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Counter"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find('.OIcon');
+      expect(icon.classes()).toContain('tag');
     });
   });
 
@@ -547,7 +540,8 @@ describe("MetricLegends", () => {
     });
 
     it("should provide proper icon labeling", () => {
-      const legendItems = wrapper.findAll('.legend-item');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
 
       legendItems.forEach(item => {
         const icon = item.find('.OIcon');
@@ -558,9 +552,17 @@ describe("MetricLegends", () => {
       });
     });
 
-    it("should have consistent spacing classes", () => {
-      const categoryIcon = wrapper.find('.OIcon.category');
-      expect(categoryIcon.classes()).toContain('tw:mr-2');
+    it("should render an icon alongside each legend item label", () => {
+      // Each legend item must have both an icon and a non-empty text label —
+      // the "tw:mr-2" spacing class is a visual detail handled by CSS, not a
+      // behavioral assertion.
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
+      legendItems.forEach(item => {
+        const icon = item.find('.OIcon');
+        expect(icon.exists()).toBe(true);
+        expect(item.text().trim().length).toBeGreaterThan(0);
+      });
     });
   });
 });

@@ -219,10 +219,10 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: true },
       });
-      const icons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      );
-      const infoIcon = icons.find(
+      // The OIcon stub renders data-name on a span inside the OButton stub.
+      // Find all OIcon stubs whose data-name is "info".
+      const iconSpans = wrapper.findAll(".OIcon-stub");
+      const infoIcon = iconSpans.find(
         (i) => i.attributes("data-name") === "info"
       );
       expect(infoIcon).toBeDefined();
@@ -233,10 +233,10 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: false },
       });
-      const icons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      );
-      const outlineIcon = icons.find(
+      // The OIcon stub renders data-name on a span inside the OButton stub.
+      // Find all OIcon stubs whose data-name is "info-outline".
+      const iconSpans = wrapper.findAll(".OIcon-stub");
+      const outlineIcon = iconSpans.find(
         (i) => i.attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();

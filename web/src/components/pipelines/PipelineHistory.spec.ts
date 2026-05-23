@@ -451,7 +451,9 @@ describe("PipelineHistory", () => {
       });
 
       const vm = wrapper.vm as any;
-      vm.onPipelineSelected({ label: "Alpha Pipeline", value: "pid-alpha" });
+      // OSelect with valueKey="value" emits the primitive value string (the pipeline_id).
+      // Call onPipelineSelected with the primitive value as the component receives it.
+      vm.onPipelineSelected("pid-alpha");
       await flushPromises();
 
       expect(vm.searchQuery).toBe("pid-alpha");
@@ -464,23 +466,30 @@ describe("PipelineHistory", () => {
 
       const vm = wrapper.vm as any;
       vm.pagination.page = 3;
-      vm.onPipelineSelected({ label: "Alpha Pipeline", value: "pid-alpha" });
+      // OSelect emits the primitive value (pipeline_id string) when valueKey is set
+      vm.onPipelineSelected("pid-alpha");
       await nextTick();
 
       expect(vm.pagination.page).toBe(1);
     });
 
-    it("does not trigger fetch when selected value has no pipeline_id", async () => {
+    it("clears searchQuery and still fetches (no filter) when null is selected", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
 
       const vm = wrapper.vm as any;
+      // Selecting null (clearing the select) always triggers a fetch without a pipeline_id filter.
       vm.onPipelineSelected(null);
       await flushPromises();
 
-      // http get should not have been called for history after null selection
-      expect(mockHttpGet).not.toHaveBeenCalled();
+      // searchQuery is cleared to empty string
+      expect(vm.searchQuery).toBe("");
+      // A fetch is still issued (without pipeline_id param) to show unfiltered history
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+      const callParams = mockHttpGet.mock.calls[0][1]?.params ?? {};
+      expect(callParams.pipeline_id).toBeUndefined();
     });
   });
 

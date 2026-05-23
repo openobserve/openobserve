@@ -101,7 +101,10 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
       });
-      const container = wrapper.find(".field-container");
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -109,7 +112,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, isSchemaField: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -117,7 +122,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, showValues: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -125,7 +132,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: false, isSchemaField: true, showValues: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -140,7 +149,10 @@ describe("FieldRow", () => {
 
     it("sets title on the field container", () => {
       const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
-      const container = wrapper.find(".field-container");
+      // OFieldRow renders with :title="field.name" — find by data-test
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.attributes("title")).toBe(defaultField.name);
     });
   });
@@ -235,8 +247,11 @@ describe("FieldRow", () => {
         field: { ...defaultField, name: "_timestamp", ftsKey: false },
         timestampColumn: "_timestamp",
       });
-      const overlay = wrapper.find(".field_overlay");
-      expect(overlay.exists()).toBe(false);
+      // Timestamp column has no action buttons rendered in the #actions slot
+      const addIcon = wrapper.find(
+        '[data-test="log-search-index-list-add-_timestamp-field-btn"]'
+      );
+      expect(addIcon.exists()).toBe(false);
     });
 
     it("shows field_overlay for non-timestamp fields", () => {
@@ -244,8 +259,11 @@ describe("FieldRow", () => {
         field: { ...defaultField, ftsKey: true },
         timestampColumn: "_timestamp",
       });
-      const overlay = wrapper.find(".field_overlay");
-      expect(overlay.exists()).toBe(true);
+      // Non-timestamp fields show action buttons in the #actions slot (add icon is rendered)
+      const addIcon = wrapper.find(
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+      );
+      expect(addIcon.exists()).toBe(true);
     });
 
     it("hides interesting icon for timestamp column when showQuickMode is true", () => {

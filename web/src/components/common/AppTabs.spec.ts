@@ -45,21 +45,24 @@ describe("AppTabs", () => {
   });
 
   it("should highlight active tab", () => {
-    const activeTab = wrapper.find('[data-test="tab-tab1"]');
-    expect(activeTab.attributes("data-state")).toBe("on");
+    // OToggleGroupItem renders a <span> wrapper around the reka-ui button;
+    // data-state="on" is set by reka-ui on the inner button element.
+    const activeTabBtn = wrapper.find('[data-test="tab-tab1"] button');
+    expect(activeTabBtn.attributes("data-state")).toBe("on");
   });
 
   it("should emit update:activeTab when non-disabled tab is clicked", async () => {
-    const tab2 = wrapper.find('[data-test="tab-tab2"]');
-    await tab2.trigger("click");
+    // Click the inner button; clicking the outer <span> does not trigger reka-ui's value update.
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"] button');
+    await tab2Btn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
     expect(wrapper.emitted("update:activeTab")[0]).toEqual(["tab2"]);
   });
 
   it("should not emit when disabled tab is clicked", async () => {
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    await disabledTab.trigger("click");
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    await disabledTabBtn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
@@ -71,9 +74,10 @@ describe("AppTabs", () => {
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
 
-  it("should apply disabled class to disabled tabs", () => {
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    expect(disabledTab.attributes("data-disabled")).toBeDefined();
+  it("should apply disabled state to disabled tabs", () => {
+    // reka-ui sets data-disabled on the inner button, not the outer <span> wrapper.
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    expect(disabledTabBtn.attributes("data-disabled")).toBeDefined();
   });
 
   it("should apply hidden class to hidden tabs", () => {
@@ -113,14 +117,14 @@ describe("AppTabs", () => {
   });
 
   it("should handle changeTab function correctly", async () => {
-    // onSelect is internal and not exposed; test tab selection via clicks
-    const tab2 = wrapper.find('[data-test="tab-tab2"]');
-    await tab2.trigger("click");
+    // onSelect is internal and not exposed; test tab selection via inner button clicks
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"] button');
+    await tab2Btn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
 
     // Disabled tab click should not add more emits
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    await disabledTab.trigger("click");
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    await disabledTabBtn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1); // Still 1
 
     // Hidden tab is not in DOM

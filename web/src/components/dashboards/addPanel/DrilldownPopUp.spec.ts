@@ -389,9 +389,13 @@ describe("DrilldownPopUp", () => {
     it("should change to byUrl type when clicked", async () => {
       wrapper = createWrapper();
 
-      await wrapper
-        .find('[data-test="dashboard-drilldown-by-url-btn"]')
-        .trigger("click");
+      // OToggleGroup uses reka-ui under the hood — emit update:model-value on the
+      // first OToggleGroup (the type selector) to simulate a user click.
+      const typeToggleGroup = wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .at(0);
+      await typeToggleGroup!.vm.$emit("update:modelValue", "byUrl");
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.drilldownData.type).toBe("byUrl");
     });
@@ -399,9 +403,11 @@ describe("DrilldownPopUp", () => {
     it("should change to logs type when clicked", async () => {
       wrapper = createWrapper();
 
-      await wrapper
-        .find('[data-test="dashboard-drilldown-by-logs-btn"]')
-        .trigger("click");
+      const typeToggleGroup = wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .at(0);
+      await typeToggleGroup!.vm.$emit("update:modelValue", "logs");
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.drilldownData.type).toBe("logs");
     });
@@ -480,12 +486,14 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should switch to custom logs mode", async () => {
-      // OToggleGroup renders the option values; find the OToggleGroupItem for "custom".
-      const customItem = wrapper
-        .findAllComponents({ name: "OToggleGroupItem" })
-        .find((c: any) => c.props("value") === "custom");
-      expect(customItem).toBeTruthy();
-      await customItem!.trigger("click");
+      // OToggleGroup uses reka-ui — emit update:model-value on the logsMode toggle
+      // (second OToggleGroup in the component) to simulate a user selecting "custom".
+      const logsModeToggleGroup = wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .at(1);
+      expect(logsModeToggleGroup).toBeTruthy();
+      await logsModeToggleGroup!.vm.$emit("update:modelValue", "custom");
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.drilldownData.data.logsMode).toBe("custom");
     });

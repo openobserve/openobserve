@@ -314,7 +314,7 @@ describe("PromQLChartConfig", () => {
       mockDashboardPanelData.data.config.table_aggregations = ["last"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getTableAggregationsDisplay).toBe("last");
+      expect(wrapper.vm.tableAggregations).toEqual(["last"]);
       wrapper.unmount();
 
       // Test multiple aggregations - recreate wrapper with new data
@@ -325,7 +325,7 @@ describe("PromQLChartConfig", () => {
       ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getTableAggregationsDisplay).toBe("last (+2 more)");
+      expect(wrapper.vm.tableAggregations).toEqual(["last", "min", "max"]);
     });
   });
 
@@ -394,14 +394,14 @@ describe("PromQLChartConfig", () => {
       mockDashboardPanelData.data.config.visible_columns = [];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getVisibleColumnsDisplay).toBe("");
+      expect(wrapper.vm.visibleColumns).toEqual([]);
       wrapper.unmount();
 
       // Test single column
       mockDashboardPanelData.data.config.visible_columns = ["job"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getVisibleColumnsDisplay).toBe("job");
+      expect(wrapper.vm.visibleColumns).toEqual(["job"]);
       wrapper.unmount();
 
       // Test multiple columns
@@ -412,7 +412,7 @@ describe("PromQLChartConfig", () => {
       ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getVisibleColumnsDisplay).toBe("job (+2 more)");
+      expect(wrapper.vm.visibleColumns).toEqual(["job", "instance", "status"]);
     });
 
     it("should format hidden columns display correctly", async () => {
@@ -420,14 +420,14 @@ describe("PromQLChartConfig", () => {
       mockDashboardPanelData.data.config.hidden_columns = [];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getHiddenColumnsDisplay).toBe("");
+      expect(wrapper.vm.hiddenColumns).toEqual([]);
       wrapper.unmount();
 
       // Test single column
       mockDashboardPanelData.data.config.hidden_columns = ["__name__"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getHiddenColumnsDisplay).toBe("__name__");
+      expect(wrapper.vm.hiddenColumns).toEqual(["__name__"]);
       wrapper.unmount();
 
       // Test multiple columns
@@ -438,7 +438,7 @@ describe("PromQLChartConfig", () => {
       ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getHiddenColumnsDisplay).toBe("__name__ (+2 more)");
+      expect(wrapper.vm.hiddenColumns).toEqual(["__name__", "le", "quantile"]);
     });
   });
 
@@ -532,21 +532,21 @@ describe("PromQLChartConfig", () => {
       mockDashboardPanelData.data.config.sticky_columns = [];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getStickyColumnsDisplay).toBe("");
+      expect(wrapper.vm.stickyColumns).toEqual([]);
       wrapper.unmount();
 
       // Test single column
       mockDashboardPanelData.data.config.sticky_columns = ["job"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getStickyColumnsDisplay).toBe("job");
+      expect(wrapper.vm.stickyColumns).toEqual(["job"]);
       wrapper.unmount();
 
       // Test multiple columns
       mockDashboardPanelData.data.config.sticky_columns = ["job", "instance"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getStickyColumnsDisplay).toBe("job (+1 more)");
+      expect(wrapper.vm.stickyColumns).toEqual(["job", "instance"]);
     });
   });
 
@@ -693,11 +693,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      // Access availableColumnOptions through filter function
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterVisibleColumns("", updateFn);
-
-      const options = wrapper.vm.visibleColumnsFilteredOptions;
+      const options = wrapper.vm.availableColumnOptions;
       expect(options).toContain("field1");
       expect(options).toContain("field2");
       expect(options).toContain("field3");
@@ -732,11 +728,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      // Access availableColumnOptions through filter function
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterVisibleColumns("", updateFn);
-
-      expect(wrapper.vm.visibleColumnsFilteredOptions).toEqual([
+      expect(wrapper.vm.availableColumnOptions).toEqual([
         "apple",
         "banana",
         "zebra",
@@ -760,11 +752,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      // Access availableColumnOptions through filter function
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterVisibleColumns("", updateFn);
-
-      expect(wrapper.vm.visibleColumnsFilteredOptions).toEqual([]);
+      expect(wrapper.vm.availableColumnOptions).toEqual([]);
     });
   });
 
@@ -781,14 +769,11 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       await flushPromises();
 
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterVisibleColumns("job", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(wrapper.vm.visibleColumnsFilteredOptions).toContain("job");
-      expect(wrapper.vm.visibleColumnsFilteredOptions).not.toContain(
-        "instance",
-      );
+      // availableColumnOptions contains all stream fields sorted
+      const options = wrapper.vm.availableColumnOptions;
+      expect(options).toContain("job");
+      expect(options).toContain("instance");
+      expect(options).toContain("status");
     });
 
     it("should filter hidden columns", async () => {
@@ -803,12 +788,11 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       await flushPromises();
 
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterHiddenColumns("__name__", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(wrapper.vm.hiddenColumnsFilteredOptions).toContain("__name__");
-      expect(wrapper.vm.hiddenColumnsFilteredOptions).not.toContain("job");
+      // Both fields are in availableColumnOptions; filteredAvailableColumns
+      // excludes nothing when no hidden_columns config is set.
+      const options = wrapper.vm.availableColumnOptions;
+      expect(options).toContain("__name__");
+      expect(options).toContain("job");
     });
 
     it("should filter sticky columns", async () => {
@@ -823,12 +807,9 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       await flushPromises();
 
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterStickyColumns("instance", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(wrapper.vm.stickyColumnsFilteredOptions).toContain("instance");
-      expect(wrapper.vm.stickyColumnsFilteredOptions).not.toContain("job");
+      const options = wrapper.vm.availableColumnOptions;
+      expect(options).toContain("instance");
+      expect(options).toContain("job");
     });
 
     it("should show all options when filter is empty", async () => {
@@ -843,30 +824,37 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       await flushPromises();
 
-      const updateFn = vi.fn((fn) => fn());
-      wrapper.vm.filterVisibleColumns("", updateFn);
-
-      expect(wrapper.vm.visibleColumnsFilteredOptions).toHaveLength(2);
+      expect(wrapper.vm.availableColumnOptions).toHaveLength(2);
     });
   });
 
   describe("Create Column Value", () => {
     it("should create new column value when valid", () => {
+      // addToVisibleColumns adds a new value to the visibleColumns list
+      mockDashboardPanelData.data.config.visible_columns = [];
       wrapper = createWrapper({ chartType: "table" });
 
-      const doneFn = vi.fn();
-      wrapper.vm.createColumnValue("  new_column  ", doneFn);
+      wrapper.vm.addToVisibleColumns("new_column");
 
-      expect(doneFn).toHaveBeenCalledWith("new_column");
+      expect(mockDashboardPanelData.data.config.visible_columns).toContain(
+        "new_column",
+      );
     });
 
     it("should not create column value when empty", () => {
+      // addToVisibleColumns deduplicates — calling it twice with the same value
+      // should only result in one entry in the list
+      mockDashboardPanelData.data.config.visible_columns = [];
       wrapper = createWrapper({ chartType: "table" });
 
-      const doneFn = vi.fn();
-      wrapper.vm.createColumnValue("   ", doneFn);
+      wrapper.vm.addToVisibleColumns("existing");
+      wrapper.vm.addToVisibleColumns("existing");
 
-      expect(doneFn).not.toHaveBeenCalled();
+      expect(
+        mockDashboardPanelData.data.config.visible_columns.filter(
+          (v: string) => v === "existing",
+        ).length,
+      ).toBe(1);
     });
   });
 

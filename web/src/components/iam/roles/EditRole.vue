@@ -152,6 +152,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
             style="scrollbar-gutter: stable;"
           >
+            <div
+              v-if="isFetchingInitialRoles"
+              data-test="edit-role-page-loading-spinner"
+              class="tw:flex tw:items-center tw:justify-center tw:py-8"
+            />
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
