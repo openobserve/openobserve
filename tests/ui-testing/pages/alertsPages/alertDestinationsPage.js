@@ -361,55 +361,35 @@ export class AlertDestinationsPage {
      * @param {string} validUrl - The URL to substitute when a placeholder is detected.
      */
     async replaceImportJsonUrlIfPlaceholder(validUrl) {
-        const result = await this.page.evaluate(({ validUrl }) => {
-            // Walk the Vue component tree to find the ImportDestination instance.
-            const findVueComponent = (el, name) => {
-                if (!el) return null;
-                const vNode = el.__vueParentComponent || el.__vue_app__?._instance;
-                let cur = vNode;
-                while (cur) {
-                    if (cur.type?.name === name) return cur;
-                    cur = cur.parent;
-                }
-                return null;
-            };
-            // Locate the import editor's container, then walk upward via __vueParentComponent.
-            const editorEl = document.querySelector('[data-test$="-import-sql-editor"]');
-            if (!editorEl) return { ok: false, reason: 'no-editor-el' };
-            // Find any ancestor with __vueParentComponent to use as walk anchor.
-            let anchor = editorEl;
-            while (anchor && !anchor.__vueParentComponent) anchor = anchor.parentElement;
-            if (!anchor) return { ok: false, reason: 'no-vue-anchor' };
-            const importDest = findVueComponent(anchor, 'ImportDestination');
-            const baseImport = findVueComponent(anchor, 'BaseImport');
-            if (!importDest || !baseImport) {
-                return { ok: false, reason: 'components-not-found', hasImport: !!importDest, hasBase: !!baseImport };
-            }
-            // baseImport.exposed contains jsonArrayOfObj + jsonStr refs surfaced for parent use.
-            const arr = baseImport.exposed?.jsonArrayOfObj || baseImport.ctx?.jsonArrayOfObj;
-            if (!arr || !Array.isArray(arr.value)) return { ok: false, reason: 'no-jsonArrayOfObj' };
-            let replacedCount = 0;
-            arr.value.forEach((item, idx) => {
-                if (item && typeof item.url === 'string' && !/^https?:\/\//i.test(item.url)) {
-                    item.url = validUrl;
-                    replacedCount++;
-                    // Also update the corrections-form ref so the input value stays in sync if it's mounted
-                    const usedUrls = importDest.exposed?.userSelectedDestinationUrl || importDest.ctx?.userSelectedDestinationUrl;
-                    if (usedUrls && Array.isArray(usedUrls.value)) usedUrls.value[idx] = validUrl;
-                }
-            });
-            return { ok: true, replacedCount };
+        // Drive the change via Monaco's model API (§5) — `setValue` triggers
+        // `onDidChangeModelContent`, which BaseImport's v-model'd `jsonStr` ref then picks
+        // up via the editor's debounced `update:query` emit. Wait deterministically for the
+        // editor model to settle on the new URL before returning.
+        const replaced = await this.page.evaluate(({ validUrl }) => {
+            const m = window.monaco;
+            if (!m || !m.editor) return { ok: false, reason: 'monaco-unavailable' };
+            const editors = m.editor.getEditors();
+            if (!editors || editors.length === 0) return { ok: false, reason: 'no-editors' };
+            const target = editors.find(ed => {
+                const dom = ed.getDomNode();
+                return dom && dom.closest('[data-test$="-import-sql-editor"]');
+            }) || editors[0];
+            const model = target.getModel();
+            if (!model) return { ok: false, reason: 'no-model' };
+            const text = model.getValue();
+            const replacement = text.replace(/"url"\s*:\s*"((?!https?:\/\/)[^"]*)"/g, `"url": "${validUrl}"`);
+            if (replacement === text) return { ok: true, replaced: false };
+            model.setValue(replacement);
+            return { ok: true, replaced: true };
         }, { validUrl }).catch(err => ({ ok: false, reason: err && err.message ? err.message : String(err) }));
-        if (result?.ok && result.replacedCount > 0) {
-            // The deep watcher on `jsonArrayOfObj` re-stringifies `jsonStr` synchronously
-            // (Vue's nextTick). Wait for the editor model to reflect the new URL.
+        if (replaced?.ok && replaced.replaced) {
             await this.page.waitForFunction(({ validUrl }) => {
                 const m = window.monaco;
                 const eds = m?.editor?.getEditors?.() || [];
                 const val = eds[0]?.getModel?.()?.getValue?.() || '';
                 return val.includes(`"url": "${validUrl}"`);
             }, { validUrl }, { timeout: 4000, polling: 100 }).catch(() => {});
-            testLogger.debug('Replaced placeholder URL via Vue reactive', { validUrl, replacedCount: result.replacedCount });
+            testLogger.debug('Replaced placeholder URL in import JSON editor', { validUrl });
         }
     }
 

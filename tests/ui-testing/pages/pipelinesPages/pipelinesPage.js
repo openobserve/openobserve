@@ -3084,9 +3084,11 @@ export class PipelinesPage {
     // Added to fix missing POM methods in pipeline-backfill.spec.js
     // ============================================================================
 
-    /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
+    /** @returns {import('@playwright/test').Locator} Status badges in pipeline-history table */
     get statusBadges() {
-        return this.page.locator('[data-test*="badge"], [data-test*="chip"], .status-badge, [data-test*="status"]');
+        // PipelineHistory.vue stamps `data-test="pipeline-history-status-badge"`
+        // on every row's OBadge (plus a per-row `data-test-status` value).
+        return this.page.locator('[data-test="pipeline-history-status-badge"]');
     }
 
     /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
@@ -3414,9 +3416,19 @@ export class PipelinesPage {
      * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
      */
     async getStatusCounts() {
-        const successCount = await this.page.locator('[data-test*="badge"]:has-text("Success"), [data-test*="badge"]:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
-        const errorCount = await this.page.locator('[data-test*="badge"]:has-text("Error"), [data-test*="badge"]:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
-        const warningCount = await this.page.locator('[data-test*="badge"]:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        // Each status badge stamps `data-test-status="<status>"` (lowercased)
+        // — count rows by status family.
+        const successCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="completed"]'
+        ).count();
+        const errorCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"]'
+        ).count();
+        const warningCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
+        ).count();
         return {
             success: successCount,
             error: errorCount,
