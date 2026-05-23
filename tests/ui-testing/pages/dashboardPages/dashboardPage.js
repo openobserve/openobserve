@@ -45,7 +45,7 @@ export class DashboardPage {
 
     // Dashboard view/edit locators
     this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
-    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name"]');
+    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name-field"]');
     this.savePanelButton = page.locator('[data-test="dashboard-panel-save"]');
     this.applyButton = page.locator('[data-test="dashboard-apply"]');
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
@@ -241,18 +241,20 @@ export class DashboardPage {
     // Search for kubernetes_container_hash and add to Y-axis
     await this.fieldSearchInput.click();
     await this.fieldSearchInput.fill('kubernetes_container_hash');
-    await this.page.waitForTimeout(1000);
-
+    const hashRow = this.page.locator('[data-test="o-field-list-row-kubernetes_container_hash"]').first();
+    await hashRow.waitFor({ state: 'visible', timeout: 10000 });
+    await hashRow.hover();
     await this.kubernetesContainerHashYButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.kubernetesContainerHashYButton.click();
+    await this.kubernetesContainerHashYButton.click({ force: true });
 
     // Clear search and add kubernetes_container_image to B-axis (breakdown)
     await this.fieldSearchInput.fill('');
     await this.fieldSearchInput.fill('kubernetes_container_image');
-    await this.page.waitForTimeout(1000);
-
+    const imageRow = this.page.locator('[data-test="o-field-list-row-kubernetes_container_image"]').first();
+    await imageRow.waitFor({ state: 'visible', timeout: 10000 });
+    await imageRow.hover();
     await this.kubernetesContainerImageBButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.kubernetesContainerImageBButton.click();
+    await this.kubernetesContainerImageBButton.click({ force: true });
 
     // Clear search
     await this.fieldSearchInput.fill('');

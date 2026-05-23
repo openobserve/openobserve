@@ -1160,7 +1160,15 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.cloneSubmitButton).click();
-        await expect(this.page.getByText('Please select stream type')).toBeVisible({ timeout: 5000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: 'Please select stream type' })
+                .first()
+        ).toBeVisible({ timeout: 5000 });
         testLogger.info('Clone validation working - stream type required');
 
         await this.page.locator(this.locators.cloneCancelButton).click();

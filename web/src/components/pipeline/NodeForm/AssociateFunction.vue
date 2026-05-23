@@ -65,8 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             :readonly="isUpdating"
             :disabled="isUpdating"
-            :error="functionExists"
-            :error-message="functionExists ? 'Function is already associated' : ''"
+            :error="functionExists || (showFunctionRequiredError && !selectedFunction)"
+            :error-message="
+              functionExists
+                ? 'Function is already associated'
+                : (showFunctionRequiredError && !selectedFunction)
+                  ? 'Field is required'
+                  : ''
+            "
             data-test="associate-function-select-function-input"
           />
         </div>
@@ -293,6 +299,13 @@ const createNewFunction = ref(false);
 const store = useStore();
 
 const functionExists = ref(false);
+// Toggle for "Field is required" — flipped on save when no function is selected.
+const showFunctionRequiredError = ref(false);
+
+// Clear the "Field is required" error as soon as the user picks a function.
+watch(selectedFunction, (next) => {
+  if (next) showFunctionRequiredError.value = false;
+});
 
 const nodeLink = ref({
   from: "",
@@ -372,6 +385,13 @@ const saveFunction = () => {
     }
     return;
   }
+
+  // Validate that a function has been selected before allowing save.
+  if (!selectedFunction.value) {
+    showFunctionRequiredError.value = true;
+    return;
+  }
+  showFunctionRequiredError.value = false;
 
   if (
     !isUpdating.value &&

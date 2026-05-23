@@ -180,7 +180,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -284,7 +292,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert with defaults', { alertName: randomAlertName });
 
         // Wait for navigation back to alerts list
@@ -466,7 +482,15 @@ export class AlertCreationWizard {
             const btn = document.querySelector(selector);
             if (btn) btn.click();
         }, this.locators.alertSubmitButton);
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });
 
@@ -623,7 +647,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created multi-condition alert', { alertName: randomAlertName });
 
         // Wait for page to navigate back to alerts list after creation
@@ -844,7 +876,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1325,7 +1365,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication for validation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1524,7 +1572,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with aggregation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1723,7 +1779,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with PromQL query', { alertName: randomAlertName });
 
         return randomAlertName;

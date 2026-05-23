@@ -58,11 +58,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
-          <div class="note-container tw:rounded-md tw:p-3 tw:mt-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-gray-800">
+          <div
+            class="note-container tw:rounded-md tw:p-3 tw:mt-3 tw:flex tw:flex-col tw:gap-2"
+            data-test="add-condition-note-container"
+          >
+            <div
+              class="tw:text-sm tw:text-gray-800"
+              data-test="add-condition-note-heading"
+            >
               Condition value Guidelines:
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+            <div
+              class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800"
+              data-test="add-condition-note-info"
+            >
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>

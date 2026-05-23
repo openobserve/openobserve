@@ -348,6 +348,72 @@ export class AlertDestinationsPage {
     }
 
     /**
+     * Rewrite the JSON inside the import editor when it contains a placeholder URL.
+     *
+     * The public fixtures hosted on `alert_tests` use `"url": "DEMO"` (or similar
+     * placeholders) which the backend's SSRF guard rejects at create time. We swap
+     * any such value for a valid HTTPS URL via the Monaco editor's model API
+     * (§5 — drive via `window.monaco.editor.getEditors()`).
+     *
+     * No-op if the editor isn't ready or no placeholder is present (e.g. file-import flows
+     * may have already provided a usable URL).
+     *
+     * @param {string} validUrl - The URL to substitute when a placeholder is detected.
+     */
+    async replaceImportJsonUrlIfPlaceholder(validUrl) {
+        const result = await this.page.evaluate(({ validUrl }) => {
+            // Walk the Vue component tree to find the ImportDestination instance.
+            const findVueComponent = (el, name) => {
+                if (!el) return null;
+                const vNode = el.__vueParentComponent || el.__vue_app__?._instance;
+                let cur = vNode;
+                while (cur) {
+                    if (cur.type?.name === name) return cur;
+                    cur = cur.parent;
+                }
+                return null;
+            };
+            // Locate the import editor's container, then walk upward via __vueParentComponent.
+            const editorEl = document.querySelector('[data-test$="-import-sql-editor"]');
+            if (!editorEl) return { ok: false, reason: 'no-editor-el' };
+            // Find any ancestor with __vueParentComponent to use as walk anchor.
+            let anchor = editorEl;
+            while (anchor && !anchor.__vueParentComponent) anchor = anchor.parentElement;
+            if (!anchor) return { ok: false, reason: 'no-vue-anchor' };
+            const importDest = findVueComponent(anchor, 'ImportDestination');
+            const baseImport = findVueComponent(anchor, 'BaseImport');
+            if (!importDest || !baseImport) {
+                return { ok: false, reason: 'components-not-found', hasImport: !!importDest, hasBase: !!baseImport };
+            }
+            // baseImport.exposed contains jsonArrayOfObj + jsonStr refs surfaced for parent use.
+            const arr = baseImport.exposed?.jsonArrayOfObj || baseImport.ctx?.jsonArrayOfObj;
+            if (!arr || !Array.isArray(arr.value)) return { ok: false, reason: 'no-jsonArrayOfObj' };
+            let replacedCount = 0;
+            arr.value.forEach((item, idx) => {
+                if (item && typeof item.url === 'string' && !/^https?:\/\//i.test(item.url)) {
+                    item.url = validUrl;
+                    replacedCount++;
+                    // Also update the corrections-form ref so the input value stays in sync if it's mounted
+                    const usedUrls = importDest.exposed?.userSelectedDestinationUrl || importDest.ctx?.userSelectedDestinationUrl;
+                    if (usedUrls && Array.isArray(usedUrls.value)) usedUrls.value[idx] = validUrl;
+                }
+            });
+            return { ok: true, replacedCount };
+        }, { validUrl }).catch(err => ({ ok: false, reason: err && err.message ? err.message : String(err) }));
+        if (result?.ok && result.replacedCount > 0) {
+            // The deep watcher on `jsonArrayOfObj` re-stringifies `jsonStr` synchronously
+            // (Vue's nextTick). Wait for the editor model to reflect the new URL.
+            await this.page.waitForFunction(({ validUrl }) => {
+                const m = window.monaco;
+                const eds = m?.editor?.getEditors?.() || [];
+                const val = eds[0]?.getModel?.()?.getValue?.() || '';
+                return val.includes(`"url": "${validUrl}"`);
+            }, { validUrl }, { timeout: 4000, polling: 100 }).catch(() => {});
+            testLogger.debug('Replaced placeholder URL via Vue reactive', { validUrl, replacedCount: result.replacedCount });
+        }
+    }
+
+    /**
      * Select a template inside the ImportDestination OSelect (`destination-import-template-input`).
      *
      * The consumer binds `:options="filteredTemplates"` and only populates that ref via
@@ -422,9 +488,28 @@ export class AlertDestinationsPage {
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
         await nameField.click();
         await nameField.fill(destinationName);
+        // Replace any placeholder URL (`"url": "DEMO"` etc.) in the loaded JSON before
+        // submission — the backend's SSRF guard rejects schemeless URLs at create time.
+        // This must run AFTER the corrections-form name/template updates because those
+        // re-write the Monaco editor from `jsonArrayOfObj` — overwriting any earlier edit.
+        await this.replaceImportJsonUrlIfPlaceholder('https://example.com/webhook/import');
+        const editorVal = await this.page.evaluate(() => {
+            const m = window.monaco;
+            if (!m || !m.editor) return null;
+            const eds = m.editor.getEditors();
+            return eds && eds[0] ? eds[0].getModel().getValue() : null;
+        }).catch(() => null);
+        testLogger.info('DEBUG editor state', { editorVal });
         await this.page.locator(this.destinationImportJsonBtn).click();
-        // Wait for import to complete
-        await this.page.waitForTimeout(2000);
+        // Wait for the post-import navigation back to the destinations list (router.push fires
+        // ~400ms after the success toast). This replaces a fixed waitForTimeout and ensures
+        // the new destination row has actually been created before downstream verification.
+        await this.page.waitForURL(/\/alert_destinations(?!.*action=import)/, { timeout: 15000 }).catch(() => {});
+        // DEBUG post-state
+        const msgs = await this.page.evaluate(() => {
+            return Array.from(document.querySelectorAll('.text-red, [class*="error"]')).map(el => el.textContent.trim()).filter(Boolean).slice(0, 6);
+        }).catch(() => []);
+        testLogger.info('DEBUG post-state', { url: this.page.url(), msgs });
     }
 
     /**
@@ -841,6 +926,11 @@ export class AlertDestinationsPage {
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
         await nameField.click();
         await nameField.fill(destinationName);
+        // Replace any placeholder URL (`"url": "DEMO"` etc.) in the loaded JSON before the
+        // final submission — the backend's SSRF guard rejects schemeless URLs at create time.
+        // This must run AFTER the corrections-form name/template updates because those
+        // re-write the Monaco editor from `jsonArrayOfObj` — overwriting any earlier edit.
+        await this.replaceImportJsonUrlIfPlaceholder('https://example.com/webhook/import');
         await this.page.locator(this.destinationImportJsonBtn).click();
     }
 
