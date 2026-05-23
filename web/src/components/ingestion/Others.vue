@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OSplitter
     v-model="splitterModel"
     unit="px"
-    :horizontal="false"
+    :horizontal="false" class="tw:h-full"
   >
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
             <OInput
               data-test="others-list-search-input"
@@ -57,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class=" card-container tw:h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full">
           <div class="tw:overflow-auto tw:h-full">
             <router-view
               :title="tabs"
