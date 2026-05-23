@@ -6,6 +6,7 @@ import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import { iconRegistry } from '@/lib/core/Icon/OIcon.icons'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
@@ -73,48 +74,56 @@ const heightClasses = computed<string>(() => {
 
 <template>
   <!--
-    TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
-    disabled, data-state, click/keyboard activation, and aria-controls linkage.
-    aria-disabled is passed explicitly for screen-reader compatibility.
+    Disabled buttons suppress hover events in browsers, so cursor-not-allowed set
+    on the button itself never renders. The span wrapper intercepts hover and
+    shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <TabsTrigger
-    :value="name"
-    :disabled="disable"
-    :aria-disabled="disable || undefined"
-    :id="`tab-${name}`"
-    :aria-controls="`tab-panel-${name}`"
-    :class="[baseClasses, stateClasses, heightClasses]"
-  >
+  <span :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <!--
-      If label or icon props are provided, render them (prop-driven mode).
-      If neither is set, fall back to the default slot (custom content mode:
-      badges, close icons, folder rows, etc.).
+      TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
+      disabled, data-state, click/keyboard activation, and aria-controls linkage.
+      aria-disabled is passed explicitly for screen-reader compatibility.
     -->
-    <template v-if="label || icon">
-      <slot name="icon">
-        <!-- img: prefix (Quasar compat) → render as <img> -->
-        <img
-          v-if="icon && isImgIcon"
-          :src="imgSrc"
-          class="o-tab__icon tw:h-4 tw:w-4 tw:shrink-0 tw:object-contain"
-          aria-hidden="true"
-          alt=""
-        />
-        <!-- OIcon registry name (kebab-case SVG icon) -->
-        <OIcon
-          v-else-if="icon && isOIcon"
-          :name="(icon as any)"
-          size="sm"
-          class="o-tab__icon tw:shrink-0"
-        />
-        <!-- Fallback: Material icon font glyph (Quasar-compat underscore names) -->
-        <span
-          v-else-if="icon"
-          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons-outlined"
-        >{{ icon }}</span>
-      </slot>
-      <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>
-    </template>
-    <slot v-else />
-  </TabsTrigger>
+    <TabsTrigger
+      :value="name"
+      :disabled="disable"
+      :aria-disabled="disable || undefined"
+      :id="`tab-${name}`"
+      :aria-controls="`tab-panel-${name}`"
+      :class="[baseClasses, stateClasses, heightClasses]"
+    >
+      <!--
+        If label or icon props are provided, render them (prop-driven mode).
+        If neither is set, fall back to the default slot (custom content mode:
+        badges, close icons, folder rows, etc.).
+      -->
+      <template v-if="label || icon">
+        <slot name="icon">
+          <!-- img: prefix (Quasar compat) → render as <img> -->
+          <img
+            v-if="icon && isImgIcon"
+            :src="imgSrc"
+            class="o-tab__icon tw:h-4 tw:w-4 tw:shrink-0 tw:object-contain"
+            aria-hidden="true"
+            alt=""
+          />
+          <!-- OIcon registry name (kebab-case SVG icon) -->
+          <OIcon
+            v-else-if="icon && isOIcon"
+            :name="(icon as any)"
+            size="sm"
+            class="o-tab__icon tw:shrink-0"
+          />
+          <!-- Fallback: Material icon font glyph (Quasar-compat underscore names) -->
+          <span
+            v-else-if="icon"
+            class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons-outlined"
+          >{{ icon }}</span>
+        </slot>
+        <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>
+      </template>
+      <slot v-else />
+    </TabsTrigger>
+    <OTooltip v-if="tooltip" :content="tooltip" />
+  </span>
 </template>
