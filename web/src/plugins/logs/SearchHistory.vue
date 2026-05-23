@@ -45,6 +45,7 @@
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
               auto-apply
+              menu-align="end"
               :default-type="searchObj.data.datetime.type"
               @on:date-change="updateDateTime"
             />

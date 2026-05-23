@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown
       v-model:open="menuOpen"
       side="bottom"
-      align="start"
+      :align="menuAlign"
       @update:open="onMenuOpenChange"
     >
       <template #trigger>
@@ -353,6 +353,10 @@ export default defineComponent({
     minDate: {
       type: String,
       default: null,
+    },
+    menuAlign: {
+      type: String,
+      default: "start",
     },
   },
 

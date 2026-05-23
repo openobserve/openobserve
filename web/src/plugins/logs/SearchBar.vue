@@ -552,11 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showSearchHistoryfn"
           >
             <template #icon-left>
-              <img
-                :src="searchHistoryIcon"
-                alt="Search History"
-                class="tw:w-4 tw:h-4"
-              />
+              <OIcon name="history" size="sm" />
             </template>
             {{ t("search.searchHistory") }}
           </ODropdownItem>
