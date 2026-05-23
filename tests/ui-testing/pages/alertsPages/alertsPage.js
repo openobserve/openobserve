@@ -59,6 +59,8 @@ export class AlertsPage {
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
             alertNameInput: '[data-test="add-alert-name-input"]',
+            // OInput inner native input - always use the `-field` variant for fill/clear operations (§4)
+            alertNameInputField: '[data-test="add-alert-name-input-field"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 

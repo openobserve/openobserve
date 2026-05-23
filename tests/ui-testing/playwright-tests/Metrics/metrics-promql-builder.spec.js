@@ -94,7 +94,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 1. Verify stream selector visible with pre-selected value
     await expect(builder.streamSelectorInput).toBeVisible({ timeout: 5000 });
-    const streamValue = await builder.streamSelectorInput.inputValue();
+    const streamValue = await builder.getStreamSelectedValue();
     expect(streamValue.length).toBeGreaterThan(0);
     testLogger.info(`Pre-selected stream: "${streamValue}"`);
 
@@ -112,9 +112,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 3. Search and filter metrics — OSelect popover search: Ctrl+A → Backspace → fill
     await builder.streamSelectorInput.click();
     await builder.streamPopover.waitFor({ state: 'visible', timeout: 5000 });
-    await builder.streamSelectorInput.press('ControlOrMeta+a').catch(() => {});
-    await builder.streamSelectorInput.press('Backspace').catch(() => {});
-    await builder.streamSelectorInput.fill('cpu');
+    await builder.streamSearchInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await builder.streamSearchInput.press('ControlOrMeta+a').catch(() => {});
+    await builder.streamSearchInput.press('Backspace').catch(() => {});
+    await builder.streamSearchInput.fill('cpu');
     // Wait until filter results converge to at least 1
     await expect.poll(async () => builder.streamOptions.count(), { timeout: 5000 }).toBeGreaterThan(0);
     const filteredCount = await builder.streamOptions.count();
@@ -472,7 +473,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 1. Verify builder mode + metric pre-selected
     expect(await builder.isModeSelected('builder')).toBe(true);
-    expect((await builder.streamSelectorInput.inputValue()).length).toBeGreaterThan(0);
+    expect((await builder.getStreamSelectedValue()).length).toBeGreaterThan(0);
     testLogger.info('Builder mode active, metric pre-selected');
 
     // 2. Set time range
@@ -758,7 +759,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 1. Verify builder mode active with metric pre-selected
     expect(await builder.isModeSelected('builder')).toBe(true);
-    const metricName = await builder.streamSelectorInput.inputValue();
+    const metricName = await builder.getStreamSelectedValue();
     expect(metricName.length).toBeGreaterThan(0);
     testLogger.info(`Metric: ${metricName}`);
 
@@ -962,7 +963,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 1. Verify builder mode and pre-selected metric
     expect(await builder.isModeSelected('builder')).toBe(true);
-    const metricName = await builder.streamSelectorInput.inputValue();
+    const metricName = await builder.getStreamSelectedValue();
     expect(metricName.length).toBeGreaterThan(0);
     testLogger.info(`Metric: ${metricName}`);
 
@@ -1145,7 +1146,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 1. Verify builder mode and pre-selected metric
     expect(await builder.isModeSelected('builder')).toBe(true);
-    const metricName = await builder.streamSelectorInput.inputValue();
+    const metricName = await builder.getStreamSelectedValue();
     expect(metricName.length).toBeGreaterThan(0);
     testLogger.info(`Metric: ${metricName}`);
 

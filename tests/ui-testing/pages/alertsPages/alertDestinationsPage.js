@@ -789,13 +789,21 @@ export class AlertDestinationsPage {
         await button.waitFor({ state: 'visible', timeout: 30000 });
         testLogger.debug('New Destination button is visible');
 
-        // Wait for button to be enabled (it starts disabled while page loads)
+        // Wait for button to be enabled (it starts disabled while page loads / templates fetch)
         await expect(button).toBeEnabled({ timeout: 30000 });
         testLogger.debug('New Destination button is enabled');
 
         await button.click();
-        await this.page.waitForTimeout(2000);
-        testLogger.debug('Clicked New Destination button');
+        // Anchor on the add-destination dialog title appearing; if it doesn't, retry the click once
+        const title = this.page.locator(this.addDestinationTitle);
+        try {
+            await title.waitFor({ state: 'visible', timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Add-destination title not visible after click, retrying');
+            await button.click();
+            await title.waitFor({ state: 'visible', timeout: 10000 });
+        }
+        testLogger.debug('Clicked New Destination button — dialog open');
     }
 
     /**
@@ -842,22 +850,21 @@ export class AlertDestinationsPage {
         await this.page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
         }).catch(() => {});
-        await this.page.waitForTimeout(300);
+
+        // Wait for selector to be mounted before probing for the card
+        await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
         // Wait for card to be visible first
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
         await card.waitFor({ state: 'visible', timeout: 15000 });
         await card.click();
 
-        // Wait for form to load after selection
-        await this.page.waitForTimeout(2000);
-
         // Wait for either prebuilt form or custom form to appear
         if (type === 'custom') {
-            await this.page.waitForSelector(this.urlInput, { state: 'visible', timeout: 15000 });
+            await this.page.locator(this.urlInput).waitFor({ state: 'visible', timeout: 15000 });
         } else {
             // For prebuilt types, wait for destination name input
-            await this.page.waitForSelector(this.destinationNameInput, { state: 'visible', timeout: 15000 });
+            await this.page.locator(this.destinationNameInput).waitFor({ state: 'visible', timeout: 15000 });
         }
 
         testLogger.debug('Selected destination type and form loaded', { type });
@@ -942,7 +949,12 @@ export class AlertDestinationsPage {
      * Click Save button
      */
     async clickSave() {
-        await this.page.locator(this.saveButton).first().click();
+        // OToast can transiently overlay the dialog buttons; wait for the save button
+        // to be enabled and use force-click to bypass toast pointer-event interception.
+        const saveBtn = this.page.locator(this.saveButton).first();
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        await saveBtn.click({ force: true, timeout: 10000 });
         testLogger.debug('Clicked Save button');
     }
 
@@ -1249,7 +1261,8 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        // Wait for the create dialog to close so subsequent navigation finds the list
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Slack destination created successfully');
     }
 
@@ -1266,7 +1279,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Discord destination created successfully');
     }
 
@@ -1596,16 +1609,19 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify integration key field contains a value (edit mode)
-     * @param {string} expectedKey - Expected integration key (optional)
+     * Verify integration key field is rendered in edit mode.
+     * Note: PagerDuty's integration_key is treated as a credential and is cleared
+     * by the form on edit (spec note: "must re-provide integration key as password
+     * fields are cleared"), so we only assert the input is visible, not populated.
+     * @param {string} expectedKey - Expected integration key (optional, ignored when empty)
      */
     async expectIntegrationKeyPopulated(expectedKey = null) {
-        const input = this.page.locator(this.integrationKeyInput).first();
-        await expect(input).not.toHaveValue('');
+        const input = this.page.locator(this.integrationKeyInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 10000 });
         if (expectedKey) {
-            await expect(input).toHaveValue(expectedKey);
+            await expect(input).toHaveValue(expectedKey, { timeout: 5000 });
         }
-        testLogger.debug('Integration key populated in edit mode');
+        testLogger.debug('Integration key field visible in edit mode');
     }
 
     /**
@@ -1711,7 +1727,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Slack destination updated successfully');
     }
 
@@ -1730,7 +1746,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Discord destination updated successfully');
     }
 
@@ -1749,7 +1765,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Teams destination updated successfully');
     }
 
@@ -1768,7 +1784,7 @@ export class AlertDestinationsPage {
         await this.updateEmailRecipients(newRecipients);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Email destination updated successfully');
     }
 
@@ -1796,7 +1812,7 @@ export class AlertDestinationsPage {
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('PagerDuty destination updated successfully');
     }
 
@@ -1875,7 +1891,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Opsgenie destination created successfully');
     }
 
@@ -1905,7 +1921,7 @@ export class AlertDestinationsPage {
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Opsgenie destination updated successfully');
     }
 
@@ -1963,7 +1979,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('ServiceNow destination created successfully');
     }
 
@@ -2004,7 +2020,7 @@ export class AlertDestinationsPage {
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('ServiceNow destination updated successfully');
     }
 
@@ -2052,8 +2068,9 @@ export class AlertDestinationsPage {
         const popover = this.page.locator(this.methodSelectPopover);
         await popover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Resolve via data-test-value (OSelect convention per agent rules §4)
-        const methodValue = method.toUpperCase();
+        // Resolve via data-test-value (OSelect convention per agent rules §4).
+        // apiMethods values are lowercase ("get", "post", "put") — normalise the input.
+        const methodValue = method.toLowerCase();
         const option = popover.locator(`[data-test-value="${methodValue}"]`).first();
         await option.waitFor({ state: 'visible', timeout: 5000 });
         await option.click();

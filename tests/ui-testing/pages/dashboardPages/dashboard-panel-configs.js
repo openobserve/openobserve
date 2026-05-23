@@ -840,18 +840,29 @@ export default class DashboardPanelConfigs {
     return await this.columnOrderRows.count();
   }
 
+  /**
+   * Dispatch a click via native DOM event so the OTooltip's hover-on-trigger
+   * subtree (which intercepts pointer events after a prior click) cannot block
+   * the action. Works because OButton listens to @click, not pointerdown.
+   */
+  async _dispatchClickOnLocator(locator) {
+    await locator.evaluate((el) => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+  }
+
   /** Clicks the move-down button for the column at the given index. */
   async moveColumnDown(index) {
     const btn = this.columnOrderMoveDownBtn(index);
     await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
+    await this._dispatchClickOnLocator(btn);
   }
 
   /** Clicks the move-up button for the column at the given index. */
   async moveColumnUp(index) {
     const btn = this.columnOrderMoveUpBtn(index);
     await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
+    await this._dispatchClickOnLocator(btn);
   }
 
   /** Saves the column order and waits for the dialog to close. */

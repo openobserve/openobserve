@@ -111,6 +111,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('slack');
     await pm.alertDestinationsPage.fillWebhookUrl('https://invalid-url.com');
+    // Trigger validation via Save click; PrebuiltDestinationForm only sets fieldErrors on validate()
+    await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectValidationError();
     testLogger.info('✓ Invalid webhook URL shows validation error');
     await pm.alertDestinationsPage.clickCancel();

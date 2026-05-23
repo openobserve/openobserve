@@ -66,6 +66,8 @@ export class MetricsBuilderPage {
         // Stream dropdown popover/options (OSelect)
         this.streamPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
         this.streamOptions = page.locator('[data-test="index-dropdown-stream-option"]');
+        // OSelect popover search input (Reka ListboxFilter) — `${parent}-search`
+        this.streamSearchInput = page.locator('[data-test="index-dropdown-stream-search"]');
 
         // Label / operator / value popovers (OSelect)
         this.labelPopover = page.locator('[data-test="promql-label-select-popover"]');
@@ -96,7 +98,8 @@ export class MetricsBuilderPage {
 
         // Options fields
         this.legendEl = page.locator(this.legendInput);
-        this.legendFieldInput = page.locator(`${this.legendInput}-field`);
+        // Legend is an OCombobox — inner input uses `-input` suffix per OCombobox convention.
+        this.legendFieldInput = page.locator(`${this.legendInput}-input`);
         this.stepValueEl = page.locator(this.stepValueInput);
         this.queryTypeEl = page.locator(this.queryTypeSelect);
         this.queryTypePopover = page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
@@ -381,10 +384,12 @@ export class MetricsBuilderPage {
         await this.streamSelectorInput.click();
         await this.streamPopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // OSelect popover search: Ctrl+A → Backspace → fill
-        await this.streamSelectorInput.press('ControlOrMeta+a').catch(() => {});
-        await this.streamSelectorInput.press('Backspace').catch(() => {});
-        await this.streamSelectorInput.fill(metricName);
+        // OSelect popover search: Ctrl+A → Backspace → fill (via the ListboxFilter input)
+        if (await this.streamSearchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await this.streamSearchInput.press('ControlOrMeta+a').catch(() => {});
+            await this.streamSearchInput.press('Backspace').catch(() => {});
+            await this.streamSearchInput.fill(metricName);
+        }
 
         // Select from dropdown options
         const option = this.page.locator(`[data-test="index-dropdown-stream-option"][data-test-value="${metricName}"]`).first();
@@ -408,10 +413,35 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Get the currently selected stream/metric text
+     * Get the currently selected stream/metric text.
+     * OSelect surfaces the active selection via `data-test-selected-label` and
+     * `data-test-selected-value` attributes on the trigger button.
      */
     async getSelectedMetric() {
-        return await this.streamSelectorInput.inputValue().catch(() => '');
+        return await this.getStreamSelectedValue();
+    }
+
+    /**
+     * Read the selected metric/stream value from the OSelect trigger's data-test
+     * attributes. OSelect exposes `data-test-selected-value` /
+     * `data-test-selected-label` on the inner PopoverTrigger (data-test
+     * `${parent}-trigger`). Falls back to inputValue() for legacy q-select.
+     */
+    async getStreamSelectedValue() {
+        const wrapper = this.streamSelectorInput;
+        if (!await wrapper.isVisible({ timeout: 3000 }).catch(() => false)) return '';
+        // Read from the inner PopoverTrigger
+        const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]');
+        if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const dtValue = await trigger.getAttribute('data-test-selected-value').catch(() => null);
+            if (dtValue && dtValue.length > 0) return dtValue;
+            const dtLabel = await trigger.getAttribute('data-test-selected-label').catch(() => null);
+            if (dtLabel && dtLabel.length > 0) return dtLabel;
+        }
+        // Fallback to wrapper attribute (in case data-test forwards) or inputValue
+        const dtVal2 = await wrapper.getAttribute('data-test-selected-value').catch(() => null);
+        if (dtVal2 && dtVal2.length > 0) return dtVal2;
+        return await wrapper.inputValue().catch(() => '');
     }
 
     // ===== Label Filter Operations =====
@@ -442,8 +472,8 @@ export class MetricsBuilderPage {
         await this.labelSelectLast.click();
         await this.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // OSelect popover search: Ctrl+A → Backspace → fill (when search input is part of popover)
-        const popoverSearch = this.page.locator('[data-test="promql-label-select-popover"] [data-test$="-field"]').first();
+        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
+        const popoverSearch = this.page.locator('[data-test="promql-label-select-search"]').first();
         if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
             await popoverSearch.press('ControlOrMeta+a').catch(() => {});
             await popoverSearch.press('Backspace').catch(() => {});
@@ -484,8 +514,8 @@ export class MetricsBuilderPage {
         await this.valueSelectLast.click();
         await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // OSelect popover search: Ctrl+A → Backspace → fill
-        const popoverSearch = this.page.locator('[data-test="promql-value-select-popover"] [data-test$="-field"]').first();
+        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
+        const popoverSearch = this.page.locator('[data-test="promql-value-select-search"]').first();
         if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
             await popoverSearch.press('ControlOrMeta+a').catch(() => {});
             await popoverSearch.press('Backspace').catch(() => {});
@@ -1390,11 +1420,13 @@ export class MetricsBuilderPage {
     async ensureDashboardSelected() {
         await this.dashboardDropdown.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Check if a dashboard is already auto-selected by reading the q-select's
-        // displayed value via inputValue (works for both OSelect and q-select).
-        const currentVal = await this.dashboardDropdown.inputValue().catch(() => '');
-        if (currentVal && currentVal.length > 0 && !currentVal.includes('Select')) {
-            return currentVal;
+        // OSelect surfaces the active selection via `data-test-selected-label` and
+        // `data-test-selected-value` on the trigger button.
+        const dtValue = await this.dashboardDropdown.getAttribute('data-test-selected-value').catch(() => null);
+        const dtLabel = await this.dashboardDropdown.getAttribute('data-test-selected-label').catch(() => null);
+        const candidate = (dtValue && dtValue.length > 0) ? dtValue : ((dtLabel && dtLabel.length > 0) ? dtLabel : '');
+        if (candidate && !candidate.includes('Select')) {
+            return candidate;
         }
 
         // No dashboard auto-selected — create a new one.
