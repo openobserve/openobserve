@@ -120,6 +120,39 @@ describe("ActionScripts", () => {
             ],
             emits: ["update:changeRecordPerPage"],
           },
+          OTable: {
+            name: "OTable",
+            inheritAttrs: false,
+            template: `
+              <div data-test="action-scripts-table">
+                <table>
+                  <tbody>
+                    <tr v-for="(row, i) in data" :key="i">
+                      <td><slot name="cell-actions" :row="row" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <slot name="bottom" />
+                <slot name="empty" />
+              </div>
+            `,
+            props: [
+              "data",
+              "columns",
+              "rowKey",
+              "loading",
+              "selectedIds",
+              "selection",
+              "pagination",
+              "pageSize",
+              "pageSizeOptions",
+              "sorting",
+              "filterMode",
+              "defaultColumns",
+              "showGlobalFilter",
+            ],
+            emits: ["update:selected-ids"],
+          },
           ODialog: {
             name: "ODialog",
             inheritAttrs: false,

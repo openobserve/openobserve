@@ -26,11 +26,13 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
+// OTable holds the skeleton visible for MIN_SKELETON_MS = 2000ms via setTimeout.
+// Use fake timers so we can advance past that hold without real waits.
+const SKELETON_HOLD_MS = 2100;
 
 describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(TemplateList, {
       attachTo: "#app",
       global: {
@@ -40,11 +42,20 @@ describe("Alert List", async () => {
         plugins: [i18n, router],
       },
     });
+
+    // Let MSW respond and the component finish its initial data fetch using real timers.
+    await flushPromises();
+    // Switch to fake timers only after promises settle so MSW/fetch plumbing is unaffected.
+    vi.useFakeTimers();
+    // Advance past OTable's 2-second skeleton hold timer so real rows are visible.
+    vi.advanceTimersByTime(SKELETON_HOLD_MS);
     await flushPromises();
   });
 
   afterEach(() => {
     wrapper.unmount();
+    vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it("Should render alerts title", () => {
@@ -52,6 +63,7 @@ describe("Alert List", async () => {
       wrapper.find('[data-test="alert-templates-list-title"]').text()
     ).toBe("Templates");
   });
+
   it("Should reder table with templates", () => {
     expect(
       wrapper.find('[data-test="alert-templates-list-table"]').exists()
@@ -59,7 +71,6 @@ describe("Alert List", async () => {
   });
 
   it("Should display table column headers", async () => {
-    await flushPromises();
     const tableData = wrapper
       .find('[data-test="alert-templates-list-table"]')
       .find("thead")
@@ -72,17 +83,16 @@ describe("Alert List", async () => {
   });
 
   it("Should display table row data", async () => {
-    await flushPromises();
+    // Target the real data tbody (not the skeleton tbody).
     const tableData = wrapper
       .find('[data-test="alert-templates-list-table"]')
-      .find("tbody")
+      .find('[data-test="o2-table-body"]')
       .find("tr")
       .findAll("td");
-    // Index 0 is the checkbox column, so actual columns start at index 1
+    // Index 0 is the checkbox cell; actual data cells start at index 1.
     expect(tableData[1].text()).toBe("01");
     expect(tableData[2].text()).toBe("Template2");
   });
-
 
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
@@ -96,38 +106,48 @@ describe("Alert List", async () => {
           }
         )
       );
+      // Override the templates list to return only Template3 after deletion.
+      // The service returns res.data which axios maps to the raw response body,
+      // so the array must be returned directly (not wrapped in { list: [...] }).
       global.server.use(
         http.get(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/templates`,
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
           () => {
-            return HttpResponse.json({
-              list: [
-                {
-                    name: "Template3",
-                    body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
-                    isDefault: true,
-                  },
-                ],
-            });
+            return HttpResponse.json([
+              {
+                name: "Template3",
+                body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
+                isDefault: true,
+              },
+            ]);
           }
         )
       );
+
+      // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
         .find(
           `[data-test="alert-template-list-${template_name}-delete-template"]`
         )
         .trigger("click");
       await flushPromises();
+
+      // Confirm the deletion in the dialog.
       const mainWrapper = new DOMWrapper(document.body);
       await mainWrapper
         .find('[data-test="o-dialog-primary-btn"]')
         .trigger("click");
+      await flushPromises();
+
+      // Advance past the skeleton hold timer triggered by the refetch.
+      vi.advanceTimersByTime(SKELETON_HOLD_MS);
       await flushPromises();
     });
 
     it("Should delete alert from the list", () => {
       expect(deleteAlert).toHaveBeenCalledTimes(1);
     });
+
     it("Should refetch all alerts", () => {
       const tableRows = wrapper
         .find('[data-test="alert-templates-list-table"]')

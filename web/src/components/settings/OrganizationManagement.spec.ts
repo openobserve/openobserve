@@ -183,6 +183,22 @@ const ODialogStub = {
   `,
 };
 
+// Stub OTable so tests are fast. The stub renders the #cell-actions slot
+// for every row in `data` so action-button tests can find rendered buttons.
+const OTableStub = {
+  name: "OTable",
+  inheritAttrs: false,
+  props: ["data", "columns", "loading", "rowKey"],
+  template: `
+    <div data-test="org-management-list-table">
+      <div v-for="(row, idx) in (data || [])" :key="idx" :data-test="'otable-row-' + idx">
+        <slot name="cell-actions" :row="row" />
+      </div>
+      <slot name="empty" v-if="!data || data.length === 0" />
+    </div>
+  `,
+};
+
 describe("OrganizationManagement.vue", () => {
   let wrapper: any;
   let mockGetAdminOrg: any;
@@ -253,6 +269,23 @@ describe("OrganizationManagement.vue", () => {
         plugins: [i18n, store, router],
         stubs: {
           ODialog: ODialogStub,
+          OTable: OTableStub,
+          // Stub heavy sub-components that are not under test
+          OTooltip: { template: "<span />" },
+          OIcon: { template: "<span />" },
+          // Keep OInput functional but lightweight — tests use data-test to find it
+          OInput: {
+            name: "OInput",
+            props: ["modelValue", "placeholder", "type"],
+            emits: ["update:modelValue"],
+            template: `<input
+              :data-test="$attrs['data-test']"
+              :value="modelValue"
+              :placeholder="placeholder"
+              :type="type || 'text'"
+              @input="$emit('update:modelValue', $event.target.value)"
+            />`,
+          },
         },
       },
       props: propsData,

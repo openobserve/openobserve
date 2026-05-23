@@ -21,6 +21,21 @@ vi.mock("@/services/segment_analytics", () => ({
   }
 }));
 
+// Mock reodotdev analytics
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({
+    track: vi.fn(),
+    reoInit: vi.fn(),
+    identify: vi.fn(),
+    isLoaded: false
+  })
+}));
+
+// Mock toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn())
+}));
+
 // Mock vue-i18n
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal();
@@ -82,7 +97,10 @@ describe("AddFunction Component", () => {
           email: "test@example.com"
         },
         theme: 'light',
-        isAiChatEnabled: false
+        isAiChatEnabled: false,
+        zoConfig: {
+          ai_enabled: false
+        }
       },
       dispatch: vi.fn()
     };

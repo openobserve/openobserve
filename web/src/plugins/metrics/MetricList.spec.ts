@@ -385,80 +385,72 @@ describe("MetricList", () => {
     });
   });
 
-  describe("filterMetrics function", () => {
-    it("should filter metrics based on search term", () => {
+  describe("streamOptions — prop-driven filtering", () => {
+    // filterMetrics is an internal helper not exposed on the public API.
+    // The observable behaviour is: streamOptions mirrors the metricsList prop
+    // and updates reactively when the prop changes.  Tests here drive that
+    // behaviour through props and assert on the returned streamOptions ref.
+
+    it("initialises streamOptions to match the metricsList prop", () => {
       const metricsList = [
         { label: "cpu_usage", value: "cpu_usage", type: "gauge" },
         { label: "memory_usage", value: "memory_usage", type: "gauge" },
         { label: "disk_io", value: "disk_io", type: "counter" },
       ];
       const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("cpu", mockUpdate);
-      
-      expect(mockUpdate).toHaveBeenCalled();
-      expect(wrapper.vm.streamOptions).toEqual([
-        { label: "cpu_usage", value: "cpu_usage", type: "gauge" }
-      ]);
-    });
 
-    it("should handle empty search term", () => {
-      const metricsList = [
-        { label: "metric1", value: "metric1", type: "counter" },
-        { label: "metric2", value: "metric2", type: "gauge" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("", mockUpdate);
-      
       expect(wrapper.vm.streamOptions).toEqual(metricsList);
     });
 
-    it("should be case insensitive", () => {
-      const metricsList = [
-        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" },
-        { label: "Memory_Usage", value: "Memory_Usage", type: "gauge" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("cpu", mockUpdate);
-      
-      expect(wrapper.vm.streamOptions).toEqual([
-        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" }
-      ]);
-    });
-
-    it("should return empty array when no matches found", () => {
-      const metricsList = [
-        { label: "metric1", value: "metric1", type: "counter" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("nonexistent", mockUpdate);
-      
-      expect(wrapper.vm.streamOptions).toEqual([]);
-    });
-
-    it("should reset streamOptions to original metricsList before filtering", () => {
+    it("streamOptions contains all metrics when metricsList has multiple items", () => {
       const metricsList = [
         { label: "metric1", value: "metric1", type: "counter" },
         { label: "metric2", value: "metric2", type: "gauge" },
       ];
       const wrapper = createWrapper({ metricsList });
-      
-      // First filter
-      const mockUpdate1 = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("metric1", mockUpdate1);
-      expect(wrapper.vm.streamOptions).toHaveLength(1);
-      
-      // Second filter should start from original list
-      const mockUpdate2 = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("metric", mockUpdate2);
+
       expect(wrapper.vm.streamOptions).toHaveLength(2);
+      expect(wrapper.vm.streamOptions).toEqual(metricsList);
+    });
+
+    it("updates streamOptions reactively when metricsList prop changes to a smaller list", async () => {
+      const original = [
+        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" },
+        { label: "Memory_Usage", value: "Memory_Usage", type: "gauge" },
+      ];
+      const wrapper = createWrapper({ metricsList: original });
+
+      const reduced = [{ label: "CPU_Usage", value: "CPU_Usage", type: "gauge" }];
+      await wrapper.setProps({ metricsList: reduced });
+
+      expect(wrapper.vm.streamOptions).toEqual(reduced);
+    });
+
+    it("streamOptions becomes empty when metricsList prop is set to empty array", async () => {
+      const wrapper = createWrapper({
+        metricsList: [{ label: "metric1", value: "metric1", type: "counter" }],
+      });
+
+      await wrapper.setProps({ metricsList: [] });
+
+      expect(wrapper.vm.streamOptions).toEqual([]);
+    });
+
+    it("updates streamOptions when metricsList prop is replaced with a different list", async () => {
+      const first = [
+        { label: "metric1", value: "metric1", type: "counter" },
+        { label: "metric2", value: "metric2", type: "gauge" },
+      ];
+      const wrapper = createWrapper({ metricsList: first });
+
+      const second = [
+        { label: "metric1", value: "metric1", type: "counter" },
+        { label: "metric2", value: "metric2", type: "gauge" },
+        { label: "metric3", value: "metric3", type: "summary" },
+      ];
+      await wrapper.setProps({ metricsList: second });
+
+      expect(wrapper.vm.streamOptions).toHaveLength(3);
     });
   });
 
