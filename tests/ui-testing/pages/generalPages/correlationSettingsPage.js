@@ -394,8 +394,8 @@ export class CorrelationSettingsPage {
         }
         // Last resort - check for checked class
         const hasCheckedClass = await checkbox.evaluate(el => {
-            return el.classList.contains('q-checkbox--checked') ||
-                   el.closest('.q-checkbox')?.classList.contains('q-checkbox--checked');
+            return el.classList.contains('checked') ||
+                   el.querySelector('input[type="checkbox"]:checked') !== null;
         }).catch(() => false);
         return hasCheckedClass;
     }
@@ -529,7 +529,7 @@ export class CorrelationSettingsPage {
 
     async getAvailableDimensionsCount() {
         // Count items in the available dimensions list (right side)
-        const list = this.page.locator('.q-list').nth(1); // TODO: verify list container selector post-Reka migration
+        const list = this.page.locator('[role="listbox"]').nth(1); // Reka migration: use role-based selector
         await list.waitFor({ state: 'visible', timeout: 10000 });
         const items = list.locator('[role="option"], [data-test$="-item"]'); // TODO: verify data-test for dimension list items
         return await items.count();
@@ -576,7 +576,7 @@ export class CorrelationSettingsPage {
         }
         // Fallback: check for checked class
         const classList = await checkbox.getAttribute('class');
-        return classList?.includes('q-checkbox--checked') || classList?.includes('checked');
+        return classList?.includes('checked');
     }
 
     // ==================== Alert Correlation Save Button ====================
@@ -606,8 +606,8 @@ export class CorrelationSettingsPage {
         // Available dimensions are in the second q-list (right side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
         const item = rightList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
@@ -624,8 +624,8 @@ export class CorrelationSettingsPage {
         // Priority dimensions are in the first q-list (left side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
@@ -641,8 +641,8 @@ export class CorrelationSettingsPage {
     async getPriorityDimensionsCount() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         // Exclude empty state items (the "No dimensions configured" message)
@@ -656,8 +656,8 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).toBeVisible({ timeout: 5000 });
@@ -669,8 +669,8 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionNotExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).not.toBeVisible({ timeout: 5000 });
@@ -724,7 +724,7 @@ export class CorrelationSettingsPage {
             return isChecked === 'true';
         }
         const classList = await checkbox.getAttribute('class');
-        return classList?.includes('q-checkbox--checked') || classList?.includes('checked');
+        return classList?.includes('checked');
     }
 
     /**
@@ -763,7 +763,7 @@ export class CorrelationSettingsPage {
     async expectServicesDataLoaded() {
         await this.page.locator(this.loadingSpinner).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
         // Check for either services content or empty state
-        const hasContent = await this.page.locator('.q-table, .q-list, .discovered-services-content').first().isVisible().catch(() => false);
+        const hasContent = await this.page.locator('[data-test="o2-table"], [role="listbox"], .discovered-services-content').first().isVisible().catch(() => false);
         const hasEmptyState = await this.page.locator('text=/no.*service|empty/i').first().isVisible().catch(() => false);
         return hasContent || hasEmptyState;
     }
@@ -847,8 +847,8 @@ export class CorrelationSettingsPage {
     async getFirstAvailableDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
         const firstItem = rightList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test
@@ -871,8 +871,8 @@ export class CorrelationSettingsPage {
     async getFirstPriorityDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Lists use role="listbox" after Reka migration
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         const firstItem = leftList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test

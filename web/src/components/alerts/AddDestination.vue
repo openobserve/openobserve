@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           icon="arrow-back-ios-new"
           class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
+          data-test="add-destination-back-btn"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >

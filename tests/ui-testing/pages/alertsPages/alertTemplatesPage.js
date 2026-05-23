@@ -34,9 +34,9 @@ export class AlertTemplatesPage {
         // Template import locators
         this.templateImportButton = '[data-test="template-import"]';
         this.importUrlTab = '[data-test="tab-import_json_url"]';
-        this.importUrlInput = '[data-test="template-import-url-input"]';
+        this.importUrlInput = '[data-test="template-import-url-input-input"]';
         this.importJsonButton = '[data-test="template-import-json-btn"]';
-        this.importNameInput = '[data-test="template-import-name-input"]';
+        this.importNameInput = '[data-test="template-import-name-input-input"]';
         this.importFileInput = '[data-test="template-import-json-file-input"]';
         this.templateImportSuccessMessage = 'Successfully imported';
         this.templateImportErrorText = 'Template - 1: "email template" creation failed --> Reason: Template name cannot contain \':\', \'#\', \'?\', \'&\', \'%\', \'/\', quotes and space characters';
@@ -668,7 +668,7 @@ export class AlertTemplatesPage {
                     return;
                 }
                 // Try next page
-                const nextBtn = this.page.locator('[data-test="table-next-page-btn"]').first();
+                const nextBtn = this.page.locator('[data-test="o2-table-next-page-btn"]').first();
                 if (await nextBtn.isVisible().catch(() => false) && await nextBtn.isEnabled().catch(() => false)) {
                     await nextBtn.click();
                     await this.page.waitForTimeout(2000);

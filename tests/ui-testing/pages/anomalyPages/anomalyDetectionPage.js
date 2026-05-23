@@ -56,7 +56,7 @@ class AnomalyDetectionPage {
 
             // Alerting
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
-            alertToggleLabel: '.q-toggle__label',
+            alertToggleLabel: '[data-test="anomaly-alert-enabled"] label',
             destination: '[data-test="anomaly-destination"]',
             destinationError: '[data-test="anomaly-destination-error"]',
             refreshDestinationsBtn: '[data-test="anomaly-refresh-destinations"]',
@@ -67,7 +67,7 @@ class AnomalyDetectionPage {
             cancelButton: '[data-test="add-alert-cancel-btn"]',
 
             // Generic Quasar components
-            qToggle: '.q-toggle',
+            qToggle: '[data-test="anomaly-alert-enabled"]',
             qMenuItem: '[data-test$="-popover"] [data-test$="-option"]',
             qMenu: '[data-test$="-popover"]',
             qDialog: '[data-test$="-dialog"]',
@@ -357,7 +357,7 @@ class AnomalyDetectionPage {
         const toggleSelectors = [
             this.selectors.alertEnabled,
             '[data-test="anomaly-alert-enabled"]',
-            '.q-toggle'
+            '[data-test="anomaly-alert-enabled"]'
         ];
 
         let toggle = null;
@@ -376,7 +376,7 @@ class AnomalyDetectionPage {
         }
 
         // Get toggle label to determine state
-        const toggleLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+        const toggleLabel = await toggle.locator('label').textContent().catch(() => '');
         testLogger.info('Alert toggle state', { toggleLabel });
 
         if (toggleLabel.toLowerCase().includes('enabled')) {
@@ -385,7 +385,7 @@ class AnomalyDetectionPage {
             await this.page.waitForTimeout(1000);
 
             // Verify it was disabled
-            const newLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+            const newLabel = await toggle.locator('label').textContent().catch(() => '');
             testLogger.info('After clicking toggle', { toggleLabel: newLabel });
             testLogger.info('Disabled alerting');
         } else {

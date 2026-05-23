@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full" data-test="template-import-preview" style="min-width: 400px;">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"

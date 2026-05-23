@@ -34,7 +34,7 @@ export class PipelinesPage {
         );
         // Target the form field error inside q-field__bottom, not the notification.
         // role="alert" is the standard ARIA role for q-field error messages — keeping per task guidelines.
-        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
+        this.pipelineNameRequiredMessage = page.locator('[data-test="o-toast"]').getByText(
           "Pipeline name is required"
         );
         // Updated selector to use placeholder since aria-label doesn't exist
@@ -130,7 +130,7 @@ export class PipelinesPage {
         this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
         this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
-        this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
+        this.conditionDropdown = page.locator('[data-test="alert-conditions-operator-select"]');
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
 
         // Condition-specific locators for comprehensive testing
@@ -1041,7 +1041,7 @@ export class PipelinesPage {
         await this.page.waitForTimeout(500);
 
         // Select from dropdown
-        const options = this.qMenu.locator('.q-item');
+        const options = this.qMenu.locator('[data-test$="-option"]');
         await options.first().click();
         await this.page.waitForTimeout(300);
 
@@ -1051,7 +1051,7 @@ export class PipelinesPage {
 
         // Scope to the visible dropdown menu and select the operator
         const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        await visibleMenu.locator('[data-test$="-option"]', { hasText: operator }).click();
         await this.page.waitForTimeout(300);
 
         // Fill value
@@ -1287,7 +1287,7 @@ export class PipelinesPage {
         await this.columnSelect.first().locator('input').click();
         await this.columnSelect.first().locator('input').fill(columnName);
         await this.page.waitForTimeout(300);
-        const options = this.qMenu.locator('.q-item');
+        const options = this.qMenu.locator('[data-test$="-option"]');
         if (await options.count() > 0) {
             await options.first().click();
         }
@@ -1297,7 +1297,7 @@ export class PipelinesPage {
         await this.operatorSelect.first().click();
         await this.page.waitForTimeout(500);
         const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        await visibleMenu.locator('[data-test$="-option"]', { hasText: operator }).click();
     }
 
     async verifyConfirmationDialog() {
@@ -2434,7 +2434,7 @@ export class PipelinesPage {
     async testPauseToggle(rowIndex) {
         const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
         const row = pipelineRows.nth(rowIndex);
-        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"], .q-toggle').first();
+        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"]').first();
 
         if (await pauseToggle.isVisible().catch(() => false)) {
             const initialState = await pauseToggle.getAttribute('aria-pressed').catch(() => 'unknown');
@@ -2619,7 +2619,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test="o2-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2772,7 +2772,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isHistoryTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="history-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="history-table"], [data-test="o2-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2879,7 +2879,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillJobsTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], [data-test="o2-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2889,9 +2889,9 @@ export class PipelinesPage {
      */
     async isGenericTableVisible() {
         // TODO(data-test): backfill/jobs/generic tables don't yet expose a data-test
-        // root in their source components — keeping native <table>/.q-table fallback
+        // root in their source components — keeping native <table>/o2-table fallback
         // until added in web/src/components/pipeline/ and shared table components.
-        const tableLocator = this.page.locator('table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test="o2-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2919,7 +2919,7 @@ export class PipelinesPage {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item').first();
+            const option = this.page.locator('[data-test$="-option"]').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -2959,7 +2959,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of buttons
      */
     async getTableButtonCount() {
-        const buttons = await this.page.locator('table button, .q-table button').all();
+        const buttons = await this.page.locator('[data-test="o2-table"] button, table button').all();
         return buttons.length;
     }
 
@@ -3220,7 +3220,7 @@ export class PipelinesPage {
 
     /**
      * Dismiss any open dialogs or menus.
-     * Use in afterEach cleanup instead of raw page.locator('.q-dialog').
+     * Use in afterEach cleanup instead of raw dialog locators.
      */
     async dismissOpenDialogs() {
         try {

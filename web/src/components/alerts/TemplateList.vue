@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:justify-end tw:gap-2">
             <OInput
               v-model="filterQuery"
+              data-test="template-search-input"
               class="tw:ml-auto no-border o2-search-input"
               :placeholder="t('template.search')"
             >
@@ -71,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:selected-ids="handleSelectedIdsUpdate"
       >
         <template #empty>
-          <NoData />
+          <NoData data-test="alert-template-no-data" />
         </template>
         <template #cell-actions="{ row }">
           <OButton

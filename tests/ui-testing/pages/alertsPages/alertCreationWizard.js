@@ -32,7 +32,7 @@ export class AlertCreationWizard {
             await this.page.waitForTimeout(500);
             // Clear any previous text in the input
             await this.page.keyboard.press('Control+a');
-            await this.page.keyboard.type(streamName, { delay: 30 });
+            await this.page.locator(this.locators.streamNameDropdown).locator('input').fill(streamName);
             await this.page.waitForTimeout(1500);
 
             const streamOption = this.page.getByText(streamName, { exact: true });
@@ -62,8 +62,8 @@ export class AlertCreationWizard {
 
                 // Re-select stream type
                 await this.page.locator(this.locators.streamTypeDropdown).click();
-                await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-                await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+                await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+                await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
                 await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
             }
@@ -95,8 +95,8 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         // Wait for stream list API call to complete after stream type selection
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
@@ -178,7 +178,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -205,8 +205,8 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
 
         await this.selectStreamByName(streamName);
@@ -238,7 +238,7 @@ export class AlertCreationWizard {
         const operatorSelect = this.page.locator(this.locators.operatorSelect).first();
         await operatorSelect.click();
         await this.page.waitForTimeout(500);
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'Contains' }).first().click();
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill('test');
@@ -272,15 +272,15 @@ export class AlertCreationWizard {
         }
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
-        // Forcefully remove any remaining q-portal elements that intercept clicks
+        // Forcefully remove any remaining portalled elements that intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+            document.querySelectorAll('div[data-reka-portalled]').forEach(el => { el.style.display = 'none'; });
+        }).catch(e => testLogger.warn('Failed to remove portalled elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert with defaults', { alertName: randomAlertName });
 
         // Wait for navigation back to alerts list
@@ -311,8 +311,8 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
 
         await this.selectStreamByName(streamName);
@@ -377,10 +377,8 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
 
         // Aggressively clean up any portal overlays that may intercept pointer events.
-        // Both Quasar (q-portal--dialog) and reka-ui (data-reka-dialog-overlay) portals
-        // can linger after the dialog state is toggled off.
+        // Reka-ui portals can linger after the dialog state is toggled off.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
             document.querySelectorAll('div[data-reka-dialog-overlay]').forEach(el => { el.style.display = 'none'; });
             document.querySelectorAll('div[data-reka-portalled]').forEach(el => { el.style.display = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove portal overlays', { error: e.message }));
@@ -460,7 +458,7 @@ export class AlertCreationWizard {
             const btn = document.querySelector(selector);
             if (btn) btn.click();
         }, this.locators.alertSubmitButton);
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });
 
@@ -489,8 +487,8 @@ export class AlertCreationWizard {
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
 
         // Select stream name
@@ -568,8 +566,8 @@ export class AlertCreationWizard {
         await expect(operatorSelect2).toBeVisible({ timeout: 5000 });
         await operatorSelect2.click();
         await this.page.waitForTimeout(500);
-        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'Contains' }).first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'Contains' }).first().click();
         await this.page.waitForTimeout(500);
 
         // Use 'validation' as value - matches the log field from ingested validation data
@@ -616,7 +614,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created multi-condition alert', { alertName: randomAlertName });
 
         // Wait for page to navigate back to alerts list after creation
@@ -656,8 +654,8 @@ export class AlertCreationWizard {
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Selected stream type: logs');
 
@@ -711,14 +709,12 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Clean up residual q-portal dialog overlays from the closed SQL Editor,
-        // scoped to already-hidden portals and the Monaco editor's portal specifically
-        // so we don't hide any other legitimately open dialog.
+        // Clean up residual portalled dialog overlays from the closed SQL Editor.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => {
-                const isHidden = el.getAttribute('aria-hidden') === 'true';
+            document.querySelectorAll('div[data-reka-dialog-overlay]').forEach(el => { el.style.display = 'none'; });
+            document.querySelectorAll('div[data-reka-portalled]').forEach(el => {
                 const hasMonaco = el.querySelector('.monaco-editor');
-                if (isHidden || hasMonaco) el.style.display = 'none';
+                if (hasMonaco) el.style.display = 'none';
             });
         }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
         await this.page.waitForTimeout(300);
@@ -739,11 +735,11 @@ export class AlertCreationWizard {
         });
         // Wait for the dropdown menu to actually appear before selecting an option
         await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        // Use role-based option selection (bypasses q-portal visibility issues)
+        // Use popover-based option selection
         // Use a flag to track success so the fallback error isn't silently swallowed
         let operatorSelected = false;
         try {
-            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
+            await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: '>=' }).first().click({ timeout: 5000 });
             operatorSelected = true;
         } catch {
             testLogger.warn('Role option not found, trying popover fallback');
@@ -809,7 +805,7 @@ export class AlertCreationWizard {
                 await fingerprintSelect.locator('input').fill(field);
                 await this.page.waitForTimeout(500);
 
-                const fieldOption = this.page.getByRole('option', { name: field }).first();
+                const fieldOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: field }).first();
                 if (await fieldOption.isVisible({ timeout: 2000 })) {
                     await fieldOption.click();
                 } else {
@@ -836,7 +832,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -861,8 +857,8 @@ export class AlertCreationWizard {
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
 
         // Select stream
@@ -1137,8 +1133,8 @@ export class AlertCreationWizard {
 
         // Select stream type (logs)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Selected stream type: logs');
 
@@ -1294,7 +1290,7 @@ export class AlertCreationWizard {
                 await fingerprintSelect.locator('input').fill(field);
                 await this.page.waitForTimeout(500);
 
-                const fieldOption = this.page.getByRole('option', { name: field }).first();
+                const fieldOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: field }).first();
                 if (await fieldOption.isVisible({ timeout: 2000 })) {
                     await fieldOption.click();
                 } else {
@@ -1315,7 +1311,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication for validation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1360,8 +1356,8 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
 
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'logs' }).first().click();
         await this.page.waitForTimeout(1000);
 
         await this.selectStreamByName(streamName);
@@ -1512,7 +1508,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with aggregation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1569,8 +1565,8 @@ export class AlertCreationWizard {
 
         // Select stream type (metrics) - IMPORTANT: Must be metrics for PromQL tab to appear
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
+        await expect(this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'metrics' }).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: 'metrics' }).first().click();
         await this.page.waitForTimeout(1000);
         // Wait for stream listing API to complete after type change
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1632,11 +1628,11 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.promqlEditorDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
             testLogger.warn('PromQL editor dialog still visible after close click, continuing anyway');
         });
-        // Forcefully remove any remaining q-portal elements that intercept clicks
-        // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
+        // Forcefully remove any remaining portalled elements that intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+            document.querySelectorAll('div[data-reka-dialog-overlay]').forEach(el => { el.style.display = 'none'; });
+            document.querySelectorAll('div[data-reka-portalled]').forEach(el => { el.style.display = 'none'; });
+        }).catch(e => testLogger.warn('Failed to remove portalled elements', { error: e.message }));
         await this.page.waitForTimeout(300);
         testLogger.info('Closed PromQL Editor dialog — portal cleaned up');
 
@@ -1710,7 +1706,7 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: this.locators.alertSuccessMessage })).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with PromQL query', { alertName: randomAlertName });
 
         return randomAlertName;

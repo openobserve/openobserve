@@ -92,7 +92,7 @@ export class MetricsQueryEditorPage {
         const clearButtons = [
             '[data-test="index-dropdown-stream"] .OIcon[name="cancel"]',
             '[data-test="index-dropdown-stream"] button[aria-label="Clear"]',
-            '[data-test="index-dropdown-stream"] .q-field__append button'
+            '[data-test="index-dropdown-stream"] button[aria-label="Clear"]'
         ];
 
         for (const selector of clearButtons) {

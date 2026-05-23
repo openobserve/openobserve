@@ -56,6 +56,7 @@ limitations under the License. -->
           <div
             v-if="selectedType === type.id"
             class="check-icon"
+            data-test="selected-destination-indicator"
           >
             <OIcon name="check-circle" size="md" />
           </div>
@@ -83,6 +84,7 @@ limitations under the License. -->
           <div
             v-if="selectedType === 'custom'"
             class="check-icon"
+            data-test="selected-destination-indicator"
           >
             <OIcon name="check-circle" size="md" />
           </div>

@@ -201,7 +201,12 @@ export class MetricsBuilderPage {
      */
     async getSelectedMetric() {
         const selector = this.page.locator(this.streamSelector);
-        return await selector.locator('.q-field__native span, .q-field__native').textContent().catch(() => '');
+        // Try input value first, then fall back to text content of the selector itself
+        const input = selector.locator('input').first();
+        if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await input.inputValue().catch(() => '');
+        }
+        return await selector.textContent().catch(() => '');
     }
 
     // ===== Label Filter Operations =====
@@ -678,11 +683,8 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
-        // OSelect (Reka Listbox role=option) post-migration; q-select (.q-menu .q-item) pre.
-        const rekaCount = await this.page.locator('').count();
-        if (rekaCount > 0) return true;
-        const menu = this.page.locator('[data-test$="-popover"]').filter({ has: this.page.locator('[data-test$="-option"]') });
-        const count = await menu.first().locator('.q-item').count();
+        const options = this.page.locator('[data-test$="-option"]');
+        const count = await options.count();
         return count > 0;
     }
 
@@ -791,25 +793,19 @@ export class MetricsBuilderPage {
         const valueDropdown = this.page.locator(this.valueSelect).last();
         await valueDropdown.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         const isDisabled = await valueDropdown.evaluate(el => {
-            // Quasar q-select disabled detection: check the element and its ancestors/descendants
-            // for disabled indicators
-            const hasDisabledClass = (node) => {
-                if (!node) return false;
-                const cls = node.className || '';
-                return cls.includes('q-field--disabled') || cls.includes('disabled');
-            };
-            // Check the element itself
-            if (hasDisabledClass(el)) return true;
-            // Check parent (q-field wrapper)
-            if (hasDisabledClass(el.parentElement)) return true;
-            // Check aria-disabled
+            // Check aria-disabled on element or ancestors
             if (el.getAttribute('aria-disabled') === 'true') return true;
-            // Check for disabled child elements (Quasar may nest q-field inside)
-            if (el.querySelector('.q-field--disabled')) return true;
+            if (el.closest('[aria-disabled="true"]')) return true;
+            // Check disabled attribute
+            if (el.hasAttribute('disabled')) return true;
+            // Check disabled class (generic)
+            const cls = el.className || '';
+            if (cls.includes('disabled')) return true;
+            if (el.parentElement?.className?.includes('disabled')) return true;
             // Check if the inner input/control is disabled
             const input = el.querySelector('input');
             if (input && input.disabled) return true;
-            // Check computed pointer-events (Quasar disabled fields have pointer-events: none)
+            // Check computed pointer-events
             const style = window.getComputedStyle(el);
             if (style.pointerEvents === 'none') return true;
             return false;
@@ -1170,14 +1166,19 @@ export class MetricsBuilderPage {
         // Wait for the dashboard list API to finish loading
         await this.page.waitForTimeout(2000);
 
-        // Check if a dashboard is already auto-selected by reading the q-select's
-        // displayed value. Quasar q-select (without use-input) renders the selected
-        // option text inside .q-field__native > span.
+        // Check if a dashboard is already auto-selected by reading the displayed value.
+        // Post-migration: OSelect renders selected text in a span or the input value.
         const hasSelectedValue = await dashDropdown.evaluate((el) => {
-            const nativeSpans = el.querySelectorAll('.q-field__native > span');
-            for (const span of nativeSpans) {
+            // Check input value first (OSelect with search)
+            const input = el.querySelector('input');
+            if (input && input.value?.trim() && !input.value.includes('Select')) {
+                return input.value.trim();
+            }
+            // Check displayed text spans (OSelect without search)
+            const spans = el.querySelectorAll('span');
+            for (const span of spans) {
                 const text = span.textContent?.trim();
-                if (text && text.length > 0 && !text.includes('Select')) {
+                if (text && text.length > 0 && !text.includes('Select') && !text.includes('placeholder')) {
                     return text;
                 }
             }

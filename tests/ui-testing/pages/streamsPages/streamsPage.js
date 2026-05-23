@@ -236,7 +236,7 @@ export class StreamsPage {
             this.page.getByText('warning No data found for histogram.'),
             this.page.locator('text=/No data.*histogram/i'),
             this.page.locator('[data-test*="histogram"]').filter({ hasText: /no data/i }),
-            this.page.locator('.q-banner').filter({ hasText: /histogram/i }),
+            this.page.locator('[role="alert"]').filter({ hasText: /histogram/i }),
             // Additional locators for variations in text rendering
             this.page.locator('span').filter({ hasText: 'No data found for histogram' }),
             this.page.locator('div').filter({ hasText: 'No data found for histogram' }).first()
@@ -404,7 +404,7 @@ export class StreamsPage {
             
             // Try individual selector
             try {
-                const element = this.page.locator('tr:has-text("Full text search") .q-checkbox__inner');
+                const element = this.page.locator('tr:has-text("Full text search") [role="checkbox"]');
                 if (await element.isVisible({ timeout: 1000 })) {
                     await element.click();
                 }
@@ -722,8 +722,8 @@ export class StreamsPage {
     get indexTypeSelect() { return this.page.locator('[data-test="schema-stream-index-select"]').first(); }
     get fieldSearchInput() { return this.page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first(); }
     get quickModeIcons() { return this.page.locator('img[alt*="quick"], img[alt*="Quick"]'); }
-    get quickModeTooltip() { return this.page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i }); }
-    get schemaTable() { return this.page.locator('.q-table').first(); }
+    get quickModeTooltip() { return this.page.locator('[role="tooltip"]').filter({ hasText: /quick.*mode/i }); }
+    get schemaTable() { return this.page.locator('table').first(); }
 
     /**
      * Click Add Stream button to open the modal
@@ -1024,7 +1024,7 @@ export class StreamsPage {
      * legacy q-select uses .q-item.
      */
     getFullTextSearchOption() {
-        return this.page.locator('.q-item').filter({ hasText: 'Full text search' });
+        return this.page.locator('[data-test$="-option"]').filter({ hasText: 'Full text search' });
     }
 
     /**

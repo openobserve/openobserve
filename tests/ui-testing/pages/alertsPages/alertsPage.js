@@ -45,8 +45,8 @@ export class AlertsPage {
             // Alert related locators
             alertMenuItem: '[data-test="menu-link-\\/alerts-item"]',
             newFolderButton: '[data-test="dashboard-new-folder-btn"]',
-            folderNameInput: '[data-test="dashboard-folder-add-name"]',
-            folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
+            folderNameInput: '[data-test="dashboard-folder-add-name-input"]',
+            folderDescriptionInput: '[data-test="dashboard-folder-add-description-input"]',
             folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
             folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
             noDataAvailableText: 'No data available',
@@ -58,7 +58,7 @@ export class AlertsPage {
 
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
-            alertNameInput: '[data-test="add-alert-name-input"]',
+            alertNameInput: '[data-test="add-alert-name-input-input"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
@@ -169,7 +169,7 @@ export class AlertsPage {
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators
-            alertSearchInput: '[data-test="alert-list-search-input"]',
+            alertSearchInput: '[data-test="alert-list-search-input-input"]',
             searchAcrossFoldersToggle: '[data-test="alert-list-search-across-folders-toggle"]',
             alertDeleteOption: 'Delete',
 
@@ -179,7 +179,7 @@ export class AlertsPage {
 
             // Incidents view locators
             incidentListTable: '[data-test="incident-list-table"]',
-            incidentSearchInput: '[data-test="incident-search-input"]',
+            incidentSearchInput: '[data-test="incident-search-input-input"]',
             incidentList: '[data-test="incident-list"]',
             incidentRow: '[data-test="incident-row"]',
             incidentAckButton: '[data-test="incident-ack-btn"]',

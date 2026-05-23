@@ -2184,7 +2184,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getDialogBox() {
-    return this.page.locator('[data-test="dialog-box"]');
+    return this.page.locator('[data-test="o-dialog"]');
   }
 
   /**

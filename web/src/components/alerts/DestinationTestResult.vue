@@ -21,7 +21,7 @@ limitations under the License. -->
       class="o2-test-success"
     >
       <div class="result-icon">
-        <OIcon name="check-circle" size="md" />
+        <OIcon name="check-circle" size="md" data-test="destination-check-icon" />
       </div>
       <div class="result-content">
         <div data-test="test-success-message" class="result-title">

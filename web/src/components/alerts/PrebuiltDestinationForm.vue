@@ -253,7 +253,7 @@ limitations under the License.
           Preview
         </OButton>
         <OButton
-          data-test="destination-test-button"
+          data-test="destination-test-btn"
           :loading="isTesting"
           variant="outline"
           size="sm"

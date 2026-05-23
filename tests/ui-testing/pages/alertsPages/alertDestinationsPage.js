@@ -16,20 +16,20 @@ export class AlertDestinationsPage {
         
         // Destination creation locators
         this.addDestinationButton = '[data-test="alert-destination-list-add-alert-btn"]';
-        this.destinationNameInput = '[data-test="add-destination-name-input"]';
+        this.destinationNameInput = '[data-test="add-destination-name-input-input"]';
         this.templateSelect = '[data-test="add-destination-template-select"]';
-        this.urlInput = '[data-test="add-destination-url-input"]';
+        this.urlInput = '[data-test="add-destination-url-input-input"]';
         this.submitButton = '[data-test="add-destination-submit-btn"]';
         this.successMessage = 'Destination saved';
         
         // Import locators
         this.destinationImportButton = '[data-test="destination-import"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
-        this.destinationImportUrlInput = '[data-test="destination-import-url-input"]';
+        this.destinationImportUrlInput = '[data-test="destination-import-url-input-input"]';
         this.destinationImportJsonBtn = '[data-test="destination-import-json-btn"]';
         this.destinationImportNameError = '[data-test="destination-import-name-error"]';
         this.destinationImportTemplateInput = '[data-test="destination-import-template-input"]';
-        this.destinationImportNameInput = '[data-test="destination-import-name-input"]';
+        this.destinationImportNameInput = '[data-test="destination-import-name-input-input"]';
         this.destinationImportCancelBtn = '[data-test="destination-import-cancel-btn"]';
         this.destinationListSearchInput = '[data-test="destination-list-search-input"]';
         this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -38,7 +38,7 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
-        this.nextPageButton = '[data-test="table-next-page-btn"]';
+        this.nextPageButton = '[data-test="o2-table-next-page-btn"]';
 
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
@@ -47,7 +47,7 @@ export class AlertDestinationsPage {
         this.selectedDestinationIndicator = '[data-test="selected-destination-indicator"]';
         this.stepperStep = '[data-test="stepper-step"]';
         this.prebuiltForm = '[data-test="prebuilt-form"]';
-        this.webhookInput = '[data-test="destination-webhook-input"]';
+        this.webhookInput = '[data-test="slack-webhook-url-input-input"], [data-test="discord-webhook-url-input-input"], [data-test="msteams-webhook-url-input-input"]';
         this.recipientsInput = '[data-test="email-recipients-input"]';
         this.integrationKeyInput = '[data-test="pagerduty-integration-key-input"]';
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
@@ -58,7 +58,7 @@ export class AlertDestinationsPage {
         this.cancelButton = '[data-test="add-destination-cancel-btn"]';
         this.backButton = '[data-test="add-destination-back-btn"]';
         this.successNotification = '[data-test="o-toast"]';
-        this.errorMessage = '[data-test="destination-error-message"]';
+        this.errorMessage = '[data-test="add-destination-name-input-error"]';
         this.checkIcon = '[data-test="destination-check-icon"]';
     }
 

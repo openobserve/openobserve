@@ -33,7 +33,7 @@ export class LogsPage {
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
-        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
+        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] [data-state]';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the state on an inner
@@ -280,7 +280,7 @@ export class LogsPage {
         this.dimensionSearchInput = '[data-test="dimension-search-input"]';
         // Analysis dashboard states
         this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-error"]';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -288,7 +288,7 @@ export class LogsPage {
         this.historyPanel = '.history-panel, [data-test*="history"]';
 
         // Table and pagination CSS selectors
-        this.tableBottom = '.q-table__bottom';
+        this.tableBottom = '[data-test="o2-table-bottom"]';
         this.tableBodyRow = 'tbody tr';
         this.tableBodyRowWithIndex = 'tbody tr[data-index]';
         this.tableHeaderCell = 'thead th';
@@ -1337,8 +1337,8 @@ export class LogsPage {
     async getQuickModeState() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        const toggleStateBtn = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] [data-state]');
+        const isOn = await toggleStateBtn.getAttribute('data-state').then(state => state === 'checked').catch(() => false);
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return isOn;
     }
@@ -4067,8 +4067,8 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isQuickModeOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        const toggleStateBtn = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] [data-state]');
+        const isQuickModeOn = await toggleStateBtn.getAttribute('data-state').then(state => state === 'checked').catch(() => false);
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
@@ -7981,9 +7981,10 @@ export class LogsPage {
      */
     async isToggleActive(toggle) {
         return await toggle.evaluate(el => {
-            return el.classList.contains('q-toggle--checked') ||
-                   el.getAttribute('aria-checked') === 'true' ||
-                   el.querySelector('.q-toggle__inner--truthy') !== null;
+            const stateBtn = el.querySelector('[data-state]');
+            return el.getAttribute('aria-checked') === 'true' ||
+                   (stateBtn && stateBtn.getAttribute('data-state') === 'checked') ||
+                   el.getAttribute('data-state') === 'checked';
         }).catch(() => null);
     }
 
@@ -8014,7 +8015,7 @@ export class LogsPage {
             '[data-test="start-time-field"] input',
             '[data-test="end-time-field"] input',
             'input[type="time"]',
-            '.q-time input',
+            '[data-test*="time-picker"] input',
             '[aria-label*="time" i] input',
             '[aria-label*="Time" i]',
         ];
@@ -8325,7 +8326,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getQuasarTimePicker() {
-        return this.page.locator('.q-time');
+        return this.page.locator('[data-test*="time-picker"]');
     }
 
 }
