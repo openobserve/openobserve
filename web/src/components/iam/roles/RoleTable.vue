@@ -102,7 +102,7 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #bottom>
-      <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="o2-table-footer-title tw:text-text-primary">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"

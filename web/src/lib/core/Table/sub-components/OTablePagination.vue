@@ -67,8 +67,7 @@ const pageSizeSelectOptions = computed(() =>
       <slot v-else-if="slots.actions" name="actions" />
       <span
         v-else
-        class="tw:text-primary tw:text-xs"
-        style="font-weight: 700;"
+        class="o2-table-footer-title tw:text-primary"
       >
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>

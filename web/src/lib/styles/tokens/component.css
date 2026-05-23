@@ -280,6 +280,14 @@
   --color-badge-error-soft-bg: var(--color-error-50);
   --color-badge-error-soft-text: var(--color-error-700);
 
+  /* Badge — info (blue, for logs stream type) */
+  --color-badge-info-ol-border: var(--color-info-700);
+  --color-badge-info-ol-text:   var(--color-info-700);
+
+  /* Badge — purple (for metrics stream type) */
+  --color-badge-purple-ol-border: var(--color-purple-600);
+  --color-badge-purple-ol-text:   var(--color-purple-700);
+
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-primary-400);
 
@@ -1018,6 +1026,14 @@
   --color-badge-error-ol-text: var(--color-badge-error-ol-text);
   --color-badge-error-soft-bg: var(--color-badge-error-soft-bg);
   --color-badge-error-soft-text: var(--color-badge-error-soft-text);
+
+  /* Badge — info (blue) */
+  --color-badge-info-ol-border: var(--color-badge-info-ol-border);
+  --color-badge-info-ol-text:   var(--color-badge-info-ol-text);
+
+  /* Badge — purple */
+  --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
+  --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
