@@ -260,30 +260,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >Create Email Template</OButton
             >
           </div>
-          <!-- Name field for custom destinations or pipelines (not prebuilt) -->
-          <div
-            v-if="
-              !isAlerts || (isAlerts && formData.destination_type === 'custom')
-            "
-            class="tw:py-1"
-            :class="{ 'tw:w-1/2': isAlerts, 'tw:w-full': !isAlerts }"
-          >
-            <OInput
-              data-test="add-destination-name-input"
-              v-model="formData.name"
-              :label="t('alerts.name') + ' *'"
-              tabindex="0"
-              :error="!!nameError"
-              :error-message="nameError"
-              @update:model-value="nameError = ''"
-            />
-          </div>
-          <!-- Template field only for custom alert destinations -->
+          <!-- Name + Template row for custom alert destinations -->
           <div
             v-if="isAlerts && formData.destination_type === 'custom'"
-            class="tw:w-1/2 tw:flex tw:py-1"
+            class="tw:flex tw:gap-3 tw:w-full"
           >
-            <div class="tw:w-full">
+            <div class="tw:w-1/2 tw:py-1">
+              <OInput
+                data-test="add-destination-name-input"
+                v-model="formData.name"
+                :label="t('alerts.name') + ' *'"
+                tabindex="0"
+                :error="!!nameError"
+                :error-message="nameError"
+                @update:model-value="nameError = ''"
+              />
+            </div>
+            <div class="tw:w-1/2 tw:py-1">
               <OSelect
                 data-test="add-destination-template-select"
                 v-model="formData.template"
@@ -296,6 +289,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
+          <!-- Name field for non-alert destinations (pipelines) -->
+          <div
+            v-if="!isAlerts"
+            class="tw:py-1 tw:w-full"
+          >
+            <OInput
+              data-test="add-destination-name-input"
+              v-model="formData.name"
+              :label="t('alerts.name') + ' *'"
+              tabindex="0"
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
+            />
+          </div>
 
           <template
             v-if="
@@ -305,46 +313,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts && formData.type === 'http')
             "
           >
-            <div class="tw:w-1/2 tw:py-1">
-              <OInput
-                data-test="add-destination-url-input"
-                v-model="formData.url"
-                :label="t('alert_destinations.url') + ' *'"
-                tabindex="0"
-                :error="!!urlError"
-                :error-message="urlError"
-                @update:model-value="urlError = ''"
-              />
-            </div>
-            <div
-              class="tw:py-1 destination-method-select"
-              :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
-            >
-              <OSelect
-                data-test="add-destination-method-select"
-                v-model="formData.method"
-                :label="t('alert_destinations.method') + ' *'"
-                :options="apiMethods"
-                tabindex="0"
-                :error="!!methodError"
-                :error-message="methodError"
-                @update:model-value="methodError = ''"
-              />
-            </div>
-            <div
-              v-if="!isAlerts"
-              class="tw:w-1/4 tw:py-1 destination-method-select"
-            >
-              <OSelect
-                data-test="add-destination-output-format-select"
-                v-model="formData.output_format"
-                :label="t('alert_destinations.output_format') + ' *'"
-                :options="outputFormats"
-                tabindex="0"
-                :error="!!outputFormatError"
-                :error-message="outputFormatError"
-                @update:model-value="outputFormatError = ''"
-              />
+            <div class="tw:flex tw:gap-3 tw:w-full">
+              <div class="tw:w-1/2 tw:py-1">
+                <OInput
+                  data-test="add-destination-url-input"
+                  v-model="formData.url"
+                  :label="t('alert_destinations.url') + ' *'"
+                  tabindex="0"
+                  :error="!!urlError"
+                  :error-message="urlError"
+                  @update:model-value="urlError = ''"
+                />
+              </div>
+              <div
+                class="tw:py-1 destination-method-select"
+                :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
+              >
+                <OSelect
+                  data-test="add-destination-method-select"
+                  v-model="formData.method"
+                  :label="t('alert_destinations.method') + ' *'"
+                  :options="apiMethods"
+                  tabindex="0"
+                  :error="!!methodError"
+                  :error-message="methodError"
+                  @update:model-value="methodError = ''"
+                />
+              </div>
+              <div
+                v-if="!isAlerts"
+                class="tw:w-1/4 tw:py-1 destination-method-select"
+              >
+                <OSelect
+                  data-test="add-destination-output-format-select"
+                  v-model="formData.output_format"
+                  :label="t('alert_destinations.output_format') + ' *'"
+                  :options="outputFormats"
+                  tabindex="0"
+                  :error="!!outputFormatError"
+                  :error-message="outputFormatError"
+                  @update:model-value="outputFormatError = ''"
+                />
+              </div>
             </div>
             <div class="tw:w-full tw:py-2">
               <div class="tw:font-bold tw:py-1">Headers</div>
