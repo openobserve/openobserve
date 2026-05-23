@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
+        <div class="card-container ">
           <OTabs
             v-model="ingestiontabs"
             orientation="vertical"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-slot:after>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
+        <div class="card-container ">
           <router-view
             title="Metrics"
             :currOrgIdentifier="currOrgIdentifier"

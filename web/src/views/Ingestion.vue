@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md ingestionPage" data-test="ingestion-page">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+  <div class="tw:rounded-md ingestionPage tw:h-full tw:flex tw:flex-col" data-test="ingestion-page">
+    <div class="tw:w-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
         <div class="tw:px-3 tw:pt-3 tw:w-full tw:flex tw:items-center tw:gap-2">
           <span class="tw:text-xl tw:font-semibold tw:mr-auto"> {{ t("ingestion.header") }}</span>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:max-h-[calc(100vh - var(--navbar-height) - 100px)]">
+    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pb-2.5">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"

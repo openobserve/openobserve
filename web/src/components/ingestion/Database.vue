@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
+        <div class="card-container  el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
             <OInput
               data-test="database-list-search-input"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-slot:after>
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class=" card-container tw:h-[calc(100vh-140px)]">
+        <div class=" card-container ">
           <div class="tw:overflow-auto tw:h-full">
             <router-view
               :title="tabs"
