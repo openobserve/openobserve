@@ -264,7 +264,12 @@ export class PipelinesPage {
         this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
         this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
         this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
-        this.connectAllNodesError = page.getByText("Please connect all nodes");
+        // PipelineEditor emits a toast "Please connect all nodes before saving"
+        // when the user clicks Save without joining nodes. OToast renders it via
+        // `data-test-message` on its root.
+        this.connectAllNodesError = page.locator(
+          '[data-test-message="Please connect all nodes before saving"]'
+        ).first();
         this.logsOptionRole = page.getByRole("option", { name: "logs" });
         this.fileInput = page.locator('input[type="file"]');
 
@@ -638,22 +643,25 @@ export class PipelinesPage {
         await this.streamNameInput.fill(streamName);
     }
 
-    async selectStreamOption() {
-        await this.e2eAutomateOption.click();
-    }
-
     /**
      * Select a stream option by name from the dropdown
      * @param {string} streamName - The name of the stream to select
      */
     async selectStreamOptionByName(streamName) {
-        await this.page.waitForTimeout(1000);
-        const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
-        await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
+        // OSelect emits `<parent>-option` data-test + a per-value
+        // `data-test-value` for every ListboxItem. Match by value to avoid
+        // the prefix collision that a substring or role-name match would
+        // produce (e.g. "e2e_automate" vs "e2e_automate3").
+        const optionLocator = this.page.locator(
+            `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
+        ).first();
+        await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
         await optionLocator.click();
-        // Click away to close any open dropdown menus
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        await this.page.waitForTimeout(500);
+        // The popover closes on selection — wait for it to detach so the
+        // subsequent Save click isn't intercepted by the listbox.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async saveInputNodeStream() {
@@ -2046,6 +2054,13 @@ export class PipelinesPage {
      * @param {string} streamName - Exact name of the stream option to select
      */
     async selectStreamOption(streamName) {
+        // When no name is supplied, fall back to the default e2e_automate
+        // option locator stored on the PO (legacy spec calls used no-arg).
+        if (!streamName) {
+            await this.e2eAutomateOption.waitFor({ state: 'visible', timeout: 15000 });
+            await this.e2eAutomateOption.click();
+            return;
+        }
         // OSelect now forwards parent data-test to ListboxItems
         // (`<parent>-option`) and stamps a per-value `data-test-value`. Match
         // by value to avoid the substring match that an earlier hasText
@@ -2267,7 +2282,7 @@ export class PipelinesPage {
      * Verify connection error is displayed
      */
     async verifyConnectionError() {
-        await this.connectAllNodesError.click();
+        await this.connectAllNodesError.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
