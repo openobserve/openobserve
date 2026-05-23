@@ -320,17 +320,25 @@ export class StreamsPage {
     }
 
     async selectFullTextSearch() {
-        // Open dropdown first
-        await this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1).click();
-        await this.waitForUI(500);
-        
-        // Then select Full text search option
-        await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+        // Per-row OSelect on schema.vue uses data-test "schema-field-<row>-index-type-select".
+        // The currently-targeted row is decided by the prior searchForField() call; the
+        // visible OSelect is the only one rendered, so .first() is safe.
+        // Open the OSelect via its auto-derived `-trigger`, then click the option with
+        // `data-test-value="fullTextSearchKey"` (see streamIndexType in schema.vue:1392).
+        const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
+        await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+            .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]')
+            .first().click();
     }
 
     async selectSecondaryIndex() {
-        // Dropdown stays open after first selection, so just select the option
-        await this.page.getByText('Secondary index').click();
+        // Dropdown stays open after first selection (multiple-select mode) — pick
+        // the Secondary index option via its OSelect `-option` data-test-value.
+        await this.page.locator('[data-test$="-index-type-select-option"][data-test-value="secondaryIndexKey"]')
+            .first().click();
     }
 
     async clickUpdateSettingsButton() {
@@ -345,19 +353,25 @@ export class StreamsPage {
     async verifyIndexTypeOptions() {
         // Wait a bit for the page to load completely
         await this.waitForUI(2000);
-        
+
         try {
-            // Click the dropdown arrow to open the options
-            const dropdownArrow = this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1);
-            await dropdownArrow.click({ timeout: 5000 });
+            // Open the OSelect via its auto-derived `-trigger` data-test
+            const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+            await trigger.waitFor({ state: 'visible', timeout: 10000 });
+            await trigger.click({ timeout: 5000 });
             testLogger.info('Clicked dropdown arrow');
 
-            // Wait for dropdown to open
-            await this.waitForUI(1000);
+            // Wait for popover to open
+            await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+                .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
             // Check if Full text search and Secondary index options are visible in the dropdown
-            const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
-            const secondaryIndexOption = this.page.getByText('Secondary index');
+            const fullTextOption = this.page.locator(
+                '[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]',
+            ).first();
+            const secondaryIndexOption = this.page.locator(
+                '[data-test$="-index-type-select-option"][data-test-value="secondaryIndexKey"]',
+            ).first();
 
             const options = [];
             try {
@@ -389,15 +403,18 @@ export class StreamsPage {
 
     async clearIndexTypeSelection(indexType) {
         if (indexType === 'Full text search') {
-            // When both are selected, UI shows "Secondary index, Full text" 
-            // We need to click the combined option first, then clear full text
+            // OSelect (multiple) keeps options toggleable — click the same option
+            // again to clear it. Re-open the popover first if needed.
             try {
-                // First check if both are selected (combined state)
-                const combinedOption = this.page.getByText('Secondary index, Full text');
-                if (await combinedOption.isVisible({ timeout: 2000 })) {
-                    await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
-                    return;
+                const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+                if (await trigger.isVisible({ timeout: 2000 })) {
+                    await trigger.click();
                 }
+                await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+                    .waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+                await this.page.locator(
+                    '[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]',
+                ).first().click({ timeout: 3000 });
             } catch (e) {
                 // Fallback to individual clearing
             }

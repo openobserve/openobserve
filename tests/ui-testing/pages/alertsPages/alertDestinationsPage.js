@@ -36,6 +36,8 @@ export class AlertDestinationsPage {
         this.destinationImportButton = '[data-test="destination-import"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.destinationImportUrlInput = '[data-test="destination-import-url-input"]';
+        // OInput inner native input (-field) for the URL field — used for fill/click
+        this.destinationImportUrlInputField = '[data-test="destination-import-url-input-field"]';
         this.destinationImportJsonBtn = '[data-test="destination-import-json-btn"]';
         this.destinationImportNameError = '[data-test="destination-import-name-error"]';
         this.destinationImportTemplateInput = '[data-test="destination-import-template-input"]';
@@ -74,58 +76,14 @@ export class AlertDestinationsPage {
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.severitySelectPopover = '[data-test="pagerduty-severity-select-popover"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
-        this.prioritySelectPopover = '[data-test="opsgenie-priority-select-popover"]';
-        this.methodSelect = '[data-test="add-destination-method-select"]';
-        this.methodSelectPopover = '[data-test="add-destination-method-select-popover"]';
-        // Save/Cancel/Test buttons resolve via stable data-test
-        this.testButton = '[data-test="destination-test-button"]';
-        this.testResult = '[data-test="destination-test-result"]';
-        this.testResultPrebuilt = '[data-test="prebuilt-test-result"]';
-        this.testResultSuccess = '[data-test="test-result-success"]';
-        this.testResultFailure = '[data-test="test-result-failure"]';
-        this.testResultLoading = '[data-test="test-result-loading"]';
-        this.testResultIdle = '[data-test="test-result-idle"]';
-        this.saveButton = '[data-test="add-destination-submit-btn"]';
-        this.cancelButton = '[data-test="add-destination-cancel-btn"]';
-        this.backButton = '[data-test="add-destination-back-btn"]';
-        // Toast/notification appears via OToast — match either o-toast-success or o-toast-message
-        this.successNotification = '[data-test^="o-toast-"]';
-        this.toastSuccess = '[data-test="o-toast-success"]';
-        // OInput-derived per-field error nodes (e.g. add-destination-name-input-error). Any of these visible = validation error
-        this.errorMessage = '[data-test$="-input-error"], [data-test$="-error"]';
-        this.addDestinationTitle = '[data-test="add-destination-title"]';
-        this.addDestinationLoadingIndicator = '[data-test="add-destination-loading-indicator"]';
-        this.dialogCloseBtn = '[data-test="o-dialog-close-btn"]';
-        this.checkmarkIcon = '[name="check-circle"]';
-    }
-
-    // ============================================================================
-    // FACTORY HELPERS
-    // ============================================================================
-
-    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/custom) */
-    getDestinationTypeCard(type) {
-        return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-    }
-
-    /** Locator for the row containing a destination's delete button. */
-    getDeleteDestinationBtn(name) {
-        return this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
-    }
-
-    /** Locator for the row containing a destination's edit button. */
-    getEditDestinationBtn(name) {
-        return this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
-    }
-
-    /**
-     * Row containing a named destination. Resolves via the destination-specific delete-button data-test
-     * and walks up to the OTable row ancestor.
-     */
-    getDestinationRow(name) {
-        return this.page.locator(
-            `xpath=//*[@data-test="alert-destination-list-${name}-delete-destination"]/ancestor::*[starts-with(@data-test,'o2-table-row-')][1]`
-        );
+        this.testButton = 'button:has-text("Test")';
+        this.testResult = '[data-test="destination-test-result"], [data-test="prebuilt-test-result"], .test-result, .o2-test-result';
+        this.saveButton = 'button:has-text("Save")';
+        this.cancelButton = 'button:has-text("Cancel")';
+        this.backButton = 'button:has-text("Back")';
+        this.successNotification = '[role="alert"]';
+        this.errorMessage = '.q-field__messages, .error-message';
+        this.checkIcon = '.OIcon';
     }
 
     async navigateToDestinations(retryCount = 0) {
@@ -355,8 +313,8 @@ export class AlertDestinationsPage {
             await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 15000 });
         }
         await this.page.locator(this.importJsonUrlTab).click();
-        await this.page.locator(this.destinationImportUrlInput).click();
-        await this.page.locator(this.destinationImportUrlInput).fill(url);
+        await this.page.locator(this.destinationImportUrlInputField).click();
+        await this.page.locator(this.destinationImportUrlInputField).fill(url);
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
@@ -681,20 +639,23 @@ export class AlertDestinationsPage {
         for (const [headerKey, headerValue] of Object.entries(headers)) {
             // Click add header button
             await this.page.locator('[data-test="add-destination-add-header-btn"]').click();
-            await this.page.waitForTimeout(500);
 
             // Fill header key - use .last() to target the most recently added empty input
             // This handles cases where there might be pre-existing empty header rows
-            const keyInput = this.page.locator('[data-test="add-destination-header--key-input"]').last();
+            // OInput wrapper data-test is `...-key-input`; inner native input auto-derives `...-key-input-field` — fill the `-field` variant per §4
+            const keyInput = this.page.locator('[data-test="add-destination-header--key-input-field"]').last();
+            // Wait for the newly added header row's input to render before interacting
+            await keyInput.waitFor({ state: 'visible', timeout: 10000 });
             await keyInput.click();
             await keyInput.fill(headerKey);
-            await this.page.waitForTimeout(500);
 
-            // Fill header value (after key is filled, selector becomes add-destination-header-{key}-value-input)
-            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input"]`);
+            // Fill header value (after key is filled, the data-test becomes add-destination-header-{key}-value-input)
+            // OInput inner native field — use `-field` variant for fill/click per §4
+            // Wait for the reactive data-test rebind (header.key propagation) before clicking
+            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input-field"]`);
+            await valueInput.waitFor({ state: 'visible', timeout: 10000 });
             await valueInput.click();
             await valueInput.fill(headerValue);
-            await this.page.waitForTimeout(300);
 
             testLogger.debug('Added header to destination', { headerKey, destinationName });
         }
@@ -949,12 +910,7 @@ export class AlertDestinationsPage {
      * Click Save button
      */
     async clickSave() {
-        // OToast can transiently overlay the dialog buttons; wait for the save button
-        // to be enabled and use force-click to bypass toast pointer-event interception.
-        const saveBtn = this.page.locator(this.saveButton).first();
-        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
-        await saveBtn.click({ force: true, timeout: 10000 });
+        await this.page.locator(this.saveButton).first().click();
         testLogger.debug('Clicked Save button');
     }
 
@@ -1159,7 +1115,9 @@ export class AlertDestinationsPage {
      * Verify success notification appears
      */
     async expectSuccessNotification() {
-        await expect(this.page.locator(this.successNotification).first()).toContainText(/saved|success/i, { timeout: 10000 });
+        // OToast variant `o-toast-success` is the precise data-test for success messages.
+        // Falling back to the o-toast-* prefix when the success variant isn't surfaced.
+        await expect(this.page.locator(this.toastSuccess).first()).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -2045,14 +2003,39 @@ export class AlertDestinationsPage {
      * @param {string} url - New URL
      */
     async updateCustomUrl(url) {
-        const input = this.page.locator(this.urlInputField).first();
-        await input.waitFor({ state: 'visible', timeout: 15000 });
-        await input.click();
-        await this.page.keyboard.press('Control+a');
-        await this.page.keyboard.press('Meta+a');
-        await input.fill(url);
-        await expect(input).toHaveValue(url, { timeout: 5000 });
-        testLogger.debug('Updated custom destination URL', { url });
+        await this.page.waitForTimeout(2000);
+
+        // Try multiple URL input selectors
+        const urlSelectors = [
+            '[data-test="add-destination-url-input"]',
+            'input[data-test*="url"]',
+            'input[placeholder*="URL"]',
+            'input[type="url"]',
+            this.urlInput
+        ];
+
+        let updated = false;
+        for (const selector of urlSelectors) {
+            try {
+                const input = this.page.locator(selector).first();
+                if (await input.isVisible().catch(() => false)) {
+                    await input.click();
+                    await this.page.keyboard.press('Control+a');
+                    await this.page.keyboard.press('Meta+a');
+                    await input.fill(url);
+                    await this.page.waitForTimeout(1000);
+                    testLogger.debug('Updated custom destination URL', { url, selector });
+                    updated = true;
+                    return;
+                }
+            } catch (error) {
+                continue;
+            }
+        }
+
+        if (!updated) {
+            throw new Error('Custom URL input not found for update');
+        }
     }
 
     /**

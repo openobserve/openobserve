@@ -338,16 +338,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await expect(builder.legendEl).toBeVisible({ timeout: 5000 });
     const legendSet = await builder.setLegend('{{instance}}');
     expect(legendSet).toBe(true);
-    const legendValue = (await builder.legendFieldInput.isVisible({ timeout: 1500 }).catch(() => false))
-      ? await builder.legendFieldInput.inputValue().catch(() => '')
-      : await builder.legendEl.inputValue().catch(() => '');
+    const legendValue = await builder.getLegendValue();
     expect(legendValue).toContain('{{instance}}');
     testLogger.info('Legend set to "{{instance}}"');
 
     // 2. Set step value
     const stepSet = await builder.setStepValue('30s');
     expect(stepSet).toBe(true);
-    expect(await builder.stepValueEl.inputValue()).toBe('30s');
+    expect(await builder.getStepValue()).toBe('30s');
     testLogger.info('Step value set to 30s');
 
     // 3. Switch query type to Instant and back to Range
@@ -454,7 +452,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(await builder.getLabelFilterCount()).toBe(1);
     expect(await builder.getOperationCount()).toBe(1);
 
-    expect(await builder.stepValueEl.inputValue().catch(() => '')).toBe('2m');
+    expect(await builder.getStepValue()).toBe('2m');
 
     // Metric selector still visible
     expect(await builder.isMetricSelectorVisible()).toBe(true);
@@ -490,7 +488,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 5. Set step value + query type
     await builder.setStepValue('30s');
-    expect(await builder.stepValueEl.inputValue()).toBe('30s');
+    expect(await builder.getStepValue()).toBe('30s');
     await builder.selectQueryType('range');
 
     // 6. Run query
@@ -1336,9 +1334,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 14. Verify options persisted (legend)
     if (await builder.legendEl.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const legendValue = (await builder.legendFieldInput.isVisible({ timeout: 1500 }).catch(() => false))
-        ? await builder.legendFieldInput.inputValue().catch(() => '')
-        : await builder.legendEl.inputValue().catch(() => '');
+      const legendValue = await builder.getLegendValue();
       expect(legendValue).toBe('{__hash__}');
       testLogger.info(`Panel editor legend: ${legendValue}`);
     }
@@ -1346,7 +1342,9 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 15. Verify the metric/stream is preserved
     const editStreamInput = builder.getEditStreamInput();
     if (await editStreamInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const editMetric = await editStreamInput.inputValue().catch(() => '');
+      // OSelect wrapper is a <div>; surface the selected value via the
+      // trigger's data-test-selected-value attribute instead of inputValue().
+      const editMetric = await builder.getStreamSelectedValue();
       expect(editMetric.toLowerCase()).toContain(metricName.toLowerCase());
       testLogger.info(`Panel editor metric: ${editMetric}`);
     }

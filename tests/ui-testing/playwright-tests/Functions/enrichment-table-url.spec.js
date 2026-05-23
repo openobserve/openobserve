@@ -237,7 +237,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified back on list page');
 
         // Search for table to verify it was NOT created
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.searchEnrichmentTableInList(tableName, { expectExists: false });
 
         // Verify table does NOT exist (no rows or "No data available" message)
         await enrichmentPage.verifyTableNotCreated(tableName);

@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
                         class="no-case tw:w-full tw:mb-1"
+                        data-test="scheduled-pipeline-stream-type-select"
                         @update:model-value="getStreamList"
                       />
 
@@ -83,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         valueKey="value"
                         :label="t('alerts.stream_name')"
                         class="tw:my-1 no-case tw:w-full"
+                        data-test="scheduled-pipeline-stream-name-select"
                         @update:model-value="getStreamFields"
                         @open="getStreamList"
                       />

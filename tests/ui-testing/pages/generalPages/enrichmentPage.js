@@ -890,7 +890,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.listPage.waitFor({ state: 'visible' });
     }
 
-    async searchEnrichmentTableInList(tableName) {
+    async searchEnrichmentTableInList(tableName, { expectExists = true } = {}) {
         // Use the OInput native input via the auto-derived `-field` data-test —
         // the search input visibility indicates the list page is ready.
         await this.searchInputField.waitFor({ state: 'visible', timeout: 30000 });
@@ -899,13 +899,21 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.searchInputField.clear();
         await this.searchInputField.fill(tableName);
 
-        // The filter is client-side — poll until either the matching row appears
-        // (success) or the input value is stable AND a known empty-state row
-        // count of zero is established. We give the OTable's filter pipeline
-        // time to recompute by polling the row's type-cell visibility.
-        await expect.poll(async () => {
-            return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
-        }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
+        // The filter is client-side — poll for the OTable filter pipeline to
+        // settle. For the positive path (default) wait until the matching row
+        // appears; for the negative path (callers expecting non-existence)
+        // wait only for the input value to flush so the filter has fired.
+        if (expectExists) {
+            await expect.poll(async () => {
+                return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
+            }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
+        } else {
+            // Negative path: wait for the input value to be committed; callers
+            // (verifyTableNotCreated) then poll for count==0 on their own.
+            await expect.poll(async () => {
+                return await this.searchInputField.inputValue().catch(() => '');
+            }, { timeout: 5000, intervals: [100, 200, 500] }).toBe(tableName);
+        }
     }
 
     async verifyTableVisibleInList(tableName) {
@@ -921,15 +929,18 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // env may take 30-60s to fetch the CSV from the public URL.
         const schemaBtn = this.getRowSchemaBtn(tableName);
         const maxAttempts = 12;
-        const pollInterval = 5000;
         for (let i = 0; i < maxAttempts; i++) {
-            const visible = await schemaBtn.isVisible({ timeout: 2000 }).catch(() => false);
-            if (visible) break;
-            testLogger.debug(`Schema button not visible — reload attempt ${i + 1}/${maxAttempts}`);
-            await this.page.waitForTimeout(pollInterval);
-            await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await this.waitForEnrichmentTablesList();
-            await this.searchEnrichmentTableInList(tableName);
+            // Use schemaBtn.waitFor with a per-iteration timeout so we
+            // deterministically poll for visibility without waitForTimeout.
+            try {
+                await schemaBtn.waitFor({ state: 'visible', timeout: 5000 });
+                break;
+            } catch (_) {
+                testLogger.debug(`Schema button not visible — reload attempt ${i + 1}/${maxAttempts}`);
+                await this.page.reload({ waitUntil: 'domcontentloaded' });
+                await this.waitForEnrichmentTablesList();
+                await this.searchEnrichmentTableInList(tableName);
+            }
         }
         await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
         await schemaBtn.click();
@@ -1412,11 +1423,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Verifying table ${tableName} was NOT created`);
 
         // After search filters down to a non-existent table, the row's type-cell
-        // (`${tableName}-type-cell`) should not be present. Assert directly that
-        // no row carries that data-test.
+        // (`${tableName}-type-cell`) should not be present. Poll briefly for the
+        // OTable filter pipeline to settle, then assert zero matching rows.
         const tableRow = this.getRowTypeCell(tableName);
-        const rowCount = await tableRow.count();
-        expect(rowCount).toBe(0);
+        await expect.poll(async () => {
+            return await tableRow.count();
+        }, { timeout: 5000, intervals: [200, 500, 1000] }).toBe(0);
 
         testLogger.debug('Verified table does not exist');
     }

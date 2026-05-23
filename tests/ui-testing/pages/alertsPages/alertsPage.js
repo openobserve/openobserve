@@ -46,7 +46,10 @@ export class AlertsPage {
             alertMenuItem: '[data-test="menu-link-\\/alerts-item"]',
             newFolderButton: '[data-test="dashboard-new-folder-btn"]',
             folderNameInput: '[data-test="dashboard-folder-add-name"]',
+            // OInput inner native input (-field) — used for fill/click per §4
+            folderNameInputField: '[data-test="dashboard-folder-add-name-field"]',
             folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
+            folderDescriptionInputField: '[data-test="dashboard-folder-add-description-field"]',
             folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
             folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
             noDataAvailableText: 'No data available',
@@ -859,12 +862,12 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.locators.newFolderButton).click();
-        await this.page.locator(this.locators.folderNameInput).click();
-        await this.page.locator(this.locators.folderNameInput).fill(folderName);
+        await this.page.locator(this.locators.folderNameInputField).click();
+        await this.page.locator(this.locators.folderNameInputField).fill(folderName);
 
         if (description) {
-            await this.page.locator(this.locators.folderDescriptionInput).click();
-            await this.page.locator(this.locators.folderDescriptionInput).fill(description);
+            await this.page.locator(this.locators.folderDescriptionInputField).click();
+            await this.page.locator(this.locators.folderDescriptionInputField).fill(description);
         }
 
         await this.page.locator(this.locators.folderSaveButton).click();
