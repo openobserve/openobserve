@@ -578,7 +578,7 @@ export class AlertsPage {
     async expectNoChartError() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
         // Assert no error-class banner is visible within the chart container
-        const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
+        const errorBanner = chartArea.locator('[class*="error"], [data-test="o-toast"]').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
         // Assert no error text pattern is visible anywhere in the chart area.
         // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
@@ -586,7 +586,7 @@ export class AlertsPage {
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
 
         // Also check page-level error toasts/banners rendered outside the chart container
-        const pageError = this.page.locator('[role="alert"][class*="bg-negative"], .q-banner--negative').first();
+        const pageError = this.page.locator('[data-test="o-toast"]').first();
         await expect(pageError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('No chart error detected');
@@ -598,7 +598,7 @@ export class AlertsPage {
      */
     async getChartErrorMessage() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, [role="alert"][class*="bg-negative"]').first();
+        const errorEl = chartArea.locator('[class*="error"], [data-test="o-toast"]').first();
         if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
             return await errorEl.textContent();
         }
@@ -634,7 +634,7 @@ export class AlertsPage {
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
         await monacoEditor.click({ force: true });
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.type(queryText);
+        await monacoEditor.locator('textarea').first().fill(queryText);
         testLogger.info('Typed query into editor', { length: queryText.length });
     }
 
@@ -809,27 +809,27 @@ export class AlertsPage {
     }
 
     async verifyFolderCreated(folderName) {
-        await expect(this.page.getByText(folderName)).toBeVisible();
+        await expect(this.page.locator('[data-test*="folder"]', { hasText: folderName })).toBeVisible();
     }
 
     async clickFolder(folderName) {
-        await this.page.getByText(folderName).click();
+        await this.page.locator('[data-test*="folder"]', { hasText: folderName }).click();
     }
 
     async navigateToFolder(folderName) {
         // Use specific folder-item selector to avoid matching unrelated text
-        const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
+        const folderItem = this.page.locator('[data-test*="folder"]', { hasText: folderName }).first();
         const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
         if (folderVisible) {
             await folderItem.click();
         } else {
-            // Fallback to generic text selector
-            await this.page.getByText(folderName).first().click();
+            // Fallback to generic folder selector
+            await this.page.locator('[data-test*="folder"]', { hasText: folderName }).first().click();
         }
         try {
             await Promise.race([
                 this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o-toast"]').filter({ hasText: /no data available/i }).waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
             testLogger.error('Neither table nor no data message found after clicking folder', { folderName, error: error.message });
@@ -838,11 +838,11 @@ export class AlertsPage {
     }
 
     async verifyNoDataAvailable() {
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /no data available/i })).toBeVisible();
     }
 
     async verifyFolderExistsError() {
-        await expect(this.page.getByText(this.locators.folderExistsError)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /folder with this name already exists/i })).toBeVisible();
     }
 
     async cancelFolderCreation() {
@@ -851,7 +851,7 @@ export class AlertsPage {
 
     async ensureFolderExists(folderName, description = '') {
         try {
-            await this.page.getByText(folderName).waitFor({ timeout: 2000 });
+            await this.page.locator('[data-test*="folder"]', { hasText: folderName }).waitFor({ timeout: 2000 });
             testLogger.info('Folder exists', { folderName });
             return true;
         } catch (error) {
@@ -862,11 +862,11 @@ export class AlertsPage {
     }
 
     async deleteFolder(folderName) {
-        const folderRow = this.page.locator(`div.folder-item:has-text("${folderName}")`);
+        const folderRow = this.page.locator('[data-test*="folder"]', { hasText: folderName }).first();
         await folderRow.hover();
         await this.page.waitForTimeout(500);
 
-        const dotButton = this.page.locator(`div.folder-item:has-text("${folderName}") button[data-o2-btn]`);
+        const dotButton = folderRow.locator('[data-test="dashboard-more-icon"]');
         await dotButton.waitFor({ state: 'visible', timeout: 3000 });
 
         testLogger.info('Button state', {
@@ -876,12 +876,12 @@ export class AlertsPage {
 
         await dotButton.click({ force: true });
 
-        await expect(this.page.getByText(this.locators.deleteFolderOption)).toBeVisible({ timeout: 3000 });
+        await expect(this.page.locator('[data-test="o-dropdown-content"]:visible').locator('text=Delete')).toBeVisible({ timeout: 3000 });
 
-        await this.page.getByText(this.locators.deleteFolderOption).click();
-        await expect(this.page.getByText(this.locators.deleteFolderConfirmText)).toBeVisible();
+        await this.page.locator('[data-test="o-dropdown-content"]:visible').locator('text=Delete').click();
+        await expect(this.page.locator('[data-test="confirm-dialog"]').filter({ hasText: /delete folder/i })).toBeVisible();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.folderDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /folder deleted successfully/i })).toBeVisible();
 
         testLogger.info('Successfully deleted folder', { folderName });
     }
@@ -900,7 +900,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000);
 
         // First try to find the alert directly (in case we're already on the right page)
-        const alertCell = this.page.getByRole('cell', { name: nameToVerify }).first();
+        const alertCell = this.page.locator('[data-test="alert-list-table"] td', { hasText: nameToVerify }).first();
         const isDirectlyVisible = await alertCell.isVisible({ timeout: 5000 }).catch(() => false);
 
         if (!isDirectlyVisible) {
@@ -917,22 +917,22 @@ export class AlertsPage {
         }
 
         // Use a longer timeout since the alert list may take time to reload
-        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="alert-list-table"] td', { hasText: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
 
     async verifySearchResults(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText)).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-list-table"]').filter({ hasText: resultText })).toBeVisible();
     }
 
     async verifySearchResultsUIValidation(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="alert-list-table"]').filter({ hasText: resultText })).toBeVisible({ timeout: 10000 });
     }
 
     async verifyAlertCellVisible(alertName, timeout = 10000) {
-        const alertCell = this.page.getByRole('cell', { name: alertName }).first();
+        const alertCell = this.page.locator('[data-test="alert-list-table"] td', { hasText: alertName }).first();
         await expect(alertCell).toBeVisible({ timeout });
         testLogger.info('Verified alert cell is visible', { alertName });
     }
@@ -998,7 +998,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
 
         // v3 shows a toast notification when name is empty
-        await expect(this.page.getByText('Alert name is required.')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /alert name is required/i })).toBeVisible({ timeout: 10000 });
         testLogger.info('Invalid alert name validation working');
 
         // Close with robust handling for dialog backdrops
@@ -1022,9 +1022,9 @@ export class AlertsPage {
         //   B) Show a toast/notification at the top of the form
         //   C) Submit successfully (if optional fields have defaults)
         // Wait for any of these outcomes within the timeout window.
-        const errorFields = this.page.locator('.q-field--error');
-        const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
-        const successMsg = this.page.getByText(this.locators.alertSuccessMessage);
+        const errorFields = this.page.locator('[data-test="o-toast"]');
+        const anyToast = this.page.locator('[data-test="o-toast"]');
+        const successMsg = this.page.locator('[data-test="o-toast"]').filter({ hasText: /alert saved successfully/i });
 
         const outcomes = await Promise.race([
             errorFields.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => 'validation'),
@@ -1079,7 +1079,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.cloneSubmitButton).click();
-        await expect(this.page.getByText('Please select stream type')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /please select stream type/i })).toBeVisible({ timeout: 5000 });
         testLogger.info('Clone validation working - stream type required');
 
         await this.page.locator(this.locators.cloneCancelButton).click();
@@ -1093,19 +1093,19 @@ export class AlertsPage {
 
     async verifyTabContents() {
         await this.page.locator('[data-test="tab-scheduled"]').click();
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-list-table"]').filter({ hasText: /no data available/i })).toBeVisible();
         await this.page.locator('[data-test="tab-realTime"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-list-table"]').filter({ hasText: 'Showing 1 - 1 of' })).toBeVisible();
         await this.page.locator('[data-test="tab-all"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-list-table"]').filter({ hasText: 'Showing 1 - 1 of' })).toBeVisible();
     }
 
     async verifyFolderSearch(folderName) {
         await this.page.locator('[data-test="folder-search"]').click();
         await this.page.locator('[data-test="folder-search"]').fill(folderName);
-        await expect(this.page.getByText(folderName)).toBeVisible();
-        await this.page.getByRole('button', { name: 'Clear' }).click();
-        await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
+        await expect(this.page.locator('[data-test*="folder"]', { hasText: folderName })).toBeVisible();
+        await this.page.locator('[data-test="folder-search-clear-btn"]').click();
+        await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').filter({ hasText: 'default' })).toBeVisible();
     }
 
     // ==================== ALERTS / INCIDENTS NAVIGATION ====================
@@ -1560,7 +1560,7 @@ export class AlertsPage {
      */
     async waitForStatusUpdateNotification() {
         // Wait for notification to appear, with fixed timeout fallback
-        const notification = this.page.locator('[role="alert"]');
+        const notification = this.page.locator('[data-test="o-toast"]');
         try {
             await notification.first().waitFor({ state: 'visible', timeout: 5000 });
             testLogger.info('Status update notification appeared');
@@ -2022,7 +2022,7 @@ export class AlertsPage {
         });
 
         await this.page.locator(this.locators.alertExportButton).click();
-        await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 60000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /successfully exported/i })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
         // Wait for the blob data to be captured (blob.text() is async)
@@ -2052,7 +2052,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000);
 
         await this.page.locator(this.locators.alertImportJsonBtn).click();
-        await expect(this.page.getByText('Error importing Alert(s)')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /error importing alert/i })).toBeVisible({ timeout: 15000 });
         testLogger.info('Invalid file import error shown as expected');
     }
 
@@ -2072,7 +2072,7 @@ export class AlertsPage {
         // Wait for import to process — on success, ImportAlert.vue shows
         // "Alert(s) imported successfully" notification and navigates back after 400ms
         try {
-            await this.page.getByText('imported successfully').waitFor({ state: 'visible', timeout: 30000 });
+            await this.page.locator('[data-test="o-toast"]').filter({ hasText: /imported successfully/i }).waitFor({ state: 'visible', timeout: 30000 });
             testLogger.info('Import success notification visible');
         } catch (e) {
             // Capture diagnostic info from the import output panel
@@ -2092,7 +2092,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(3000);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="alert-list-table"] td', { hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
         testLogger.info('Imported alert visible in list', { alertName: this.currentAlertName });
     }
 
@@ -2276,7 +2276,7 @@ export class AlertsPage {
      */
     async selectStreamType(streamType) {
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await this.page.getByRole('option', { name: streamType }).locator('div').nth(2).click();
+        await this.page.locator('[data-test$="-option"]', { hasText: new RegExp(streamType, 'i') }).first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Selected stream type', { streamType });
     }
@@ -2292,11 +2292,11 @@ export class AlertsPage {
             await expect(streamDropdown).toBeVisible({ timeout: 10000 });
             await streamDropdown.click();
             await this.page.waitForTimeout(500);
-            await this.page.keyboard.press('Control+a');
-            await this.page.keyboard.type(streamName, { delay: 30 });
+            const searchInput = streamDropdown.locator('input').first();
+            await searchInput.fill(streamName);
             await this.page.waitForTimeout(1500);
 
-            const testStreamOption = this.page.getByText(streamName, { exact: true });
+            const testStreamOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${streamName}$`) }).first();
             if (await testStreamOption.isVisible({ timeout: 5000 }).catch(() => false)) {
                 await testStreamOption.click();
                 testLogger.info('Selected metrics stream', { streamName, attempt });
@@ -2330,7 +2330,7 @@ export class AlertsPage {
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
 
-        const testStreamOption = this.page.getByText(streamName, { exact: true });
+        const testStreamOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${streamName}$`) }).first();
         try {
             await expect(testStreamOption).toBeVisible({ timeout: 5000 });
             await testStreamOption.click();
@@ -2369,10 +2369,10 @@ export class AlertsPage {
         await expect(streamDropdown).toBeVisible({ timeout: 10000 });
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.press('Control+a');
-        await this.page.keyboard.type(streamName, { delay: 30 });
+        const searchInput = streamDropdown.locator('input').first();
+        await searchInput.fill(streamName);
         await this.page.waitForTimeout(1500);
-        const streamOption = this.page.getByText(streamName, { exact: true }).first();
+        const streamOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${streamName}$`) }).first();
         await expect(streamOption).toBeVisible({ timeout: 10000 });
         await streamOption.click();
         testLogger.info('Selected stream by name', { stream: streamName });
@@ -2520,7 +2520,7 @@ export class AlertsPage {
      * @param {number} stepIndex - 0-based step index
      */
     async clickStepIndicator(stepIndex) {
-        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item, .alert-v3-steps > div > div');
+        const indicators = this.page.locator('[data-test*="step-indicator"]');
         const target = indicators.nth(stepIndex);
         await target.waitFor({ state: 'visible', timeout: 10000 });
         await target.click({ force: true });
@@ -2573,10 +2573,11 @@ export class AlertsPage {
             }
             await this.page.locator(this.locators.streamNameDropdown).click();
             await this.page.waitForTimeout(500);
-            await this.page.keyboard.type(streamName, { delay: 30 });
+            const searchInput = this.page.locator(this.locators.streamNameDropdown).locator('input').first();
+            await searchInput.fill(streamName);
             await this.page.waitForTimeout(1000);
             try {
-                const streamOption = this.page.getByText(streamName, { exact: true });
+                const streamOption = this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${streamName}$`) }).first();
                 await streamOption.waitFor({ state: 'visible', timeout: 10000 });
                 await streamOption.click({ timeout: 5000 });
                 streamSelected = true;
@@ -2587,7 +2588,7 @@ export class AlertsPage {
         if (!streamSelected) {
             // Final attempt with force click — will throw if element doesn't exist in DOM
             testLogger.warn(`Stream '${streamName}' not found after 3 attempts, trying force-click`);
-            await this.page.getByText(streamName, { exact: true }).click({ force: true, timeout: 10000 });
+            await this.page.locator('[data-test$="-option"]', { hasText: new RegExp(`^${streamName}$`) }).first().click({ force: true, timeout: 10000 });
         }
 
         // Select Scheduled alert type via v3 dropdown
@@ -2696,7 +2697,7 @@ export class AlertsPage {
      */
     getPromqlConditionRow() {
         const queryConfigSection = this.page.locator('.step-query-config');
-        const promqlConditionLabel = queryConfigSection.getByText('Trigger if the value is').first();
+        const promqlConditionLabel = queryConfigSection.locator('div', { hasText: /trigger if the value is/i }).first();
         // Return the parent container that holds both label and controls
         return promqlConditionLabel.locator('..');
     }
@@ -3134,7 +3135,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getNotification() {
-        return this.page.locator('[role="alert"]');
+        return this.page.locator('[data-test="o-toast"]');
     }
 
     /**
@@ -3142,7 +3143,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getAlertSetupText() {
-        return this.page.getByText('Alert Setup');
+        return this.page.locator('[data-test*="alert"]', { hasText: /alert setup/i }).first();
     }
 
     /**
@@ -3150,7 +3151,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getPreviewNotAvailableMessage() {
-        return this.page.getByText('Preview is not available in SQL mode');
+        return this.page.locator('[data-test*="alert"]', { hasText: /preview is not available in sql mode/i }).first();
     }
 
     /**
@@ -3166,7 +3167,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getGroupByLabel() {
-        return this.page.getByText('Group by');
+        return this.page.locator('[data-test*="group-by"], .step-query-config div', { hasText: /group by/i }).first();
     }
 
     /**
@@ -3391,7 +3392,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getAggregationThresholdLabel() {
-        return this.page.getByText('Having groups');
+        return this.page.locator('[data-test*="having"], .step-query-config div', { hasText: /having groups/i }).first();
     }
 
     /**
@@ -3447,6 +3448,6 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getErrorMessageBanner() {
-        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+        return this.page.locator('[data-test="o-toast"], [data-test*="error"]');
     }
 }

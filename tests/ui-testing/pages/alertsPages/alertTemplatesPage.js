@@ -154,12 +154,8 @@ export class AlertTemplatesPage {
         const addBtnLocator = this.page.locator(this.addTemplateButton);
         const addBtnFallbackLocators = [
             this.addTemplateButton,
-            'button:has-text("Add Template")',
-            '.q-table__control button',
-            'button[data-test*="add"]',
-            'button:has(.OIcon):has-text("add")',
-            '.q-toolbar button:has-text("Add")',
-            'button[data-o2-btn]:has-text("Add Template")'
+            '[data-test*="template"][data-test*="add"]',
+            '[data-test*="add"][data-test*="btn"]'
         ];
 
         let addBtnClicked = false;
@@ -220,12 +216,12 @@ export class AlertTemplatesPage {
     async _getSearchInput() {
         // Try multiple strategies to find the template search input
         const strategies = [
-            // Strategy 1: placeholder text match (this.templateSearchInput = 'Search Template')
-            () => this.page.getByPlaceholder(this.templateSearchInput),
-            // Strategy 2: data-test selector for template search
+            // Strategy 1: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
-            // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('[data-o2-page-container] .q-table__control input[type="text"], [data-o2-page-container] input.q-field__input[placeholder*="Search"], [data-o2-page-container] input[placeholder*="search"]').first()
+            // Strategy 2: data-test selector with inner input
+            () => this.page.locator('[data-test="alert-template-search-input-input"]'),
+            // Strategy 3: data-test selector for template search (alternate naming)
+            () => this.page.locator('[data-test="template-search-input-input"]')
         ];
 
         for (const strategy of strategies) {
@@ -308,7 +304,9 @@ export class AlertTemplatesPage {
         try {
             await Promise.race([
                 this.page.locator(this.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o-toast"]').filter({ hasText: /no data available/i }).waitFor({ state: 'visible', timeout: 30000 }).catch(() =>
+                    this.page.locator('[data-test="alert-template-no-data"]').waitFor({ state: 'visible', timeout: 30000 })
+                )
             ]);
         } catch (error) {
             testLogger.error('Neither table nor no data message found after template search', { templateName, error: error.message });
@@ -316,7 +314,7 @@ export class AlertTemplatesPage {
         }
 
         // Verify template exists before deletion
-        await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
+        await this.page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`).waitFor({ timeout: 2000 });
 
         // Click delete button using the correct locator
         await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
@@ -339,7 +337,7 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000); // Wait for search to complete
 
         // Verify no results found
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-template-no-data"]')).toBeVisible();
     }
 
     /**
@@ -546,7 +544,7 @@ export class AlertTemplatesPage {
 
         // Wait for success message like regular createTemplate
         try {
-            await expect(this.page.getByText(this.templateSuccessMessage)).toBeVisible({ timeout: 10000 });
+            await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Template Saved Successfully/i })).toBeVisible({ timeout: 10000 });
             testLogger.info('Validation template success message visible', { templateName });
         } catch (e) {
             testLogger.warn('Validation template success message not immediately visible, proceeding', { templateName });
@@ -646,31 +644,31 @@ export class AlertTemplatesPage {
             // Try multiple strategies to find the template
             let found = false;
 
-            // Strategy 1: Look for the template name directly as text on the page
-            const templateText = this.page.getByText(templateName, { exact: false });
-            found = await templateText.isVisible({ timeout: 3000 }).catch(() => false);
+            // Strategy 1: Look for the template's delete button (proves it's in the list)
+            const templateDeleteBtn = this.page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`);
+            found = await templateDeleteBtn.isVisible({ timeout: 3000 }).catch(() => false);
             if (found) {
-                testLogger.info('Successfully verified template exists (text match)', { templateName });
+                testLogger.info('Successfully verified template exists (delete button match)', { templateName });
                 return;
             }
 
-            // Strategy 2: Look for it as a table cell
-            const cell = this.page.getByRole('cell', { name: templateName });
-            found = await cell.isVisible({ timeout: 3000 }).catch(() => false);
+            // Strategy 2: Look for the template's update button
+            const templateUpdateBtn = this.page.locator(`[data-test="alert-template-list-${templateName}-update-template"]`);
+            found = await templateUpdateBtn.isVisible({ timeout: 3000 }).catch(() => false);
             if (found) {
-                testLogger.info('Successfully verified template exists (cell match)', { templateName });
+                testLogger.info('Successfully verified template exists (update button match)', { templateName });
                 return;
             }
 
             // Strategy 3: Try with pagination if table has next page
             for (let pageNum = 0; pageNum < 5; pageNum++) {
-                const cellCheck = await this.page.getByRole('cell', { name: templateName }).isVisible({ timeout: 2000 }).catch(() => false);
-                if (cellCheck) {
+                const btnCheck = await this.page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`).isVisible({ timeout: 2000 }).catch(() => false);
+                if (btnCheck) {
                     testLogger.info('Successfully verified template exists (paginated)', { templateName });
                     return;
                 }
                 // Try next page
-                const nextBtn = this.page.locator('button:has-text("chevron_right")').first();
+                const nextBtn = this.page.locator('[data-test="table-next-page-btn"]').first();
                 if (await nextBtn.isVisible().catch(() => false) && await nextBtn.isEnabled().catch(() => false)) {
                     await nextBtn.click();
                     await this.page.waitForTimeout(2000);
@@ -756,10 +754,8 @@ export class AlertTemplatesPage {
             // Try import button selectors (avoiding overly broad selectors that click wrong elements)
             const importBtnFallbackLocators = [
                 this.templateImportButton,
-                'button:has-text("Import Template")',
                 '[data-test*="template-import"]',
-                'button:has-text("Import")',
-                '.q-table__control button:has-text("Import")',
+                '[data-test*="import"][data-test*="btn"]'
             ];
 
             let importBtnClicked = false;
@@ -795,8 +791,8 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(1000); // Small delay after filling URL
         await this.page.locator(this.importJsonButton).click();
         // Wait for validation/preview to render — text contains Template index and field validation
-        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
-        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="template-import-preview"]').filter({ hasText: /Template - 1:/i })).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="template-import-preview"]').filter({ hasText: /The.*name.*field.*required/i })).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).click();
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
@@ -804,7 +800,7 @@ export class AlertTemplatesPage {
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Successfully imported/i })).toBeVisible();
         }
     }
 
@@ -813,9 +809,10 @@ export class AlertTemplatesPage {
      * @param {string} templateName - Name of the imported template
      */
     async verifyImportedTemplateExists(templateName) {
-        await this.page.getByPlaceholder(this.templateSearchInput).click();
-        await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName);
-        await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible();
+        const searchInput = await this._getSearchInput();
+        await searchInput.click();
+        await searchInput.fill(templateName);
+        await expect(this.page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`)).toBeVisible();
     }
 
     /**
@@ -830,15 +827,15 @@ export class AlertTemplatesPage {
         await this.page.locator(this.importFileInput).setInputFiles(filePath);
         await this.page.locator(this.importJsonButton).click();
         // Wait for validation/preview to render — text contains Template index and field validation
-        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
-        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="template-import-preview"]').filter({ hasText: /Template - 1:/i })).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="template-import-preview"]').filter({ hasText: /The.*name.*field.*required/i })).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
 
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Successfully imported/i })).toBeVisible();
         }
     }
 
@@ -847,9 +844,10 @@ export class AlertTemplatesPage {
      * @param {string} searchText - Text to search for
      */
     async searchTemplates(searchText) {
-        await this.page.getByPlaceholder(this.templateSearchInput).click();
-        await this.page.getByPlaceholder(this.templateSearchInput).fill('');
-        await this.page.getByPlaceholder(this.templateSearchInput).fill(searchText);
+        const searchInput = await this._getSearchInput();
+        await searchInput.click();
+        await searchInput.fill('');
+        await searchInput.fill(searchText);
         await this.page.waitForTimeout(2000);
         testLogger.debug('Searched for templates', { searchText });
     }
@@ -880,7 +878,7 @@ export class AlertTemplatesPage {
      */
     async hasTemplates() {
         try {
-            const noData = await this.page.getByText('No data available').isVisible({ timeout: 2000 });
+            const noData = await this.page.locator('[data-test="alert-template-no-data"]').isVisible({ timeout: 2000 });
             if (noData) {
                 testLogger.debug('No templates found');
                 return false;
@@ -904,7 +902,7 @@ export class AlertTemplatesPage {
 
         // Check if "Template is in use for destination" message appears
         try {
-            const inUseMessage = await this.page.getByText(this.templateInUseMessage).textContent({ timeout: 3000 });
+            const inUseMessage = await this.page.locator('[data-test="o-toast"]').filter({ hasText: /Template is in use for destination/i }).textContent({ timeout: 3000 });
 
             // Extract destination name from message: "Template is in use for destination Telegram_alert"
             const match = inUseMessage.match(/destination\s+(.+)$/);

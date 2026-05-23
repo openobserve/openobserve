@@ -38,28 +38,28 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
-        this.nextPageButton = 'button:has-text("chevron_right")';
+        this.nextPageButton = '[data-test="table-next-page-btn"]';
 
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
         this.destinationTypeCard = '[data-test="destination-type-card"]';
         this.destinationTypeName = '[data-test="destination-type-name"]';
-        this.selectedDestinationIndicator = '.selected-destination-indicator';
-        this.stepperStep = '.q-stepper__step';
+        this.selectedDestinationIndicator = '[data-test="selected-destination-indicator"]';
+        this.stepperStep = '[data-test="stepper-step"]';
         this.prebuiltForm = '[data-test="prebuilt-form"]';
-        this.webhookInput = 'input[data-test*="webhook"], input[placeholder*="webhook"]';
-        this.recipientsInput = 'input[data-test="email-recipients-input"]';
-        this.integrationKeyInput = 'input[data-test="pagerduty-integration-key-input"]';
+        this.webhookInput = '[data-test="destination-webhook-input"]';
+        this.recipientsInput = '[data-test="email-recipients-input"]';
+        this.integrationKeyInput = '[data-test="pagerduty-integration-key-input"]';
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
-        this.testButton = 'button:has-text("Test")';
-        this.testResult = '[data-test="destination-test-result"], [data-test="prebuilt-test-result"], .test-result, .o2-test-result';
-        this.saveButton = 'button:has-text("Save")';
-        this.cancelButton = 'button:has-text("Cancel")';
-        this.backButton = 'button:has-text("Back")';
-        this.successNotification = '[role="alert"]';
-        this.errorMessage = '.q-field__messages, .error-message';
-        this.checkIcon = '.OIcon';
+        this.testButton = '[data-test="destination-test-btn"]';
+        this.testResult = '[data-test="destination-test-result"]';
+        this.saveButton = '[data-test="add-destination-submit-btn"]';
+        this.cancelButton = '[data-test="add-destination-cancel-btn"]';
+        this.backButton = '[data-test="add-destination-back-btn"]';
+        this.successNotification = '[data-test="o-toast"]';
+        this.errorMessage = '[data-test="destination-error-message"]';
+        this.checkIcon = '[data-test="destination-check-icon"]';
     }
 
     async navigateToDestinations(retryCount = 0) {
@@ -162,7 +162,7 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(1000);
         
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Destination saved/i })).toBeVisible();
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -226,7 +226,7 @@ export class AlertDestinationsPage {
 
         while (!destinationFound && !isLastPage) {
             try {
-                await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 5000 });
+                await this.page.locator(`[data-test="alert-destination-list-${destinationName}-delete-destination"]`).waitFor({ timeout: 5000 });
                 destinationFound = true;
                 testLogger.info('Found destination via UI', { destinationName });
             } catch (error) {
@@ -319,7 +319,7 @@ export class AlertDestinationsPage {
         await this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName)).click();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(1000); // Wait for deletion to complete
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /No data available/i })).toBeVisible();
     }
 
     /**
@@ -370,7 +370,7 @@ export class AlertDestinationsPage {
 
         // Check if "Destination is currently used by alert" message appears
         try {
-            const inUseMessage = await this.page.getByText(this.destinationInUseMessage).textContent({ timeout: 3000 });
+            const inUseMessage = await this.page.locator('[data-test="o-toast"]').filter({ hasText: /Destination is currently used by alert:/i }).textContent({ timeout: 3000 });
 
             // Extract alert name from message: "Destination is currently used by alert: Automation_Alert_3Igfv"
             const match = inUseMessage.match(/alert:\s*(.+)$/);
@@ -417,7 +417,7 @@ export class AlertDestinationsPage {
     async hasDestinations() {
         try {
             // Check if "No data available" is shown
-            const noData = await this.page.getByText('No data available').isVisible({ timeout: 2000 });
+            const noData = await this.page.locator('[data-test="o-toast"]').filter({ hasText: /No data available/i }).isVisible({ timeout: 2000 });
             if (noData) {
                 testLogger.debug('No destinations found');
                 return false;
@@ -515,7 +515,7 @@ export class AlertDestinationsPage {
      */
     async verifySuccessfulImportMessage() {
         // Look for the success message text anywhere on the page (toast or dialog)
-        const successMessage = this.page.getByText('Successfully imported');
+        const successMessage = this.page.locator('[data-test="o-toast"]').filter({ hasText: /Successfully imported/i });
         await expect(successMessage).toBeVisible({ timeout: 10000 });
     }
 
@@ -532,7 +532,7 @@ export class AlertDestinationsPage {
         const errorItem = this.page.locator('[data-test^="destination-import-error-"]').first();
 
         // Or look for the destination count message text anywhere on the page
-        const countMessage = this.page.getByText(/Destination - \d+:/);
+        const countMessage = this.page.locator('[data-test="o-toast"]').filter({ hasText: /Destination - \d+:/i });
 
         // Wait for either the error item or the count message to be visible
         await expect(errorItem.or(countMessage)).toBeVisible({ timeout: 10000 });
@@ -644,7 +644,7 @@ export class AlertDestinationsPage {
 
         // Submit destination
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Destination saved/i })).toBeVisible();
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -670,11 +670,7 @@ export class AlertDestinationsPage {
         // Try multiple fallback selectors for the import button
         const importBtnFallbackLocators = [
             this.destinationImportButton,
-            'button:has-text("Import Destination")',
-            '[data-test*="destination-import"]',
-            'button:has-text("Import")',
-            '.q-table__control button:has-text("Import")',
-            'button[data-o2-btn]:has-text("Import")'
+            '[data-test*="destination-import"]'
         ];
 
         let importBtnClicked = false;
@@ -813,11 +809,10 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(500);
 
         // Click the option with matching text (capitalize first letter)
-        // Severity dropdown is OSelect (Reka Listbox) post-migration ([role="option"]);
-        // legacy q-select uses .q-item__label.
+        // Select the severity option from dropdown
         const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
         await this.page
-            .locator(`[role="option"]:has-text("${severityLabel}"), .q-item__label:has-text("${severityLabel}")`)
+            .locator('[data-test$="-option"]', { hasText: new RegExp(severityLabel, 'i') })
             .first()
             .click();
         await this.page.waitForTimeout(500);
@@ -963,14 +958,10 @@ export class AlertDestinationsPage {
         }
 
         // If form fields not found, try waiting for stepper
-        const hasStepper = await this.page.locator('.q-stepper').isVisible().catch(() => false);
+        const hasStepper = await this.page.locator('[data-test="destination-stepper"]').isVisible().catch(() => false);
         if (hasStepper) {
-            await this.page.waitForFunction(() => {
-                const steps = document.querySelectorAll('.q-stepper__step');
-                return steps.length >= 2;
-            }, { timeout: 10000 }).catch(() => {});
-
             const steps = this.page.locator(this.stepperStep);
+            await steps.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             const count = await steps.count();
             testLogger.debug('Stepper steps found', { stepCount: count });
         } else {
@@ -988,9 +979,7 @@ export class AlertDestinationsPage {
         // Try multiple possible selectors for the indicator
         const selectors = [
             this.selectedDestinationIndicator,
-            '.selected-destination',
-            '.destination-type-indicator',
-            `text="${typeName}"`
+            '[data-test="destination-type-readonly"]'
         ];
 
         let found = false;
@@ -1021,10 +1010,8 @@ export class AlertDestinationsPage {
 
         // Try multiple ways to find the checkmark
         const checkSelectors = [
-            '.OIcon:has-text("check_circle")',
-            'i:has-text("check_circle")',
-            '[name="check_circle"]',
-            '.check-icon'
+            this.checkIcon,
+            '[data-test="destination-check-icon"]'
         ];
 
         let found = false;
@@ -1136,7 +1123,7 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(2000);
 
         // Wait for table to be visible and loaded
-        await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 20000 }).catch(() => {});
+        await this.page.locator('[data-test="alert-destinations-list-table"]').waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
         // Use the search/filter input to find the destination instead of pagination
@@ -1150,10 +1137,8 @@ export class AlertDestinationsPage {
 
         // Try multiple selector strategies to find the destination
         const selectors = [
-            `tr:has-text("${name}")`,  // Table row
-            `td:has-text("${name}")`,   // Table cell
-            `[data-test*="${name}"]`,   // Data-test attribute
-            `text=${name}`              // Any text match
+            `[data-test="alert-destination-list-${name}-delete-destination"]`,
+            `[data-test*="${name}"]`
         ];
 
         // Retry logic with multiple selectors
@@ -1220,7 +1205,7 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationNotInList(name) {
-        await expect(this.page.locator(`text=${name}`)).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`)).not.toBeVisible({ timeout: 5000 });
     }
 
     // ============================================================================
@@ -1320,9 +1305,9 @@ export class AlertDestinationsPage {
     async deleteDestination(name) {
         testLogger.info('Deleting destination', { name });
 
-        // Find the destination row
-        const destinationRow = this.page.locator(`tr:has-text("${name}")`);
-        await expect(destinationRow).toBeVisible({ timeout: 10000 });
+        // Find the destination by its delete button (confirms row exists)
+        const destinationMarker = this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
+        await expect(destinationMarker).toBeVisible({ timeout: 10000 });
 
         // Click the delete button using the data-test attribute
         const deleteBtn = this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
@@ -1336,7 +1321,7 @@ export class AlertDestinationsPage {
         await confirmBtn.click();
 
         // Wait for success notification
-        await expect(this.page.locator(this.successNotification).first()).toContainText(/deleted|removed|success/i, { timeout: 10000 });
+        await expect(this.page.locator('[data-test="o-toast"]').first()).toContainText(/deleted|removed|success/i, { timeout: 10000 });
         await this.page.waitForTimeout(2000);
 
         testLogger.info('Destination deleted successfully');
@@ -1361,7 +1346,7 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(3000);
 
         // Wait for table to be visible
-        await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="alert-destinations-list-table"]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
         // Use search to find the destination
         const searchInput = this.page.locator('[data-test="destination-list-search-input"]');
@@ -1439,7 +1424,7 @@ export class AlertDestinationsPage {
         // We must wait for this to disappear before the name input becomes visible
 
         // Wait for loading state to complete - use text match for the loading message
-        const loadingMessage = this.page.getByText('Loading destination data...');
+        const loadingMessage = this.page.locator('[data-test="add-destination-loading-indicator"]');
         const loadingSpinner = this.page.locator('[data-test="add-destination-loading-indicator"]');
 
         // Check if loading state is present and wait for it to disappear
@@ -1522,15 +1507,12 @@ export class AlertDestinationsPage {
 
         // Try to scroll the dialog/page to reveal form fields below the type selector
         await this.page.evaluate(() => {
-            // Scroll within dialog
-            const dialogs = document.querySelectorAll('[data-test*="dialog"], [role="dialog"], .q-card');
+            const dialogs = document.querySelectorAll('[data-test*="dialog"]');
             dialogs.forEach(dialog => {
                 if (dialog.scrollHeight > dialog.clientHeight) {
                     dialog.scrollTop = 400;
                 }
             });
-
-            // Also scroll the page
             window.scrollBy(0, 300);
         }).catch(() => {});
 
@@ -1550,12 +1532,8 @@ export class AlertDestinationsPage {
 
         // Try multiple possible webhook input selectors
         const webhookSelectors = [
-            'input[data-test*="webhook"]',
-            'input[placeholder*="webhook"]',
-            'input[placeholder*="Webhook"]',
-            'input[name*="webhook"]',
-            'input[type="url"]',
-            this.urlInput  // Fallback to URL input
+            this.webhookInput,
+            this.urlInput
         ];
 
         let found = false;
@@ -1592,10 +1570,8 @@ export class AlertDestinationsPage {
 
         // Try multiple possible recipients input selectors
         const recipientsSelectors = [
-            'input[data-test="email-recipients-input"]',
-            'input[data-test*="recipients"]',
-            'input[placeholder*="email"]',
-            'input[name*="recipients"]'
+            '[data-test="email-recipients-input"]',
+            '[data-test*="recipients-input"]'
         ];
 
         let found = false;
@@ -1645,9 +1621,9 @@ export class AlertDestinationsPage {
 
         // Scroll down more to ensure webhook field is visible (it's below the type selector)
         await this.page.evaluate(() => {
-            const dialogs = document.querySelectorAll('[data-test*="dialog"], [role="dialog"], .q-card');
+            const dialogs = document.querySelectorAll('[data-test*="dialog"]');
             dialogs.forEach(dialog => {
-                dialog.scrollTop = dialog.scrollHeight; // Scroll to bottom
+                dialog.scrollTop = dialog.scrollHeight;
             });
             window.scrollBy(0, 500);
         }).catch(() => {});
@@ -1655,11 +1631,7 @@ export class AlertDestinationsPage {
 
         // Same selectors as expectWebhookUrlPopulated for consistency
         const webhookSelectors = [
-            'input[data-test*="webhook"]',
-            'input[placeholder*="webhook"]',
-            'input[placeholder*="Webhook"]',
-            'input[name*="webhook"]',
-            'input[type="url"]',
+            this.webhookInput,
             this.urlInput
         ];
 
@@ -1707,9 +1679,8 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(2000);
 
         const recipientsSelectors = [
-            'input[data-test="email-recipients-input"]',
-            'input[data-test*="recipients"]',
-            'input[placeholder*="email"]'
+            '[data-test="email-recipients-input"]',
+            '[data-test*="recipients-input"]'
         ];
 
         let updated = false;
@@ -1898,7 +1869,7 @@ export class AlertDestinationsPage {
 
         // Verify modified name doesn't exist
         const modifiedName = `${name}_modified`;
-        await expect(this.page.locator(`text=${modifiedName}`)).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator(`[data-test="alert-destination-list-${modifiedName}-delete-destination"]`)).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('Cancel edit verified - no changes saved');
     }
@@ -1912,7 +1883,7 @@ export class AlertDestinationsPage {
      * @param {string} apiKey - Opsgenie API key
      */
     async fillOpsgenieApiKey(apiKey) {
-        const input = this.page.locator('input[data-test="opsgenie-api-key-input"], input[placeholder*="API Key"]').first();
+        const input = this.page.locator('[data-test="opsgenie-api-key-input"]').first();
         await input.fill(apiKey);
         testLogger.debug('Filled Opsgenie API key');
     }
@@ -1925,7 +1896,7 @@ export class AlertDestinationsPage {
         const select = this.page.locator('[data-test="opsgenie-priority-select"]').first();
         if (await select.isVisible()) {
             await select.click();
-            await this.page.locator(`text=${priority}`).click();
+            await this.page.locator('[data-test$="-option"]', { hasText: new RegExp(priority, 'i') }).first().click();
             testLogger.debug('Selected priority', { priority });
         }
     }
@@ -1965,7 +1936,7 @@ export class AlertDestinationsPage {
         await this.expectDestinationTypeInEditMode('Opsgenie');
 
         if (newApiKey) {
-            const input = this.page.locator('input[data-test="opsgenie-api-key-input"], input[placeholder*="API Key"]').first();
+            const input = this.page.locator('[data-test="opsgenie-api-key-input"]').first();
             await input.clear();
             await input.fill(newApiKey);
         }
@@ -1989,7 +1960,7 @@ export class AlertDestinationsPage {
      * @param {string} url - ServiceNow instance URL
      */
     async fillServiceNowInstanceUrl(url) {
-        const input = this.page.locator('input[data-test="servicenow-instance-url-input"], input[placeholder*="Instance URL"]').first();
+        const input = this.page.locator('[data-test="servicenow-instance-url-input"]').first();
         await input.fill(url);
         testLogger.debug('Filled ServiceNow instance URL');
     }
@@ -1999,7 +1970,7 @@ export class AlertDestinationsPage {
      * @param {string} username - ServiceNow username
      */
     async fillServiceNowUsername(username) {
-        const input = this.page.locator('input[data-test="servicenow-username-input"], input[placeholder*="Username"]').first();
+        const input = this.page.locator('[data-test="servicenow-username-input"]').first();
         await input.fill(username);
         testLogger.debug('Filled ServiceNow username');
     }
@@ -2009,7 +1980,7 @@ export class AlertDestinationsPage {
      * @param {string} password - ServiceNow password
      */
     async fillServiceNowPassword(password) {
-        const input = this.page.locator('input[data-test="servicenow-password-input"], input[type="password"]').first();
+        const input = this.page.locator('[data-test="servicenow-password-input"]').first();
         await input.fill(password);
         testLogger.debug('Filled ServiceNow password');
     }
@@ -2050,19 +2021,19 @@ export class AlertDestinationsPage {
         await this.expectDestinationTypeInEditMode('ServiceNow');
 
         if (newInstanceUrl) {
-            const urlInput = this.page.locator('input[data-test="servicenow-instance-url-input"], input[placeholder*="Instance URL"]').first();
+            const urlInput = this.page.locator('[data-test="servicenow-instance-url-input"]').first();
             await urlInput.clear();
             await urlInput.fill(newInstanceUrl);
         }
 
         if (newUsername) {
-            const usernameInput = this.page.locator('input[data-test="servicenow-username-input"], input[placeholder*="Username"]').first();
+            const usernameInput = this.page.locator('[data-test="servicenow-username-input"]').first();
             await usernameInput.clear();
             await usernameInput.fill(newUsername);
         }
 
         if (newPassword) {
-            const passwordInput = this.page.locator('input[data-test="servicenow-password-input"], input[type="password"]').first();
+            const passwordInput = this.page.locator('[data-test="servicenow-password-input"]').first();
             await passwordInput.clear();
             await passwordInput.fill(newPassword);
         }
@@ -2098,9 +2069,6 @@ export class AlertDestinationsPage {
         // Try multiple URL input selectors
         const urlSelectors = [
             '[data-test="add-destination-url-input"]',
-            'input[data-test*="url"]',
-            'input[placeholder*="URL"]',
-            'input[type="url"]',
             this.urlInput
         ];
 
