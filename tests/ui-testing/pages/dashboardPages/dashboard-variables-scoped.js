@@ -753,14 +753,8 @@ export default class DashboardVariablesScoped {
       }
     }
 
-    // Verify the committed value starts with $; if not something went wrong.
-    if (valueCommitted) {
-      const currentValue = await filterValueInput.inputValue().catch(() => '');
-      if (!currentValue.startsWith('$')) {
-        // The input display may lag but Vue's filter.value was already set via onSelect.
-        // No corrective action needed — the model value is correct.
-      }
-    }
+    // Log final result
+    const finalInputValue = await filterValueInput.inputValue().catch(() => '');
   }
 
   /**
@@ -1133,6 +1127,18 @@ export default class DashboardVariablesScoped {
     // Click dropdown trigger to open menu
     await varDropdown.click();
 
+    // Wait for dropdown menu to open and stabilize — OSelect popover exposes
+    // data-test `${parentDataTest}-popover`. The selector forwards
+    // `variable-selector-<name>-inner` to OSelect, so the popover/options carry
+    // a `variable-selector-<name>-inner-*` prefix.
+    // We confirm the popover opened BEFORE awaiting the stream so we know the
+    // click landed. The stream wait can take time and a concurrent cascade
+    // re-render can detach the trigger (causing the portal to close via
+    // :hide-when-detached). We re-open if that happens.
+    const selectorDataTest = `variable-selector-${variableName}-inner`;
+    const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 10000 });
+
     // Wait for the values stream to complete loading options
     try {
       await valuesStreamPromise;
@@ -1140,13 +1146,12 @@ export default class DashboardVariablesScoped {
       throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
     }
 
-    // Wait for dropdown menu to open and stabilize — OSelect popover exposes
-    // data-test `${parentDataTest}-popover`. The selector forwards
-    // `variable-selector-<name>-inner` to OSelect, so the popover/options carry
-    // a `variable-selector-<name>-inner-*` prefix.
-    const selectorDataTest = `variable-selector-${variableName}-inner`;
-    const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
-    await dropdownMenu.waitFor({ state: "visible", timeout });
+    // If a concurrent cascade re-render closed the portal, re-open the dropdown.
+    const isPopoverVisible = await dropdownMenu.isVisible().catch(() => false);
+    if (!isPopoverVisible) {
+      await varDropdown.click();
+      await dropdownMenu.waitFor({ state: "visible", timeout: 10000 });
+    }
 
     // Wait for options to be present in the dropdown
     const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
