@@ -141,9 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="lg"
                     data-test="progress-bar"
                   >
-                    <template #label>
-                      <span class="tw:text-xs tw:font-semibold">{{ row.progress_percent }}%</span>
-                    </template>
+                    {{ row.progress_percent }}%
                   </OProgressBar>
                 </div>
                 <div
@@ -364,7 +362,7 @@ const columns: OTableColumnDef[] = [
   { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, meta: { align: "left" } },
   { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, meta: { align: "left" } },
   { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, meta: { align: "left" } },
-  { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center" }, isAction: true, size: 150 },
+  { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 
 const allStatusOptions = ["running", "completed", "paused", "failed"];
