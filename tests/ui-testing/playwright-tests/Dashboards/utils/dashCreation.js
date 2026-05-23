@@ -82,6 +82,7 @@ export async function deleteDashboard(page, dashboardName) {
 
   const deleteButton = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
+    .first()
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
