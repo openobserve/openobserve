@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
@@ -128,26 +128,30 @@ const removedUsers = ref(new Set());
 const addedRoles = ref(new Set());
 const removedRoles = ref(new Set());
 
-const tabs = [
-  {
-    value: "roles",
-    label: "Roles",
-    icon: "shield",
-  },
-  {
-    value: "users",
-    label: "Users",
-    icon: "group",
-  },
-];
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      value: "roles",
+      label: "Roles",
+      icon: "shield",
+    },
+    {
+      value: "users",
+      label: "Users",
+      icon: "group",
+    },
+  ];
 
-if (store.state.zoConfig.service_account_enabled) {
-  tabs.push({
-    value: "serviceAccounts",
-    label: "Service Accounts",
-    icon: "smart-toy",
-  });
-}
+  if (store.state.zoConfig.service_account_enabled) {
+    baseTabs.push({
+      value: "serviceAccounts",
+      label: "Service Accounts",
+      icon: "smart-toy",
+    });
+  }
+
+  return baseTabs;
+});
 
 const getGroupDetails = () => {
   const groupName: string = router.currentRoute.value.params
