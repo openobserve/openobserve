@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     /></template>
                   </OTooltip>
                 </OButton>
-                <ODropdown>
+                <ODropdown align="end">
                   <template #trigger>
                     <OButton
                       variant="ghost"
