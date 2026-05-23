@@ -3215,6 +3215,10 @@ export class LogsPage {
         // OToast convention §4 — match by the data-test-message attribute (escaped) across
         // all variant hosts. AGENT_RULES §2 bans `[role="alert"]` and `filter({ hasText })`.
         // CSS attribute selectors are limited to data-test* attributes.
+        //
+        // Some validations in the UX-revamp moved from $q.notify toasts to inline
+        // OInput error messages (rendered as `[data-test="<name>-error"]`).
+        // Cover both surfaces so the wait succeeds for either feedback channel.
         const escaped = String(text).replace(/"/g, '\\"');
         const selector = [
             `[data-test="o-toast-success"][data-test-message*="${escaped}"]`,
@@ -3223,6 +3227,7 @@ export class LogsPage {
             `[data-test="o-toast-warning"][data-test-message*="${escaped}"]`,
             `[data-test="o-toast-loading"][data-test-message*="${escaped}"]`,
             `[data-test="o-toast-default"][data-test-message*="${escaped}"]`,
+            `[data-test$="-error"][data-test-error-text*="${escaped}"]`,
         ].join(', ');
         await this.page.locator(selector).first().waitFor({ state: 'visible', timeout });
     }
@@ -4432,18 +4437,52 @@ export class LogsPage {
     /**
      * Wait for the total row count reported in `logs-search-result-title` to be at least
      * `minCount`. Deterministic wait for SQL-mode `LIMIT N` queries where the in-memory
-     * hits array must be fully populated before triggering a download — the title text
-     * encodes `... out of <totalCount>` from useHistogram.ts:getHistogramTitle().
+     * hits array must be fully populated before triggering a download.
+     *
+     * Strict data-test-only implementation (AGENT_RULES §2 — no Vue internals, no DOM
+     * attribute reads via `querySelector`, no class/role/text locators):
+     *  1. Wait for the run-query button — located by its data-test — to be enabled
+     *     AND to not carry the `title="Cancel"` attribute. Both checks use Playwright
+     *     matchers (`toBeEnabled`, `not.toHaveAttribute`) against the data-test
+     *     locator, no manual attribute reads.
+     *  2. Poll the title's `out of N` text via `toContainText` with a two-sample
+     *     stability gate — require two consecutive reads to agree before returning.
+     *     Absorbs the brief window where one streaming chunk has updated the title
+     *     while the underlying hits array is still being mutated by sibling chunks.
      */
     async expectPaginationTotalAtLeast(minCount, timeout = 30000) {
         const title = this.page.locator(this.paginationRowCountTitle);
         await expect(title).toBeVisible({ timeout });
+
+        // Stage 1 — wait until the run-query button is enabled and no longer in
+        // cancel state. The Run and Cancel variants share `data-test="logs-search-bar-refresh-btn"`
+        // but differ on the localized `title` attribute (set to `t("search.cancel")`
+        // while streaming, `t("search.runQuery")` / `t("search.generateQueryTooltip")`
+        // afterward). Playwright matchers operate on the data-test locator directly.
+        const queryBtn = this.page.locator(this.queryButton);
+        await expect(queryBtn).toBeEnabled({ timeout }).catch(() => {
+            testLogger.warn('expectPaginationTotalAtLeast: run-query button never re-enabled, continuing');
+        });
+        await expect(queryBtn).not.toHaveAttribute('title', /cancel/i, { timeout }).catch(() => {
+            testLogger.warn('expectPaginationTotalAtLeast: run-query button still in Cancel state, continuing');
+        });
+
+        // Stage 2 — poll the title's "out of N" text via the data-test locator with
+        // a two-sample stability gate. The title is the rendered projection of
+        // `hits.length`; once two consecutive reads agree (and meet `minCount`),
+        // the chunk-mutation race is over. `textContent()` is invoked on the
+        // data-test-resolved Locator — no element-only or class selectors involved.
+        let lastCount = -1;
         await expect.poll(async () => {
-            const text = await title.textContent().catch(() => '');
-            const match = text && text.match(/out of\s+([\d,]+)/);
-            if (!match) return 0;
-            return parseInt(match[1].replace(/,/g, ''), 10) || 0;
-        }, { timeout, intervals: [200, 500, 1000] }).toBeGreaterThanOrEqual(minCount);
+            const text = (await title.textContent()) || '';
+            const match = text.match(/out of\s+([\d,]+)/);
+            const current = match ? (parseInt(match[1].replace(/,/g, ''), 10) || 0) : 0;
+            const stable = current === lastCount && current >= minCount;
+            lastCount = current;
+            // Return the smaller of the two samples until they agree — this prevents
+            // `expect.poll` from succeeding on a single transient over-read.
+            return stable ? current : Math.min(current, minCount - 1);
+        }, { timeout, intervals: [200, 500, 500, 1000] }).toBeGreaterThanOrEqual(minCount);
     }
 
     async waitForDownload() {
@@ -8265,14 +8304,38 @@ export class LogsPage {
 
         // Phase 2: Wait for async initializeBuild() to complete.
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
-        // Use visible filter to avoid hidden cached PanelEditor instances.
+        // The chart-type selection (ChartSelection.vue → data-selected="true" on the <li>)
+        // is set synchronously during initializeBuild() before the chart renderer mounts.
+        // Use waitForFunction to accept EITHER signal — chart/table/no-data visible OR any
+        // chart-type item already marked data-selected="true". This short-circuits Phase 2
+        // when chart-type has been auto-set but the renderer DOM hasn't appeared yet, which
+        // is the common case for Custom-mode CTE/subquery → table chart on CI where the
+        // chart-renderer can lag behind the chart-type selection by several seconds.
         try {
-            const initIndicator = this.page
-                .locator(this.buildInitIndicator)
-                .filter({ visible: true })
-                .first();
-            await initIndicator.waitFor({ state: 'visible', timeout });
-            testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
+            await this.page.waitForFunction(
+                () => {
+                    // Chart/table/no-data renderer present (the original signal)
+                    if (
+                        document.querySelector('[data-test="chart-renderer"]') ||
+                        document.querySelector('[data-test="dashboard-panel-table"]') ||
+                        document.querySelector('[data-test="no-data"]')
+                    ) {
+                        return true;
+                    }
+                    // OR any chart-selection item already marked data-selected="true"
+                    // (chart-type auto-selection completed even if renderer is still mounting)
+                    const items = document.querySelectorAll(
+                        '[data-test="dashboard-addpanel-chart-selection-item"]'
+                    );
+                    for (const item of items) {
+                        if (item.getAttribute('data-selected') === 'true') return true;
+                    }
+                    return false;
+                },
+                undefined,
+                { timeout, polling: 'raf' }
+            );
+            testLogger.info('Build tab initialization complete (renderer or chart-type selected)');
         } catch (error) {
             // Phase 2 is best-effort — Build tab may not render data for all query types
             testLogger.warn('Build tab chart/table/no-data not visible, waiting for networkidle');
@@ -8441,9 +8504,20 @@ export class LogsPage {
         // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
         const filterItems = this.page.locator(this.filterConditionLabelItems);
         // Wait for the builder filter parsing to attach at least one condition (deterministic).
-        // Some queries genuinely have zero filters — fall through to 0 after a short check.
-        await filterItems.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
-        const count = await filterItems.count();
+        // initializeBuild() in BuildQueryPage.vue is fully async — parseSQL → parsedQueryToPanelFields →
+        // updateGroupedFields → makeAutoSQLQuery. On slow CI the chain can take 20+ seconds before the
+        // filter rows mount. Some queries genuinely have zero filters — fall through to 0 after the wait.
+        await filterItems.first().waitFor({ state: 'attached', timeout: 30000 }).catch(() => {});
+        // Poll for count stability so we don't read mid-render before all rows mount (multiple AND/OR
+        // conditions render the rows in sequence as the v-for materializes).
+        let count = await filterItems.count();
+        await expect.poll(async () => {
+            const next = await filterItems.count();
+            if (next === count && next > 0) return 'stable';
+            count = next;
+            return 'changing';
+        }, { intervals: [200, 200, 200, 500, 500, 1000, 1000], timeout: 5000 }).toBe('stable').catch(() => {});
+        count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
         return count;
     }

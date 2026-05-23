@@ -76,14 +76,59 @@ export class AlertDestinationsPage {
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
         this.severitySelectPopover = '[data-test="pagerduty-severity-select-popover"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
-        this.testButton = 'button:has-text("Test")';
-        this.testResult = '[data-test="destination-test-result"], [data-test="prebuilt-test-result"], .test-result, .o2-test-result';
-        this.saveButton = 'button:has-text("Save")';
-        this.cancelButton = 'button:has-text("Cancel")';
-        this.backButton = 'button:has-text("Back")';
-        this.successNotification = '[role="alert"]';
-        this.errorMessage = '.q-field__messages, .error-message';
-        this.checkIcon = '.OIcon';
+        this.prioritySelectPopover = '[data-test="opsgenie-priority-select-popover"]';
+        this.methodSelect = '[data-test="add-destination-method-select"]';
+        this.methodSelectPopover = '[data-test="add-destination-method-select-popover"]';
+        // Save/Cancel/Test buttons resolve via stable data-test
+        this.testButton = '[data-test="destination-test-button"]';
+        this.testResult = '[data-test="destination-test-result"]';
+        this.testResultPrebuilt = '[data-test="prebuilt-test-result"]';
+        this.testResultSuccess = '[data-test="test-result-success"]';
+        this.testResultFailure = '[data-test="test-result-failure"]';
+        this.testResultLoading = '[data-test="test-result-loading"]';
+        this.testResultIdle = '[data-test="test-result-idle"]';
+        this.saveButton = '[data-test="add-destination-submit-btn"]';
+        this.cancelButton = '[data-test="add-destination-cancel-btn"]';
+        this.backButton = '[data-test="add-destination-back-btn"]';
+        // Toast/notification appears via OToast — match either o-toast-success or o-toast-message
+        this.successNotification = '[data-test^="o-toast-"]';
+        this.toastSuccess = '[data-test="o-toast-success"]';
+        this.toastMessage = '[data-test="o-toast-message"]';
+        // OInput-derived per-field error nodes (e.g. add-destination-name-input-error). Any of these visible = validation error
+        this.errorMessage = '[data-test$="-input-error"], [data-test$="-error"]';
+        this.addDestinationTitle = '[data-test="add-destination-title"]';
+        this.addDestinationLoadingIndicator = '[data-test="add-destination-loading-indicator"]';
+        this.dialogCloseBtn = '[data-test="o-dialog-close-btn"]';
+        this.checkmarkIcon = '[name="check-circle"]';
+    }
+
+    // ============================================================================
+    // FACTORY HELPERS
+    // ============================================================================
+
+    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/custom) */
+    getDestinationTypeCard(type) {
+        return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
+    }
+
+    /** Locator for the row containing a destination's delete button. */
+    getDeleteDestinationBtn(name) {
+        return this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
+    }
+
+    /** Locator for the row containing a destination's edit button. */
+    getEditDestinationBtn(name) {
+        return this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
+    }
+
+    /**
+     * Row containing a named destination. Resolves via the destination-specific delete-button data-test
+     * and walks up to the OTable row ancestor.
+     */
+    getDestinationRow(name) {
+        return this.page.locator(
+            `xpath=//*[@data-test="alert-destination-list-${name}-delete-destination"]/ancestor::*[starts-with(@data-test,'o2-table-row-')][1]`
+        );
     }
 
     async navigateToDestinations(retryCount = 0) {
@@ -833,7 +878,17 @@ export class AlertDestinationsPage {
         // Wait for card to be visible first
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
         await card.waitFor({ state: 'visible', timeout: 15000 });
-        await card.click();
+        // Card list can re-render between waitFor and click (e.g. when prebuilt-templates
+        // load resolves), so retry on detached races before bailing. Use force-click to
+        // bypass actionability checks once the card has stabilised in the second attempt.
+        try {
+            await card.click({ timeout: 10000 });
+        } catch (e) {
+            testLogger.debug('selectDestinationType first click failed, retrying with force', { type, error: e.message });
+            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await card.waitFor({ state: 'visible', timeout: 10000 });
+            await card.click({ force: true, timeout: 10000 });
+        }
 
         // Wait for either prebuilt form or custom form to appear
         if (type === 'custom') {
@@ -925,7 +980,18 @@ export class AlertDestinationsPage {
      * Click Save button
      */
     async clickSave() {
-        await this.page.locator(this.saveButton).first().click();
+        // OToast can transiently overlay the dialog buttons; wait for any in-flight toast
+        // (especially "Please wait while loading…") to clear before clicking Save so the
+        // click isn't intercepted and we don't accidentally read a stale success toast.
+        await this.page.locator(this.toastMessage).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        const saveBtn = this.page.locator(this.saveButton).first();
+        // Prebuilt forms can scroll the submit button off-screen — scroll it into view first,
+        // then wait for visibility, then force-click to bypass any overlay pointer interception.
+        await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        // force-click bypasses any residual toast overlay still occupying pointer events.
+        await saveBtn.click({ force: true, timeout: 10000 });
         testLogger.debug('Clicked Save button');
     }
 
@@ -2018,39 +2084,18 @@ export class AlertDestinationsPage {
      * @param {string} url - New URL
      */
     async updateCustomUrl(url) {
-        await this.page.waitForTimeout(2000);
-
-        // Try multiple URL input selectors
-        const urlSelectors = [
-            '[data-test="add-destination-url-input"]',
-            'input[data-test*="url"]',
-            'input[placeholder*="URL"]',
-            'input[type="url"]',
-            this.urlInput
-        ];
-
-        let updated = false;
-        for (const selector of urlSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-                if (await input.isVisible().catch(() => false)) {
-                    await input.click();
-                    await this.page.keyboard.press('Control+a');
-                    await this.page.keyboard.press('Meta+a');
-                    await input.fill(url);
-                    await this.page.waitForTimeout(1000);
-                    testLogger.debug('Updated custom destination URL', { url, selector });
-                    updated = true;
-                    return;
-                }
-            } catch (error) {
-                continue;
-            }
-        }
-
-        if (!updated) {
-            throw new Error('Custom URL input not found for update');
-        }
+        // OInput inner native field is the `-field` derivative — use it for fills/clicks.
+        const input = this.page.locator(this.urlInputField).first();
+        // Edit drawer may be scrolled — bring the URL field into view before waiting on visibility
+        await input.scrollIntoViewIfNeeded().catch(() => {});
+        await input.waitFor({ state: 'visible', timeout: 15000 });
+        await input.click();
+        // Cross-platform select-all (Ctrl on Win/Linux, Meta on macOS) before fill
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Meta+a');
+        await input.fill(url);
+        await expect(input).toHaveValue(url, { timeout: 5000 });
+        testLogger.debug('Updated custom destination URL', { url });
     }
 
     /**

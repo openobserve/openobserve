@@ -49,9 +49,22 @@ export class UserPage {
         // ===========================================================
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
         this.userEmailFieldError = page.locator('[data-test="user-email-field-error"]');
+        // OSelect inline error rendered inside the role field wrapper when
+        // AddUser onSubmit detects an empty `formData.role` and sets
+        // `roleError = "Field is required"` (see AddUser.vue).
+        this.userRoleFieldError = page.locator('[data-test="user-role-field-error"]');
         // OInput inline error rendered inside the AddUpdateOrganization drawer
         // when "Save" is clicked with an empty name.
         this.orgNameFieldError = page.locator('[data-test="org-name-error"]');
+        // Save (primary) button inside the Add/Update Organization drawer —
+        // scoped under the dialog wrapper data-test for uniqueness. The
+        // ux-revamp ODrawer disables the primary button while the form is
+        // invalid (see AddUpdateOrganization.vue :primaryButtonDisabled),
+        // so a blank org-name keeps Save in a disabled state instead of
+        // surfacing an inline error from onSubmit.
+        this.addOrgDrawerSaveButton = page.locator(
+            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]'
+        );
 
         // OTable rows — used by searchUser / verifyUserExists poll loops.
         this.tableRows = page.locator('[data-test^="o2-table-row-"]');
@@ -144,24 +157,37 @@ export class UserPage {
     }
 
     async verifyOrgNameRequiredError(expectedMessage) {
-        // Org-name OInput surfaces its validator error via the auto-derived
-        // `${parent}-error` element when the Save button is clicked with an
-        // empty name (see AddUpdateOrganization.vue onSubmit).
-        await expect(this.orgNameFieldError).toBeVisible({ timeout: 15000 });
-        await expect(this.orgNameFieldError).toContainText(expectedMessage);
+        // ux-revamp behavior: the ODrawer primary (Save) button is bound to
+        // `:primaryButtonDisabled="(!organizationData.name || !isValidOrgName) && !proPlanRequired"`
+        // in AddUpdateOrganization.vue, so a blank org-name keeps Save in a
+        // disabled state — the inline `${parent}-error` only renders via
+        // `showNameError = true` after onSubmit, which never fires while
+        // Save is disabled. Assert the disabled state as the validation
+        // signal; if the inline error happens to be visible (touched-state
+        // binding re-applied in a future change) also verify its message.
+        await expect(this.addOrgDrawerSaveButton).toBeDisabled({ timeout: 15000 });
+        const inlineErrorVisible = await this.orgNameFieldError
+            .isVisible({ timeout: 1000 })
+            .catch(() => false);
+        if (inlineErrorVisible) {
+            await expect(this.orgNameFieldError).toContainText(expectedMessage);
+        }
     }
 
     async verifySuccessMessage(expectedMessage) {
-        // The message can surface from one of two places:
+        // The message can surface from one of three places:
         // 1. OToast (`data-test="o-toast-message"`) — global notifications
         //    fired via the toast() helper.
         // 2. OInput inline error (`data-test="<parent>-error"`) — e.g. the
         //    AddUser email validator sets `emailError = "Please enter a valid
         //    email address."` which renders inside the email field wrapper.
-        // Poll across both surfaces until one of them carries the expected
+        // 3. OSelect inline error (`data-test="<parent>-error"`) — e.g. the
+        //    AddUser role validator sets `roleError = "Field is required"`
+        //    which renders inside the role field wrapper.
+        // Poll across all surfaces until one of them carries the expected
         // text; keeps the assertion deterministic without text-based locators.
         await expect.poll(async () => {
-            const sources = [this.toastMessage, this.userEmailFieldError];
+            const sources = [this.toastMessage, this.userEmailFieldError, this.userRoleFieldError];
             for (const src of sources) {
                 const count = await src.count();
                 for (let i = 0; i < count; i++) {

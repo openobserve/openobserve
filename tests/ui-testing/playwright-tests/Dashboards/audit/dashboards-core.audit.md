@@ -2011,3 +2011,126 @@ All 7 multistream tests pass locally (chromium, single worker):
 - §10: zero `page.waitForTimeout` — `expect.poll(...)` + `locator.waitFor({ state: 'attached' })`.
 - No spec edits — all 3 callers (line 47 helper, line 152 multistreamselect, line 266) keep
   the legacy string form; the new contract accepts both shapes for backwards-compatibility.
+
+## 2026-05-23 — logstable.spec.js:374 "blank SQL query with cmd+enter" — §7a re-confirmed (CI failure re-investigation)
+
+### Problem (CI report)
+
+CI failure on `tests/ui-testing/playwright-tests/Logs/logstable.spec.js:374` —
+`should show proper error when running blank SQL query with cmd+enter`. The error banner
+`[data-test="logs-search-error-message"]` never becomes visible within the 30s timeout in
+`expectBlankQueryError`. The same `this.errorMessage` selector / `expectBlankQueryError` PO
+method is shared with `logsqueries.spec.js:169`.
+
+### Root cause (source-code investigation, not a PO bug)
+
+`web/src/composables/useLogs/useSearchBar.ts` `getQueryData()` has the legacy
+`if (queryReq === null) { ... searchObj.data.errorMsg = notificationMsg.value; ... }` branch
+**commented out** (lines 849-854 — historical, not active). The remaining active path in
+`useSearchQuery.ts:130-138` only assigns `errorMsg = notificationMsg.value` when
+`notificationMsg.value` was **already** set BEFORE the null check fires; on a first blank-SQL
+cmd+enter, `notificationMsg.value` is empty, so the function sets it to "Search query is
+empty or invalid." but never propagates that into `searchObj.data.errorMsg`.
+
+Effect on the rendered DOM: `Index.vue` (lines 132-179) gates the error banner on
+`searchObj.data.errorMsg !== ''`; since `errorMsg` stays empty for blank SQL, the
+"Error occurred while retrieving search events." banner never mounts, and the test times
+out waiting for `[data-test="logs-search-error-message"]`.
+
+This is a **product-behavior regression on the UX-revamp branch**: the entire error-handling
+block in `getQueryData` is disabled. The data-test selector itself is correct and present in
+`Index.vue` at lines 162, 227, 257, 275 — verified directly in the source. The PO selector
+`[data-test="logs-search-error-message"]` is reachable from the no-record / apply-search /
+patterns paths, but NOT from the blank-SQL-cmd+enter path on this branch.
+
+### Classification
+
+**§7a — dev-server / branch-state behavior**, identical classification to the prior 2026-05-22
+audit entry (row #11 in the `Logs-Core — logspage.spec.js` table). The selector layer is correct;
+the source code's blank-query error path has been intentionally disabled during the UX-revamp
+refactor. CI may pass once the source-code path is restored, but that's out-of-scope for an
+e2e test agent — fixing source product behavior requires a separate PR with feature-author review.
+
+### Action taken
+
+- **No PO edit.** `tests/ui-testing/pages/logsPages/logsPage.js:4675-4691` `expectBlankQueryError`
+  already uses `this.errorMessage` (= `[data-test="logs-search-error-message"]`) per §2. No
+  selector violation. No POM-strict violation.
+- **No spec edit.** `tests/ui-testing/playwright-tests/Logs/logstable.spec.js:374-403` is
+  policy-compliant — uses PO methods only, no `getBy*`, no `.class`, no `waitForTimeout`.
+- **No source `.vue` edit.** Restoring the `getQueryData` error-handling path is a product
+  decision outside the e2e refactor scope. Should be raised as a separate issue / PR.
+- **Did NOT run the test against the dev server** per §7a step 2.
+
+### Verified at policy level
+
+- §2: `expectBlankQueryError` references `this.errorMessage` (data-test-only).
+- §3: no inline `this.page.locator(...)`; `this.errorMessage` is a constructor-hoisted string.
+- §9a: no JSDoc / inline comments / banners / `testLogger.*` removed (no edits made).
+- §10: zero `waitForTimeout` (no edits made).
+- §7a: classified as branch-state / product-behavior regression. No env-adaptive widening,
+  no inline `test.skip`, no return-false dodging, no source workarounds.
+
+---
+
+### Source regression: saved-view name regex widened to allow `@` (2026-05-23)
+
+**Test:** `tests/ui-testing/playwright-tests/Logs/logspage.spec.js:138` —
+"should verify if special characters allowed in saved views name"
+
+**Spec input:** `"e2e@@@@@"` — expected to be rejected as containing invalid characters.
+
+**Current source behavior:** `web/src/plugins/logs/SearchBar.vue` has widened the
+view-name validator regex to `/^[-A-Za-z0-9 /@_]+$/` which **allows** the `@`
+character. As a result, `"e2e@@@@@"` now passes validation and the test never
+sees the expected rejection.
+
+**Classification:** Real product regression, not a test bug. The test must
+remain unchanged (`e2e@@@@@`) so this surfaces as a CI failure until the regex
+is restored to disallow `@` (or another mechanism rejects this input).
+
+**Files changed in this commit:**
+- Reverted `tests/ui-testing/playwright-tests/Logs/logspage.spec.js:146-155`
+  back to `"e2e@@@@@"` + `"Please provide valid view name"` (the original
+  expected behavior).
+- Kept `web/src/lib/forms/Input/OInput.vue` enhancement
+  (`:data-test-error-text="effectiveError"`) — generic improvement, unrelated
+  to the regex regression.
+- Kept `tests/ui-testing/pages/logsPages/logsPage.js`
+  `waitForNotificationWithText` selector-union extension (purely additive,
+  forward-compatible).
+
+**Action required (out of scope here):** Restore the `@`-rejecting regex in
+`SearchBar.vue` via a separate product PR.
+
+---
+
+## Logs-Builder-Basic + Advanced — logsQueryBuilder-filters-{basic,advanced}.spec.js (timing-hardened)
+
+| # | Title | Root cause | Files changed | Final |
+|---|---|---|---|---|
+| 1 | (14 CI-failing tests across both specs: `not equals (<>)`, `>`, `<=`, `Contains`, `Starts With`, `Ends With`, `IN`, `IS NULL`, `IS NOT NULL`, `str_match`, `multiple AND`, `mixed operators`, `grouped (A OR B) AND C`, `(A AND B) OR (C AND D)`) | `pm.logsPage.getFilterConditionCount()` returned 0 on CI but the actual filter rows DID render — selector `[data-test^="dashboard-add-condition-label-"]` correctly matches `web/src/views/Dashboards/addPanel/AddCondition.vue:19`. The PO's wait was only `filterItems.first().waitFor({ state: 'attached', timeout: 10000 })`. `initializeBuild()` in `BuildQueryPage.vue` is a multi-stage async chain (`parseSQL` → `parsedQueryToPanelFields` → `updateGroupedFields` → `makeAutoSQLQuery` → `runQuery`). On slow CI, parallel-mode workers compete for headless_shell and the first filter row can mount past the 10 s budget — `count()` reads 0 and the test fails. Additionally, for queries with 3-4 filter rows the Vue `v-for` materializes rows sequentially across microtasks, so a single early `count()` could under-read mid-render. Tests pass locally individually; failure only manifests under CI load. | `tests/ui-testing/pages/logsPages/logsPage.js` — `getFilterConditionCount()`: (i) bumped initial attach timeout from 10 s to 30 s, (ii) added an `expect.poll` count-stability loop (intervals 200/200/200/500/500/1000/1000 ms, 5 s cap) that exits once consecutive samples agree and `count > 0`. Selector unchanged (`this.filterConditionLabelItems` = `[data-test^="dashboard-add-condition-label-"]`, hoisted in constructor — §3 strict). JSDoc preserved with expanded explanation of the async init chain; original "Some queries genuinely have zero filters" rationale kept verbatim. `testLogger.info('Filter has X condition(s)')` log preserved. Zero `waitForTimeout` introduced — pure `expect.poll` for state convergence per §10. | PASS — local `-g` re-runs: `not equals` 1 cond (passed), `multiple AND` 3 cond (passed), `(A AND B) OR (C AND D)` 4 cond (passed), `grouped (A OR B) AND C` 3 cond (passed). |
+
+### Verified at policy level
+
+- §2: PO uses `[data-test^="dashboard-add-condition-label-"]` (data-test-only attribute selector). No `getBy*`, no `.class`, no `:has-text`, no XPath element predicates.
+- §3: locator hoisted as `this.filterConditionLabelItems` in constructor at line 255; method body only does `this.page.locator(this.filterConditionLabelItems)`.
+- §9a: JSDoc block (`@returns {Promise<number>}`) preserved; original comment "Some queries genuinely have zero filters" preserved; `testLogger.info` preserved verbatim. No "Update:" / "Note:" annotations added.
+- §10: zero `waitForTimeout` introduced. Replacement uses `expect.poll(...).toBe('stable')` keyed on real count stability — deterministic wait.
+- Source `.vue` untouched — `AddCondition.vue` already exposes the correct data-test pattern; no missing attributes.
+
+---
+
+## Logs-Queries — logsqueries.spec.js: "should add invalid query and display error" (§7a backend-permissiveness flake)
+
+| # | Title | Root cause | Files changed | Final |
+|---|---|---|---|---|
+| 1 | `should add invalid query and display error` (logsqueries.spec.js:169) | The test types bare `kubernetes` into the query editor (non-SQL mode) and expects an inline `[data-test="logs-search-error-message"]` banner to render. With sqlMode off, `handleNonSqlMode` in `web/src/composables/useLogs/useSearchQuery.ts:510` wraps the input as `select * from "e2e_automate" WHERE kubernetes`. The pentest backend's SQL parser is non-deterministic on bare identifier WHERE clauses against streams whose schema contains `kubernetes_*` fields: roughly 80% of runs the parser rejects the query (sets `searchObj.data.errorMsg`, renders the error banner — the test passes), 20% of runs the backend treats `kubernetes` as full-text-style match against the indexed kubernetes log data (115k matches in `tests/test-data/logs_data.json`), returns hits via `_search_stream` 200 OK, and the page renders `data-test="logs-search-search-result"` (rows table) instead of `logs-search-error-message`. Verified by capturing visible-`data-test` lists across 10 repeats: 8/10 had `logs-search-error-message`, 2/10 had `logs-search-search-result` with `logs-search-result-detail-*` rows. PO + spec are correct: selector `[data-test="logs-search-error-message"]` still exists in `web/src/plugins/logs/Index.vue:162,227,257,275`, `expectErrorMessageVisible()` uses a 30 s explicit timeout, `runQueryAndWaitForResults()` waits on the Run-button state machine. The flake is backend behaviour on a search term the test data happens to be saturated with, not a UI / selector / timing bug. | No test/PO/source edits. Reverting to the original `waitForTimeout(2000)` between `typeInQueryEditor("kubernetes")` and `clickSearchBarRefreshButton()` (per the pre-refactor spec) would not change the outcome — the flake is in the backend response, not the click sequencing. The proper fix is to change the test query to one that is guaranteed-invalid regardless of stream schema (e.g. `SELECT FROMBADKEYWORD` in sqlMode, or `invalid_field_xyz_$$$ =` in non-SQL mode), but that is a test-design change outside the §7a / refactor scope. | Verified at policy level — selectors, POM, comments, telemetry, and §10 deterministic-waits all compliant. Flake classified as §7a (real backend behaviour quirk on pentest env). |
+
+### Verified at policy level
+
+- §2: `this.errorMessage = '[data-test="logs-search-error-message"]'` in `tests/ui-testing/pages/logsPages/logsPage.js:114` — pure data-test attribute selector, no `getBy*`, no `.class`.
+- §3: locator hoisted in constructor; `expectErrorMessageVisible()` references the class member.
+- §7a: classified as pentest backend permissiveness on bare-identifier WHERE clauses against schema-rich streams. No dev-server / time-range / API-bypass workarounds added.
+- §9a: no comments / `testLogger.*` calls removed or modified.
+- §10: no `waitForTimeout` introduced. Existing `expect(...).toBeVisible({ timeout: 30000 })` retries deterministically on element visibility — the 30 s budget cannot fix a backend that returns 200-OK-with-results.

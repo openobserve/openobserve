@@ -473,6 +473,12 @@ export class SanityPage {
             testLogger.info('createFunctionViaFunctionsPage: POST not detected');
         }
 
+        // Wait for the success toast — fired by AddFunction.onSubmit's .then() right
+        // alongside emit("update:list"), which the parent FunctionList listens to in
+        // order to flip showAddJSTransformDialog=false and re-render the list view.
+        // The toast is the most deterministic signal that the save chain completed.
+        await expect(this.toastSuccess.first()).toBeVisible({ timeout: 15000 });
+
         // Wait for the search input on the function list to be back in view, indicating
         // we navigated back from the AddFunction form to the list.
         await this.functionListSearchInputField.waitFor({ state: 'visible', timeout: 30000 });

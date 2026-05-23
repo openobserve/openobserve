@@ -1438,6 +1438,7 @@ const fieldWidthClass = computed(() => {
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
+      :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
       class="tw:text-xs tw:text-select-error-text tw:leading-none"
       role="alert"
     >

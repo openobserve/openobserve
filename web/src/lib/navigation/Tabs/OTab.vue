@@ -8,6 +8,11 @@ import OIcon from '@/lib/core/Icon/OIcon.vue'
 import { iconRegistry } from '@/lib/core/Icon/OIcon.icons'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 
+// Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
+// on the inner clickable TabsTrigger (Reka button) instead of the wrapper
+// <span class="tw:contents">. e2e tests can then locate and click the tab.
+defineOptions({ inheritAttrs: false })
+
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
 })
@@ -91,6 +96,7 @@ const heightClasses = computed<string>(() => {
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses]"
+      v-bind="$attrs"
     >
       <!--
         If label or icon props are provided, render them (prop-driven mode).
