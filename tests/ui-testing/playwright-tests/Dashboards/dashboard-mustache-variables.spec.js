@@ -454,8 +454,8 @@ test.describe(
         // Wait for the panel to render (network idle indicates query completed)
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Verify no error toast or error state — check for any [role="alert"] element count
-        const errorToast = page.locator('[role="alert"]');
+        // Verify no error toast appeared — check for OToast error elements
+        const errorToast = page.locator('[data-test="o-toast-error"]');
         const errorCount = await errorToast.count();
 
         // We expect no errors since the mustache variable should be substituted
@@ -892,8 +892,8 @@ test.describe(
         // Wait for the panel to render (network idle indicates query completed)
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Verify no error toast or error state — check for any [role="alert"] element count
-        const errorToast = page.locator('[role="alert"]');
+        // Verify no error toast appeared — check for OToast error elements
+        const errorToast = page.locator('[data-test="o-toast-error"]');
         const errorCount = await errorToast.count();
 
         // We expect no errors since the spaced mustache variable should be normalized and substituted

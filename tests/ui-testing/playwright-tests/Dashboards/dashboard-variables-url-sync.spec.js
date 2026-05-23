@@ -610,7 +610,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(`[data-test="variable-selector-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Set values
-    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}"]`);
+    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}-inner-trigger"]`);
     await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await globalDropdown.click();
@@ -621,7 +621,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}"]`);
+    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}-inner-trigger"]`);
     await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await tabDropdown.click();
