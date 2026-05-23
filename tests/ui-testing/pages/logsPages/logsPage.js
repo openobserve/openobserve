@@ -28,10 +28,11 @@ export class LogsPage {
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
         // FieldListPagination schema-toggle buttons (data-test set per-slot in FieldListPagination.vue).
-        // Two render paths: with user-defined-schema toggle (`logs-user-defined-fields-btn-<slot>`)
-        // or plain interesting-fields toggle (`logs-all-fields-btn` / `logs-interesting-fields-btn`).
-        this.allFieldsToggleBtn = '[data-test="logs-all-fields-btn"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
-        this.interestingFieldsToggleBtn = '[data-test="logs-interesting-fields-btn"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
+        // The common FieldListPagination renders with `${dataTestPrefix}-all-fields-btn` etc.
+        // For the logs sidebar prefix is `logs-page`. Legacy non-prefixed variants kept as fallback
+        // for any consumer that still ships the old data-test names.
+        this.allFieldsToggleBtn = '[data-test="logs-page-all-fields-btn"], [data-test="logs-all-fields-btn"], [data-test="logs-page-user-defined-fields-btn-all_fields_slot"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
+        this.interestingFieldsToggleBtn = '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
         this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
@@ -40,6 +41,11 @@ export class LogsPage {
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
+        // OSelect post-migration: the wrapper is a div (cannot be `.fill()`'d) — use the
+        // explicit `-trigger` / `-popover` / `-search` parts when narrowing the list (§4).
+        this.indexDropDownTrigger = '[data-test="log-search-index-list-select-stream-trigger"]';
+        this.indexDropDownPopover = '[data-test="log-search-index-list-select-stream-popover"]';
+        this.indexDropDownSearch = '[data-test="log-search-index-list-select-stream-search"]';
         this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
@@ -239,8 +245,12 @@ export class LogsPage {
         this.addToFilter = '[data-test="dashboard-add-filter-data"]';
         // PanelFieldList uses OFieldList which renders an OInput with data-test="o-field-list-search".
         // OInput convention: wrapper carries data-test, inner native <input> carries `-field` suffix.
-        this.fieldListSearchInput = '[data-test="o-field-list-search-field"]';
-        this.fieldListSearchInputWrapper = '[data-test="o-field-list-search"]';
+        // Scoped under [data-test="logs-build-query-page"] because the logs sidebar's IndexList
+        // also renders an OFieldList with the same data-test, and in build mode that sidebar is
+        // v-show:false (display:none) but its DOM persists — first() would otherwise resolve to
+        // the hidden one and fail Playwright's visibility actionability check.
+        this.fieldListSearchInput = '[data-test="logs-build-query-page"] [data-test="o-field-list-search-field"]';
+        this.fieldListSearchInputWrapper = '[data-test="logs-build-query-page"] [data-test="o-field-list-search"]';
         // Builder filter conditions — each rendered with data-test="dashboard-add-condition-label-{index}-{label}"
         this.filterConditionLabelItems = '[data-test^="dashboard-add-condition-label-"]';
 
@@ -332,7 +342,13 @@ export class LogsPage {
         // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
         this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
-        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn-button"]';
+        // OSwitch's inner switch button does NOT receive a derived `-button` data-test in the
+        // current OSwitch.vue implementation (button is plain `role="switch"` with data-state).
+        // Drill into the wrapper and target the inner [data-state] attribute directly.
+        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
+        // Pre-scoped checked/unchecked state filters — mirror histogramToggleCheckedBtn pattern.
+        this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
+        this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -1987,7 +2003,10 @@ export class LogsPage {
     async addRemoveInteresting() {
         // Click the field button once to toggle it off (remove from query)
         // Note: clickInterestingFields() was already called before this, which added the field
-        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
+        // The OField row's tooltip/info-icon overlay (`o-field-row__actions`) intercepts a
+        // normal click, so force the click past it. AGENT_RULES §4 covers OToast/OInput
+        // conventions; the underlying field-btn is the legitimate target here.
+        await this.page.locator(this.interestingFieldBtn('kubernetes_pod_name')).first().click({ force: true });
     }
 
     // Kubernetes methods
@@ -3193,7 +3212,19 @@ export class LogsPage {
     }
 
     async waitForNotificationWithText(text, timeout = 3000) {
-        await this.page.locator(this.notificationMessage).filter({ hasText: text }).first().waitFor({ state: 'visible', timeout });
+        // OToast convention §4 — match by the data-test-message attribute (escaped) across
+        // all variant hosts. AGENT_RULES §2 bans `[role="alert"]` and `filter({ hasText })`.
+        // CSS attribute selectors are limited to data-test* attributes.
+        const escaped = String(text).replace(/"/g, '\\"');
+        const selector = [
+            `[data-test="o-toast-success"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-error"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-info"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-warning"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-loading"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-default"][data-test-message*="${escaped}"]`,
+        ].join(', ');
+        await this.page.locator(selector).first().waitFor({ state: 'visible', timeout });
     }
 
     async expectIndexFieldSearchInputVisible() {
@@ -3530,6 +3561,34 @@ export class LogsPage {
             await this.page.locator(this.vrlEditor).first().click({ force: true }).catch(() => {});
             await this.page.keyboard.type('.a=2');
         }
+        // Wait for Monaco's model + the 500ms CodeQueryEditor debounce so
+        // searchObj.data.tempFunctionContent is populated before subsequent
+        // dialog opens / save calls run (otherwise fnSavedFunctionDialog
+        // emits the "No function definition found." toast and the dialog
+        // never opens).
+        await this.page.waitForFunction(
+            (selector) => {
+                if (!window.monaco?.editor?.getEditors) return false;
+                const hosts = document.querySelectorAll(selector);
+                if (!hosts.length) return false;
+                const ed = window.monaco.editor.getEditors().find((e) => {
+                    const n = e.getDomNode?.();
+                    return n && Array.from(hosts).some((h) => h.contains(n));
+                });
+                if (!ed) return false;
+                const val = ed.getValue?.() ?? '';
+                if (!val.includes('.a=2')) return false;
+                const w = window;
+                if (w.__lastVrlEditorValue !== val) {
+                    w.__vrlEditorStableSince = Date.now();
+                    w.__lastVrlEditorValue = val;
+                    return false;
+                }
+                return Date.now() - (w.__vrlEditorStableSince ?? 0) > 700;
+            },
+            this.vrlEditor,
+            { timeout: 10000 },
+        ).catch(() => {});
     }
 
     async waitForTimeout(milliseconds) {
@@ -3543,7 +3602,11 @@ export class LogsPage {
     }
 
     async clickCloseDialogForce() {
-        return await this.page.locator(this.closeDialog).click({ force: true });
+        // The log-detail drawer's close button may sit outside the current viewport when the
+        // drawer is taller than the visible area. Scroll it into view before clicking.
+        const closeBtn = this.page.locator(this.closeDialog);
+        await closeBtn.scrollIntoViewIfNeeded().catch(() => {});
+        return await closeBtn.click({ force: true });
     }
 
     async clickLiveModeButton() {
@@ -3968,7 +4031,13 @@ export class LogsPage {
     }
 
     async expectFunctionNameNotValid() {
-        return await this.page.getByText('Function name is not valid.').click();
+        // OInput convention §4: the error span is `<parent>-error`. SearchBar.vue sets
+        // savedFunctionNameError to "This field is required" (empty/blank input) or
+        // "Input must be alphanumeric" (invalid characters). Toast variant for legacy
+        // i18n key `functionNameInvalid` is unused. Wait on the OInput's error span.
+        const errorSpan = this.page.locator('[data-test="saved-function-name-input-error"]');
+        await errorSpan.waitFor({ state: 'visible', timeout: 10000 });
+        return errorSpan;
     }
 
     async expectWarningNoFunctionDefinition() {
@@ -4387,15 +4456,11 @@ export class LogsPage {
         //    "logs-user-defined-fields-btn-all_fields_slot".
         //  - When only Quick Mode is on: data-test="logs-all-fields-btn" directly on
         //    the "all_fields" OToggleGroupItem.
-        // Try the dedicated all-fields button first, then the user-defined "all_fields_slot".
-        const allFieldsBtn = this.page.locator('[data-test="logs-all-fields-btn"]').first();
-        const userDefAllFieldsBtn = this.page
-            .locator('[data-test="logs-user-defined-fields-btn-all_fields_slot"]')
-            .first();
-        if (await allFieldsBtn.isVisible().catch(() => false)) {
-            await allFieldsBtn.click();
-        } else if (await userDefAllFieldsBtn.isVisible().catch(() => false)) {
-            await userDefAllFieldsBtn.click();
+        // Use the canonical class member which already covers the prefixed
+        // (`logs-page-…`) and legacy variants in a single locator.
+        const btn = this.page.locator(this.allFieldsToggleBtn).first();
+        if (await btn.isVisible().catch(() => false)) {
+            await btn.click();
         } else {
             // Neither toggle exposes "all_fields" — the field list is already in the
             // default state; nothing to click.
@@ -4510,6 +4575,24 @@ export class LogsPage {
 
     async expectTimestampFieldVisible() {
         // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
+        // Clear any active field-search filter and switch back to All Fields view —
+        // semantic intent is "the _timestamp field still exists in the stream", which
+        // can be hidden by a stale search filter or by interesting-fields-only mode
+        // left over from the calling test. clickClearButton (reset-fields-icon) only
+        // resets `selectedFields`, not `filterField`, so we clear it explicitly here.
+        const searchInput = this.page.locator(this.logSearchIndexListFieldSearchInput);
+        if (await searchInput.isVisible().catch(() => false)) {
+            const currentValue = await searchInput.inputValue().catch(() => '');
+            if (currentValue) {
+                await searchInput.fill('');
+            }
+        }
+        // If the field list is currently in interesting-fields-only mode (no schema
+        // toggle group surfaced), switch back to All Fields so _timestamp surfaces.
+        const allFieldsBtn = this.page.locator(this.allFieldsToggleBtn).first();
+        if (await allFieldsBtn.isVisible().catch(() => false)) {
+            await allFieldsBtn.click({ force: true }).catch(() => {});
+        }
         const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
         await field.waitFor({ state: 'visible', timeout: 10000 });
         return await expect(field).toBeVisible();
@@ -4593,8 +4676,11 @@ export class LogsPage {
         // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
         // Allow a longer timeout for the error banner — the backend issues a delayed
         // error response for blank queries.
-        const errorMessage = this.page.getByText("Error occurred while retrieving search events");
+        // AGENT_RULES §2: target the data-test directly (Index.vue uses
+        // data-test="logs-search-error-message" on the error banner).
+        const errorMessage = this.page.locator(this.errorMessage).first();
         await expect(errorMessage).toBeVisible({ timeout: 30000 });
+        await expect(errorMessage).toContainText('Error occurred while retrieving search events', { timeout: 5000 });
 
         // Verify there's a clickable error details button
         const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
@@ -4975,15 +5061,40 @@ export class LogsPage {
     }
 
     async fillStreamFilter(streamName) {
-        return await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+        // OSelect wrapper is a div and cannot be `.fill()`'d. Open the popover via
+        // its explicit `-trigger` (falling back to the wrapper if absent) and type
+        // into the popover's `-search` filter input (§4 OSelect contract).
+        const trigger = this.page.locator(this.indexDropDownTrigger);
+        const wrapper = this.page.locator(this.indexDropDown);
+        const popover = this.page.locator(this.indexDropDownPopover);
+        const search = this.page.locator(this.indexDropDownSearch);
+        if (await trigger.count() > 0) {
+            await trigger.first().click();
+        } else {
+            await wrapper.click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await search.waitFor({ state: 'visible', timeout: 5000 });
+        await search.press('ControlOrMeta+a').catch(() => {});
+        await search.press('Backspace').catch(() => {});
+        return await search.fill(streamName);
     }
 
     async toggleStreamSelection(streamName) {
-        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"]`).click();
+        // Post-OSelect-migration: the legacy q-select toggle data-test
+        // `log-search-index-list-stream-toggle-<name>` is no longer emitted.
+        // Pick the OSelect option whose `data-test-value` matches streamName.
+        // Caller must ensure the popover is open (e.g. via fillStreamFilter).
+        return await this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        ).first().click();
     }
 
     async toggleQueryModeEditor() {
-        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+        // Post-OSwitch-migration: the toggle is a `<button data-state>` inside
+        // the wrapper data-test. Click the inner [data-state] button (see
+        // sqlModeToggleStateBtn for the canonical pattern).
+        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] [data-state]').first().click();
         // Wait for the VRL function editor container to appear (Firefox needs this)
         await this.page.waitForTimeout(2000);
         await this.page.locator('[data-test="logs-vrl-function-editor"]').first().waitFor({ state: 'visible', timeout: 15000 });
@@ -5978,7 +6089,10 @@ export class LogsPage {
      */
     async waitForSQLModeActive() {
         // Deterministic signal: OSwitch's inner button has data-state="checked" once v-model flips to true.
-        await expect(this.page.locator(this.sqlModeToggleInnerBtn)).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+        // Wait on the visible checked state directly — avoids strict-mode collisions with any
+        // OTooltip grace-area spans that may also carry data-state attributes inside the wrapper.
+        await this.page.locator(this.sqlModeToggleCheckedBtn).first()
+            .waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('SQL mode switch stabilized');
     }
 

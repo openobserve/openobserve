@@ -411,21 +411,19 @@ export class SanityPage {
             const editors = window.monaco.editor.getEditors();
             return editors.some(ed => vrlContainer.contains(ed.getDomNode()));
         }, { timeout: 15000 });
-        // Drive the VRL editor via window.monaco's executeEdits API — this guarantees
-        // an onDidChangeModelContent firing path that mirrors a real user typing each
-        // character. Setting via setValue alone doesn't reliably trigger the parent's
-        // debounced @update:query handler on this dev build.
-        await this.page.evaluate(() => {
+        // Drive the VRL editor via real keyboard input — this dispatches the same
+        // DOM input events the user generates, which Monaco's input handler routes
+        // through onDidChangeModelContent → debounced emit("update:query") in the
+        // parent UnifiedQueryEditor. executeEdits writes the model directly and
+        // can race the debounced emit, leaving formData.function empty at save.
+        await this.fnEditor.first().click({ force: true });
+        await this.page.waitForFunction(() => {
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             const editors = window.monaco.editor.getEditors();
-            const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
-            if (!targetEditor) return;
-            targetEditor.focus();
-            const range = targetEditor.getModel().getFullModelRange();
-            targetEditor.executeEdits('test-helper', [
-                { range, text: '.sanity=1', forceMoveMarkers: true },
-            ]);
-        });
+            const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode()));
+            return targetEditor && targetEditor.hasTextFocus && targetEditor.hasTextFocus();
+        }, { timeout: 5000 }).catch(() => {});
+        await this.page.keyboard.type('.sanity=1');
         // Wait for the editor model to actually contain the typed text.
         await this.page.waitForFunction(() => {
             const editors = window.monaco.editor.getEditors();
@@ -437,7 +435,7 @@ export class SanityPage {
         // queues per-char events; the debounced emit fires 500ms after the LAST char.
         // To make this deterministic, poll the time-since-last-mutation against the
         // debounce window: wait until the editor value has been stable for >600ms.
-        await this.page.waitForFunction(async () => {
+        await this.page.waitForFunction(() => {
             const editors = window.monaco.editor.getEditors();
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];

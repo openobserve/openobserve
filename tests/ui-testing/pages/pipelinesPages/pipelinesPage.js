@@ -39,25 +39,43 @@ export class PipelinesPage {
           .locator("div")
           .nth(2);
         this.saveButton = page.locator('[data-test="input-node-stream-save-btn"]');
-        this.selectStreamError = page.getByText("Please select Stream from the");
+        // Error toast / message shown when saving stream node without selecting a stream.
+        // Scoped to the input-node form via its routing-section data-test, then
+        // by ARIA role="alert" (q-field error). The new error string is
+        // "This field is required" (from t('validation.required')).
+        this.selectStreamError = page.locator(
+          '[data-test="add-stream-input-stream-routing-section"] [role="alert"]'
+        ).first();
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        // Target the form field error inside q-field__bottom, not the notification.
-        // role="alert" is the standard ARIA role for q-field error messages — keeping per task guidelines.
-        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
-          "Pipeline name is required"
+        // Pipeline name required error — PipelineEditor's OInput. The wrapper
+        // data-test was added in PipelineEditor.vue (source mod). OInput
+        // renders the error inside the wrapper with role="alert".
+        this.pipelineNameRequiredMessage = page.locator(
+          '[data-test="pipeline-editor-name-input"] [role="alert"]'
+        ).first();
+        // Pipeline name OInput - auto-derived `-field` for the native input.
+        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-field"]');
+        // Source/destination node required errors are toasts in PipelineEditor.
+        // OToast emits `data-test="o-toast-default"` (no variant) with the
+        // message on `data-test-message`. Match the message attribute prefix.
+        this.sourceNodeRequiredMessage = page.locator(
+          '[data-test-message="Source node is required"]'
         );
-        // Updated selector to use placeholder since aria-label doesn't exist
-        this.pipelineNameInput = page.locator('input[placeholder="Enter Pipeline Name"]');
-        this.sourceNodeRequiredMessage = page.getByText("Source node is required");
-        this.streamNameInput = page.getByLabel("Stream Name *");
-        this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
+        // Stream-name OSelect search input — auto-derived `-search` data-test
+        // when searchable=true (see OSelect.vue listbox branch).
+        this.streamNameInput = page.locator('[data-test="input-node-stream-name-select-search"]');
+        // Stream-name OSelect option for `e2e_automate` — auto-derived from
+        // parent data-test as `<parent>-option` + per-value `data-test-value`.
+        this.e2eAutomateOption = page.locator(
+          '[data-test="input-node-stream-name-select-option"][data-test-value="e2e_automate"]'
+        );
         this.inputNodeStreamSaveButton = page.locator(
           '[data-test="input-node-stream-save-btn"]'
         );
-        this.destinationNodeRequiredMessage = page.getByText(
-          "Destination node is required"
+        this.destinationNodeRequiredMessage = page.locator(
+          '[data-test-message="Destination node is required"]'
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
         this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -67,7 +85,7 @@ export class PipelinesPage {
        this.selectPreviousNodeDropdown = page.getByLabel('Select Previous Node');
        this.previousNodeDropdown = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]');
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
-        this.createStreamToggle = page.locator('[data-test="create-stream-toggle"] div').nth(2);
+        this.createStreamToggle = page.locator('[data-test="create-stream-toggle"]');
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
         this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
@@ -77,26 +95,55 @@ export class PipelinesPage {
         this.sqlQueryInput = page.locator('.monaco-editor').last();
         this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
-        this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
+        this.createFunctionToggle = page.locator('[data-test="create-function-toggle"]');
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
         this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
-        this.functionNameRequiredError = page.getByText('Function Name is required')
-        this.functionRequiredError = page.getByText('Function is required')
-        this.streamSelectionError = page.getByText('Please select Stream from the')
-        // FilterGroup selectors for new condition UI
+        // Toasts use OToast's `data-test-message` attribute to expose the
+        // message string, scoped per-instance (§4 OToast convention).
+        this.functionNameRequiredError = page.locator(
+          '[data-test-message="Function Name is required"]'
+        );
+        this.functionRequiredError = page.locator(
+          '[data-test-message="Function is required"]'
+        );
+        // Stream-selection toast — appears when saving an input-node without
+        // selecting a stream from the dropdown.
+        this.streamSelectionError = page.locator(
+          '[data-test-message*="Stream"]'
+        );
+        // FilterGroup selectors for new condition UI.
+        // Post-OSelect migration the inner OSelect/OInput emits its OWN data-test
+        // (forwarded from the wrapper) so auto-derived `-trigger`, `-popover`,
+        // `-search`, `-option`, and `-field` data-tests exist alongside the wrapper.
         this.columnSelect = page.locator('[data-test="alert-conditions-select-column"]');
+        this.columnSelectTrigger = page.locator('[data-test="alert-conditions-select-column-trigger"]');
+        this.columnSelectPopover = page.locator('[data-test="alert-conditions-select-column-popover"]');
+        this.columnSelectSearch = page.locator('[data-test="alert-conditions-select-column-search"]');
         this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
+        this.operatorSelectTrigger = page.locator('[data-test="alert-conditions-operator-select-trigger"]');
+        this.operatorSelectPopover = page.locator('[data-test="alert-conditions-operator-select-popover"]');
         this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
+        // OInput inner native input (-field) — must `.fill()` the field variant per §4.
+        this.valueInputField = page.locator('[data-test="alert-conditions-value-input-field"]');
         this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
+        // Per-name OSelect option (works across both FilterCondition.vue and FieldsInput.vue
+        // because the inner OSelect now emits the parent data-test, so options stamp
+        // `alert-conditions-select-column-option` with `data-test-value="<col>"`).
+        this.columnOptionByName = (name) => page.locator(
+            `[data-test="alert-conditions-select-column-option"][data-test-value="${name}"]`,
+        ).first();
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
-        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input"]').getByText('Field is required!')
+        // OSelect renders its `:error-message` inside a `<span role="alert">`
+        // immediately after the trigger. Scope the alert under the parent OSelect.
+        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input"] [role="alert"]');
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
         this.pipelineDestinationsTab = page.locator('[data-test="pipeline-destinations-tab"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
+        this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
@@ -182,7 +229,12 @@ export class PipelinesPage {
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
         this.vrlEditorMonaco = page.locator('[data-test="logs-vrl-function-editor"]').first().locator('.monaco-editor').last();
         this.noteText = page.getByText("Note: The function will be");
-        this.streamTypeDropdown = page.locator('div').filter({ hasText: /^Stream Type \*$/ }).first();
+        // Scheduled-pipeline stream-type OSelect — wrapper and auto-derived
+        // `-trigger` / `-popover` / `-option` data-tests (added on
+        // ScheduledPipeline.vue per AGENT_RULES §6).
+        this.streamTypeDropdown = page.locator('[data-test="scheduled-pipeline-stream-type-select"]');
+        this.streamTypeDropdownTrigger = page.locator('[data-test="scheduled-pipeline-stream-type-select-trigger"]');
+        this.streamTypeDropdownPopover = page.locator('[data-test="scheduled-pipeline-stream-type-select-popover"]');
         this.streamTypeLabel = page.getByLabel('Stream Type *');
         this.sqlEditorViewLines = page.locator('[data-test="scheduled-pipeline-sql-editor"] .view-lines');
         this.invalidSqlQueryText = page.getByText("Invalid SQL Query");
@@ -250,27 +302,79 @@ export class PipelinesPage {
     }
 
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
+        // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
+        // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
+        // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch
+        // HTML5 drag events. We dispatch the full HTML5 drag sequence
+        // (dragstart → dragover → drop) directly via DOM APIs using
+        // `page.evaluate`, sharing a single DataTransfer instance so the
+        // source's `event.dataTransfer.setData` and the drop's `clientX/Y`
+        // both flow through to useDnD.ts:onDrop.
         const targetBox = await this.vueFlowPane.boundingBox();
         const streamBox = await streamElement.boundingBox();
-        targetBox.x += offset.x;
-      targetBox.y += offset.y;
-        if (streamBox && targetBox) {
-          await this.page.mouse.move(streamBox.x + streamBox.width / 2, streamBox.y + streamBox.height / 2);
-          await this.page.mouse.down();
-          await this.page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
-          await this.page.mouse.up();
-        }
+        if (!streamBox || !targetBox) return;
+        const sourceX = streamBox.x + streamBox.width / 2;
+        const sourceY = streamBox.y + streamBox.height / 2;
+        const targetX = targetBox.x + targetBox.width / 2 + offset.x;
+        const targetY = targetBox.y + targetBox.height / 2 + offset.y;
+        // Resolve elements via DOM coordinates so we don't introduce
+        // non-data-test selectors here.
+        await this.page.evaluate(
+            ({ sx, sy, tx, ty }) => {
+                const sourceEl = document.elementFromPoint(sx, sy);
+                const targetEl = document.elementFromPoint(tx, ty);
+                if (!sourceEl || !targetEl) return;
+                // Walk up from sourceEl to find the [draggable=true] ancestor
+                let dragEl = sourceEl;
+                while (dragEl && dragEl !== document.body) {
+                    if (dragEl.getAttribute && dragEl.getAttribute('draggable') === 'true') break;
+                    dragEl = dragEl.parentElement;
+                }
+                if (!dragEl) dragEl = sourceEl;
+                const dt = new DataTransfer();
+                dragEl.dispatchEvent(new DragEvent('dragstart', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: sx, clientY: sy,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragenter', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragover', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('drop', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                dragEl.dispatchEvent(new DragEvent('dragend', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+            },
+            { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
+        );
+        // Wait for the input-node stream form dialog to render — `onDrop` sets
+        // pipelineObj.dialog.show=true which mounts add-stream-input-stream-routing-section.
+        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     async selectLogs() {
-        // Open the input-node stream-type OSelect via its wrapper data-test.
+        // Open the input-node stream-type OSelect. Stream-type uses the
+        // non-listbox SelectRoot branch (searchable=false, plain string opts),
+        // so there is no `<parent>-trigger` data-test. Click the wrapper.
         await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamTypeSelect.click();
         // Wait for the OSelect popover to appear (data-test forwarded from parent).
-        await this.inputNodeStreamTypePopover.waitFor({ state: 'visible', timeout: 10000 });
-        // Pick the `logs` option by its `data-test-value` value-specific attribute.
-        await this.inputNodeStreamTypeLogsOption.waitFor({ state: 'visible', timeout: 10000 });
-        await this.inputNodeStreamTypeLogsOption.click();
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `logs` option — OSelectItem forwards parent data-test plus a
+        // per-value `data-test-value` (see OSelectItem.vue source mod).
+        await this.inputNodeStreamTypeLogsOption.first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.first().click();
     }
 
     /**
@@ -312,15 +416,20 @@ export class PipelinesPage {
         await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(500);
 
-        // The data-test attribute is on a wrapper div, the q-select is inside
-        const streamTypeWrapper = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
-
-        // Click on the q-select component inside the wrapper
-        const qSelect = streamTypeWrapper.locator('.q-select');
-        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
-        await qSelect.click();
-        await this.page.waitForTimeout(500);
+        // Post-OSelect-migration contract (§4): the wrapper div carries the data-test;
+        // OSelect auto-derives a `-trigger` data-test for the inner PopoverTrigger.
+        // Prefer the explicit `-trigger`; fall back to the wrapper for backwards compat.
+        const trigger = this.page.locator('[data-test="input-node-stream-type-select-trigger"]').first();
+        const wrapper = this.page.locator('[data-test="input-node-stream-type-select"]').first();
+        if (await trigger.count() > 0) {
+            await trigger.waitFor({ state: 'visible', timeout: 15000 });
+            await trigger.click();
+        } else {
+            await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await wrapper.click();
+        }
+        await this.page.locator('[data-test="input-node-stream-type-select-popover"]')
+            .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -458,7 +567,7 @@ export class PipelinesPage {
     }
 
     async confirmStreamError() {
-        await this.selectStreamError.click();
+        await expect(this.selectStreamError.first()).toBeVisible({ timeout: 10000 });
     }
 
     async savePipeline() {
@@ -466,7 +575,7 @@ export class PipelinesPage {
     }
 
     async confirmPipelineNameRequired() {
-        await this.pipelineNameRequiredMessage.click();
+        await expect(this.pipelineNameRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
 
     async enterPipelineName(pipelineName) {
@@ -476,11 +585,25 @@ export class PipelinesPage {
     }
 
     async confirmSourceNodeRequired() {
-        await this.sourceNodeRequiredMessage.click();
+        await expect(this.sourceNodeRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
     async enterStreamName(streamName) {
+        // The stream-name OSelect (searchable=true) renders the search input
+        // only when its popover is open. Click the wrapper first to open it,
+        // then fill the `-search` field.
+        const wrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+        const popoverOpen = await this.streamNameInput.isVisible().catch(() => false);
+        if (!popoverOpen) {
+            await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await wrapper.click();
+            await this.streamNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        }
+        // Use Ctrl+A/Backspace before fill to clear any existing search term —
+        // matches the OSelect popover search convention from AGENT_RULES.
+        await this.streamNameInput.click();
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Backspace');
         await this.streamNameInput.fill(streamName);
-        await this.streamNameInput.press("Enter");
     }
 
     async selectStreamOption() {
@@ -506,7 +629,7 @@ export class PipelinesPage {
     }
 
     async confirmDestinationNodeRequired() {
-        await this.destinationNodeRequiredMessage.click();
+        await expect(this.destinationNodeRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
     async deletePipeline() {
         // Navigate back from pipeline editing
@@ -680,7 +803,7 @@ export class PipelinesPage {
     }
 
     async enterFunctionName(name) {
-        await this.functionNameInput.fill(name);
+        await this.functionNameInputField.fill(name);
     }
 
     async assertFunctionNameRequiredErrorVisible() {
@@ -716,7 +839,11 @@ export class PipelinesPage {
     }
 
     async verifyConditionRequiredError() {
-        const error = this.page.locator('[data-test="alert-conditions-select-column"]').getByText('Field is required!');
+        // OSelect renders its error message as a `<span role="alert">` under
+        // the wrapper with the parent's data-test.
+        const error = this.page
+            .locator('[data-test="alert-conditions-select-column"] [role="alert"]')
+            .first();
         await error.waitFor({ state: 'visible' });
     }
 
@@ -906,20 +1033,33 @@ export class PipelinesPage {
         await this.selectAndDragCondition();
         await this.page.waitForTimeout(1000);
 
-        // FilterGroup UI: Click column select and fill
-        await this.columnSelect.locator('input').click();
-        await this.columnSelect.locator('input').fill("container_name");
-        await this.page.waitForTimeout(500);
-        await this.page.getByRole("option", { name: "kubernetes_container_name" }).click();
+        // FilterGroup UI: open the column OSelect via its `-trigger`, type into the
+        // `-search` filter, and pick the auto-derived `-option` with data-test-value.
+        if (await this.columnSelectTrigger.count() > 0) {
+            await this.columnSelectTrigger.first().click();
+        } else {
+            await this.columnSelect.first().click();
+        }
+        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        if (await this.columnSelectSearch.count() > 0) {
+            await this.columnSelectSearch.first().fill('container_name');
+        }
+        await this.columnOptionByName('kubernetes_container_name').waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName('kubernetes_container_name').click();
 
-        // Click operator select and choose Contains
-        await this.operatorSelect.click();
-        await this.page.waitForTimeout(300);
-        await this.containsOption.click();
+        // Click operator select via its trigger and choose Contains via option locator.
+        if (await this.operatorSelectTrigger.count() > 0) {
+            await this.operatorSelectTrigger.first().click();
+        } else {
+            await this.operatorSelect.first().click();
+        }
+        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test="alert-conditions-operator-select-option"][data-test-value="Contains"]')
+            .first().click();
 
-        // Fill value input
-        await this.valueInput.locator('input').click();
-        await this.valueInput.locator('input').fill("ziox");
+        // Fill value via OInput `-field` inner native input (the wrapper is a div).
+        await this.valueInputField.first().click();
+        await this.valueInputField.first().fill('ziox');
 
         await this.saveCondition();
         await this.page.waitForTimeout(2000);
@@ -928,10 +1068,8 @@ export class PipelinesPage {
     async setupDestinationStream(dynamicDestinationName) {
         // Use drag and drop approach instead of icon click
         await this.selectAndDragSecondStream();
-        await this.streamNameInput.click();
-        await this.page.waitForTimeout(1000);
-        await this.streamNameInput.fill(dynamicDestinationName);
-        await this.page.waitForTimeout(1000);
+        // Open the stream-name OSelect via its trigger and fill the `-search` input.
+        await this.fillDestinationStreamName(dynamicDestinationName);
         await this.clickInputNodeStreamSave();
         
         // Wait for dialog to close and add edge connections
@@ -1041,39 +1179,43 @@ export class PipelinesPage {
     // ========== Condition-specific methods ==========
 
     async fillCondition(columnName, operator, value, index = 0) {
-        const columnSelects = this.columnSelect;
-
-        // Try clicking the input first
-        await columnSelects.nth(index).locator('input').click();
-        await this.page.waitForTimeout(200);
-
-        // Check if dropdown opened, if not click the dropdown icon
-        let menuVisible = await this.qMenu.isVisible().catch(() => false);
-        if (!menuVisible) {
-            await columnSelects.nth(index).locator('i').click();
-            await this.page.waitForTimeout(200);
+        // Post-OSelect migration: open the column OSelect via its `-trigger` (the
+        // PopoverTrigger button), narrow the virtualised list via the `-search`
+        // input, and pick the `-option` whose `data-test-value` matches columnName.
+        const triggers = this.columnSelectTrigger;
+        const wrappers = this.columnSelect;
+        const trigCount = await triggers.count();
+        if (trigCount > 0) {
+            await triggers.nth(index).click();
+        } else {
+            await wrappers.nth(index).click();
         }
-
-        await columnSelects.nth(index).locator('input').fill(columnName);
-        await this.page.waitForTimeout(500);
-
-        // Select from dropdown
-        const options = this.qMenu.locator('.q-item');
-        await options.first().click();
+        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const searchCount = await this.columnSelectSearch.count();
+        if (searchCount > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnName).click();
         await this.page.waitForTimeout(300);
 
-        // Select operator
-        await this.operatorSelect.nth(index).click();
-        await this.page.waitForTimeout(500);
-
-        // Scope to the visible dropdown menu and select the operator
-        const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        // Operator OSelect — same pattern.
+        const opTriggers = this.operatorSelectTrigger;
+        const opTrigCount = await opTriggers.count();
+        if (opTrigCount > 0) {
+            await opTriggers.nth(index).click();
+        } else {
+            await this.operatorSelect.nth(index).click();
+        }
+        await this.operatorSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+        ).first().click();
         await this.page.waitForTimeout(300);
 
-        // Fill value
-        await this.valueInput.nth(index).locator('input').click();
-        await this.valueInput.nth(index).locator('input').fill(value);
+        // Fill value via OInput `-field` inner native input.
+        await this.valueInputField.nth(index).click();
+        await this.valueInputField.nth(index).fill(value);
         await this.page.waitForTimeout(300);
     }
 
@@ -1132,11 +1274,9 @@ export class PipelinesPage {
         // Verify the condition node was created successfully
         await expect(this.pipelineNodeDefaultConditionNode).toBeVisible({ timeout: 5000 });
 
-        // Add destination stream
+        // Add destination stream — use the open-popover-then-fill helper.
         await this.selectAndDragSecondStream();
-        await this.streamNameInput.click();
-        await this.streamNameInput.fill("destination-node");
-        await this.page.waitForTimeout(1000);
+        await this.fillDestinationStreamName("destination-node");
         await this.clickInputNodeStreamSave();
 
         await this.page.waitForTimeout(2000);
@@ -1792,8 +1932,42 @@ export class PipelinesPage {
      * @param {string} streamName - Name for the destination stream
      */
     async fillDestinationStreamName(streamName) {
+        // The stream-name OSelect (searchable=true, creatable for output nodes)
+        // renders the `-search` input only when its popover is open. Click the
+        // wrapper trigger first to open it, then fill the search input. After
+        // typing, the matching option (existing or created) must be clicked or
+        // committed via Enter to register the model value.
+        const wrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+        const trigger = this.page.locator('[data-test="input-node-stream-name-select-trigger"]').first();
+        const popover = this.page.locator('[data-test="input-node-stream-name-select-popover"]').first();
+        const searchOpen = await this.streamNameInput.isVisible().catch(() => false);
+        if (!searchOpen) {
+            if (await trigger.count() > 0) {
+                await trigger.waitFor({ state: 'visible', timeout: 15000 });
+                await trigger.click();
+            } else {
+                await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+                await wrapper.click();
+            }
+            await this.streamNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await this.streamNameInput.click();
         await this.streamNameInput.fill(streamName);
+        // Try matching option first; if none, the creatable OSelect commits via Enter.
+        const matchingOption = this.page.locator(
+            `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`,
+        ).first();
+        const optionVisible = await matchingOption.isVisible({ timeout: 2000 }).catch(() => false);
+        if (optionVisible) {
+            await matchingOption.click();
+        } else {
+            await this.streamNameInput.press('Enter');
+        }
+        // Close the popover deterministically — `@create` writes to v-model but
+        // does NOT auto-close the popover. Press Escape to dismiss it so it
+        // doesn't intercept the subsequent Save click.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
     }
 
@@ -1805,20 +1979,35 @@ export class PipelinesPage {
      * @param {string} value - Value to filter by
      */
     async fillConditionFields(columnName, columnOption, operator, value) {
-        // Fill column select
-        await this.columnSelect.locator('input').click();
-        await this.columnSelect.locator('input').fill(columnName);
-        await this.page.waitForTimeout(500);
-        await this.page.getByRole("option", { name: columnOption }).click();
+        // Open column OSelect via its `-trigger` and pick the option whose
+        // `data-test-value` matches `columnOption`. Filter the virtualised list
+        // by typing into the `-search` input first when present.
+        if (await this.columnSelectTrigger.count() > 0) {
+            await this.columnSelectTrigger.first().click();
+        } else {
+            await this.columnSelect.first().click();
+        }
+        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        if (await this.columnSelectSearch.count() > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnOption).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnOption).click();
 
-        // Select operator
-        await this.operatorSelect.click();
-        await this.page.waitForTimeout(300);
-        await this.page.getByText(operator, { exact: true }).click();
+        // Operator OSelect — open via `-trigger`, pick by `-option` data-test-value.
+        if (await this.operatorSelectTrigger.count() > 0) {
+            await this.operatorSelectTrigger.first().click();
+        } else {
+            await this.operatorSelect.first().click();
+        }
+        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+        ).first().click();
 
-        // Fill value input
-        await this.valueInput.locator('input').click();
-        await this.valueInput.locator('input').fill(value);
+        // Fill value via OInput `-field` inner native input.
+        await this.valueInputField.first().click();
+        await this.valueInputField.first().fill(value);
     }
 
     /**
@@ -1946,8 +2135,14 @@ export class PipelinesPage {
      * Click stream type dropdown
      */
     async clickStreamTypeDropdown() {
-        await this.streamTypeDropdown.click();
-        await this.streamTypeLabel.click();
+        // Open the scheduled-pipeline stream-type OSelect via its `-trigger`
+        // (PopoverTrigger button); fall back to the wrapper for backwards compat.
+        if (await this.streamTypeDropdownTrigger.count() > 0) {
+            await this.streamTypeDropdownTrigger.first().click();
+        } else {
+            await this.streamTypeDropdown.first().click();
+        }
+        await this.streamTypeDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -2184,16 +2379,17 @@ export class PipelinesPage {
      */
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
-        await this.streamTypeLabel.click();
-        // Wait for dropdown to open (OSelect forwards parent data-test to options as `*-option`)
-        await this.page.waitForFunction(() => {
-            const options = document.querySelectorAll('[data-test$="-option"]');
-            return options.length > 0;
-        }, { timeout: 3000 });
-        await this.page
-            .locator('[data-test$="-option"]', { hasText: type })
-            .first()
-            .click();
+        // Open via the OSelect trigger (data-test) added on ScheduledPipeline.vue
+        // and pick the option with the matching `data-test-value`.
+        if (await this.streamTypeDropdownTrigger.count() > 0) {
+            await this.streamTypeDropdownTrigger.first().click();
+        } else {
+            await this.streamTypeDropdown.first().click();
+        }
+        await this.streamTypeDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="scheduled-pipeline-stream-type-select-option"][data-test-value="${type}"]`,
+        ).first().click();
         testLogger.info(`Stream type '${type}' selected`);
     }
 

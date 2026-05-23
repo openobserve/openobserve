@@ -591,4 +591,113 @@ export class AlertManagement {
 
         return { found: alertFound, logText: foundLogText };
     }
+
+    // =========================================================================
+    // ALERT EDIT — DEDUPLICATION REGRESSION HELPERS
+    // =========================================================================
+
+    /**
+     * Wait for the alert list page to be ready (canonical landmark).
+     * @param {number} timeout
+     */
+    async waitForAlertListReady(timeout = 30000) {
+        await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Open the alert edit screen by clicking the alert's update (pencil) button.
+     * The list row exposes `[data-test="alert-list-{name}-update-alert"]` (AlertList.vue:312).
+     * @param {string} alertName
+     */
+    async openAlertEditByName(alertName) {
+        const updateBtn = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`).first();
+        await expect(updateBtn).toBeVisible({ timeout: 10000 });
+        await updateBtn.click();
+        // Wait for the AddAlert form to render — `add-alert-submit-btn` is the canonical landmark.
+        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Opened alert edit view', { alertName });
+    }
+
+    /**
+     * Activate the Advanced tab in the AddAlert v3 wizard.
+     * Deduplication lives in this tab (AddAlert.vue line ~273).
+     */
+    async openAdvancedTab() {
+        const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
+        await expect(advancedTab).toBeVisible({ timeout: 10000 });
+        await advancedTab.click();
+        // Wait for the dedup fingerprint OSelect wrapper to mount in the Advanced tab.
+        await this.page.locator(this.locators.dedupFingerprintFieldsSelect).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Switched to Advanced tab — deduplication panel visible');
+    }
+
+    /**
+     * Read currently selected fingerprint field values from the OSelect trigger.
+     * OSelect exposes `data-test-selected-value` (comma-joined for multiple).
+     * @returns {Promise<string[]>}
+     */
+    async getSelectedFingerprintFields() {
+        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
+        await expect(trigger).toBeVisible({ timeout: 5000 });
+        const raw = await trigger.getAttribute('data-test-selected-value');
+        if (!raw) return [];
+        return raw.split(',').map(v => v.trim()).filter(Boolean);
+    }
+
+    /**
+     * Remove all currently selected fingerprint fields by opening the OSelect popover
+     * and clicking each previously selected option to toggle it OFF (multi-select).
+     * Returns the number of fields removed.
+     */
+    async removeAllFingerprintFields() {
+        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
+        await expect(trigger).toBeVisible({ timeout: 5000 });
+
+        const selectedBefore = await this.getSelectedFingerprintFields();
+        testLogger.info('Removing fingerprint fields — initial selection', { selected: selectedBefore });
+
+        if (selectedBefore.length === 0) {
+            testLogger.warn('No fingerprint fields selected to remove');
+            return 0;
+        }
+
+        await trigger.click();
+        const popover = this.page.locator(this.locators.dedupFingerprintFieldsPopover);
+        await expect(popover).toBeVisible({ timeout: 5000 });
+
+        let removed = 0;
+        for (const value of selectedBefore) {
+            // Per-value option uses `data-test-value="<value>"`
+            const option = popover.locator(`[data-test="alert-dedup-fingerprint-fields-option"][data-test-value="${value}"]`).first();
+            await expect(option).toBeVisible({ timeout: 5000 });
+            await option.click();
+            removed += 1;
+            // Wait for the trigger's selected-value attribute to no longer include this value.
+            await expect.poll(async () => {
+                const current = await trigger.getAttribute('data-test-selected-value');
+                if (!current) return [];
+                return current.split(',').map(v => v.trim()).filter(Boolean);
+            }, { timeout: 5000 }).not.toContain(value);
+            testLogger.info('Deselected fingerprint option', { value, removed });
+        }
+
+        // Close the popover via keyboard — Escape is the canonical dismissal.
+        await this.page.keyboard.press('Escape');
+        await popover.waitFor({ state: 'hidden', timeout: 5000 });
+
+        return removed;
+    }
+
+    /**
+     * Submit the AddAlert form (Save button) and wait for the success toast.
+     * @returns {Promise<void>}
+     */
+    async submitAlertEdit() {
+        const submitBtn = this.page.locator(this.locators.alertSubmitButton);
+        await expect(submitBtn).toBeEnabled({ timeout: 10000 });
+        await submitBtn.click();
+        // OToast variant=success carries data-test="o-toast-success"; data-test-message holds the text.
+        await this.page.locator(this.locators.oToastSuccess).first().waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Alert update submitted — success toast visible');
+    }
 }

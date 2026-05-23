@@ -23,17 +23,20 @@
             {{ t("search_history.title") }}
           </div>
         </div>
-        <div class="tw:flex tw:items-center tw:pr-3">
-          <div>
-            <OSwitch
-              v-model="wrapText"
-              :label="t('search_history.wrapText')"
-              size="sm"
-              class="tw:mr-3"
-            />
-          </div>
+        <div class="tw:flex tw:items-center tw:pr-3 tw:gap-3">
+          <OButton
+            data-test="search-history-wrap-content-btn"
+            variant="ghost"
+            size="icon"
+            class="wrap-content-btn"
+            :class="{ 'wrap-content-btn--active': wrapText }"
+            @click="wrapText = !wrapText"
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
           <div
-            class="warning-text tw:flex tw:items-center tw:px-2 tw:mr-3 tw:h-[36px] tw:rounded-md"
+            class="warning-text tw:flex tw:items-center tw:px-2 tw:h-[36px] tw:rounded-md"
           >
             <OIcon name="info" class="tw:mr-1" size="sm" />
             <div>
@@ -45,6 +48,7 @@
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
               auto-apply
+              menu-align="end"
               :default-type="searchObj.data.datetime.type"
               @on:date-change="updateDateTime"
             />
@@ -54,7 +58,6 @@
             <OButton
               variant="primary"
               size="sm"
-              class="tw:ml-3"
               @click="fetchSearchHistory"
               :disabled="isLoading"
             >
@@ -247,8 +250,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -268,9 +271,9 @@ export default defineComponent({
     AppTabs,
     QueryEditor,
     OButton,
-    OSwitch,
     OSpinner,
     OIcon,
+    OTooltip,
     OTable,
 },
   props: {

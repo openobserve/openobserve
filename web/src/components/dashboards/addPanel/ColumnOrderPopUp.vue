@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
+      <div class="tw:text-xs tw:text-gray-400 tw:mb-3" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
         class="tw:text-center tw:p-6 tw:text-gray-400"
+        data-test="dashboard-column-order-empty-state"
       >
         <OIcon name="view-column" class="tw:mb-3" style="width: 48px; height: 48px;" />
         <div class="tw:text-base">{{ t("dashboard.noColumnsOrdered") }}</div>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:pt-[0.125rem] tw:justify-between tw:w-full"
+    class="field-list-pagination-wrapper tw:justify-between tw:w-full tw:pt-2 tw:pb-1 tw:px-2"
     :class="showSchemaToggle || showQuickMode ? 'tw:flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -272,6 +272,11 @@ const visiblePages = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.field-list-pagination-wrapper {
+  border-top: 1px solid var(--o2-border-color);
+  background-color: var(--o2-card-bg);
+}
+
 .field-list-pagination {
   display: flex;
   align-items: center;

@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="props.columns || []"
               multiple
               creatable
+              data-test="alert-dedup-fingerprint-fields"
               class="tw:max-w-[600px] tw:min-w-[300px]"
               helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
               @update:model-value="emitUpdate"
@@ -94,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="localDeduplication.time_window_minutes"
                 type="number"
                 min="1"
+                data-test="alert-dedup-time-window"
                 :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
                 @update:model-value="emitUpdate"
               />

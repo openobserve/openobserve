@@ -304,7 +304,6 @@ test.describe("Users and Organizations", () => {
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
         await pageManager.createOrgPage.fillOrgName('');
-        await pageManager.createOrgPage.clickSaveOrg();
         await pageManager.userPage.verifyOrgNameRequiredError('Name is required');
 
         testLogger.info('Test completed successfully');

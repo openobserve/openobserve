@@ -465,8 +465,10 @@ class SchemaPage {
         } catch (error) {
             testLogger.warn('Failed to find monaco editor visible, trying toggle button');
 
-            // Click toggle button to reveal/enable VRL editor
-            await this.showQueryToggleBtn.nth(1).click({ force: true });
+            // Click toggle button to reveal/enable VRL editor. Only one of
+            // TransformSelector / FunctionSelector renders at a time (v-if/v-else-if
+            // in SearchBar.vue), so the show-query toggle is a single element.
+            await this.showQueryToggleBtn.first().click({ force: true });
             await this.fnEditor.first().waitFor({ state: 'visible', timeout: 15000 });
         }
         await this._pickStreamOption(fromStream);

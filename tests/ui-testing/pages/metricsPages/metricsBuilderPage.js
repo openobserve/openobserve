@@ -37,7 +37,7 @@ export class MetricsBuilderPage {
         // AddToDashboard.vue is now an ODrawer with parent slug `add-to-dashboard-dialog`.
         // Cancel/Add are the ODrawer footer secondary/primary buttons, not the old
         // metrics-schema-* buttons.
-        this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"], button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
+        this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"]';
         this.dashboardDialogTitle = '[data-test="add-to-dashboard-dialog"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
         this.dashboardCancelButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-secondary-btn"]';
@@ -48,6 +48,231 @@ export class MetricsBuilderPage {
         // footer button after the dialog migration.
         this.confirmDialogOk = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.confirmDialogCancel = '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
+
+        // ============== Hoisted locators (constructor-only) ==============
+        // Mode buttons
+        this.sqlModeBtn = page.locator(this.sqlModeButton);
+        this.promqlModeBtn = page.locator(this.promqlModeButton);
+        this.builderModeBtn = page.locator(this.builderModeButton);
+        this.customModeBtn = page.locator(this.customModeButton);
+
+        // Confirm dialog
+        this.confirmOkBtn = page.locator(this.confirmDialogOk).first();
+
+        // Field selectors
+        this.streamSelectorInput = page.locator(this.streamSelector);
+        this.fieldSearchEl = page.locator(this.fieldSearchInput);
+
+        // Stream dropdown popover/options (OSelect)
+        this.streamPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
+        this.streamOptions = page.locator('[data-test="index-dropdown-stream-option"]');
+        // OSelect popover search input (Reka ListboxFilter) — `${parent}-search`
+        this.streamSearchInput = page.locator('[data-test="index-dropdown-stream-search"]');
+
+        // Label / operator / value popovers (OSelect)
+        this.labelPopover = page.locator('[data-test="promql-label-select-popover"]');
+        this.labelOptions = page.locator('[data-test="promql-label-select-option"]');
+        this.operatorPopover = page.locator('[data-test="promql-operator-select-popover"]');
+        this.operatorOptions = page.locator('[data-test="promql-operator-select-option"]');
+        this.valuePopover = page.locator('[data-test="promql-value-select-popover"]');
+        this.valueOptions = page.locator('[data-test="promql-value-select-option"]');
+
+        this.labelSelectLast = page.locator(this.labelSelect).last();
+        this.operatorSelectLast = page.locator(this.operatorSelect).last();
+        this.valueSelectLast = page.locator(this.valueSelect).last();
+
+        // Add filter / add operation buttons
+        this.addLabelFilterBtn = page.locator(this.addLabelFilterButton);
+        this.addOperationBtn = page.locator(this.addOperationButton);
+
+        // Operation selector dialog
+        this.operationDialog = page.locator('[data-test="operations-list-operation-selector-dialog"]');
+        this.operationDialogSearchInput = this.operationDialog.locator('[data-test="operations-list-search-input"]');
+        this.operationDialogCloseBtn = this.operationDialog.locator('[data-test="o-dialog-primary-btn"]');
+        this.operationDialogOptions = this.operationDialog.locator('[data-test^="promql-operation-option-"]');
+        this.operationDialogHeaders = this.operationDialog.locator('[data-test^="operations-list-category-"]');
+
+        // Filter count: data-test starts with promql-label-filter- but no remove
+        this.labelFilterChips = page.locator('[data-test^="promql-label-filter-"]:not([data-test*="remove"]):not([data-test*="menu"]):not([data-test*="popover"]):not([data-test*="option"])');
+        this.operationChips = page.locator('[data-test^="promql-operation-"]:not([data-test*="remove"]):not([data-test*="drag"]):not([data-test*="param"]):not([data-test*="menu"]):not([data-test*="popover"]):not([data-test*="option"])');
+
+        // Options fields
+        this.legendEl = page.locator(this.legendInput);
+        // Legend is an OCombobox — inner input uses `-input` suffix per OCombobox convention.
+        this.legendFieldInput = page.locator(`${this.legendInput}-input`);
+        this.stepValueEl = page.locator(this.stepValueInput);
+        this.queryTypeEl = page.locator(this.queryTypeSelect);
+        this.queryTypePopover = page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
+
+        // Run query
+        this.runQueryBtn = page.locator(this.runQueryButton).first();
+
+        // Add to Dashboard
+        this.addToDashboardBtn = page.locator(this.addToDashboardButton).first();
+        this.dashboardDialogEl = page.locator(this.dashboardDialogTitle);
+        this.dashboardPanelTitleEl = page.locator(this.dashboardPanelTitleInput);
+        this.dashboardPanelTitleFieldEl = page.locator(`${this.dashboardPanelTitleInput}-field`);
+        this.dashboardCancelBtn = page.locator(this.dashboardCancelButton);
+        this.dashboardAddBtn = page.locator(this.dashboardAddButton);
+
+        // Folder / dashboard / tab dropdowns in Add to Dashboard
+        this.folderDropdown = page.locator('[data-test="index-dropdown-stream_type"]');
+        this.folderPopover = page.locator('[data-test="index-dropdown-stream_type-popover"]');
+        this.folderOptions = page.locator('[data-test="index-dropdown-stream_type-option"]');
+
+        this.dashboardDropdown = page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+        this.dashboardDropdownPopover = page.locator('[data-test="dashboard-dropdown-dashboard-selection-popover"]');
+        this.dashboardDropdownOptions = page.locator('[data-test="dashboard-dropdown-dashboard-selection-option"]');
+
+        this.tabDropdown = page.locator('[data-test="dashboard-dropdown-tab-selection"]');
+        this.tabDropdownPopover = page.locator('[data-test="dashboard-dropdown-tab-selection-popover"]');
+        this.tabDropdownOptions = page.locator('[data-test="dashboard-dropdown-tab-selection-option"]');
+
+        // New dashboard dialog (within Add-to-Dashboard drawer)
+        this.newDashboardBtn = page.locator('[data-test="dashboard-dashboard-new-add"]');
+        this.newDashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+        this.newDashboardSubmitBtn = page.locator(
+            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+        );
+        this.newDashboardDialogEl = page.locator('[data-test="dashboard-dashboard-add-dialog"]');
+
+        // Monaco query preview editor
+        this.queryEditorEl = page.locator('[data-test="dashboard-panel-query-editor"]').first();
+
+        // Table chart (dashboard panel) — TenstackTable header data-tests are
+        // `o2-table-th-{columnId}`; the wrapper has `dashboard-table-renderer-wrapper`.
+        // We accept either the wrapper or the inner table data-test so the locator
+        // works for both metrics PromQL tables and dashboard panel tables.
+        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="dashboard-table-renderer-wrapper"], [data-test="promql-table-chart"]').first();
+        this.tableHeaderCells = page.locator('[data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])');
+        this.tableRows = page.locator('[data-test="dashboard-data-row"]');
+
+        // Chart renderer
+        this.chartRenderer = page.locator('[data-test="chart-renderer"]');
+
+        // Menus
+        this.menuLinkDashboards = page.locator('[data-test="menu-link-\\/dashboards-item"]');
+        this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
+        this.dashboardSearchFieldInput = page.locator('[data-test="dashboard-search-field"]').first();
+        this.confirmDeleteBtn = page.locator('[data-test="o-dialog-primary-btn"]');
+
+        // Step value `-field` variant (OInput inner native input)
+        this.stepValueFieldInput = page.locator(`${this.stepValueInput}-field`);
+
+        // MetricSelector component popover/option/field
+        this.metricSelectorEl = page.locator('[data-test="metric-selector"]');
+        this.metricSelectorPopover = page.locator('[data-test="metric-selector-popover"]');
+        this.metricSelectorFieldInput = page.locator('[data-test="metric-selector-field"]').first();
+
+        // Dashboard dropdown OInput inner input
+        this.dashboardDropdownFieldInput = page.locator('[data-test="dashboard-dropdown-dashboard-selection-field"]').first();
+
+        // New dashboard name input `-field` variant
+        this.newDashboardNameFieldInput = page.locator('[data-test="add-dashboard-name-field"]').first();
+
+        // OToast success / error
+        this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+        this.toastError = page.locator('[data-test="o-toast-error"]');
+    }
+
+    // ============== Factory helpers for per-index locators ==============
+
+    /**
+     * Get label filter button at a given index
+     * @param {number} index - 0-based index
+     */
+    getLabelFilterButton(index) {
+        return this.page.locator(`[data-test="promql-label-filter-${index}"]`);
+    }
+
+    getLabelFilterRemoveBtn(index) {
+        return this.page.locator(`[data-test="promql-label-filter-remove-${index}"]`);
+    }
+
+    getLabelFilterMenu(index) {
+        return this.page.locator(`[data-test="promql-label-filter-${index}-menu"]`);
+    }
+
+    getOperationButton(index) {
+        return this.page.locator(`[data-test="promql-operation-${index}"]`);
+    }
+
+    getOperationRemoveBtn(index) {
+        return this.page.locator(`[data-test="promql-operation-remove-${index}"]`);
+    }
+
+    getOperationMenu(index) {
+        return this.page.locator(`[data-test="promql-operation-${index}-menu"]`);
+    }
+
+    getOperationParam(index) {
+        return this.page.locator(`[data-test="promql-operation-param-${index}"]`).last();
+    }
+
+    getOperationParamFieldInput(index) {
+        return this.page.locator(`[data-test="promql-operation-param-${index}-field"]`).last();
+    }
+
+    getOperationParamPopover(index) {
+        return this.page.locator(`[data-test="promql-operation-param-${index}-popover"]`);
+    }
+
+    getOperationParamOptions(index) {
+        return this.page.locator(`[data-test="promql-operation-param-${index}-option"]`);
+    }
+
+    getOperationParamOptionByValue(index, value) {
+        // OSelect option key — prefer data-test-value
+        return this.page.locator(`[data-test="promql-operation-param-${index}-option"][data-test-value="${value}"]`).first();
+    }
+
+    getLabelOptionByValue(value) {
+        return this.page.locator(`[data-test="promql-label-select-option"][data-test-value="${value}"]`).first();
+    }
+
+    getOperatorOptionByValue(value) {
+        return this.page.locator(`[data-test="promql-operator-select-option"][data-test-value="${value}"]`).first();
+    }
+
+    getValueOptionByValue(value) {
+        return this.page.locator(`[data-test="promql-value-select-option"][data-test-value="${value}"]`).first();
+    }
+
+    getPanelBarByTitle(title) {
+        return this.page.locator(`[data-test="dashboard-panel-bar-${title}"]`).first();
+    }
+
+    getPanelContainerByTitle(title) {
+        // Panel container has a per-name data-test; fall back to the bar's ancestor
+        return this.page.locator(`[data-test="dashboard-panel-container-${title}"]`).first();
+    }
+
+    getPanelDropdownByTitle(title) {
+        return this.page.locator(`[data-test="dashboard-edit-panel-${title}-dropdown"]`).first();
+    }
+
+    getEditPanelMenuItem() {
+        return this.page.locator('[data-test="dashboard-edit-panel"]');
+    }
+
+    getPanelNameInput() {
+        return this.page.locator('[data-test="dashboard-panel-name"]');
+    }
+
+    getDashboardApplyBtn() {
+        return this.page.locator('[data-test="dashboard-apply"]');
+    }
+
+    getDashboardDiscardBtn() {
+        return this.page.locator('[data-test="dashboard-panel-discard"]');
+    }
+
+    getDashboardConfirmPrimaryBtn() {
+        return this.page.locator('[data-test="o-dialog-primary-btn"]').first();
+    }
+
+    getEditStreamInput() {
+        return this.page.locator('[data-test="index-dropdown-stream"]');
     }
 
     // ===== Query Mode Switching =====
@@ -56,10 +281,9 @@ export class MetricsBuilderPage {
      * Switch to PromQL query type
      */
     async switchToPromQLMode() {
-        const promqlBtn = this.page.locator(this.promqlModeButton);
-        if (await promqlBtn.isVisible({ timeout: 3000 })) {
-            await promqlBtn.click();
-            await this.page.waitForTimeout(500);
+        if (await this.promqlModeBtn.isVisible({ timeout: 3000 })) {
+            await this.promqlModeBtn.click();
+            await this.handleConfirmDialog();
             return true;
         }
         return false;
@@ -69,14 +293,11 @@ export class MetricsBuilderPage {
      * Switch to Builder mode (as opposed to Custom)
      */
     async switchToBuilderMode() {
-        const builderBtn = this.page.locator(this.builderModeButton);
-        if (await builderBtn.isVisible({ timeout: 3000 })) {
-            const classes = await builderBtn.getAttribute('class') || '';
-            const dataState = await builderBtn.getAttribute('data-state') || '';
+        if (await this.builderModeBtn.isVisible({ timeout: 3000 })) {
+            const classes = await this.builderModeBtn.getAttribute('class') || '';
+            const dataState = await this.builderModeBtn.getAttribute('data-state') || '';
             if (!classes.includes('selected') && dataState !== 'on') {
-                await builderBtn.click();
-                await this.page.waitForTimeout(500);
-
+                await this.builderModeBtn.click();
                 // Handle confirmation dialog if it appears
                 await this.handleConfirmDialog();
             }
@@ -89,12 +310,12 @@ export class MetricsBuilderPage {
      * Switch to Custom mode
      */
     async switchToCustomMode() {
-        const customBtn = this.page.locator(this.customModeButton);
-        if (await customBtn.isVisible({ timeout: 3000 })) {
-            const classes = await customBtn.getAttribute('class') || '';
-            if (!classes.includes('selected')) {
-                await customBtn.click();
-                await this.page.waitForTimeout(500);
+        if (await this.customModeBtn.isVisible({ timeout: 3000 })) {
+            const classes = await this.customModeBtn.getAttribute('class') || '';
+            const dataState = await this.customModeBtn.getAttribute('data-state') || '';
+            if (!classes.includes('selected') && dataState !== 'on') {
+                await this.customModeBtn.click();
+                await this.handleConfirmDialog();
             }
             return true;
         }
@@ -105,10 +326,9 @@ export class MetricsBuilderPage {
      * Switch to SQL mode
      */
     async switchToSQLMode() {
-        const sqlBtn = this.page.locator(this.sqlModeButton);
-        if (await sqlBtn.isVisible({ timeout: 3000 })) {
-            await sqlBtn.click();
-            await this.page.waitForTimeout(500);
+        if (await this.sqlModeBtn.isVisible({ timeout: 3000 })) {
+            await this.sqlModeBtn.click();
+            await this.handleConfirmDialog();
             return true;
         }
         return false;
@@ -119,10 +339,9 @@ export class MetricsBuilderPage {
      */
     async handleConfirmDialog() {
         try {
-            const okBtn = this.page.locator(this.confirmDialogOk).first();
-            if (await okBtn.isVisible({ timeout: 2000 })) {
-                await okBtn.click();
-                await this.page.locator(this.confirmDialogOk).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            if (await this.confirmOkBtn.isVisible({ timeout: 2000 })) {
+                await this.confirmOkBtn.click();
+                await this.confirmOkBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         } catch {
@@ -136,14 +355,34 @@ export class MetricsBuilderPage {
      * @param {'sql'|'promql'|'builder'|'custom'} mode
      */
     async isModeSelected(mode) {
-        const selectorMap = {
-            sql: this.sqlModeButton,
-            promql: this.promqlModeButton,
-            builder: this.builderModeButton,
-            custom: this.customModeButton,
+        const btnMap = {
+            sql: this.sqlModeBtn,
+            promql: this.promqlModeBtn,
+            builder: this.builderModeBtn,
+            custom: this.customModeBtn,
         };
-        const btn = this.page.locator(selectorMap[mode]);
+        const btn = btnMap[mode];
         if (await btn.isVisible({ timeout: 2000 })) {
+            // OToggleGroupItem (Reka UI) signals active state via data-state="on".
+            // Poll briefly because QueryTypeSelector mounts and initializes
+            // `selectedButtonType` asynchronously after the page loads.
+            const selected = await this.page.waitForFunction(
+                (testId) => {
+                    const el = document.querySelector(`[data-test="${testId}"]`);
+                    if (!el) return null;
+                    const cls = el.getAttribute('class') || '';
+                    const ds = el.getAttribute('data-state') || '';
+                    return cls.includes('selected') || ds === 'on';
+                },
+                {
+                    sql: 'dashboard-sql-query-type',
+                    promql: 'dashboard-promql-query-type',
+                    builder: 'dashboard-builder-query-type',
+                    custom: 'dashboard-custom-query-type',
+                }[mode],
+                { timeout: 3000 }
+            ).then(h => h.jsonValue()).catch(() => null);
+            if (selected === true) return true;
             const classes = await btn.getAttribute('class') || '';
             const dataState = await btn.getAttribute('data-state') || '';
             return classes.includes('selected') || dataState === 'on';
@@ -160,32 +399,32 @@ export class MetricsBuilderPage {
      * @param {string} metricName
      */
     async selectMetric(metricName) {
-        const input = this.page.locator(this.streamSelector);
-        if (!await input.isVisible({ timeout: 5000 })) {
+        if (!await this.streamSelectorInput.isVisible({ timeout: 5000 })) {
             return false;
         }
 
-        // Click to focus and open dropdown — FieldList stream picker is OSelect
-        // (Reka Listbox) post-migration; fall back to .q-menu for legacy q-select.
-        await input.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        // Click to focus and open dropdown — FieldList stream picker is OSelect post-migration.
+        await this.streamSelectorInput.click();
+        await this.streamPopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Clear and type to filter
-        await input.clear();
-        await input.fill(metricName);
-        await this.page.waitForTimeout(1000);
+        // OSelect popover search: Ctrl+A → Backspace → fill (via the ListboxFilter input)
+        if (await this.streamSearchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await this.streamSearchInput.press('ControlOrMeta+a').catch(() => {});
+            await this.streamSearchInput.press('Backspace').catch(() => {});
+            await this.streamSearchInput.fill(metricName);
+        }
 
-        // Select from dropdown options (OSelect Reka Listbox)
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: metricName }).first();
-        if (await option.isVisible({ timeout: 5000 })) {
+        // Select from dropdown options
+        const option = this.page.locator(`[data-test="index-dropdown-stream-option"][data-test-value="${metricName}"]`).first();
+        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
             await option.click();
-            await this.page.waitForTimeout(1500);
+            await this.streamPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
 
         // If no dropdown option, press Enter to confirm
         await this.page.keyboard.press('Enter');
-        await this.page.waitForTimeout(1000);
+        await this.streamPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         return true;
     }
 
@@ -193,15 +432,53 @@ export class MetricsBuilderPage {
      * Check if stream/metric selector is visible in the sidebar
      */
     async isMetricSelectorVisible() {
-        return await this.page.locator(this.streamSelector).isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.streamSelectorInput.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
-     * Get the currently selected stream/metric text
+     * Get the currently selected stream/metric text.
+     * OSelect surfaces the active selection via `data-test-selected-label` and
+     * `data-test-selected-value` attributes on the trigger button.
      */
     async getSelectedMetric() {
-        const selector = this.page.locator(this.streamSelector);
-        return await selector.locator('.q-field__native span, .q-field__native').textContent().catch(() => '');
+        return await this.getStreamSelectedValue();
+    }
+
+    /**
+     * Read the selected metric/stream value from the OSelect trigger's data-test
+     * attributes. OSelect exposes `data-test-selected-value` /
+     * `data-test-selected-label` on the inner PopoverTrigger (data-test
+     * `${parent}-trigger`). Falls back to inputValue() for legacy q-select.
+     */
+    async getStreamSelectedValue() {
+        const wrapper = this.streamSelectorInput;
+        if (!await wrapper.isVisible({ timeout: 3000 }).catch(() => false)) return '';
+        // Read from the inner PopoverTrigger
+        const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]');
+        if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+            // OSelect populates these attrs once the model-value resolves; the
+            // metrics page auto-selects a metric on mount asynchronously, so
+            // poll briefly until at least one is non-empty.
+            const value = await this.page.waitForFunction(
+                () => {
+                    const tr = document.querySelector('[data-test="index-dropdown-stream-trigger"]');
+                    if (!tr) return null;
+                    const v = tr.getAttribute('data-test-selected-value') || '';
+                    const l = tr.getAttribute('data-test-selected-label') || '';
+                    return (v && v.length > 0) ? v : ((l && l.length > 0) ? l : null);
+                },
+                { timeout: 5000 }
+            ).then(handle => handle.jsonValue()).catch(() => null);
+            if (value) return value;
+            const dtValue = await trigger.getAttribute('data-test-selected-value').catch(() => null);
+            if (dtValue && dtValue.length > 0) return dtValue;
+            const dtLabel = await trigger.getAttribute('data-test-selected-label').catch(() => null);
+            if (dtLabel && dtLabel.length > 0) return dtLabel;
+        }
+        // Fallback to wrapper attribute (in case data-test forwards) or inputValue
+        const dtVal2 = await wrapper.getAttribute('data-test-selected-value').catch(() => null);
+        if (dtVal2 && dtVal2.length > 0) return dtVal2;
+        return await wrapper.inputValue().catch(() => '');
     }
 
     // ===== Label Filter Operations =====
@@ -210,53 +487,40 @@ export class MetricsBuilderPage {
      * Click the add label filter button (+)
      */
     async clickAddLabelFilter() {
-        const addBtn = this.page.locator(this.addLabelFilterButton);
-        await addBtn.click();
-        await this.page.locator(this.addLabelFilterButton).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.addLabelFilterBtn.click();
+        await this.addLabelFilterBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
-     * Get label filter button at a given index
-     * @param {number} index - 0-based index
-     */
-    getLabelFilterButton(index) {
-        return this.page.locator(`[data-test="promql-label-filter-${index}"]`);
-    }
-
-    /**
-     * Open label filter menu at index. LabelFilterEditor chip menu is now an
-     * ODropdown — falls back to legacy .q-menu until source exposes a data-test.
+     * Open label filter menu at index. LabelFilterEditor chip menu is now an ODropdown.
      * @param {number} index - 0-based index
      */
     async openLabelFilterMenu(index) {
         const filterBtn = this.getLabelFilterButton(index);
         await filterBtn.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.getLabelFilterMenu(index).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
-     * Select a label name from the label filter dropdown. Inside the migrated
-     * ODropdown, the label picker is an OSelect (Reka Listbox). Falls back to
-     * legacy .q-menu .q-item for q-select until OSelect forwards a data-test.
+     * Select a label name from the label filter dropdown.
      * @param {string} labelName
      */
     async selectLabel(labelName) {
-        const labelDropdown = this.page.locator(this.labelSelect).last();
-        await labelDropdown.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.labelSelectLast.click();
+        await this.labelPopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Type to filter
-        const input = labelDropdown.locator('input').first();
-        if (await input.isVisible({ timeout: 2000 })) {
-            await input.fill(labelName);
-            await this.page.waitForTimeout(1000);
+        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
+        const popoverSearch = this.page.locator('[data-test="promql-label-select-search"]').first();
+        if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await popoverSearch.press('ControlOrMeta+a').catch(() => {});
+            await popoverSearch.press('Backspace').catch(() => {});
+            await popoverSearch.fill(labelName);
         }
 
-        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: labelName }).first();
-        if (await option.isVisible({ timeout: 5000 })) {
+        const option = this.getLabelOptionByValue(labelName);
+        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -267,15 +531,13 @@ export class MetricsBuilderPage {
      * @param {string} operator - one of: =, !=, =~, !~
      */
     async selectOperator(operator) {
-        const operatorDropdown = this.page.locator(this.operatorSelect).last();
-        await operatorDropdown.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.operatorSelectLast.click();
+        await this.operatorPopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: operator }).first();
-        if (await option.isVisible({ timeout: 3000 })) {
+        const option = this.getOperatorOptionByValue(operator);
+        if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.operatorPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -286,22 +548,21 @@ export class MetricsBuilderPage {
      * @param {string} value
      */
     async selectValue(value) {
-        const valueDropdown = this.page.locator(this.valueSelect).last();
-        await valueDropdown.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.valueSelectLast.click();
+        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Type to filter
-        const input = valueDropdown.locator('input').first();
-        if (await input.isVisible({ timeout: 2000 })) {
-            await input.fill(value);
-            await this.page.waitForTimeout(1000);
+        // OSelect popover search: Ctrl+A → Backspace → fill (ListboxFilter → `${parent}-search`)
+        const popoverSearch = this.page.locator('[data-test="promql-value-select-search"]').first();
+        if (await popoverSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await popoverSearch.press('ControlOrMeta+a').catch(() => {});
+            await popoverSearch.press('Backspace').catch(() => {});
+            await popoverSearch.fill(value);
         }
 
-        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: value }).first();
-        if (await option.isVisible({ timeout: 5000 })) {
+        const option = this.getValueOptionByValue(value);
+        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -312,7 +573,7 @@ export class MetricsBuilderPage {
      * @param {number} index - 0-based index
      */
     async removeLabelFilter(index) {
-        const removeBtn = this.page.locator(`[data-test="promql-label-filter-remove-${index}"]`);
+        const removeBtn = this.getLabelFilterRemoveBtn(index);
         await removeBtn.click();
         await removeBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
@@ -321,9 +582,7 @@ export class MetricsBuilderPage {
      * Get count of visible label filter items
      */
     async getLabelFilterCount() {
-        // Count by matching data-test attributes starting with "promql-label-filter-" but not "remove"
-        const filters = this.page.locator('[data-test^="promql-label-filter-"]:not([data-test*="remove"])');
-        return await filters.count();
+        return await this.labelFilterChips.count();
     }
 
     /**
@@ -360,7 +619,7 @@ export class MetricsBuilderPage {
 
         // Close menu by pressing Escape — LabelFilterEditor chip menu = ODropdown post-migration
         await this.page.keyboard.press('Escape');
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.getLabelFilterMenu(newIndex).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // ===== Operations =====
@@ -369,13 +628,10 @@ export class MetricsBuilderPage {
      * Click the add operation button
      */
     async clickAddOperation() {
-        const addBtn = this.page.locator(this.addOperationButton);
-        await addBtn.click();
+        await this.addOperationBtn.click();
         // Operation selector is now an ODialog (see OperationsList.vue) — wait on the
         // parent slug rather than the legacy `.q-dialog` wrapper.
-        await this.page
-            .locator('[data-test="operations-list-operation-selector-dialog"]')
-            .waitFor({ state: 'visible', timeout: 5000 });
+        await this.operationDialog.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -384,46 +640,28 @@ export class MetricsBuilderPage {
      */
     async selectOperation(operationName) {
         // Wait for dialog to appear and fully render (expansion items are default-opened)
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
-        await dialog.waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.waitForTimeout(300);
+        await this.operationDialog.waitFor({ state: 'visible', timeout: 5000 });
 
         // Do NOT fill the search input: typing triggers a Vue re-render that temporarily
         // collapses q-expansion-item sections, making items transiently invisible.
         // The full un-filtered list is already rendered with all sections expanded.
 
-        // Find a clickable q-item inside expansion content whose primary label matches.
-        // Structure: .q-expansion-item__content > .q-list > .q-item
-        //              > .q-item__section > .q-item__label (op name, NOT caption)
-        const opItem = dialog
-            .locator('[data-test$="-option"], [role="option"], [data-reka-accordion-content] [role="listitem"]')
-            .filter({ hasText: new RegExp(`^\\s*${operationName}\\s*$`) })
-            .first();
-
-        if (await opItem.isVisible({ timeout: 3000 })) {
+        // Find an operation option by data-test-value (preferred)
+        const opItem = this.operationDialog.locator(`[data-test^="promql-operation-option-"][data-test-value="${operationName}"]`).first();
+        if (await opItem.isVisible({ timeout: 3000 }).catch(() => false)) {
             await opItem.click();
-            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.operationDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
 
-        // Fallback: explicitly open all expansion sections, then retry
-        const expansionHeaders = dialog.locator('[data-reka-accordion-trigger], [aria-expanded]');
-        const headerCount = await expansionHeaders.count();
-        for (let i = 0; i < headerCount; i++) {
-            await expansionHeaders.nth(i).click().catch(() => {});
-        }
-        await this.page.waitForTimeout(400);
-
-        const opItemRetry = dialog
-            .locator('[data-test$="-option"], [role="option"], [data-reka-accordion-content] [role="listitem"]')
-            .filter({ hasText: new RegExp(`^\\s*${operationName}\\s*$`) })
-            .first();
-
-        if (await opItemRetry.isVisible({ timeout: 3000 })) {
-            await opItemRetry.click();
-            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        // Fallback: match by data-test suffix (lowercased)
+        const opItemAlt = this.operationDialog.locator(`[data-test="promql-operation-option-${operationName.toLowerCase()}"]`).first();
+        if (await opItemAlt.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await opItemAlt.click();
+            await this.operationDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
+
         return false;
     }
 
@@ -440,8 +678,7 @@ export class MetricsBuilderPage {
      * Get count of visible operations
      */
     async getOperationCount() {
-        const operations = this.page.locator('[data-test^="promql-operation-"]:not([data-test*="remove"]):not([data-test*="drag"]):not([data-test*="param"])');
-        return await operations.count();
+        return await this.operationChips.count();
     }
 
     /**
@@ -449,7 +686,7 @@ export class MetricsBuilderPage {
      * @param {number} index
      */
     async getOperationText(index) {
-        const opBtn = this.page.locator(`[data-test="promql-operation-${index}"]`);
+        const opBtn = this.getOperationButton(index);
         return await opBtn.textContent();
     }
 
@@ -458,7 +695,7 @@ export class MetricsBuilderPage {
      * @param {number} index
      */
     async removeOperation(index) {
-        const removeBtn = this.page.locator(`[data-test="promql-operation-remove-${index}"]`);
+        const removeBtn = this.getOperationRemoveBtn(index);
         await removeBtn.click();
         await removeBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
@@ -471,16 +708,23 @@ export class MetricsBuilderPage {
      */
     async setOperationParam(operationIndex, paramIndex, value) {
         // Open operation menu — OperationsList chip menu is ODropdown post-migration
-        const opBtn = this.page.locator(`[data-test="promql-operation-${operationIndex}"]`);
+        const opBtn = this.getOperationButton(operationIndex);
         await opBtn.click();
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.getOperationMenu(operationIndex).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-        // Find and fill the parameter input
-        const paramInput = this.page.locator(`[data-test="promql-operation-param-${paramIndex}"]`).last();
-        if (await paramInput.isVisible({ timeout: 3000 })) {
-            const input = paramInput.locator('input').first();
-            await input.clear();
-            await input.fill(value);
+        // Find and fill the parameter input — prefer the OInput `-field` variant
+        const paramFieldInput = this.page.locator(`[data-test="promql-operation-param-${paramIndex}-field"]`).last();
+        if (await paramFieldInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await paramFieldInput.press('ControlOrMeta+a').catch(() => {});
+            await paramFieldInput.press('Backspace').catch(() => {});
+            await paramFieldInput.fill(value);
+            return true;
+        }
+        const paramInput = this.getOperationParam(paramIndex);
+        if (await paramInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await paramInput.press('ControlOrMeta+a').catch(() => {});
+            await paramInput.press('Backspace').catch(() => {});
+            await paramInput.fill(value);
             return true;
         }
         return false;
@@ -493,14 +737,68 @@ export class MetricsBuilderPage {
      * @param {string} legend
      */
     async setLegend(legend) {
-        const legendField = this.page.locator(this.legendInput);
-        if (await legendField.isVisible({ timeout: 3000 })) {
-            const input = legendField.locator('input').first();
-            await input.clear();
-            await input.fill(legend);
-            return true;
+        if (await this.legendEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // Prefer the OCombobox `-input` variant (Reka ComboboxInput renders native input)
+            const fieldInput = this.legendFieldInput;
+            if (await fieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await fieldInput.click();
+                await fieldInput.press('ControlOrMeta+a').catch(() => {});
+                await fieldInput.press('Backspace').catch(() => {});
+                await fieldInput.fill(legend);
+                return true;
+            }
+            // Fallback: descend into the wrapper to find the native input child
+            // (covers cases where Reka's ComboboxInput rendered the native input
+            // without forwarding the explicit `-input` data-test).
+            const nestedInput = this.legendEl.locator('xpath=.//input').first();
+            if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await nestedInput.click();
+                await nestedInput.press('ControlOrMeta+a').catch(() => {});
+                await nestedInput.press('Backspace').catch(() => {});
+                await nestedInput.fill(legend);
+                return true;
+            }
+            // Else, the data-test is on the input element directly
+            const tagName = await this.legendEl.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                await this.legendEl.press('ControlOrMeta+a').catch(() => {});
+                await this.legendEl.press('Backspace').catch(() => {});
+                await this.legendEl.fill(legend);
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * Read the legend input value (OCombobox `-input` or fallback to nested input).
+     * Returns '' if no fillable input is present.
+     */
+    async getLegendValue() {
+        if (await this.legendFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await this.legendFieldInput.inputValue().catch(() => '');
+        }
+        const nestedInput = this.legendEl.locator('xpath=.//input').first();
+        if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await nestedInput.inputValue().catch(() => '');
+        }
+        return await this.legendEl.inputValue().catch(() => '');
+    }
+
+    /**
+     * Read the step-value input value (OInput `-field` or fallback to nested input).
+     * Spec callers used to read `stepValueEl.inputValue()` directly — that fails
+     * because the wrapper is a <div>, not an <input>. Use this helper instead.
+     */
+    async getStepValue() {
+        if (await this.stepValueFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await this.stepValueFieldInput.inputValue().catch(() => '');
+        }
+        const nestedInput = this.stepValueEl.locator('xpath=.//input').first();
+        if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await nestedInput.inputValue().catch(() => '');
+        }
+        return await this.stepValueEl.inputValue().catch(() => '');
     }
 
     /**
@@ -508,19 +806,32 @@ export class MetricsBuilderPage {
      * @param {string} stepValue - e.g., "30s", "1m"
      */
     async setStepValue(stepValue) {
-        const stepField = this.page.locator(this.stepValueInput);
-        if (await stepField.isVisible({ timeout: 3000 })) {
-            // data-test is directly on the <input> element, not a wrapper
-            const tagName = await stepField.evaluate(el => el.tagName).catch(() => '');
-            if (tagName === 'INPUT') {
-                await stepField.click();
-                await stepField.fill(stepValue);
-            } else {
-                const input = stepField.locator('input').first();
-                await input.click();
-                await input.fill(stepValue);
+        if (await this.stepValueEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // Prefer OInput `-field` variant
+            if (await this.stepValueFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await this.stepValueFieldInput.click();
+                await this.stepValueFieldInput.press('ControlOrMeta+a').catch(() => {});
+                await this.stepValueFieldInput.press('Backspace').catch(() => {});
+                await this.stepValueFieldInput.fill(stepValue);
+                return true;
             }
-            return true;
+            // Fallback: descend into the wrapper to find the native input child
+            const nestedInput = this.stepValueEl.locator('xpath=.//input').first();
+            if (await nestedInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await nestedInput.click();
+                await nestedInput.press('ControlOrMeta+a').catch(() => {});
+                await nestedInput.press('Backspace').catch(() => {});
+                await nestedInput.fill(stepValue);
+                return true;
+            }
+            // data-test is directly on the <input> element
+            const tagName = await this.stepValueEl.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                await this.stepValueEl.click();
+                await this.stepValueEl.fill(stepValue);
+                return true;
+            }
+            return false;
         }
         return false;
     }
@@ -530,20 +841,22 @@ export class MetricsBuilderPage {
      * @param {'range'|'instant'} queryType
      */
     async selectQueryType(queryType) {
-        const qtSelect = this.page.locator(this.queryTypeSelect);
-        if (await qtSelect.isVisible({ timeout: 3000 })) {
-            await qtSelect.click();
-            // OSelect forwards its parent data-test (`${parentDataTest}-popover`)
-            const popover = this.page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
-            await popover.waitFor({ state: 'visible', timeout: 5000 });
+        if (await this.queryTypeEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.queryTypeEl.click();
+            await this.queryTypePopover.waitFor({ state: 'visible', timeout: 5000 });
 
-            const label = queryType === 'range' ? 'Range' : 'Instant';
-            const option = this.page
-                .locator('[data-test="dashboard-promql-builder-query-type-option"]', { hasText: label })
-                .first();
-            if (await option.isVisible({ timeout: 3000 })) {
+            const valueKey = queryType === 'range' ? 'range' : 'instant';
+            const option = this.page.locator(`[data-test="dashboard-promql-builder-query-type-option"][data-test-value="${valueKey}"]`).first();
+            if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.queryTypePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                return true;
+            }
+            // Fallback: legacy Range/Instant capitalised values
+            const altOption = this.page.locator(`[data-test="dashboard-promql-builder-query-type-option"][data-test-value="${queryType === 'range' ? 'Range' : 'Instant'}"]`).first();
+            if (await altOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await altOption.click();
+                await this.queryTypePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -554,8 +867,8 @@ export class MetricsBuilderPage {
      * Check if Options section is visible (legend, step value, query type)
      */
     async isOptionsVisible() {
-        const legend = await this.page.locator(this.legendInput).isVisible({ timeout: 2000 }).catch(() => false);
-        const step = await this.page.locator(this.stepValueInput).isVisible({ timeout: 2000 }).catch(() => false);
+        const legend = await this.legendEl.isVisible({ timeout: 2000 }).catch(() => false);
+        const step = await this.stepValueEl.isVisible({ timeout: 2000 }).catch(() => false);
         return legend || step;
     }
 
@@ -565,9 +878,18 @@ export class MetricsBuilderPage {
      * Click the Run Query / Apply button
      */
     async clickRunQuery() {
-        const runBtn = this.page.locator(this.runQueryButton).first();
-        await runBtn.click();
-        await this.page.waitForTimeout(2000);
+        await this.runQueryBtn.click();
+        await this.runQueryBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    }
+
+    /**
+     * Wait deterministically for a query response (PromQL endpoints)
+     */
+    async waitForQueryResponse(timeout = 15000) {
+        return this.page.waitForResponse(
+            (resp) => /\/prometheus\/api\/v1\/query(_range)?/.test(resp.url()),
+            { timeout }
+        ).catch(() => null);
     }
 
     // ===== Add to Dashboard =====
@@ -576,18 +898,16 @@ export class MetricsBuilderPage {
      * Click Add to Dashboard button
      */
     async clickAddToDashboard() {
-        const addBtn = this.page.locator(this.addToDashboardButton).first();
-        if (await addBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await addBtn.click();
+        if (await this.addToDashboardBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await this.addToDashboardBtn.click();
             // Wait for the "Add to Dashboard" side panel to fully load (matches visualise.js pattern)
-            const sidePanelTitle = this.page.locator(this.dashboardDialogTitle);
-            const panelOpened = await sidePanelTitle.waitFor({ state: 'visible', timeout: 10000 })
+            const panelOpened = await this.dashboardDialogEl.waitFor({ state: 'visible', timeout: 10000 })
                 .then(() => true)
                 .catch(() => false);
             if (!panelOpened) {
                 return false;
             }
-            await sidePanelTitle.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+            await this.dashboardDialogEl.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -597,7 +917,7 @@ export class MetricsBuilderPage {
      * Check if Add to Dashboard dialog is visible
      */
     async isDashboardDialogVisible() {
-        return await this.page.locator(this.dashboardDialogTitle).isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.dashboardDialogEl.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
@@ -605,19 +925,21 @@ export class MetricsBuilderPage {
      * @param {string} title
      */
     async fillPanelTitle(title) {
-        const titleInput = this.page.locator(this.dashboardPanelTitleInput);
-        if (await titleInput.isVisible({ timeout: 3000 })) {
-            // data-test may be directly on the <input> element
-            const tagName = await titleInput.evaluate(el => el.tagName).catch(() => '');
-            if (tagName === 'INPUT') {
-                await titleInput.click();
-                await titleInput.fill(title);
-            } else {
-                const input = titleInput.locator('input').first();
-                await input.click();
-                await input.fill(title);
-            }
+        // Prefer OInput `-field` variant
+        if (await this.dashboardPanelTitleFieldEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.dashboardPanelTitleFieldEl.press('ControlOrMeta+a').catch(() => {});
+            await this.dashboardPanelTitleFieldEl.press('Backspace').catch(() => {});
+            await this.dashboardPanelTitleFieldEl.fill(title);
             return true;
+        }
+        if (await this.dashboardPanelTitleEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // data-test may be directly on the <input> element
+            const tagName = await this.dashboardPanelTitleEl.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                await this.dashboardPanelTitleEl.click();
+                await this.dashboardPanelTitleEl.fill(title);
+                return true;
+            }
         }
         return false;
     }
@@ -626,10 +948,9 @@ export class MetricsBuilderPage {
      * Click Cancel in Add to Dashboard dialog
      */
     async clickDashboardCancel() {
-        const cancelBtn = this.page.locator(this.dashboardCancelButton);
-        if (await cancelBtn.isVisible({ timeout: 3000 })) {
-            await cancelBtn.click();
-            await cancelBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        if (await this.dashboardCancelBtn.isVisible({ timeout: 3000 })) {
+            await this.dashboardCancelBtn.click();
+            await this.dashboardCancelBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -639,13 +960,25 @@ export class MetricsBuilderPage {
      * Click Add in Add to Dashboard dialog
      */
     async clickDashboardAdd() {
-        const addBtn = this.page.locator(this.dashboardAddButton);
-        if (await addBtn.isVisible({ timeout: 3000 })) {
-            await addBtn.click();
-            await this.page.waitForTimeout(1000);
-            return true;
-        }
-        return false;
+        if (!await this.dashboardAddBtn.isVisible({ timeout: 3000 })) return false;
+        // Add-to-Dashboard primary button is disabled until folder + dashboard
+        // + tab are picked; poll until the disabled state clears, otherwise the
+        // click is a no-op and the drawer never closes.
+        const enabled = await this.page.waitForFunction(
+            () => {
+                const btn = document.querySelector('[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]');
+                if (!btn) return false;
+                if (btn.hasAttribute('disabled')) return false;
+                if (btn.getAttribute('aria-disabled') === 'true') return false;
+                if (btn.getAttribute('data-disabled') !== null) return false;
+                return true;
+            },
+            { timeout: 5000 }
+        ).then(() => true).catch(() => false);
+        if (!enabled) return false;
+        await this.dashboardAddBtn.click();
+        await this.dashboardDialogEl.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+        return true;
     }
 
     // ===== Builder UI Visibility Checks =====
@@ -655,8 +988,8 @@ export class MetricsBuilderPage {
      * (Label Filters section, Operations section, Options section)
      */
     async isBuilderUIVisible() {
-        const labelFiltersVisible = await this.page.locator(this.addLabelFilterButton).isVisible({ timeout: 3000 }).catch(() => false);
-        const operationsVisible = await this.page.locator(this.addOperationButton).isVisible({ timeout: 3000 }).catch(() => false);
+        const labelFiltersVisible = await this.addLabelFilterBtn.isVisible({ timeout: 3000 }).catch(() => false);
+        const operationsVisible = await this.addOperationBtn.isVisible({ timeout: 3000 }).catch(() => false);
         return labelFiltersVisible || operationsVisible;
     }
 
@@ -664,40 +997,42 @@ export class MetricsBuilderPage {
      * Check if the Add Label Filter button is visible
      */
     async isAddLabelFilterVisible() {
-        return await this.page.locator(this.addLabelFilterButton).isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.addLabelFilterBtn.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
      * Check if the Add Operation button is visible
      */
     async isAddOperationVisible() {
-        return await this.page.locator(this.addOperationButton).isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.addOperationBtn.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
-        // OSelect (Reka Listbox role=option) post-migration; q-select (.q-menu .q-item) pre.
-        const rekaCount = await this.page.locator('').count();
-        if (rekaCount > 0) return true;
-        const menu = this.page.locator('[data-test$="-popover"]').filter({ has: this.page.locator('[data-test$="-option"]') });
-        const count = await menu.first().locator('.q-item').count();
-        return count > 0;
+        return (await this.labelOptions.count()) > 0;
     }
 
     /**
-     * Get the MetricSelector component's q-select element
+     * Get the MetricSelector component locator
      */
     getMetricSelectorLocator() {
-        return this.page.locator('[data-test="metric-selector"]');
+        return this.metricSelectorEl;
+    }
+
+    /**
+     * Per-value MetricSelector option factory.
+     */
+    getMetricSelectorOptionByValue(value) {
+        return this.page.locator(`[data-test="metric-selector-option"][data-test-value="${value}"]`).first();
     }
 
     /**
      * Check if MetricSelector component is visible (builder mode metric dropdown)
      */
     async isBuilderMetricSelectorVisible() {
-        return await this.getMetricSelectorLocator().isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.metricSelectorEl.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
@@ -705,25 +1040,23 @@ export class MetricsBuilderPage {
      * @param {string} metricName
      */
     async selectBuilderMetric(metricName) {
-        const selector = this.getMetricSelectorLocator();
-        if (!await selector.isVisible({ timeout: 5000 })) return false;
+        if (!await this.metricSelectorEl.isVisible({ timeout: 5000 })) return false;
 
-        await selector.click();
-        // MetricSelector uses OSelect (Reka Listbox) — fall back to .q-menu legacy
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.metricSelectorEl.click();
+        // MetricSelector uses OSelect (Reka Listbox)
+        await this.metricSelectorPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-        // Type to filter
-        const input = selector.locator('input').first();
-        if (await input.isVisible({ timeout: 2000 })) {
-            await input.fill(metricName);
-            await this.page.waitForTimeout(1000);
+        // OSelect popover search: Ctrl+A → Backspace → fill via -field
+        if (await this.metricSelectorFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await this.metricSelectorFieldInput.press('ControlOrMeta+a').catch(() => {});
+            await this.metricSelectorFieldInput.press('Backspace').catch(() => {});
+            await this.metricSelectorFieldInput.fill(metricName);
         }
 
-        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: metricName }).first();
-        if (await option.isVisible({ timeout: 5000 })) {
+        const option = this.getMetricSelectorOptionByValue(metricName);
+        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
             await option.click();
-            await this.page.waitForTimeout(1500);
+            await this.metricSelectorPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -733,30 +1066,76 @@ export class MetricsBuilderPage {
      * Get the currently selected metric from MetricSelector
      */
     async getBuilderMetricValue() {
-        const selector = this.getMetricSelectorLocator();
-        // Try input value first (Quasar q-select with use-input)
-        const input = selector.locator('input').first();
-        if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await input.inputValue().catch(() => '');
+        if (await this.metricSelectorFieldInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await this.metricSelectorFieldInput.inputValue().catch(() => '');
         }
-        return await selector.textContent().catch(() => '');
+        return await this.metricSelectorEl.textContent().catch(() => '');
     }
 
     /**
      * Get operation dialog categories (expansion panel labels)
      */
     async getOperationCategories() {
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
-        if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
+        if (!await this.operationDialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
 
-        const headers = dialog.locator('[data-reka-accordion-trigger], [aria-expanded], [data-test*="category"]');
-        const count = await headers.count();
+        const count = await this.operationDialogHeaders.count();
         const categories = [];
         for (let i = 0; i < count; i++) {
-            const text = await headers.nth(i).textContent().catch(() => '');
+            const text = await this.operationDialogHeaders.nth(i).textContent().catch(() => '');
             if (text.trim()) categories.push(text.trim());
         }
         return categories;
+    }
+
+    /**
+     * Get operation dialog search input (used by spec; routes via PO).
+     */
+    getOperationSearchInput() {
+        return this.operationDialogSearchInput;
+    }
+
+    /**
+     * Count visible operation options inside the dialog.
+     */
+    async getOperationOptionCount() {
+        return await this.operationDialogOptions.count();
+    }
+
+    /**
+     * Set the operation search query (OSelect popover pattern: Ctrl+A → Backspace → fill).
+     * Falls back to the dialog `input` field input if `-field` variant is not present.
+     * @param {string} query
+     */
+    async setOperationSearch(query) {
+        const fieldInput = this.operationDialog.locator('[data-test="operations-list-search-input-field"]').first();
+        if (await fieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await fieldInput.press('ControlOrMeta+a').catch(() => {});
+            await fieldInput.press('Backspace').catch(() => {});
+            if (query) await fieldInput.fill(query);
+            return;
+        }
+        if (await this.operationDialogSearchInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await this.operationDialogSearchInput.press('ControlOrMeta+a').catch(() => {});
+            await this.operationDialogSearchInput.press('Backspace').catch(() => {});
+            if (query) await this.operationDialogSearchInput.fill(query);
+        }
+    }
+
+    /**
+     * Wait until the operation option count converges to the predicate. Used by the
+     * search test to avoid sleeps.
+     */
+    async waitForOperationOptionCount(predicate, timeout = 5000) {
+        await this.page.waitForFunction(
+            (fn) => {
+                const els = document.querySelectorAll('[data-test="operations-list-operation-selector-dialog"] [data-test^="promql-operation-option-"]');
+                // eslint-disable-next-line no-new-func
+                const matchFn = new Function('count', `return (${fn})(count);`);
+                return matchFn(els.length);
+            },
+            predicate.toString(),
+            { timeout }
+        ).catch(() => {});
     }
 
     /**
@@ -764,11 +1143,9 @@ export class MetricsBuilderPage {
      */
     async closeOperationDialog() {
         // OperationsList dialog now uses ODialog with primary button label "Close".
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
-        const closeBtn = dialog.locator('[data-test="o-dialog-primary-btn"]');
-        if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await closeBtn.click();
-            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        if (await this.operationDialogCloseBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.operationDialogCloseBtn.click();
+            await this.operationDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -778,8 +1155,7 @@ export class MetricsBuilderPage {
      * Check if operation selector dialog is visible
      */
     async isOperationDialogVisible() {
-        return await this.page
-            .locator('[data-test="operations-list-operation-selector-dialog"]')
+        return await this.operationDialog
             .isVisible({ timeout: 2000 })
             .catch(() => false);
     }
@@ -788,28 +1164,37 @@ export class MetricsBuilderPage {
      * Check if value dropdown is disabled (no label selected)
      */
     async isValueSelectDisabled() {
-        const valueDropdown = this.page.locator(this.valueSelect).last();
-        await valueDropdown.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
-        const isDisabled = await valueDropdown.evaluate(el => {
-            // Quasar q-select disabled detection: check the element and its ancestors/descendants
-            // for disabled indicators
+        await this.valueSelectLast.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+        const isDisabled = await this.valueSelectLast.evaluate(el => {
+            // OSelect post-migration: the PopoverTrigger button (`-trigger`) is
+            // the element that carries the disabled state when `:disabled` is
+            // set on the OSelect. We also check ancestor data-disabled, native
+            // disabled attr, and the legacy q-field--disabled class for safety.
             const hasDisabledClass = (node) => {
                 if (!node) return false;
                 const cls = node.className || '';
                 return cls.includes('q-field--disabled') || cls.includes('disabled');
             };
-            // Check the element itself
+            // Find the OSelect trigger inside the wrapper (post-migration) — the
+            // disabled flag binds to the PopoverTrigger button.
+            const trigger = el.querySelector('[data-test$="-trigger"]');
+            if (trigger) {
+                if (trigger.hasAttribute('disabled')) return true;
+                if (trigger.getAttribute('data-disabled') !== null) return true;
+                if (trigger.getAttribute('aria-disabled') === 'true') return true;
+                const cls = trigger.className || '';
+                if (cls.includes('data-[disabled]') || cls.includes('cursor-not-allowed') || cls.includes('disabled:')) {
+                    // class-based hint only; rely on actual attrs below
+                }
+            }
             if (hasDisabledClass(el)) return true;
-            // Check parent (q-field wrapper)
             if (hasDisabledClass(el.parentElement)) return true;
-            // Check aria-disabled
             if (el.getAttribute('aria-disabled') === 'true') return true;
-            // Check for disabled child elements (Quasar may nest q-field inside)
-            if (el.querySelector('.q-field--disabled')) return true;
-            // Check if the inner input/control is disabled
+            if (el.getAttribute('data-disabled') === 'true') return true;
+            if (el.querySelector('[aria-disabled="true"]')) return true;
+            if (el.querySelector('[data-disabled]')) return true;
             const input = el.querySelector('input');
             if (input && input.disabled) return true;
-            // Check computed pointer-events (Quasar disabled fields have pointer-events: none)
             const style = window.getComputedStyle(el);
             if (style.pointerEvents === 'none') return true;
             return false;
@@ -822,7 +1207,6 @@ export class MetricsBuilderPage {
     /**
      * Capture the PromQL query from the API request when Run Query is clicked.
      * Stays in Builder mode — no mode switching needed.
-     * Sets up request interception, clicks Run Query, and returns the captured query.
      * @returns {Promise<string>} The PromQL query string from the request
      */
     async captureQueryFromRunRequest() {
@@ -833,8 +1217,7 @@ export class MetricsBuilderPage {
         );
 
         // Click Run Query
-        const runBtn = this.page.locator(this.runQueryButton).first();
-        await runBtn.click();
+        await this.runQueryBtn.click();
 
         const request = await requestPromise;
         const url = new URL(request.url(), 'http://localhost');
@@ -853,8 +1236,8 @@ export class MetricsBuilderPage {
             }
         }
 
-        // Wait for response to complete
-        await this.page.waitForTimeout(2000);
+        // Wait for the corresponding response so the chart renders before assertions
+        await this.waitForQueryResponse(15000);
         return decodeURIComponent(query);
     }
 
@@ -864,15 +1247,26 @@ export class MetricsBuilderPage {
      * @returns {Promise<string>} The PromQL query string
      */
     async getQueryPreviewText() {
-        const queryEditor = this.page.locator('[data-test="dashboard-panel-query-editor"]').first();
-        if (await queryEditor.isVisible({ timeout: 5000 }).catch(() => false)) {
-            // Read from Monaco editor's .view-lines
-            const text = await queryEditor.locator('.view-lines').textContent().catch(() => '');
-            return text.trim();
+        if (!await this.queryEditorEl.isVisible({ timeout: 5000 }).catch(() => false)) {
+            return '';
         }
-        // Fallback: try any visible .view-lines in the query area
-        const fallback = await this.page.locator('.view-lines').first().textContent().catch(() => '');
-        return fallback.trim();
+        // Read directly from the Monaco model via window.monaco
+        const text = await this.queryEditorEl.evaluate(() => {
+            try {
+                const editors = window.monaco?.editor?.getEditors?.() || [];
+                for (const ed of editors) {
+                    const model = ed.getModel?.();
+                    if (model) {
+                        const val = model.getValue?.();
+                        if (val && val.length > 0) return val;
+                    }
+                }
+            } catch (_e) {
+                // ignore
+            }
+            return '';
+        }).catch(() => '');
+        return (text || '').trim();
     }
 
     /**
@@ -883,9 +1277,10 @@ export class MetricsBuilderPage {
     async verifyBuilderState() {
         const state = {};
 
-        // 1. Read metric from stream selector
-        const streamInput = this.page.locator(this.streamSelector);
-        state.metric = await streamInput.inputValue().catch(() => '');
+        // 1. Read metric from stream selector (OSelect — use the trigger's
+        //    `data-test-selected-value` attribute, not inputValue() on the
+        //    wrapper div).
+        state.metric = await this.getStreamSelectedValue();
 
         // 2. Read label filter chip texts
         const filterCount = await this.getLabelFilterCount();
@@ -904,22 +1299,14 @@ export class MetricsBuilderPage {
         }
 
         // 4. Read options
-        const legendField = this.page.locator(this.legendInput);
-        if (await legendField.isVisible({ timeout: 2000 }).catch(() => false)) {
-            const legendInput = legendField.locator('input').first();
-            state.legend = await legendInput.inputValue().catch(() => '');
+        if (await this.legendEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+            state.legend = await this.getLegendValue();
         } else {
             state.legend = '';
         }
 
-        const stepField = this.page.locator(this.stepValueInput);
-        if (await stepField.isVisible({ timeout: 2000 }).catch(() => false)) {
-            const tagName = await stepField.evaluate(el => el.tagName).catch(() => '');
-            if (tagName === 'INPUT') {
-                state.stepValue = await stepField.inputValue().catch(() => '');
-            } else {
-                state.stepValue = await stepField.locator('input').first().inputValue().catch(() => '');
-            }
+        if (await this.stepValueEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+            state.stepValue = await this.getStepValue();
         } else {
             state.stepValue = '';
         }
@@ -929,26 +1316,23 @@ export class MetricsBuilderPage {
 
     /**
      * Verify the table chart has rendered with data rows.
-     * Checks for the q-table with headers and at least one data row.
+     * Checks for the table with headers and at least one data row.
      * @returns {Promise<{visible: boolean, rowCount: number, headers: string[]}>}
      */
     async getTableChartData() {
-        const table = this.page.locator('[data-test="dashboard-panel-table"]');
-        const visible = await table.isVisible({ timeout: 5000 }).catch(() => false);
+        const visible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         if (!visible) return { visible: false, rowCount: 0, headers: [] };
 
-        // Get header texts
+        // Get header texts via the data-test header cells
         const headers = [];
-        const thElements = table.locator('thead th');
-        const headerCount = await thElements.count().catch(() => 0);
+        const headerCount = await this.tableHeaderCells.count().catch(() => 0);
         for (let i = 0; i < headerCount; i++) {
-            const text = await thElements.nth(i).textContent().catch(() => '');
+            const text = await this.tableHeaderCells.nth(i).textContent().catch(() => '');
             if (text.trim()) headers.push(text.trim());
         }
 
-        // Count data rows (TanStack dashboard mode uses data-test="dashboard-data-row")
-        const rows = table.locator('[data-test="dashboard-data-row"], tbody tr');
-        const rowCount = await rows.count().catch(() => 0);
+        // Count data rows
+        const rowCount = await this.tableRows.count().catch(() => 0);
 
         return { visible, rowCount, headers };
     }
@@ -963,7 +1347,6 @@ export class MetricsBuilderPage {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
         if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
             await chartItem.click();
-            await this.page.waitForTimeout(500);
             return true;
         }
         return false;
@@ -982,10 +1365,8 @@ export class MetricsBuilderPage {
      */
     async isChartRendered() {
         // Check for chart-renderer canvas or table-renderer
-        const chartCanvas = this.page.locator('[data-test="chart-renderer"]');
-        const tableRenderer = this.page.locator('[data-test="dashboard-panel-table"]');
-        const chartVisible = await chartCanvas.isVisible({ timeout: 5000 }).catch(() => false);
-        const tableVisible = await tableRenderer.isVisible({ timeout: 5000 }).catch(() => false);
+        const chartVisible = await this.chartRenderer.isVisible({ timeout: 5000 }).catch(() => false);
+        const tableVisible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         return chartVisible || tableVisible;
     }
 
@@ -996,15 +1377,13 @@ export class MetricsBuilderPage {
      * @param {string} folderName - folder name to select (default: "default")
      */
     async selectDashboardFolder(folderName = 'default') {
-        const folderDropdown = this.page.locator('[data-test="index-dropdown-stream_type"]');
-        if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await folderDropdown.click();
-            // SelectFolderDropDown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
-            const option = this.page.locator('[data-test$="-option"]').filter({ hasText: folderName }).first();
+        if (await this.folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.folderDropdown.click();
+            await this.folderPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            const option = this.page.locator(`[data-test="index-dropdown-stream_type-option"][data-test-value="${folderName}"]`).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.folderPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1016,23 +1395,21 @@ export class MetricsBuilderPage {
      * @param {string} dashboardName
      */
     async selectDashboardInDialog(dashboardName) {
-        const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
-        if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await dashDropdown.click();
-            // SelectDashboardDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
+        if (await this.dashboardDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await this.dashboardDropdown.click();
+            await this.dashboardDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-            // Type to filter
-            const input = dashDropdown.locator('input').first();
-            if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await input.fill(dashboardName);
-                await this.page.waitForTimeout(1000);
+            // OSelect popover search: Ctrl+A → Backspace → fill
+            if (await this.dashboardDropdownFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await this.dashboardDropdownFieldInput.press('ControlOrMeta+a').catch(() => {});
+                await this.dashboardDropdownFieldInput.press('Backspace').catch(() => {});
+                await this.dashboardDropdownFieldInput.fill(dashboardName);
             }
 
-            const option = this.page.locator('[data-test$="-option"]').filter({ hasText: dashboardName }).first();
+            const option = this.page.locator(`[data-test="dashboard-dropdown-dashboard-selection-option"][data-test-value="${dashboardName}"]`).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.dashboardDropdownPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1044,36 +1421,27 @@ export class MetricsBuilderPage {
      * @param {string} tabName
      */
     async selectDashboardTab(tabName = 'Default') {
-        const tabDropdown = this.page.locator('[data-test="dashboard-dropdown-tab-selection"]');
-
         // Wait for the tab dropdown to become visible (it appears only after a dashboard is selected)
-        if (!await tabDropdown.isVisible({ timeout: 8000 }).catch(() => false)) {
+        if (!await this.tabDropdown.isVisible({ timeout: 8000 }).catch(() => false)) {
             return false;
         }
 
-        // Wait for the tab list to auto-load and auto-select (SelectTabDropdown onMounted async fetch)
-        await this.page.waitForTimeout(2000);
+        // Wait for the tab list to auto-load via dashboard dropdown popover hidden state
+        await this.dashboardDropdownPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
         // Click an empty area of the Add-to-Dashboard ODrawer panel to dismiss any
-        // open Quasar menu from prior dropdowns (folder/dashboard). The previous
-        // `schema-title-text` element was removed when AddToDashboard migrated to
-        // ODrawer — the drawer's `data-test="add-to-dashboard-dialog"` slug is
-        // safe to click because it's inside the drawer (so it doesn't trigger
-        // interact-outside) but outside teleported q-menus.
-        const drawerPanel = this.page.locator('[data-test="add-to-dashboard-dialog"]');
-        if (await drawerPanel.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await drawerPanel.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
-            await this.page.waitForTimeout(300);
+        // open Quasar menu from prior dropdowns (folder/dashboard).
+        if (await this.dashboardDialogEl.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await this.dashboardDialogEl.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
         }
 
         // Now click the tab dropdown normally
-        await tabDropdown.click();
-        // SelectTabDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
-        await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'visible', timeout: 5000 });
-        const option = this.page.locator('[data-test$="-option"]').filter({ hasText: tabName }).first();
+        await this.tabDropdown.click();
+        await this.tabDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const option = this.page.locator(`[data-test="dashboard-dropdown-tab-selection-option"][data-test-value="${tabName}"]`).first();
         if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('[data-test$="-popover"], [role="listbox"]').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.tabDropdownPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -1112,7 +1480,7 @@ export class MetricsBuilderPage {
 
         // Click Add button to save
         await this.clickDashboardAdd();
-        await this.page.locator(this.dashboardDialogTitle).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await this.dashboardDialogEl.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
 
         return true;
     }
@@ -1124,37 +1492,36 @@ export class MetricsBuilderPage {
      * @param {string} dashboardName
      */
     async createNewDashboardInDialog(dashboardName) {
-        const newDashBtn = this.page.locator('[data-test="dashboard-dashboard-new-add"]');
-        await newDashBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await newDashBtn.waitFor({ state: 'attached', timeout: 5000 });
-        await newDashBtn.click();
+        await this.newDashboardBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await this.newDashboardBtn.waitFor({ state: 'attached', timeout: 5000 });
+        await this.newDashboardBtn.click();
 
         // Wait for the "New dashboard" dialog name input to be fully ready
-        const dashNameInput = this.page.locator('[data-test="add-dashboard-name"]');
-        await dashNameInput.waitFor({ state: 'visible', timeout: 10000 });
-        await dashNameInput.waitFor({ state: 'attached', timeout: 5000 });
+        await this.newDashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        await this.newDashboardNameInput.waitFor({ state: 'attached', timeout: 5000 });
 
-        // Click then fill (Quasar q-input needs click to focus first)
-        await dashNameInput.click();
-        await dashNameInput.fill(dashboardName);
+        // Prefer the OInput `-field` variant
+        if (await this.newDashboardNameFieldInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await this.newDashboardNameFieldInput.click();
+            await this.newDashboardNameFieldInput.fill(dashboardName);
+        } else {
+            // Click then fill on the wrapper
+            await this.newDashboardNameInput.click();
+            await this.newDashboardNameInput.fill(dashboardName);
+        }
 
         // Submit dashboard creation — SelectDashboardDropdown wraps AddDashboard in an
         // ODrawer with `data-test="dashboard-dashboard-add-dialog"`, and the legacy
         // `dashboard-add-submit` button was removed in favour of the ODrawer footer
         // primary action (Save) which calls `addDashboardRef?.submit()`.
-        const submitBtn = this.page.locator(
-            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
-        );
-        await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await submitBtn.click();
+        await this.newDashboardSubmitBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await this.newDashboardSubmitBtn.click();
 
         // Wait for the inner "New dashboard" drawer to close (parent "Add to Dashboard"
         // drawer stays open and auto-selects the newly created dashboard).
-        await this.page
-            .locator('[data-test="dashboard-dashboard-add-dialog"]')
+        await this.newDashboardDialogEl
             .waitFor({ state: 'hidden', timeout: 10000 })
             .catch(() => {});
-        await this.page.waitForTimeout(3000);
     }
 
     /**
@@ -1164,35 +1531,18 @@ export class MetricsBuilderPage {
      * @returns {Promise<string>} The name of the selected/created dashboard
      */
     async ensureDashboardSelected() {
-        const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
-        await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await this.dashboardDropdown.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Wait for the dashboard list API to finish loading
-        await this.page.waitForTimeout(2000);
-
-        // Check if a dashboard is already auto-selected by reading the q-select's
-        // displayed value. Quasar q-select (without use-input) renders the selected
-        // option text inside .q-field__native > span.
-        const hasSelectedValue = await dashDropdown.evaluate((el) => {
-            const nativeSpans = el.querySelectorAll('.q-field__native > span');
-            for (const span of nativeSpans) {
-                const text = span.textContent?.trim();
-                if (text && text.length > 0 && !text.includes('Select')) {
-                    return text;
-                }
-            }
-            return '';
-        });
-
-        if (hasSelectedValue) {
-            return hasSelectedValue;
+        // OSelect surfaces the active selection via `data-test-selected-label` and
+        // `data-test-selected-value` on the trigger button.
+        const dtValue = await this.dashboardDropdown.getAttribute('data-test-selected-value').catch(() => null);
+        const dtLabel = await this.dashboardDropdown.getAttribute('data-test-selected-label').catch(() => null);
+        const candidate = (dtValue && dtValue.length > 0) ? dtValue : ((dtLabel && dtLabel.length > 0) ? dtLabel : '');
+        if (candidate && !candidate.includes('Select')) {
+            return candidate;
         }
 
         // No dashboard auto-selected — create a new one.
-        // We skip opening the dropdown because when the list is empty,
-        // the q-select shows a "No result" q-item that matches .q-menu .q-item
-        // and pressing Escape to close the menu could close the parent dialog.
-        // This matches the visualise.js pattern of always creating a fresh dashboard.
         const newDashName = `test_dash_${Date.now()}`;
         await this.createNewDashboardInDialog(newDashName);
         return newDashName;
@@ -1204,9 +1554,8 @@ export class MetricsBuilderPage {
      * Navigate to dashboards list page
      */
     async navigateToDashboards() {
-        const dashMenu = this.page.locator('[data-test="menu-link-\\/dashboards-item"]');
-        await dashMenu.click();
-        await this.page.waitForTimeout(2000);
+        await this.menuLinkDashboards.click();
+        await this.dashboardSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     }
 
     /**
@@ -1214,8 +1563,7 @@ export class MetricsBuilderPage {
      * @param {string} panelTitle
      */
     async isPanelVisibleOnDashboard(panelTitle) {
-        const panel = this.page.locator(`[data-test="dashboard-panel-bar"]:has-text("${panelTitle}")`);
-        return await panel.isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.getPanelBarByTitle(panelTitle).isVisible({ timeout: 10000 }).catch(() => false);
     }
 
     /**
@@ -1224,28 +1572,27 @@ export class MetricsBuilderPage {
      */
     async deleteDashboard(dashboardName) {
         await this.navigateToDashboards();
-        await this.page.waitForTimeout(1000);
 
-        // Search for the dashboard
-        const searchInput = this.page.locator('[data-test="dashboard-search"]');
-        if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await searchInput.fill(dashboardName);
-            await this.page.waitForTimeout(1000);
+        // Search for the dashboard via OInput field
+        if (await this.dashboardSearchFieldInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.dashboardSearchFieldInput.press('ControlOrMeta+a').catch(() => {});
+            await this.dashboardSearchFieldInput.press('Backspace').catch(() => {});
+            await this.dashboardSearchFieldInput.fill(dashboardName);
+        } else if (await this.dashboardSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await this.dashboardSearchInput.fill(dashboardName);
         }
 
-        // Find the row and click delete
-        const dashboardRow = this.page.locator('tr, .q-tr').filter({ hasText: dashboardName }).first();
+        // Find the row via per-row data-test pattern (dashboard-name-cell-<name> or similar)
+        const dashboardRow = this.page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`).first();
         if (await dashboardRow.isVisible({ timeout: 5000 }).catch(() => false)) {
-            const deleteBtn = dashboardRow.locator('[data-test="dashboard-delete"]');
+            // Walk up to the OTable row and click delete
+            const deleteBtn = dashboardRow.locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]//*[@data-test='dashboard-delete']`).first();
             if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await deleteBtn.click();
-                await this.page.locator('[data-test="o-dialog-primary-btn"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-                // Confirm deletion
-                const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]');
-                if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await confirmBtn.click();
-                    await this.page.waitForTimeout(2000);
+                await this.confirmDeleteBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+                if (await this.confirmDeleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await this.confirmDeleteBtn.click();
+                    await this.confirmDeleteBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                     return true;
                 }
             }
@@ -1254,19 +1601,16 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Check for success notification (positive toast)
+     * Check for success notification (OToast)
      */
     async hasSuccessNotification() {
-        const notification = this.page.locator('[role="alert"]:has-text("success"), [role="alert"]:has-text("added")');
-        return await notification.isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.toastSuccess.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
-     * Check for error notification (negative toast)
+     * Check for error notification (OToast)
      */
     async hasErrorNotification() {
-        const notification = this.page.locator('[role="alert"]:has-text("Error"), [role="alert"]:has-text("error")');
-        return await notification.isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.toastError.isVisible({ timeout: 3000 }).catch(() => false);
     }
 }
-

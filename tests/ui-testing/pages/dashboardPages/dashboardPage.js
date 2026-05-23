@@ -52,6 +52,10 @@ export class DashboardPage {
 
     // Stream & field selection locators
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
+    // OInput wraps the stream-name filter; the wrapper carries
+    // `index-dropdown-stream` and the inner native <input> exposes the
+    // `-field` suffix (per AGENT_RULES §4). Always fill the `-field` variant.
+    this.streamDropdownInput = page.locator('[data-test="index-dropdown-stream-field"]');
     // OSelect stamps every ListboxItem with `${parent}-option` and
     // `data-test-value="<value>"` — `e2e_automate` is the stream this PO
     // always exercises, so we hoist its option locator to a class member.
@@ -195,9 +199,10 @@ export class DashboardPage {
     await this.streamDropdown.click();
     await this.page.waitForTimeout(500);
 
-    // Type stream name to filter
-    await this.streamDropdown.press("Control+a");
-    await this.streamDropdown.fill("e2e_automate");
+    // Type stream name to filter — fill the inner `-field` input (the wrapper
+    // is a div and cannot be .fill()'d per AGENT_RULES §4).
+    await this.streamDropdownInput.press("Control+a");
+    await this.streamDropdownInput.fill("e2e_automate");
     await this.page.waitForTimeout(1500);
 
     // Select e2e_automate stream option via the class-member locator.

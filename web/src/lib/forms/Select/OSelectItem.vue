@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import { SelectItem, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
 
@@ -15,6 +15,13 @@ defineSlots<SelectItemSlots>();
 // Register original value type into the parent OSelect's value map so that
 // numeric (or boolean or null) values are recovered when Reka UI returns a string.
 const valueMap = inject(SELECT_VALUE_MAP_KEY, null);
+
+// Inject the parent OSelect's data-test (forwarded via provide) so that
+// option rows receive a `<parent>-option` data-test attribute and a
+// `data-test-value` mirroring the option's value. Matches the listbox-mode
+// behaviour and keeps e2e selectors data-test-only (§4 OSelect convention).
+const parentDataTestRef = inject(SELECT_PARENT_DATA_TEST_KEY, null);
+const parentDataTest = computed(() => parentDataTestRef?.value);
 
 /** Internal string Reka sees — null maps to the sentinel */
 const rekaValue = computed(() =>
@@ -33,6 +40,8 @@ onUnmounted(() => {
   <SelectItem
     :value="rekaValue"
     :disabled="props.disabled"
+    :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
+    :data-test-value="rekaValue"
     :class="[
       'tw:relative tw:flex tw:items-center tw:w-full',
       'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
