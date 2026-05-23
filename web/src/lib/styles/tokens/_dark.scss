@@ -151,6 +151,14 @@
     --color-badge-error-soft-bg: color-mix(in srgb, var(--color-error-400) 15%, transparent);
     --color-badge-error-soft-text: var(--color-error-400);
 
+    /* info (blue): brighten for dark bg */
+    --color-badge-info-ol-border: var(--color-info-200);
+    --color-badge-info-ol-text:   var(--color-info-200);
+
+    /* purple: brighten for dark bg */
+    --color-badge-purple-ol-border: var(--color-purple-400);
+    --color-badge-purple-ol-text:   var(--color-purple-400);
+
     /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);
     --color-button-outline-warning-text: var(--color-warning-400);

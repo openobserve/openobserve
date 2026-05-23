@@ -158,15 +158,15 @@ export default defineComponent({
         header: t("organization.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
+        size: 500,
+        meta: { align: "left" },
       },
       {
         id: "identifier",
         header: t("organization.identifier"),
         accessorKey: "identifier",
         sortable: true,
-        size: 260,
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "type",
@@ -195,7 +195,7 @@ export default defineComponent({
       size: 80,
       minSize: 64,
       maxSize: 100,
-      meta: { align: "left", actionCount: 1 },
+      meta: { align: "center", actionCount: 1 },
     });
 
     watch(

@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <NoData />
           </template>
           <template #bottom>
-            <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ rows.length }} {{ t('iam.groups') }}</span>
+            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"

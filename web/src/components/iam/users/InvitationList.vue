@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="tw:text-xs tw:text-text-primary tw:font-bold">
+            <span class="o2-table-footer-title tw:text-text-primary">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>

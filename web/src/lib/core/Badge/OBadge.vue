@@ -80,6 +80,16 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:text-badge-error-ol-text",
     "tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border",
   ].join(" "),
+  "info-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-info-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-info-ol-border",
+  ].join(" "),
+  "purple-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-purple-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border",
+  ].join(" "),
   // Soft (light tinted bg, dark text — no ring)
   "default-soft":
     "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text",

@@ -10,7 +10,8 @@
  *   default | primary | success | warning | error
  *
  * Outline variants (transparent background, coloured ring + text):
- *   default-outline | primary-outline | success-outline | warning-outline | error-outline
+ *   default-outline | primary-outline | success-outline | warning-outline | error-outline |
+ *   info-outline | purple-outline
  *
  * Soft variants (light tinted background, dark text — no ring):
  *   default-soft | primary-soft | success-soft | warning-soft | error-soft
@@ -26,6 +27,8 @@ export type BadgeVariant =
   | "success-outline"
   | "warning-outline"
   | "error-outline"
+  | "info-outline"
+  | "purple-outline"
   | "default-soft"
   | "primary-soft"
   | "success-soft"

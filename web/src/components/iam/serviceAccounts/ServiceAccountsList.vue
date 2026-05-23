@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span class="text-weight-medium">AI SRE Agent</span>
-                <OBadge variant="primary-soft" size="sm" class="tw:ml-2">system</OBadge>
+                <OBadge variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
               </template>
               <template v-else>{{ row.email }}</template>
             </template>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <OBadge variant="default">
+                <OBadge variant="default-outline">
                     {{ t('serviceAccounts.systemManaged', 'System Managed') }}
                   <OTooltip v-if="row.description" :content="row.description" />
                 </OBadge>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <span class="tw:text-text-primary tw:text-xs tw:font-bold">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <span class="o2-table-footer-title tw:text-text-primary">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
@@ -330,15 +330,15 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "email",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
+        size: 550,
+        meta: { align: "left" },
       },
       {
         id: "first_name",
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
-        size: 150,
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "token",
@@ -508,7 +508,7 @@ export default defineComponent({
               token: res.token ? redactToken(res.token) : '',
             };
 
-            serviceAccountsState.service_accounts_users.push(user);
+            serviceAccountsState.service_accounts_users = [...serviceAccountsState.service_accounts_users, user];
             resultTotal.value = serviceAccountsState.service_accounts_users.length;
           }
         } else {
@@ -517,13 +517,11 @@ export default defineComponent({
               message: "Service Account updated successfully.",
             });
           }, 2000);
-          serviceAccountsState.service_accounts_users.forEach((member: any, key: number) => {
+          serviceAccountsState.service_accounts_users = serviceAccountsState.service_accounts_users.map((member: any) => {
             if (member.email == data.email) {
-              serviceAccountsState.service_accounts_users[key] = {
-                ...serviceAccountsState.service_accounts_users[key],
-                ...data,
-              };
+              return { ...member, ...data };
             }
+            return member;
           });
         }
       }

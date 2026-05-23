@@ -911,7 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <OBadge variant="primary" class="tw:w-fit">
+                          <OBadge :variant="getStreamTypeVariant(alerts[selectedAlertIndex]?.stream_type)" class="tw:w-fit">
                             <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
                           </OBadge>
                         </div>
@@ -2216,6 +2216,21 @@ export default defineComponent({
       }
     };
 
+    const getStreamTypeVariant = (streamType: string): BadgeVariant => {
+      switch (streamType?.toLowerCase()) {
+        case "logs":
+          return "info-outline";
+        case "metrics":
+          return "purple-outline";
+        case "traces":
+          return "success-outline";
+        case "rum":
+          return "warning-outline";
+        default:
+          return "primary-outline";
+      }
+    };
+
     const getSeverityVariant = (severity: string): BadgeVariant => {
       switch (severity) {
         case "P1":
@@ -2912,6 +2927,7 @@ export default defineComponent({
       getStatusLabel,
       getSeverityColorHex,
       getSeverityVariant,
+      getStreamTypeVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,
