@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <td class="label tw:px-2">End time</td>
                   </tr>
                   <tr>
-                    <td>
+                    <td class="tw:pr-1.5">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.startTime"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </td>
-                    <td>
+                    <td class="tw:pl-1.5">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.endTime"

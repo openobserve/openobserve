@@ -386,7 +386,7 @@ const triggerClasses = computed(() => [
             type="button"
             :class="[
               'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
-              activeTab === 'tw:relative'
+              activeTab === 'relative'
                 ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
                 : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
             ]"
@@ -399,7 +399,7 @@ const triggerClasses = computed(() => [
             type="button"
             :class="[
               'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
-              activeTab === 'tw:absolute'
+              activeTab === 'absolute'
                 ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
                 : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
             ]"

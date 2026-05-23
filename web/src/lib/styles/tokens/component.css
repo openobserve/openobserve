@@ -498,7 +498,7 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-border-strong);
+  --color-datepicker-border: var(--color-border-default);
   --color-datepicker-hover-border: var(--color-primary-400);
   --color-datepicker-focus-border: var(--color-primary-500);
   --color-datepicker-focus-ring: var(--color-primary-400);
