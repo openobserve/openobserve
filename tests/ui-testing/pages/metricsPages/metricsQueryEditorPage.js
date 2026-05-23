@@ -397,10 +397,24 @@ export class MetricsQueryEditorPage {
         // autocomplete on cloud which corrupts the query text
         await this.page.keyboard.insertText(query);
 
-        // Deterministic wait — verify model contains the query
+        // Deterministic wait — verify Monaco model contains the query
         await expect.poll(async () => {
             return await this.getCurrentQueryText();
         }, { timeout: 3000, intervals: [100, 250, 500] }).toContain(query);
+        let lastVal = '';
+        let stableCount = 0;
+        await expect.poll(async () => {
+            const v = await this.getCurrentQueryText();
+            if (v === lastVal && v.includes(query)) {
+                stableCount += 1;
+            } else {
+                stableCount = 0;
+                lastVal = v;
+            }
+            // 4 consecutive identical reads at 200ms intervals = 800ms of
+            // stability, comfortably past the 500ms debounce window.
+            return stableCount;
+        }, { timeout: 3000, intervals: [200] }).toBeGreaterThanOrEqual(4);
     }
 
     /**

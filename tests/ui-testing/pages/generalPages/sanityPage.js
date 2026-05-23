@@ -236,6 +236,28 @@ export class SanityPage {
         await this.histogramToggleButton.click();
     }
 
+    // Returns true when the histogram OSwitch is currently ON.
+    // OSwitch surfaces its state via a nested `role="switch"` element carrying
+    // `aria-checked="true|false"` — query that rather than the wrapper div.
+    async isHistogramOn() {
+        await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 15000 });
+        const switchControl = this.histogramToggleButton.locator('[role="switch"]');
+        const aria = await switchControl.getAttribute('aria-checked');
+        return aria === 'true';
+    }
+
+    // Ensure the histogram toggle is ON before tests that expect the chart to render.
+    // After the UX revamp, histogram defaults to OFF when a stream is selected via the
+    // index-list dropdown (only direct ?stream=... URL navigation auto-enables it), so
+    // PO methods that assume the chart is visible must turn it on explicitly.
+    async ensureHistogramOn() {
+        if (!(await this.isHistogramOn())) {
+            await this.clickHistogramToggle();
+            await expect(this.histogramToggleButton.locator('[role="switch"]'))
+                .toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+        }
+    }
+
     async toggleHistogramOffAndOn() {
         await this.clickHistogramToggle();
         await this.searchResultTitle.click();
@@ -841,6 +863,12 @@ export class SanityPage {
         // First, ensure data is loaded by clicking the refresh button
         await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
         await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
+
+        // After the UX revamp, histogram defaults to OFF when a stream is selected via the
+        // index-list dropdown (selectStream flow). The chart canvas only mounts when the
+        // OSwitch is ON, so flip it before triggering the search so the histogram payload is
+        // requested as part of the run-query call.
+        await this.ensureHistogramOn();
 
         try {
             await this.refreshButton.click({ timeout: 10000 });

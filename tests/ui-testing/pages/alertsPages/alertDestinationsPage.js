@@ -41,7 +41,13 @@ export class AlertDestinationsPage {
         this.destinationImportJsonBtn = '[data-test="destination-import-json-btn"]';
         this.destinationImportNameError = '[data-test="destination-import-name-error"]';
         this.destinationImportTemplateInput = '[data-test="destination-import-template-input"]';
+        // OSelect search input + popover + option follow the OSelect data-test convention (§4)
+        this.destinationImportTemplateSearch = '[data-test="destination-import-template-input-search"]';
+        this.destinationImportTemplatePopover = '[data-test="destination-import-template-input-popover"]';
+        this.destinationImportTemplateOption = '[data-test="destination-import-template-input-option"]';
+        // OInput wrapper for visibility; inner native `-field` derivative for fill/click (§4)
         this.destinationImportNameInput = '[data-test="destination-import-name-input"]';
+        this.destinationImportNameInputField = '[data-test="destination-import-name-input-field"]';
         this.destinationImportCancelBtn = '[data-test="destination-import-cancel-btn"]';
         this.destinationListSearchInput = '[data-test="destination-list-search-input"]';
         this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -227,7 +233,15 @@ export class AlertDestinationsPage {
         await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
         
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.locator(this.successToastMessage)).toBeVisible({ timeout: 10000 });
+        // Match any OToast variant (success/info) carrying the destination-saved message.
+        // OToast renders message in 3 elements (sr-only span/title + visible message div)
+        // so scope to `o-toast-message` + hasText filter per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: /Destination saved/i })
+                .first()
+        ).toBeVisible({ timeout: 15000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -334,6 +348,41 @@ export class AlertDestinationsPage {
     }
 
     /**
+     * Select a template inside the ImportDestination OSelect (`destination-import-template-input`).
+     *
+     * The consumer binds `:options="filteredTemplates"` and only populates that ref via
+     * the `@search` emit. On first open the list is empty — typing into the OSelect's
+     * search input triggers `@search`, which copies `getFormattedTemplates` into
+     * `filteredTemplates`. After that, the per-value `data-test-value="<name>"` option
+     * resolves cleanly without scrolling/`getByText`.
+     *
+     * @param {string} templateName - Template name to pick (must already exist server-side).
+     */
+    async selectImportTemplate(templateName) {
+        const trigger = this.page.locator(this.destinationImportTemplateInput);
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
+
+        const popover = this.page.locator(this.destinationImportTemplatePopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Drive `@search` on the OSelect search input so `filteredTemplates` is populated.
+        // Type the exact name to narrow to a single matching option (deterministic).
+        const searchInput = this.page.locator(this.destinationImportTemplateSearch);
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+        await searchInput.fill('');
+        await searchInput.fill(templateName);
+
+        const option = popover.locator(`[data-test-value="${templateName}"]`).first();
+        // The parent's `templates` prop is populated async via `getTemplates()` on the
+        // destinations list view; poll briefly so a newly-created template surfaces.
+        await expect(option).toBeVisible({ timeout: 15000 });
+        await option.click();
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.debug('Selected import template via OSelect search', { templateName });
+    }
+
+    /**
      * Import destination from URL
      * @param {string} url - URL of the destination JSON
      * @param {string} templateName - Name of the template to use
@@ -363,11 +412,16 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
-        await this.page.locator(this.destinationImportTemplateInput).click();
-        await this.commonActions.scrollAndFindOption(templateName, 'template');
+        // Resolve the template via the OSelect search-input convention — the legacy
+        // scroll-and-find path used getByText/getByRole + an empty-options dropdown
+        // race that intermittently lost newly-created templates.
+        await this.selectImportTemplate(templateName);
 
-        await this.page.locator(this.destinationImportNameInput).click();
-        await this.page.locator(this.destinationImportNameInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const nameField = this.page.locator(this.destinationImportNameInputField);
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+        await nameField.click();
+        await nameField.fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
         // Wait for import to complete
         await this.page.waitForTimeout(2000);
@@ -777,11 +831,16 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await this.page.waitForTimeout(1000); // Wait for error message
-        await this.page.locator(this.destinationImportTemplateInput).click();
-        await this.commonActions.scrollAndFindOption(templateName, 'template');
+        // Resolve the template via the OSelect search-input convention — the legacy
+        // scroll-and-find path used getByText/getByRole + an empty-options dropdown
+        // race that intermittently lost newly-created templates.
+        await this.selectImportTemplate(templateName);
 
-        await this.page.locator(this.destinationImportNameInput).click();
-        await this.page.locator(this.destinationImportNameInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const nameField = this.page.locator(this.destinationImportNameInputField);
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+        await nameField.click();
+        await nameField.fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
     }
 
@@ -2084,6 +2143,13 @@ export class AlertDestinationsPage {
      * @param {string} url - New URL
      */
     async updateCustomUrl(url) {
+        // The custom-edit form renders the URL field only after BOTH
+        // formData.destination_type === 'custom' and formData.type === 'http'
+        // resolve from props.destination — gate on the OInput wrapper first so the
+        // inner `-field` is guaranteed to be attached before we try to fill it.
+        const urlWrapper = this.page.locator(this.urlInput).first();
+        await urlWrapper.waitFor({ state: 'attached', timeout: 15000 });
+        await urlWrapper.waitFor({ state: 'visible', timeout: 15000 });
         // OInput inner native field is the `-field` derivative — use it for fills/clicks.
         const input = this.page.locator(this.urlInputField).first();
         // Edit drawer may be scrolled — bring the URL field into view before waiting on visibility

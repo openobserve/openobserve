@@ -173,7 +173,7 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor("kubernetes");
+    await pm.logsPage.typeInQueryEditor("_invalid_field_does_not_exist");
     // Use runQueryAndWaitForResults -- it waits for any in-flight auto-search
     // to settle (button exits Cancel state) before clicking, so the click
     // actually triggers the new (invalid) search instead of cancelling.

@@ -60,10 +60,10 @@ export class AlertCreationWizard {
                 await this.page.locator(this.locators.alertNameInput).click();
                 await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
 
-                // Re-select stream type
+                // Re-select stream type via OSelect popover pattern (§4)
                 await this.page.locator(this.locators.streamTypeDropdown).click();
-                await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-                await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+                await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+                await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
                 await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
             }
@@ -94,12 +94,14 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
         // Wait for stream list API call to complete after stream type selection
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -204,10 +206,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -310,10 +314,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -487,11 +493,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         // Select stream name
         await this.selectStreamByName(streamName);
@@ -654,11 +661,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
@@ -859,11 +867,12 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInputField).fill(alertName);
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         // Select stream
         await this.selectStreamByName(streamName);
@@ -1135,11 +1144,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
@@ -1359,10 +1369,12 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -1567,13 +1579,14 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (metrics) - IMPORTANT: Must be metrics for PromQL tab to appear
+        // Select stream type (metrics) via OSelect popover pattern (§4) — IMPORTANT: Must be metrics for PromQL tab to appear
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="metrics"]`).click();
         // Wait for stream listing API to complete after type change
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: metrics');
 
         // Select metrics stream name

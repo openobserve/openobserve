@@ -71,17 +71,25 @@ export class DashboardPage {
     this.streamOptionE2eAutomate = page
       .locator('[data-test="index-dropdown-stream-option"][data-test-value="e2e_automate"]')
       .first();
-    this.fieldSearchInput = page.locator('[data-test="index-field-search-input"]');
+    // OFieldList (PanelFieldList.vue → OFieldList.vue) exposes its search box via an
+    // OInput wrapper: `o-field-list-search` is the wrapper, `o-field-list-search-field`
+    // is the inner native <input> (auto-derived `-field` suffix per AGENT_RULES §4 —
+    // always fill the `-field` variant). The legacy `index-field-search-input`
+    // / `data-cy` Cypress attribute no longer exists post-revamp.
+    this.fieldSearchInput = page.locator('[data-test="o-field-list-search-field"]');
     // Field-list "add to Y-axis / breakdown" buttons resolved by per-field
     // `data-test` prefix/suffix patterns (no element/text predicates).
+    // Post-revamp OFieldRow exposes per-field rows as
+    // `data-test="o-field-list-row-${field.name}"` (OFieldList.vue line ~66) —
+    // the legacy `field-list-item-` prefix no longer exists.
     this.kubernetesContainerHashYButton = page
       .locator(
-        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]',
+        '[data-test="o-field-list-row-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]',
       )
       .first();
     this.kubernetesContainerImageBButton = page
       .locator(
-        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_image"] [data-test="dashboard-add-b-data"]',
+        '[data-test="o-field-list-row-kubernetes_container_image"] [data-test="dashboard-add-b-data"]',
       )
       .first();
 

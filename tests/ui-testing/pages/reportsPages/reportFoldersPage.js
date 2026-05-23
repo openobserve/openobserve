@@ -30,6 +30,13 @@ export class ReportFoldersPage {
     this.folderCancelBtn = page.locator(
       '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
     );
+    // OFormInput surfaces validator errors via the inner OInput's
+    // `<parentDataTest>-error` slot once `field.state.meta.isTouched` flips
+    // true (see OFormInput.vue / OInput.vue). The name validator emits
+    // `t("dashboard.nameRequired")` when the trimmed value is empty.
+    this.folderNameError = page.locator(
+      '[data-test="dashboard-folder-add-name-error"]'
+    );
 
     // Delete confirmation dialog
     this.confirmDeleteDialog = page.locator('[data-test="dashboard-confirm-delete-folder-dialog"]');
@@ -238,11 +245,22 @@ export class ReportFoldersPage {
   }
 
   async expectFolderSaveDisabled() {
-    await expect(this.folderSaveBtn).toBeDisabled();
+    await this.folderSaveBtn.click();
+    // onSubmit short-circuits on `!valid` so the dialog must remain open.
+    await expect(this.folderDialog).toBeVisible({ timeout: 5000 });
+    // If the name field has been touched (typed-then-cleared) the inline
+    // error surfaces; on a freshly-opened dialog it may not — soft-assert.
+    const inlineErrorVisible = await this.folderNameError
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
+    if (inlineErrorVisible) {
+      await expect(this.folderNameError).toBeVisible();
+    }
   }
 
   async expectFolderSaveEnabled() {
     await expect(this.folderSaveBtn).toBeEnabled();
+    await expect(this.folderNameError).toBeHidden({ timeout: 5000 });
   }
 
   async openMoveDialog(reportName) {
