@@ -88,6 +88,9 @@ export class PipelinesPage {
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
         this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
+        // OInput inner native input — `.fill()` MUST target the `-field`
+        // variant per §4 (the wrapper isn't the input).
+        this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
         this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
@@ -701,8 +704,9 @@ export class PipelinesPage {
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
-        await this.pipelineSearchInput.click();
-        await this.pipelineSearchInput.fill(pipelineName);
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.click();
+        await this.pipelineSearchInputField.fill(pipelineName);
     }
 
     /**

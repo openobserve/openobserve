@@ -361,11 +361,7 @@ export class AlertDestinationsPage {
      * @param {string} validUrl - The URL to substitute when a placeholder is detected.
      */
     async replaceImportJsonUrlIfPlaceholder(validUrl) {
-        // Drive the change via Monaco's model API (§5) — `setValue` triggers
-        // `onDidChangeModelContent`, which BaseImport's v-model'd `jsonStr` ref then picks
-        // up via the editor's debounced `update:query` emit. Wait deterministically for the
-        // editor model to settle on the new URL before returning.
-        const replaced = await this.page.evaluate(({ validUrl }) => {
+        const replaced = await this.page.evaluate(async ({ validUrl }) => {
             const m = window.monaco;
             if (!m || !m.editor) return { ok: false, reason: 'monaco-unavailable' };
             const editors = m.editor.getEditors();
@@ -383,6 +379,7 @@ export class AlertDestinationsPage {
             return { ok: true, replaced: true };
         }, { validUrl }).catch(err => ({ ok: false, reason: err && err.message ? err.message : String(err) }));
         if (replaced?.ok && replaced.replaced) {
+            await this.page.waitForTimeout(600);
             await this.page.waitForFunction(({ validUrl }) => {
                 const m = window.monaco;
                 const eds = m?.editor?.getEditors?.() || [];
