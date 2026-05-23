@@ -87,6 +87,15 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-pivot-sticky-row-totals"]'
     );
 
+    // Pagination locators
+    this.paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
+    this.rowsPerPageWrapper = page.locator('[data-test="dashboard-config-rows-per-page"]');
+    this.rowsPerPageField = page.locator('[data-test="dashboard-config-rows-per-page-field"]');
+    this.rowsPerPageInfo = page.locator('[data-test="dashboard-config-rows-per-page-info"]');
+    this.tablePagination = page.locator('[data-test="dashboard-table-pagination"]');
+    this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
+    this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
+
     //Metric Text
     this.bgColor = page.locator('[data-test="dashboard-config-color-mode"]');
 
@@ -948,14 +957,90 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Get the checked state of a toggle by data-test selector
-   * @param {import('@playwright/test').Locator} toggleLocator
+   * Get the checked state of an OSwitch toggle.
+   * OSwitch renders aria-checked on the inner <button role="switch">, NOT on the
+   * wrapper div that carries the data-test attribute. Query the inner [data-state]
+   * button to determine the current state.
+   * @param {import('@playwright/test').Locator} toggleLocator - locator for the OSwitch wrapper
    * @returns {Promise<boolean>}
    */
   async getToggleState(toggleLocator) {
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
-    const ariaChecked = await toggleLocator.getAttribute("aria-checked");
-    return ariaChecked === "true";
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and data-state="checked|unchecked"
+    const innerBtn = toggleLocator.locator('[data-test$="-btn"]');
+    const dataState = await innerBtn.getAttribute('data-state');
+    return dataState === 'checked';
+  }
+
+  // ========== Pagination Configs ==========
+
+  /**
+   * Toggle the pagination switch in the config panel.
+   */
+  async togglePagination() {
+    await this.paginationToggle.waitFor({ state: "visible" });
+    await this.paginationToggle.click();
+  }
+
+  /**
+   * Returns true if pagination is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPaginationEnabled() {
+    return this.getToggleState(this.paginationToggle);
+  }
+
+  /**
+   * Set the rows-per-page value.
+   * Targets the inner OInput field (not the wrapper div).
+   * @param {string|number} value
+   */
+  async setRowsPerPage(value) {
+    await this.rowsPerPageWrapper.waitFor({ state: "visible" });
+    await this.rowsPerPageField.click();
+    await this.rowsPerPageField.fill(String(value));
+  }
+
+  /**
+   * Returns the current value in the rows-per-page input.
+   * @returns {Promise<string>}
+   */
+  async getRowsPerPageValue() {
+    return await this.rowsPerPageField.inputValue();
+  }
+
+  /**
+   * Returns true if the transpose toggle inner button is disabled.
+   * @returns {Promise<boolean>}
+   */
+  async isTransposeDisabled() {
+    const innerBtn = this.transpose.locator('[data-test$="-btn"]');
+    return await innerBtn.isDisabled();
+  }
+
+  /**
+   * Returns true if the dynamic columns toggle inner button is disabled.
+   * @returns {Promise<boolean>}
+   */
+  async isDynamicColumnsDisabled() {
+    const innerBtn = this.dynamicColumn.locator('[data-test$="-btn"]');
+    return await innerBtn.isDisabled();
+  }
+
+  /**
+   * Returns true if pivot row totals is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPivotRowTotalsEnabled() {
+    return this.getToggleState(this.pivotRowTotals);
+  }
+
+  /**
+   * Returns true if pivot column totals is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPivotColTotalsEnabled() {
+    return this.getToggleState(this.pivotColTotals);
   }
 
 }

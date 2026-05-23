@@ -71,11 +71,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       // Search for a field and verify +P is NOT visible for line chart
-      const searchInput = page.locator(
-        '[data-test="index-field-search-input"]'
-      );
-      await searchInput.click();
-      await searchInput.fill("kubernetes_container_name");
+      await pm.chartTypeSelector.searchField("kubernetes_container_name");
 
       const pivotButton = page
         .locator('[data-test="dashboard-add-p-data"]')
@@ -88,8 +84,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.selectChartType("table");
 
       // Search again and verify +P IS visible for table chart
-      await searchInput.click();
-      await searchInput.fill("kubernetes_container_name");
+      await pm.chartTypeSelector.searchField("kubernetes_container_name");
       await pivotButton.waitFor({ state: "visible", timeout: 5000 });
       await expect(pivotButton).toBeVisible();
 
@@ -289,8 +284,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Verify toggles are NOT disabled
       const transposeDisabledBefore =
-        await transposeToggle.getAttribute("aria-disabled");
-      expect(transposeDisabledBefore).not.toBe("true");
+        await pm.dashboardPanelConfigs.isTransposeDisabled();
+      expect(transposeDisabledBefore).toBe(false);
 
       testLogger.info(
         "Verified transpose/dynamic columns are enabled without pivot"
@@ -304,12 +299,12 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Verify transpose and dynamic columns are now disabled
       const transposeDisabledAfter =
-        await transposeToggle.getAttribute("aria-disabled");
-      expect(transposeDisabledAfter).toBe("true");
+        await pm.dashboardPanelConfigs.isTransposeDisabled();
+      expect(transposeDisabledAfter).toBe(true);
 
       const dynamicDisabledAfter =
-        await dynamicColumnsToggle.getAttribute("aria-disabled");
-      expect(dynamicDisabledAfter).toBe("true");
+        await pm.dashboardPanelConfigs.isDynamicColumnsDisabled();
+      expect(dynamicDisabledAfter).toBe(true);
 
       testLogger.info(
         "Verified transpose/dynamic columns are disabled in pivot mode"
@@ -438,16 +433,16 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Initially row totals should be OFF
       const rowTotalsCheckedBefore =
-        await rowTotalsToggle.getAttribute("aria-checked");
-      expect(rowTotalsCheckedBefore).toBe("false");
+        await pm.dashboardPanelConfigs.isPivotRowTotalsEnabled();
+      expect(rowTotalsCheckedBefore).toBe(false);
 
       testLogger.info("Verified pivot options toggles are visible and default OFF");
 
       // Enable row totals
       await pm.dashboardPanelConfigs.togglePivotRowTotals();
       const rowTotalsCheckedAfter =
-        await rowTotalsToggle.getAttribute("aria-checked");
-      expect(rowTotalsCheckedAfter).toBe("true");
+        await pm.dashboardPanelConfigs.isPivotRowTotalsEnabled();
+      expect(rowTotalsCheckedAfter).toBe(true);
 
       // Sticky column totals sub-option should appear
       const stickyColTotals = page.locator(
@@ -462,8 +457,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Enable column totals
       await pm.dashboardPanelConfigs.togglePivotColTotals();
       const colTotalsCheckedAfter =
-        await colTotalsToggle.getAttribute("aria-checked");
-      expect(colTotalsCheckedAfter).toBe("true");
+        await pm.dashboardPanelConfigs.isPivotColTotalsEnabled();
+      expect(colTotalsCheckedAfter).toBe(true);
 
       // Sticky row totals sub-option should appear
       const stickyRowTotals = page.locator(
@@ -479,8 +474,13 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      const table = page.locator('[data-test="dashboard-panel-table"]');
-      await expect(table.getByText("Total").first()).toBeVisible();
+      // Verify a pivot header cell with label "Total" is visible.
+      // OTableHeader renders pivot headers with data-test="o2-table-pivot-th-{level}-{cell}"
+      const totalHeader = page
+        .locator('[data-test^="o2-table-pivot-th-"]')
+        .filter({ hasText: "Total" })
+        .first();
+      await expect(totalHeader).toBeVisible();
 
       testLogger.info("Verified Total row/column appears in pivot table");
 
@@ -617,11 +617,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       testLogger.info("Verified 3 pivot fields added successfully");
 
       // Try to add a 4th pivot field - the +P button should be disabled
-      const searchInput = page.locator(
-        '[data-test="index-field-search-input"]'
-      );
-      await searchInput.click();
-      await searchInput.fill("log");
+      await pm.chartTypeSelector.searchField("log");
 
       const pivotButton = page
         .locator('[data-test="dashboard-add-p-data"]')
@@ -634,7 +630,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       testLogger.info("Verified +P button is disabled after 3 pivot fields");
 
       // Clean up
-      await searchInput.fill("");
+      await pm.chartTypeSelector.clearFieldSearch();
       await pm.dashboardPanelActions.savePanel();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
@@ -710,20 +706,13 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Open config panel and verify settings persisted
       await pm.dashboardPanelConfigs.openConfigPanel();
 
-      const rowTotalsToggle = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
-      const colTotalsToggle = page.locator(
-        '[data-test="dashboard-config-pivot-col-totals"]'
-      );
-
       const rowTotalsState =
-        await rowTotalsToggle.getAttribute("aria-checked");
-      expect(rowTotalsState).toBe("true");
+        await pm.dashboardPanelConfigs.isPivotRowTotalsEnabled();
+      expect(rowTotalsState).toBe(true);
 
       const colTotalsState =
-        await colTotalsToggle.getAttribute("aria-checked");
-      expect(colTotalsState).toBe("true");
+        await pm.dashboardPanelConfigs.isPivotColTotalsEnabled();
+      expect(colTotalsState).toBe(true);
 
       testLogger.info(
         "Verified pivot settings persisted after save and reload"
