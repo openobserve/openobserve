@@ -950,11 +950,22 @@ export class TracesPage {
   }
 
   /**
-   * Check if no results message is visible
+   * Check if no results message is visible.
+   * Polls briefly so this resolves to a stable terminal state — callers use
+   * this in compound `hasResults || noResults` assertions after a search, so
+   * a too-short timeout can return false while the search is still settling
+   * (count badge visible but list not yet rendered).
    * @returns {Promise<boolean>}
    */
   async isNoResultsVisible() {
-    return await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 1000 }).catch(() => false);
+    // Race against any terminal-state signal so we don't sleep the whole timeout
+    // when results have already rendered.
+    await Promise.any([
+      this.page.locator(this.resultNotFoundText).waitFor({ state: 'visible', timeout: 8000 }),
+      this.page.locator(this.searchResultItem).first().waitFor({ state: 'visible', timeout: 8000 }),
+      this.page.locator(this.errorMessage).waitFor({ state: 'visible', timeout: 8000 }),
+    ]).catch(() => {});
+    return await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 500 }).catch(() => false);
   }
 
   /**
@@ -1936,18 +1947,36 @@ export class TracesPage {
 
   /**
    * Check if a specific tab is active in Analysis Dashboard
-   * @param {string} tabLabel - 'Rate', 'Latency', or 'Errors'
+   * @param {string} tabLabel - 'Rate', 'Latency'/'Duration', or 'Errors'
    * @returns {Promise<boolean>}
    */
   async isTabActive(tabLabel) {
     // Each OTab carries data-test="traces-analysis-dashboard-${name}-tab"; map
     // the labels used by callers (Rate/Latency/Errors) to internal names
     // (volume/duration/error) and rely on data-state for active.
-    const labelToName = { rate: 'volume', latency: 'duration', errors: 'error' };
+    // OTab wraps the Reka TabsTrigger in a <span> for disabled-tooltip support,
+    // so the consumer's data-test lands on the wrapper while data-state="active"
+    // is on the inner button. Poll the DOM for active state on either the
+    // wrapper itself OR a descendant (mirrors the metricsBuilderPage pattern
+    // for OToggleGroupItem).
+    const labelToName = { rate: 'volume', latency: 'duration', duration: 'duration', errors: 'error', error: 'error' };
     const name = labelToName[tabLabel.toLowerCase()] || tabLabel.toLowerCase();
-    const activeTab = this.page
-      .locator(`${this.analysisDashboardDrawer} [data-test="traces-analysis-dashboard-${name}-tab"][data-state="active"]`);
-    return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
+    const testId = `traces-analysis-dashboard-${name}-tab`;
+    const drawerSel = this.analysisDashboardDrawer;
+    const isActive = await this.page.waitForFunction(
+      ({ drawerSel, testId }) => {
+        const drawer = document.querySelector(drawerSel);
+        if (!drawer) return null;
+        const el = drawer.querySelector(`[data-test="${testId}"]`);
+        if (!el) return null;
+        if (el.getAttribute('data-state') === 'active') return true;
+        const inner = el.querySelector('[data-state="active"]');
+        return inner ? true : null;
+      },
+      { drawerSel, testId },
+      { timeout: 3000 }
+    ).then(h => h.jsonValue()).catch(() => null);
+    return Boolean(isActive);
   }
 
   /**

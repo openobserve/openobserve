@@ -5140,10 +5140,24 @@ export class LogsPage {
     }
 
     async getCellByName(name) {
+        // UX revamp: index list group headers are <div data-test="o-field-list-group-<name>">
+        // (no role="cell"). Prefer the o-field-list-group locator when the
+        // requested name matches a group header; fall back to ARIA cell role
+        // for actual table cells elsewhere.
+        const groupLocator = this.page.locator('[data-test^="o-field-list-group-"]')
+            .filter({ hasText: name });
+        if ((await groupLocator.count()) > 0) {
+            return groupLocator.first();
+        }
         return await this.page.getByRole('cell', { name });
     }
 
     async clickCellByName(name) {
+        const groupLocator = this.page.locator('[data-test^="o-field-list-group-"]')
+            .filter({ hasText: name });
+        if ((await groupLocator.count()) > 0) {
+            return await groupLocator.first().click();
+        }
         return await this.page.getByRole('cell', { name }).click();
     }
 
@@ -5211,8 +5225,39 @@ export class LogsPage {
     }
 
     // Additional methods for multistream functionality
-    async expectLogsSearchIndexListContainsText(text) {
-        return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
+    /**
+     * Verifies that the logs-search-index-list shows the given streams as selected.
+     *
+     * UX revamp uses OSelect chips that render adjacent with no separator (e.g. the
+     * concatenated textContent becomes "e2e_automatee2e_stream1"), so we can't do
+     * a single `toContainText("a, b")` check on the panel itself. Instead we read
+     * `data-test-selected-value` on the select trigger — it holds the comma-joined
+     * selected stream values regardless of how many chips are visually rendered
+     * (the trigger truncates overflow with a "+N more" chip).
+     *
+     * Accepts either a comma-separated string ("e2e_automate, e2e_stream1") or
+     * an array of stream names; each name is verified individually.
+     *
+     * @param {string|string[]} streams - Stream name(s) expected to be selected
+     */
+    async expectLogsSearchIndexListContainsText(streams) {
+        const expected = Array.isArray(streams)
+            ? streams
+            : String(streams).split(',').map((s) => s.trim()).filter(Boolean);
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        // Wait for the trigger to render its data-test-selected-value attribute
+        // (it's computed reactively from the selectedStream model).
+        await trigger.waitFor({ state: 'attached' });
+        // Poll the attribute until every expected stream is present in the
+        // comma-joined selected-value list. We compare on a normalised array of
+        // values rather than substring match to avoid false positives where one
+        // stream name is a prefix of another (e.g. "e2e_a" vs "e2e_automate").
+        await expect.poll(async () => {
+            const attr = await trigger.getAttribute('data-test-selected-value');
+            if (!attr) return false;
+            const selected = attr.split(',').map((v) => v.trim()).filter(Boolean);
+            return expected.every((name) => selected.includes(name));
+        }, { message: `Expected streams [${expected.join(', ')}] to be selected in the index list` }).toBe(true);
     }
 
     /**

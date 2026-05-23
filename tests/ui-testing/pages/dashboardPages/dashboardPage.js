@@ -51,11 +51,16 @@ export class DashboardPage {
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
 
     // Stream & field selection locators
+    // `index-dropdown-stream` is an OSelect (PanelFieldList.vue) — clicking the
+    // wrapper opens a popover that exposes `${parent}-popover`, `${parent}-search`
+    // (the filter input), and `${parent}-option` (with `data-test-value="<value>"`).
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
-    // OInput wraps the stream-name filter; the wrapper carries
-    // `index-dropdown-stream` and the inner native <input> exposes the
-    // `-field` suffix (per AGENT_RULES §4). Always fill the `-field` variant.
-    this.streamDropdownInput = page.locator('[data-test="index-dropdown-stream-field"]');
+    // OSelect popover surface — wait for visibility before interacting with the
+    // search input or option list.
+    this.streamDropdownPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
+    // OSelect inner filter input (ListboxFilter). Forward `${parent}-search`
+    // stream options.
+    this.streamDropdownSearch = page.locator('[data-test="index-dropdown-stream-search"]');
     // OSelect stamps every ListboxItem with `${parent}-option` and
     // `data-test-value="<value>"` — `e2e_automate` is the stream this PO
     // always exercises, so we hoist its option locator to a class member.
@@ -137,10 +142,13 @@ export class DashboardPage {
 
     await this.addDashboardButton.click();
 
-    // Wait for dialog with retry mechanism
-    // Use deterministic waitFor — wait on the drawer dialog being attached
-    // (mounts in a portal); the wrapper + inner `-field` follow.
-    let isDialogOpen = await this.dashboardAddDialog
+    // Wait for dialog with retry mechanism.
+    // ODrawer keeps the panel mounted across open/close cycles — `state:
+    // 'attached'` alone is unreliable (resolves true even when the dialog is
+    // closed). Reka stamps `data-state="open"`/`"closed"` on the panel; gate
+    // the retry on the open-state attribute instead.
+    const openPanel = this.page.locator('[data-test="dashboard-add-dialog"][data-state="open"]');
+    let isDialogOpen = await openPanel
       .waitFor({ state: 'attached', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
@@ -148,7 +156,7 @@ export class DashboardPage {
     if (!isDialogOpen) {
       // First retry: click the button again
       await this.addDashboardButton.click();
-      isDialogOpen = await this.dashboardAddDialog
+      isDialogOpen = await openPanel
         .waitFor({ state: 'attached', timeout: 5000 })
         .then(() => true)
         .catch(() => false);
@@ -160,7 +168,11 @@ export class DashboardPage {
 
     // Wait for the input to be fully ready (use the inner `-field` input
     // — that's the actual fillable element).
-    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
+    // NOTE: `AddDashboard` is registered with `defineAsyncComponent(() => import(...))`
+    // in Dashboards.vue, so the inner form (OFormInput + OInput) only mounts after
+    // the dynamic import resolves. Under test load (ingestion in beforeEach can
+    // saturate the network) the import + mount can take >10s. Give it 30s.
+    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 30000 });
 
     // Fill the dashboard name
     await this.dashboardNameInput.fill(this.dashboardName);
@@ -195,15 +207,17 @@ export class DashboardPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(3000);
 
-    // Click on Stream dropdown - use data-test selector used in other dashboard tests
+    // Click on Stream dropdown — OSelect opens a popover with a search input
+    // and option list.
     await this.streamDropdown.click();
-    await this.page.waitForTimeout(500);
+    await this.streamDropdownPopover.waitFor({ state: "visible", timeout: 15000 });
 
-    // Type stream name to filter — fill the inner `-field` input (the wrapper
-    // is a div and cannot be .fill()'d per AGENT_RULES §4).
-    await this.streamDropdownInput.press("Control+a");
-    await this.streamDropdownInput.fill("e2e_automate");
-    await this.page.waitForTimeout(1500);
+    // Type stream name to filter — fill the OSelect inner search input
+    // (`${parent}-search`, per AGENT_RULES §4).
+    await this.streamDropdownSearch.waitFor({ state: "visible", timeout: 10000 });
+    await this.streamDropdownSearch.press("ControlOrMeta+a");
+    await this.streamDropdownSearch.press("Backspace");
+    await this.streamDropdownSearch.fill("e2e_automate");
 
     // Select e2e_automate stream option via the class-member locator.
     await this.streamOptionE2eAutomate.waitFor({ state: "visible", timeout: 15000 });

@@ -1054,9 +1054,12 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation
+        // v3 UI validates non-empty name — clear input and submit to trigger validation.
+        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
+        // fillable); the inner native <input> auto-derives `-field`. We click the
+        // wrapper to focus the field, then clear the `-field` variant.
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).clear();
+        await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();

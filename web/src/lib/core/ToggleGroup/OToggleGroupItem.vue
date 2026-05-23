@@ -7,6 +7,8 @@ import { ToggleGroupItem } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+defineOptions({ inheritAttrs: false });
+
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
   size: "md",
@@ -37,6 +39,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
   -->
   <span :class="props.disabled ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <ToggleGroupItem
+      v-bind="$attrs"
       :value="props.value"
       :disabled="props.disabled"
       :class="[

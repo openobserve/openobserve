@@ -662,7 +662,12 @@ export class AlertDestinationsPage {
 
         // Submit destination
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+        // Scope success-toast assertion to OToast data-test to avoid strict-mode
+        // collision when sr-only ARIA-live "Notification […]" + visible title +
+        // visible message all match plain `getByText('Destination saved')`.
+        await expect(
+            this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').first()
+        ).toBeVisible({ timeout: 30000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -754,15 +759,25 @@ export class AlertDestinationsPage {
         await expect(button).toBeEnabled({ timeout: 30000 });
         testLogger.debug('New Destination button is enabled');
 
+        // Click and wait for the dialog title to appear. If the dialog doesn't
+        // open within the budget, re-check button visibility before retrying —
+        // a successful click navigates away from the list so the button DOM
+        // is gone; retrying the click would target a detached node.
         await button.click();
-        // Anchor on the add-destination dialog title appearing; if it doesn't, retry the click once
         const title = this.page.locator(this.addDestinationTitle);
         try {
-            await title.waitFor({ state: 'visible', timeout: 5000 });
+            await title.waitFor({ state: 'visible', timeout: 15000 });
         } catch (e) {
-            testLogger.warn('Add-destination title not visible after click, retrying');
-            await button.click();
-            await title.waitFor({ state: 'visible', timeout: 10000 });
+            testLogger.warn('Add-destination title not visible after click, checking button state');
+            const stillVisible = await button.isVisible({ timeout: 1000 }).catch(() => false);
+            if (stillVisible) {
+                // Button still present → first click was lost; retry once.
+                await button.click({ force: true });
+                await title.waitFor({ state: 'visible', timeout: 15000 });
+            } else {
+                // Button gone → dialog opened but title binding may be late; final wait.
+                await title.waitFor({ state: 'visible', timeout: 15000 });
+            }
         }
         testLogger.debug('Clicked New Destination button — dialog open');
     }
