@@ -16,7 +16,7 @@
         variant="outline"
         class="tw:mb-[0.375rem] tw:mr-2"
         @click="copyLogToClipboard"
-      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><OIcon name="content-copy" size="sm" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
@@ -25,7 +25,7 @@
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="sm" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
@@ -49,7 +49,7 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><OIcon name="account-tree" size="xs" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="sm" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
@@ -198,7 +198,7 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <OIcon name="content-copy" size="xs" class="tw:mr-2" />
+          <OIcon name="content-copy" size="sm" class="tw:mr-2" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">

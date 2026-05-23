@@ -83,77 +83,57 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .metrics-summary-card {
-  background: linear-gradient(135deg, rgba(var(--q-primary-rgb), 0.05) 0%, rgba(var(--q-primary-rgb), 0.02) 100%);
+  background-color: transparent;
+  box-shadow: none;
+}
 
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-  }
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr));
+  gap: 1rem;
+}
 
-  .metric-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(var(--q-primary-rgb), 0.1);
-    transition: all 0.2s ease;
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 1);
-      border-color: rgba(var(--q-primary-rgb), 0.3);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .metric-icon {
-      flex-shrink: 0;
-    }
-
-    .metric-content {
-      flex: 1;
-      min-width: 0;
-
-      .metric-label {
-        font-size: 11px;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: rgba(0, 0, 0, 0.6);
-        margin-bottom: 4px;
-      }
-
-      .metric-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--q-primary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    }
+  &:hover {
+    border-color: var(--o2-primary-color);
+    box-shadow: 0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.05);
   }
 }
 
-// Dark theme support
-.body--dark {
-  .metrics-summary-card {
-    background: linear-gradient(135deg, rgba(var(--q-primary-rgb), 0.15) 0%, rgba(var(--q-primary-rgb), 0.08) 100%);
+.metric-icon {
+  flex-shrink: 0;
+  color: var(--o2-text-secondary);
+}
 
-    .metric-item {
-      background-color: rgba(255, 255, 255, 0.05);
-      border-color: rgba(var(--q-primary-rgb), 0.2);
+.metric-content {
+  flex: 1;
+  min-width: 0;
+}
 
-      &:hover {
-        background-color: rgba(255, 255, 255, 0.08);
-        border-color: rgba(var(--q-primary-rgb), 0.4);
-      }
+.metric-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--o2-text-label);
+  margin-bottom: 0.25rem;
+}
 
-      .metric-label {
-        color: rgba(255, 255, 255, 0.7);
-      }
-    }
-  }
+.metric-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--o2-primary-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

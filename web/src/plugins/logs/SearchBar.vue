@@ -552,11 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showSearchHistoryfn"
           >
             <template #icon-left>
-              <img
-                :src="searchHistoryIcon"
-                alt="Search History"
-                class="tw:w-4 tw:h-4"
-              />
+              <OIcon name="history" size="sm" />
             </template>
             {{ t("search.searchHistory") }}
           </ODropdownItem>
@@ -567,7 +563,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             data-test="search-download-submenu-trigger"
             class="search-download-item"
-            @mouseenter="showDownloadSubmenu = true"
+            :class="{ 'search-download-item--disabled': isDownloadDisabled }"
+            :aria-disabled="isDownloadDisabled || undefined"
+            @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
             @mouseleave="showDownloadSubmenu = false"
           >
             <OIcon size="sm" name="download" class="search-download-item-icon" />
@@ -576,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
-              v-if="showDownloadSubmenu"
+              v-if="showDownloadSubmenu && !isDownloadDisabled"
               class="search-download-submenu"
               data-test="search-download-submenu"
             >
@@ -603,6 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownItem
             data-test="logs-search-bar-download-custom-range-btn"
+            :disabled="isDownloadDisabled"
             @select="toggleCustomDownloadDialog"
           >
             <template #icon-left>
@@ -4166,6 +4165,11 @@ export default defineComponent({
     // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
+    const isDownloadDisabled = computed(
+      () =>
+        !searchObj.data.stream.selectedStream?.length ||
+        !searchObj.data.queryResults?.hits?.length,
+    );
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4818,6 +4822,7 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
+      isDownloadDisabled,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -5277,6 +5282,15 @@ export default defineComponent({
 
   &:hover {
     background-color: var(--o2-hover-accent);
+  }
+
+  &--disabled {
+    cursor: not-allowed;
+    color: var(--o2-text-muted);
+
+    &:hover {
+      background-color: transparent;
+    }
   }
 
   /* Invisible hover bridge extending to the LEFT of the parent item,

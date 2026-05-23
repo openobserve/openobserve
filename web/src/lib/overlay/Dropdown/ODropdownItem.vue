@@ -36,7 +36,7 @@ const variantClasses: Record<
       'tw:w-full tw:px-3 tw:py-1.5 tw:rounded-md',
       'tw:cursor-pointer tw:select-none tw:outline-none',
       variantClasses[variant],
-      'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed tw:data-[disabled]:pointer-events-none',
+      'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed',
     ]"
     @select="(e) => emit('select', e)"
   >
