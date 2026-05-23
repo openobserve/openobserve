@@ -22,6 +22,17 @@ export class PipelinesPage {
         this.streamButton = page.getByRole("button", { name: "Stream" }).first();
         this.queryButton = page.getByRole("button", { name: "Query" });
         this.vueFlowPane = page.locator(".vue-flow__pane");
+        // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
+        // the wrapper opens the OSelect popover with `*-option` items.
+        this.inputNodeStreamTypeSelect = page.locator('[data-test="input-node-stream-type-select"]').first();
+        // OSelect popover for the input-node stream-type select. Per the OSelect
+        // convention (§4) the popover/options pick up `<parentDataTest>-popover`
+        // and `<parentDataTest>-option` data-test attributes.
+        this.inputNodeStreamTypePopover = page.locator('[data-test="input-node-stream-type-select-popover"]');
+        // Per-value `logs` option inside the stream-type OSelect popover.
+        this.inputNodeStreamTypeLogsOption = page.locator(
+          '[data-test="input-node-stream-type-select-option"][data-test-value="logs"]'
+        );
         this.logsDropdown = page.locator("div").filter({ hasText: /^logs$/ });
         this.logsOption = page
           .getByRole("option", { name: "logs" })
@@ -252,8 +263,14 @@ export class PipelinesPage {
     }
 
     async selectLogs() {
-        await this.logsDropdown.click();
-        await this.logsOption.click();
+        // Open the input-node stream-type OSelect via its wrapper data-test.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        // Wait for the OSelect popover to appear (data-test forwarded from parent).
+        await this.inputNodeStreamTypePopover.waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `logs` option by its `data-test-value` value-specific attribute.
+        await this.inputNodeStreamTypeLogsOption.waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.click();
     }
 
     /**
@@ -2485,21 +2502,42 @@ export class PipelinesPage {
     /**
      * Get pipeline row locator by name
      * Used in pipelines.spec.js
+     * Resolves via the row's update-pipeline button (per-row data-test), then
+     * walks up to the nearest table-row container via XPath ancestor with a
+     * `data-test` prefix — keeps the selector data-test-only (§2).
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
     getPipelineRowByName(pipelineName) {
-        return this.page.locator('tr').filter({ hasText: pipelineName });
+        return this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)
+            .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`)
+            .first();
     }
 
     /**
-     * Get pipeline toggle locator for a specific pipeline
+     * Get pipeline toggle (pause/start) locator for a specific pipeline.
+     * The OButton in PipelinesList exposes a unique per-row data-test:
+     * `pipeline-list-{name}-pause-start-alert`.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Toggle locator
      */
     getPipelineToggle(pipelineName) {
-        const pipelineRow = this.getPipelineRowByName(pipelineName);
-        return pipelineRow.locator('[data-test*="toggle"]');
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
+    }
+
+    /**
+     * Fallback alias for the pause/start button — `pipeline-list-{name}-pause-start-alert`
+     * is the only enable/disable control rendered per row in PipelinesList.vue.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Enable/disable button locator
+     */
+    getPipelineEnableDisableButton(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-alert"]`
+        );
     }
 
     /**

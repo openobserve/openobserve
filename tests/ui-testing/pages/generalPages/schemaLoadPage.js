@@ -140,8 +140,13 @@ class SchemaLoadPage {
         await this.logSearchIndexSelectStream.click();
         await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Type the stream name into the popover's ListboxFilter to narrow options
+        // Type the stream name into the popover's ListboxFilter to narrow options.
+        // Use Ctrl+A → Backspace before fill to defensively clear reka-ui's
+        // ComboboxInput internal searchTerm state (which can survive a `.fill()`
+        // overwrite alone) before we re-filter.
         await this.logSearchStreamPopoverSearch.waitFor({ state: 'visible', timeout: 10000 });
+        await this.logSearchStreamPopoverSearch.press('ControlOrMeta+a');
+        await this.logSearchStreamPopoverSearch.press('Backspace');
         await this.logSearchStreamPopoverSearch.fill(streamName);
 
         // After filtering, the popover narrows to just our stream — click the first option.
@@ -321,7 +326,11 @@ class SchemaLoadPage {
             await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 15000 });
 
             // Type the stream name into the popover's ListboxFilter to narrow options.
+            // Defensive clear via Ctrl+A → Backspace handles reka-ui's
+            // ComboboxInput internal searchTerm state surviving a `.fill()` overwrite.
             await this.logSearchStreamPopoverSearch.waitFor({ state: 'visible', timeout: 10000 });
+            await this.logSearchStreamPopoverSearch.press('ControlOrMeta+a');
+            await this.logSearchStreamPopoverSearch.press('Backspace');
             await this.logSearchStreamPopoverSearch.fill(streamName);
 
             // After filtering by stream name, the popover's filteredOptions should narrow to

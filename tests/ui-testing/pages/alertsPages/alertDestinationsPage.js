@@ -16,9 +16,13 @@ export class AlertDestinationsPage {
         
         // Destination creation locators
         this.addDestinationButton = '[data-test="alert-destination-list-add-alert-btn"]';
+        // OInput wrapper (for visibility/state assertions); inner native input uses `-field` suffix for fill/click
         this.destinationNameInput = '[data-test="add-destination-name-input"]';
+        this.destinationNameInputField = '[data-test="add-destination-name-input-field"]';
         this.templateSelect = '[data-test="add-destination-template-select"]';
         this.urlInput = '[data-test="add-destination-url-input"]';
+        // OInput inner native input for URL (used for fill operations)
+        this.urlInputField = '[data-test="add-destination-url-input-field"]';
         this.submitButton = '[data-test="add-destination-submit-btn"]';
         this.successMessage = 'Destination saved';
         
@@ -142,24 +146,25 @@ export class AlertDestinationsPage {
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
-        await this.page.waitForTimeout(1000); // Wait for name input to appear
+        // wait for the destination name field to be ready before filling
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-        await this.page.locator(this.destinationNameInput).click();
-        await this.page.locator(this.destinationNameInput).fill(destinationName);
-        await this.page.waitForTimeout(1000);
-        
+        await this.page.locator(this.destinationNameInputField).click();
+        await this.page.locator(this.destinationNameInputField).fill(destinationName);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
+
         // Handle template selection with scrolling
         await this.page.locator(this.templateSelect).click();
-        await this.page.waitForTimeout(2000); // Wait for template options to load
-        
+        // wait for template popover to appear
+        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 10000 });
+
         // Use the common scroll function
         await this.commonActions.scrollAndFindOption(templateName, 'template');
-        
-        await this.page.waitForTimeout(1000);
-        
-        await this.page.locator(this.urlInput).click();
-        await this.page.locator(this.urlInput).fill(url);
-        await this.page.waitForTimeout(1000);
+
+        await this.page.locator(this.urlInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.urlInputField).click();
+        await this.page.locator(this.urlInputField).fill(url);
+        await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
         
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
@@ -559,11 +564,11 @@ export class AlertDestinationsPage {
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
-        await this.page.waitForTimeout(1000); // Wait for name input to appear
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-        await this.page.locator(this.destinationNameInput).click();
-        await this.page.locator(this.destinationNameInput).fill(destinationName);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.destinationNameInputField).click();
+        await this.page.locator(this.destinationNameInputField).fill(destinationName);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
 
         // Handle template selection with retry logic for race conditions
         // Templates might not appear in dropdown immediately after creation
@@ -602,23 +607,22 @@ export class AlertDestinationsPage {
 
                     // Select 'custom' destination type again
                     await this.selectDestinationType('custom');
-                    await this.page.waitForTimeout(1000);
+                    await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-                    await this.page.locator(this.destinationNameInput).click();
-                    await this.page.locator(this.destinationNameInput).fill(destinationName);
-                    await this.page.waitForTimeout(1000);
+                    await this.page.locator(this.destinationNameInputField).click();
+                    await this.page.locator(this.destinationNameInputField).fill(destinationName);
+                    await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
                 } else {
                     throw new Error(`Template ${templateName} not found in dropdown after ${maxRetries} attempts`);
                 }
             }
         }
 
-        await this.page.waitForTimeout(1000);
-
         // Fill URL
-        await this.page.locator(this.urlInput).click();
-        await this.page.locator(this.urlInput).fill(url);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.urlInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.urlInputField).click();
+        await this.page.locator(this.urlInputField).fill(url);
+        await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
 
         // Add custom headers
         for (const [headerKey, headerValue] of Object.entries(headers)) {
@@ -829,8 +833,9 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.locator(this.destinationNameInput).fill(name);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.destinationNameInputField).fill(name);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(name, { timeout: 5000 });
         testLogger.debug('Filled destination name', { name });
     }
 

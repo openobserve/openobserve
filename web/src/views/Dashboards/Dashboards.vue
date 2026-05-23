@@ -271,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #cell-name="{ row, value }">
               <div
+                :title="value"
                 :data-test="`dashboard-name-cell-${value}`"
                 class="text-truncate"
               >

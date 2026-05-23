@@ -15,7 +15,9 @@ export class AlertTemplatesPage {
         
         // Template creation locators
         this.addTemplateButton = '[data-test="template-list-add-btn"]';
+        // OInput wrapper (use for visibility/state assertions); inner native input gets `-field` suffix
         this.templateNameInput = '[data-test="add-template-name-input"]';
+        this.templateNameInputField = '[data-test="add-template-name-input-field"]';
         this.templateEditor = '[data-test="add-template-editor"]';
         this.templateSubmitButton = '[data-test="add-template-submit-btn"]';
         this.templateSuccessMessage = 'Template Saved Successfully.';
@@ -181,10 +183,11 @@ export class AlertTemplatesPage {
             throw new Error('Could not find Add Template button in the UI');
         }
 
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(this.templateNameInput).click({ force: true });
-        await this.page.locator(this.templateNameInput).fill(templateName);
-        await this.page.waitForTimeout(1000);
+        // Wait for the template name input to be ready, then fill via the OInput inner field
+        await this.page.locator(this.templateNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.templateNameInputField).click({ force: true });
+        await this.page.locator(this.templateNameInputField).fill(templateName);
+        await expect(this.page.locator(this.templateNameInputField)).toHaveValue(templateName, { timeout: 5000 });
 
         const templateText = `{
   "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
@@ -504,9 +507,10 @@ export class AlertTemplatesPage {
             testLogger.warn('Editor view-lines not visible, continuing with force-click');
         });
 
-        await this.page.locator(this.templateNameInput).click({ force: true });
-        await this.page.locator(this.templateNameInput).fill(templateName);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.templateNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.templateNameInputField).click({ force: true });
+        await this.page.locator(this.templateNameInputField).fill(templateName);
+        await expect(this.page.locator(this.templateNameInputField)).toHaveValue(templateName, { timeout: 5000 });
 
         // JSON array format required for OpenObserve ingestion API
         const templateText = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;

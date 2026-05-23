@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
+      data-test="alert-list-splitter"
       class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
       <!-- Left: FolderList -->

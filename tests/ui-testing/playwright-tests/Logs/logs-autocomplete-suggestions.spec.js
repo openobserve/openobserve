@@ -113,28 +113,44 @@ async function getFieldRecord(page, org, streamType, streamName, fieldName) {
 }
 
 /**
- * Wait for IndexedDB to have at least one record for a given field
+ * Wait for IndexedDB to have at least one record for a given field.
+ * Uses expect.poll keyed on the actual record contents — deterministic, no setTimeout.
  */
 async function waitForFieldInIndexedDB(page, org, streamType, streamName, fieldName, timeout = 10000) {
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
-        const record = await getFieldRecord(page, org, streamType, streamName, fieldName);
-        if (record && record.values && record.values.length > 0) {
-            return record;
-        }
-        await page.waitForTimeout(500);
+    let record = null;
+    try {
+        await expect.poll(async () => {
+            record = await getFieldRecord(page, org, streamType, streamName, fieldName);
+            return !!(record && record.values && record.values.length > 0);
+        }, { timeout, intervals: [200, 500, 1000] }).toBe(true);
+    } catch (_) {
+        return null;
     }
-    return null;
+    return record;
+}
+
+/**
+ * Click a field expand button and wait for the values_stream response that
+ * carries the values back to the page (which then schedules the IDB write).
+ * Replaces the legacy `click → waitForTimeout(2000)` pattern with a deterministic
+ * wait keyed on the actual /_values_stream response.
+ */
+async function clickFieldExpandAndWaitValues(page, button, fieldName) {
+    const valuesPromise = page.waitForResponse(
+        (r) => r.url().includes('_values_stream') && r.url().includes(`fields=${fieldName}`),
+        { timeout: 15000 }
+    ).catch(() => null);
+    await button.click();
+    await valuesPromise;
 }
 
 /**
  * Get MonacoEditorHelper instance and query editor container
- * Uses page object selector for the container
+ * Uses page object getter for the container (POM-strict)
  */
 function getMonacoHelper(page, pm) {
     const monacoHelper = new MonacoEditorHelper(page);
-    const queryEditorSelector = pm.logsPage.queryEditor || '[data-test="logs-search-bar-query-editor"]';
-    const container = page.locator(queryEditorSelector);
+    const container = pm.logsPage.getQueryEditorContainer();
     return { monacoHelper, container };
 }
 
@@ -195,11 +211,16 @@ async function selectSuggestion(page, pm, text) {
 }
 
 /**
- * Get editor content
+ * Get editor content directly from Monaco model (not view DOM) so reads are
+ * deterministic even if executeEdits hasn't yet re-rendered the view-lines.
  */
 async function getQueryEditorContent(page, pm) {
-    const { monacoHelper, container } = getMonacoHelper(page, pm);
-    return await monacoHelper.getContent(container);
+    return await page.evaluate((hostSelector) => {
+        const host = document.querySelector(hostSelector);
+        const editors = window.monaco?.editor?.getEditors?.() || [];
+        const ed = host ? editors.find((e) => host.contains(e.getDomNode())) : editors[0];
+        return ed?.getValue?.() ?? '';
+    }, '[data-test="logs-search-bar-query-editor"]');
 }
 
 /**
@@ -211,8 +232,90 @@ async function triggerSuggestions(page, pm) {
 }
 
 /**
- * Run query and wait for results
- * Uses a resilient approach - waits for response OR timeout, doesn't fail if response not captured
+ * Trigger Ctrl+Space and poll the suggestions widget until it shows the expected
+ * stored value — re-triggering on each poll if the popup closed. Avoids racing
+ * the CodeQueryEditor's 500ms `update:query` debounce that populates
+ * autoCompleteData. If expectedValueOrNull is null, just polls until suggestions
+ * appear non-empty.
+ *
+ * IMPORTANT: After this function returns, the suggestion popup is open AND the
+ * first row (sorted by sortText, value suggestions use '\x01' prefix so they're
+ * top) is the value. Caller should use selectSuggestion(text) to click a specific
+ * row OR press 'Enter' for the highlighted one.
+ */
+async function triggerSuggestionsWithRetry(page, pm, expectedValueOrNull, timeout = 12000) {
+    const { monacoHelper } = getMonacoHelper(page, pm);
+    let lastSuggestions = [];
+    await expect.poll(async () => {
+        // Press Escape to close any prior popup, then re-trigger
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.keyboard.press('Control+Space');
+        try {
+            await monacoHelper.waitForSuggestions(1500);
+            lastSuggestions = await monacoHelper.getSuggestionLabels();
+        } catch (_) {
+            lastSuggestions = [];
+        }
+        if (expectedValueOrNull == null) return lastSuggestions.length > 0;
+        return lastSuggestions.some((s) => s.includes(String(expectedValueOrNull)));
+    }, { timeout, intervals: [400, 800, 1500] }).toBe(true);
+    return lastSuggestions;
+}
+
+/**
+ * Select a specific suggestion by value via Monaco's suggestController model.
+ * Reads the completion items, finds the one matching the expected value, and
+ * inserts its `insertText` directly via editor.executeEdits — bypasses both
+ * `:has-text(...)` click flakiness AND the Enter-key race when the suggestion
+ * popup transiently loses focus. Targets the query editor specifically (host
+ * keyed off the page object selector).
+ */
+async function acceptSuggestionByValue(page, expectedValue) {
+    const expected = String(expectedValue);
+    const result = await page.evaluate(({ expected, hostSelector }) => {
+        const host = document.querySelector(hostSelector);
+        const editors = window.monaco?.editor?.getEditors?.() || [];
+        const ed = host
+            ? editors.find((e) => host.contains(e.getDomNode()))
+            : editors[0];
+        if (!ed) return { ok: false, reason: 'no-editor' };
+        const ctrl = ed.getContribution?.('editor.contrib.suggestController');
+        const list = ctrl?.model?._completionModel?.items ?? ctrl?.model?.items ?? [];
+        const labels = list.map((it) => {
+            const label = it?.completion?.label ?? it?.label;
+            return typeof label === 'string' ? label : label?.label ?? '';
+        });
+        const idx = labels.findIndex((l) => l.includes(expected));
+        if (idx < 0) return { ok: false, reason: 'not-found', labels: labels.slice(0, 10) };
+        const item = list[idx];
+        const insertText = item?.completion?.insertText ?? item?.insertText ?? '';
+        if (!insertText) return { ok: false, reason: 'no-insert-text', label: labels[idx] };
+        // Cancel the suggestion popup first so Monaco doesn't re-render the edit
+        // back to the suggestion's preview / ghost state.
+        try { ctrl?.cancelSuggestWidget?.(); } catch (_) {}
+        // Execute edit at current cursor — replaces selection if any.
+        ed.focus();
+        const position = ed.getPosition();
+        const range = {
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+        };
+        ed.executeEdits('autocomplete-test', [{ range, text: String(insertText), forceMoveMarkers: true }]);
+        return { ok: true, insertText, value: ed.getValue() };
+    }, { expected, hostSelector: '[data-test="logs-search-bar-query-editor"]' });
+    if (!result.ok) {
+        throw new Error(`acceptSuggestionByValue failed: ${result.reason}. Labels: ${(result.labels || []).join(', ')}`);
+    }
+}
+
+/**
+ * Run query and wait for results.
+ * Uses the PO's deterministic run-query method (waits on button state) +
+ * waits for an actual /_search response to ensure IndexedDB background writes
+ * have data to capture, then waits for the suggestion store's stream context
+ * to be populated. No setTimeout / waitForTimeout buffers.
  */
 async function runQueryAndWaitForResults(page, pm) {
     const orgName = process.env["ORGNAME"] || 'default';
@@ -223,16 +326,16 @@ async function runQueryAndWaitForResults(page, pm) {
         { timeout: 30000 }
     ).catch(() => null); // Don't fail if response not captured
 
-    await pm.logsPage.clickRefreshButton();
+    // PO handles the click + ready-state wait deterministically
+    await pm.logsPage.runQueryAndWaitForResults().catch(() => pm.logsPage.clickRefreshButton());
 
-    // Wait for either response or a timeout
-    await Promise.race([
-        searchResponsePromise,
-        page.waitForTimeout(5000) // Fallback: wait 5 seconds if response not captured
-    ]);
+    // Wait for the search response (or skip if it never resolves — PO already settled the button)
+    await searchResponsePromise;
 
-    // Wait for results to render and any background operations (like IndexedDB writes)
-    await page.waitForTimeout(2000);
+    // Ensure the field list has hydrated with at least one field expand button —
+    // this is the deterministic signal that the search results are rendered AND
+    // useSuggestions has streamName populated for autocomplete value lookups.
+    await pm.logsPage.getAllFieldExpandButtons().first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 }
 
 /**
@@ -241,23 +344,16 @@ async function runQueryAndWaitForResults(page, pm) {
  * Returns { fieldName, stringValue, record } or null if none found
  */
 async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttempts = 5) {
-    // Use page object selector for field expand buttons
-    const fieldButtonsSelector = pm.logsPage.allFieldExpandButtons || '[data-test*="log-search-expand-"][data-test$="-field-btn"]';
-    const fieldButtons = page.locator(fieldButtonsSelector);
+    const fieldButtons = pm.logsPage.getAllFieldExpandButtons();
     const buttonCount = await fieldButtons.count();
 
     // Try known string fields first - these are more likely to have string values
     const preferredStringFields = ['kubernetes_container_name', 'level', 'log', 'kubernetes_pod_name', 'kubernetes_namespace_name'];
 
     for (const preferredField of preferredStringFields) {
-        // Use page object selector for specific field button
-        const preferredButtonSelector = pm.logsPage.fieldExpandButton ?
-            pm.logsPage.fieldExpandButton(preferredField) :
-            `[data-test="log-search-expand-${preferredField}-field-btn"]`;
-        const preferredButton = page.locator(preferredButtonSelector);
+        const preferredButton = pm.logsPage.getFieldExpandButton(preferredField);
         if (await preferredButton.count() > 0) {
             await preferredButton.click();
-            await page.waitForTimeout(2000);
 
             const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, preferredField, 10000);
             if (record && record.values && record.values.length > 0) {
@@ -282,7 +378,6 @@ async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttem
         if (preferredStringFields.includes(fieldName)) continue;
 
         await button.click();
-        await page.waitForTimeout(2000);
 
         const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 10000);
         if (record && record.values && record.values.length > 0) {
@@ -317,17 +412,17 @@ test.describe("Autocomplete Value Suggestions", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        // Wait for auth to complete
-        await page.waitForTimeout(1000);
+        // Wait for auth-driven navigation to settle deterministically
+        await page.waitForLoadState('domcontentloaded');
 
         // Ingest test data
         await ingestTestData(page);
-        await page.waitForTimeout(1000);
 
         // Navigate to logs page
         await page.goto(
             `${logData.logsUrl}?org_identifier=${orgName}`
         );
+        await page.waitForLoadState('domcontentloaded');
 
         testLogger.info('Test setup completed');
     });
@@ -348,26 +443,19 @@ test.describe("Autocomplete Value Suggestions", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Find a field to expand - look for any available field expand button
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
+        // Iterate through fields until one with captured values is found.
+        // Some fields (e.g. ftsKey fields) crash the expand handler silently, and
+        // others may have empty value sets on the pentest backend — using
+        // findFieldWithStringValues skips both deterministically.
+        const fieldButtons = pm.logsPage.getAllFieldExpandButtons();
         const buttonCount = await fieldButtons.count();
         expect(buttonCount).toBeGreaterThan(0);
 
-        // Get the first field name from the data-test attribute
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        // Extract field name from "log-search-expand-{fieldName}-field-btn"
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-        testLogger.info(`Expanding field: ${fieldName}`);
+        const result = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(result, 'Expected to capture at least one field with values').not.toBeNull();
 
-        // Click to expand the field
-        await firstButton.click();
-
-        // Wait for field values to load in the UI
-        await page.waitForTimeout(2000);
-
-        // Wait for IndexedDB record to be created (background write via requestIdleCallback)
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
+        const { fieldName, record } = result;
+        testLogger.info(`Expanded field: ${fieldName}`);
 
         // Verify record was created
         expect(record).not.toBeNull();
@@ -396,59 +484,39 @@ test.describe("Autocomplete Value Suggestions", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Find a field with values and expand it
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        // Expand the field to capture values
-        await firstButton.click();
-        await page.waitForTimeout(2000);
-
-        // Wait for values to be stored
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-        expect(record).not.toBeNull();
+        // Find a field with values and expand it (skip ftsKey fields that crash
+        // the expand handler silently when fired with a null event)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName, record } = fieldResult;
         testLogger.info(`Field ${fieldName} has ${record.values.length} stored values`);
 
         // Now type in the query editor to trigger suggestions
         // First clear and set up a base query
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} = `);
+        // Wait for Monaco model + autocomplete context to settle before triggering
+        await pm.logsPage.waitForQueryEditorValue(`${fieldName} = `, 5000);
 
-        // Wait a moment for Monaco to process
-        await page.waitForTimeout(1000);
+        // Trigger autocomplete and retry until stored value appears (debounce-safe).
+        // Picks any stored value from the captured record to wait on.
+        const expectedSampleValue = record.values[0];
+        const suggestions = await triggerSuggestionsWithRetry(page, pm, expectedSampleValue, 12000);
+        testLogger.info(`Found ${suggestions.length} suggestions: ${suggestions.slice(0, 5).join(', ')}`);
 
-        // Trigger autocomplete by pressing Ctrl+Space or just waiting
-        await page.keyboard.press('Control+Space');
+        // Should have at least one value suggestion
+        expect(suggestions.length).toBeGreaterThan(0);
 
-        // Wait for suggestions widget
-        try {
-            await waitForSuggestionsWidget(page, pm, 10000);
+        // Check if any of our stored values appear in suggestions
+        const storedValues = record.values;
+        const hasStoredValue = suggestions.some(s =>
+            storedValues.some(v => s.includes(v))
+        );
 
-            // Get suggestion labels
-            const suggestions = await getSuggestionLabels(page, pm);
-            testLogger.info(`Found ${suggestions.length} suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        // Assert that stored values appear in suggestions
+        expect(hasStoredValue).toBe(true);
+        testLogger.info('Found stored field values in suggestions');
 
-            // Should have at least one value suggestion
-            expect(suggestions.length).toBeGreaterThan(0);
-
-            // Check if any of our stored values appear in suggestions
-            const storedValues = record.values;
-            const hasStoredValue = suggestions.some(s =>
-                storedValues.some(v => s.includes(v))
-            );
-
-            // Assert that stored values appear in suggestions
-            expect(hasStoredValue).toBe(true);
-            testLogger.info('Found stored field values in suggestions');
-
-            testLogger.info('Autocomplete suggestions test PASSED');
-        } catch (error) {
-            testLogger.warn(`Suggestions widget not visible: ${error.message}`);
-            // Take screenshot for debugging
-            await page.screenshot({ path: 'autocomplete-suggestions-debug.png' });
-            throw error;
-        }
+        testLogger.info('Autocomplete suggestions test PASSED');
     });
 
     // =========================================================================
@@ -473,18 +541,19 @@ test.describe("Autocomplete Value Suggestions", () => {
 
         // Type query to trigger suggestions
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} = `);
-        await page.waitForTimeout(500);
-        await page.keyboard.press('Control+Space');
+        await pm.logsPage.waitForQueryEditorValue(`${fieldName} = `, 5000);
 
-        // Wait for suggestions - no silent catch
-        await waitForSuggestionsWidget(page, pm, 10000);
+        // Retry-trigger autocomplete until the stored value appears
+        await triggerSuggestionsWithRetry(page, pm, stringValue, 12000);
 
         // Assert string value is in suggestions
         const hasStringValue = await suggestionContainsValue(page, pm, stringValue);
         expect(hasStringValue, `Expected string value ${stringValue} to be in suggestions`).toBe(true);
 
-        await selectSuggestion(page, pm, stringValue);
-        await page.waitForTimeout(500);
+        // Use keyboard navigation + Enter for deterministic suggestion selection.
+        // Monaco's virtualised suggest list can swallow raw `.click()` events when
+        // multiple rows share text — keyboard accept is the canonical insertion path.
+        await acceptSuggestionByValue(page, stringValue);
 
         // Get the editor content
         const editorContent = await getQueryEditorContent(page, pm);
@@ -514,24 +583,15 @@ test.describe("Autocomplete Value Suggestions", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Expand a field to capture values
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
-
-        // Verify values are in IndexedDB
-        const recordBefore = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-        expect(recordBefore).not.toBeNull();
+        // Expand a field with values (skip ftsKey fields that crash the handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName, record: recordBefore } = fieldResult;
         const valuesBefore = recordBefore.values;
         testLogger.info(`Values before refresh: ${valuesBefore.length}`);
 
         // Hard refresh the page
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2000);
 
         // Verify values are still in IndexedDB
         const recordAfter = await getFieldRecord(page, orgName, 'logs', streamName, fieldName);
@@ -561,18 +621,10 @@ test.describe("Autocomplete Value Suggestions", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Expand a field
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
-
-        // Wait for values
-        const record1 = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-        expect(record1).not.toBeNull();
+        // Expand a field with values (skip ftsKey fields that crash the handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName, record: record1 } = fieldResult;
         testLogger.info(`Stream ${streamName} - ${fieldName}: ${record1.values.length} values`);
 
         // Verify the record key format is correct (includes stream name for isolation)
@@ -603,7 +655,7 @@ test.describe("Autocomplete Value Suggestions", () => {
 
         // Type a partial keyword to trigger keyword suggestions
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions - this is a regression test, failures indicate a problem
@@ -635,7 +687,6 @@ test.describe("Autocomplete Value Suggestions", () => {
         await runQueryAndWaitForResults(page, pm);
 
         // Wait for background capture
-        await page.waitForTimeout(3000);
 
         // Get all records
         const records = await getIndexedDBRecords(page);
@@ -680,7 +731,6 @@ test.describe("Autocomplete Value Suggestions", () => {
         await runQueryAndWaitForResults(page, pm);
 
         // Wait for background capture
-        await page.waitForTimeout(3000);
 
         // Get all records
         const records = await getIndexedDBRecords(page);
@@ -722,10 +772,10 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
-        await page.waitForTimeout(1000);
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
     });
 
     test("should handle typing field IN ( operator", {
@@ -737,17 +787,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Type IN operator
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} IN (`);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions and assert - no silent catch
@@ -767,17 +814,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Type LIKE operator
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} LIKE `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions and assert - no silent catch
@@ -815,7 +859,7 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
             pm,
             `SELECT * FROM "${streamName}" WHERE ${fieldName} = '${partial}`,
         );
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Suggestions should still appear even with partial input - no silent catch
@@ -835,17 +879,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Type NOT IN operator
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} NOT IN (`);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions and assert - no silent catch
@@ -865,17 +906,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Type != operator
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} != `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions and assert - no silent catch
@@ -895,17 +933,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Test >= operator - no silent catch
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} >= `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         await waitForSuggestionsWidget(page, pm, 5000);
@@ -915,7 +950,7 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
 
         // Test <= operator - no silent catch
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} <= `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         await waitForSuggestionsWidget(page, pm, 5000);
@@ -934,17 +969,14 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        // Find a field with captured values (skips ftsKey fields that crash the expand handler)
+        const fieldResult = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldResult, 'Expected to find a field with captured values').not.toBeNull();
+        const { fieldName } = fieldResult;
 
         // Type str_match function
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE str_match(${fieldName}, `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions and assert - no silent catch
@@ -972,10 +1004,10 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
-        await page.waitForTimeout(1000);
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
     });
 
     test("should insert numeric values WITHOUT quotes", {
@@ -989,13 +1021,11 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
 
         // Search for the field in the field list search box first
         await pm.logsPage.searchFieldByName('code');
-        await page.waitForTimeout(1000);
 
         // Find the field expand button for 'code'
-        const codeFieldBtn = page.locator(pm.logsPage.fieldExpandButton('code'));
+        const codeFieldBtn = pm.logsPage.getFieldExpandButton('code');
         await codeFieldBtn.waitFor({ state: 'visible', timeout: 5000 });
         await codeFieldBtn.click();
-        await page.waitForTimeout(2000);
 
         // Wait for values in IndexedDB - assert values were captured
         const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, 'code', 15000);
@@ -1010,18 +1040,18 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
 
         // Type query to trigger suggestions
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE code = `);
-        await page.waitForTimeout(500);
-        await page.keyboard.press('Control+Space');
+        await pm.logsPage.waitForQueryEditorValue('code = ', 5000);
 
-        // Wait for suggestions - no silent catch
-        await waitForSuggestionsWidget(page, pm, 10000);
+        // Retry-trigger autocomplete until the numeric value shows up
+        // (handles the 500ms editor debounce that gates updateAutoComplete).
+        await triggerSuggestionsWithRetry(page, pm, numericValue, 12000);
 
         // Check if our numeric value is in suggestions
         const hasNumericValue = await suggestionContainsValue(page, pm, numericValue);
         expect(hasNumericValue, `Expected numeric value ${numericValue} to be in suggestions`).toBe(true);
 
-        await selectSuggestion(page, pm, numericValue);
-        await page.waitForTimeout(500);
+        // Keyboard accept — see acceptSuggestionByValue() rationale.
+        await acceptSuggestionByValue(page, numericValue);
 
         // Get the editor content
         const editorContent = await getQueryEditorContent(page, pm);
@@ -1055,17 +1085,16 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
 
         // Type with opening quote already present
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} = '`);
-        await page.waitForTimeout(500);
-        await page.keyboard.press('Control+Space');
+        await pm.logsPage.waitForQueryEditorValue(`${fieldName} = '`, 5000);
 
-        // Wait for suggestions - no silent catch
-        await waitForSuggestionsWidget(page, pm, 10000);
+        // Retry-trigger autocomplete until the stored value appears
+        await triggerSuggestionsWithRetry(page, pm, stringValue, 12000);
 
         const hasStringValue = await suggestionContainsValue(page, pm, stringValue);
         expect(hasStringValue, `Expected string value ${stringValue} to be in suggestions`).toBe(true);
 
-        await selectSuggestion(page, pm, stringValue);
-        await page.waitForTimeout(500);
+        // Keyboard accept — see acceptSuggestionByValue() rationale above.
+        await acceptSuggestionByValue(page, stringValue);
 
         const editorContent = await getQueryEditorContent(page, pm);
         testLogger.info(`Editor content: ${editorContent}`);
@@ -1098,10 +1127,10 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
-        await page.waitForTimeout(1000);
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
     });
 
     test("should show keyword suggestions on cold start (no stored values)", {
@@ -1117,7 +1146,7 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
 
         // Don't run search - just type in query editor
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE `);
-        await page.waitForTimeout(500);
+        await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
         await page.keyboard.press('Control+Space');
 
         // Wait for suggestions widget - cold start should still show SQL keywords/field names

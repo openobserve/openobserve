@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="alert-condition-row">
+              <div class="alert-condition-row" data-test="alert-if-row-logs">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <div class="tw:min-w-[130px] tw:max-w-[180px]">
@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="triggerThreshold"
                       type="number"
+                      data-test="alert-trigger-threshold-input"
                       @blur="restoreDefaultThreshold"
                       class="tw:min-w-[60px] tw:max-w-[80px]"
                       min="1"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row" data-test="alert-group-by-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
@@ -176,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost-primary"
                     size="icon-circle-sm"
+                    data-test="alert-group-by-add-btn"
                     @click="addLogGroupByColumn"
                   >
                     <OIcon name="add" size="sm" />
@@ -185,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row">
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row" data-test="alert-having-groups-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
