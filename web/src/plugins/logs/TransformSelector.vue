@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OInput>
           </div>
 
-          <div v-if="filteredTransformOptions.length">
+          <div v-if="filteredTransformOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
             <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
               <li
                 v-for="(item, i) in filteredTransformOptions"
