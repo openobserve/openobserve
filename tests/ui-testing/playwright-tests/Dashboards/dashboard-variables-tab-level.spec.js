@@ -187,8 +187,14 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const popover2 = page.locator(`[data-test="variable-selector-${variableName}-inner-popover"]`);
     await popover2.waitFor({ state: "visible", timeout: 5000 });
 
+    // Wait for at least 2 options to load in the dropdown
+    const optionSelector2 = `[data-test="variable-selector-${variableName}-inner-option"]`;
+    await page.waitForFunction(
+      sel => document.querySelectorAll(sel).length >= 2,
+      optionSelector2,
+      { timeout: 15000 }
+    );
     const option2 = popover2.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).nth(1);
-    await option2.waitFor({ state: "visible", timeout: 10000 });
     const value2 = await option2.textContent();
     await option2.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
