@@ -44,13 +44,12 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     // Stream selector should be visible for multi-stream environments
     if (isStreamSelectorVisible) {
       await pm.metricsPage.clickStreamSelector();
-      await page.waitForTimeout(500);
 
       const hasStreamOptions = await pm.metricsPage.isStreamOptionVisible();
 
       if (!hasStreamOptions) {
         testLogger.warn('Stream options not visible after clicking selector - may be single stream or UI changed');
-        await page.locator('body').click({ position: { x: 10, y: 10 } });
+        await page.keyboard.press('Escape');
       } else {
         expect(hasStreamOptions).toBe(true); // Should have stream options available
 
@@ -58,7 +57,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         const streamName = await streamOption.textContent();
         testLogger.info(`Selecting stream: ${streamName}`);
         await streamOption.click();
-        await page.waitForTimeout(1000);
 
         await pm.metricsPage.enterMetricsQuery('up');
         await pm.metricsPage.clickApplyButton();
@@ -89,11 +87,10 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         successfulSelections++;
       } else {
         testLogger.warn(`Failed to select time range: ${range}`);
-        await page.locator('body').click({ position: { x: 10, y: 10 } });
+        await page.keyboard.press('Escape');
       }
 
       await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
-      await page.waitForTimeout(2000);
 
       const hasError = await pm.metricsPage.expectQueryError();
       if (hasError) {
@@ -169,7 +166,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         testLogger.info(`Executing ${group.category} - ${queryData.name}`);
 
         await pm.metricsPage.executeQuery(queryData.query);
-        await page.waitForTimeout(1500);
 
         // Verify query executed without errors
         const hasError = await pm.metricsPage.expectQueryError();
@@ -202,10 +198,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     for (const queryData of aggregationQueries) {
       testLogger.info(`Testing aggregation: ${queryData.name}`);
 
-      await pm.metricsPage.clearQueryEditor();
-      await pm.metricsPage.enterMetricsQuery(queryData.query);
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
+      await pm.metricsPage.executeQuery(queryData.query);
 
       const hasError = await pm.metricsPage.expectQueryError();
       if (hasError) {
@@ -216,8 +209,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       expect(hasError).toBe(false); // Should execute without errors
 
       testLogger.info(`Aggregation "${queryData.name}" executed successfully`);
-
-      await page.waitForTimeout(1000);
     }
 
     // Test 2: Subqueries
@@ -232,7 +223,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       testLogger.info(`Executing subquery: ${query.substring(0, 50)}...`);
 
       await pm.metricsPage.executeQuery(query);
-      await page.waitForTimeout(2000);
 
       testLogger.info('Subquery executed');
     }
@@ -245,7 +235,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       testLogger.info(`Testing alert condition: ${name}`);
 
       await pm.metricsPage.executeQuery(query);
-      await page.waitForTimeout(2000);
 
       const resultsVisible = await pm.metricsPage.areResultsVisible();
       if (resultsVisible) {
@@ -293,8 +282,6 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       // Verify query completed within reasonable time
       // executeQuery() includes a networkidle wait (up to 5s) + CI can be slow
       expect(executionTime).toBeLessThan(30000);
-
-      await page.waitForTimeout(1000);
     }
 
     testLogger.info('Performance testing completed successfully');

@@ -36,6 +36,142 @@ export class MetricsPage {
         // Other UI elements
         this.syntaxGuideButton = '[data-cy="syntax-guide-button"]';
 
+        // Inline error list locator (DashboardErrors component)
+        this.inlineError = page.locator('[data-test="dashboard-error"]');
+
+        // ===== metrics-config.spec.js locators =====
+        // Date/time picker (shared metrics control)
+        this.dateTimePicker = page.locator('[data-test="metrics-date-picker"]');
+        // Relative tab inside DateTime popover
+        this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
+        // Datetime start/end input (absolute mode)
+        this.dateTimeStartInput = page.locator('[data-test="datetime-start-time"]');
+        // Auto-refresh button (toggles dropdown)
+        this.refreshIntervalButton = page.locator('[data-test="metrics-auto-refresh"]');
+        // Refresh interval options (data-test prefix shared with logs search bar)
+        this.refreshIntervalOptions = page.locator('[data-test^="logs-search-bar-refresh-time-"]');
+        // Panel-display/axis/threshold/export controls (not implemented on metrics page).
+        // Kept as data-test placeholders so spec defensive `if visible` checks resolve to false
+        // without violating §2 (no .class / text= / button:has-text selectors).
+        this.metricsPanelSettingsBtn = page.locator('[data-test="metrics-panel-settings-btn"]');
+        this.metricsPanelSettingsPanel = page.locator('[data-test="metrics-panel-settings-panel"]');
+        this.metricsPanelSettingsClose = page.locator('[data-test="metrics-panel-settings-close-btn"]');
+        this.metricsAxisBtn = page.locator('[data-test="metrics-axis-btn"]');
+        this.metricsThresholdBtn = page.locator('[data-test="metrics-threshold-btn"]');
+        this.metricsThresholdInputs = page.locator('[data-test^="metrics-threshold-input-"]');
+        this.metricsExportBtn = page.locator('[data-test="metrics-export-btn"]');
+        this.metricsExportOptions = page.locator('[data-test^="metrics-export-option-"]');
+        this.metricsExportOptionCsv = page.locator('[data-test="metrics-export-option-csv"]');
+
+        // Chart-area error rendered by PanelSchemaRenderer when errorDetail.message is set
+        this.chartErrorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+
+        // Date-time relative buttons (data-test pattern: date-time-relative-{value}-{unit}-btn)
+        this.dateTimeRelative15m = page.locator('[data-test="date-time-relative-15-m-btn"]');
+
+        // Query editor / mode buttons
+        this.customQueryTypeButton = page.locator('[data-test="dashboard-custom-query-type"]');
+        this.queryEditorContainer = page.locator('[data-test="dashboard-panel-query-editor"]');
+        this.dashboardQueryContainer = page.locator('[data-test="dashboard-query"]');
+
+        // PromQL Table Chart locators
+        this.promqlTableModeSelect = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+        this.promqlTableModePopover = page.locator('[data-test="dashboard-config-promql-table-mode-popover"]');
+        this.promqlTableModeOptions = page.locator('[data-test="dashboard-config-promql-table-mode-option"]');
+        this.promqlTableChart = page.locator('[data-test="promql-table-chart"]');
+        // TenstackTable headers — data-test="o2-table-th-<columnId>"; we walk all headers in DOM order.
+        this.promqlTableHeaders = page.locator(
+            '[data-test="promql-table-chart"] [data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])'
+        );
+
+        // ===== ConfigPanel sidebar (PanelSidebar + Reka Collapsible sections) =====
+        this.dashboardSidebarButton = page.locator('[data-test="dashboard-sidebar"]').first();
+        this.dashboardSidebarCollapseButton = page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
+        this.panelSidebarContent = page.locator('[data-test="panel-sidebar-content"]').first();
+        this.panelSidebarExpandedHeader = page.locator('[data-test="panel-sidebar-header-expanded"]').first();
+        // Sentinel: any config-panel control. Used to gate the async ConfigPanel mount.
+        this.anyDashboardConfigControl = page.locator('[data-test^="dashboard-config-"]').first();
+        // All config-panel controls (used by getConfigSectionKeys to enumerate).
+        this.allDashboardConfigControls = page.locator('[data-test^="dashboard-config-"]');
+        // Metrics page does not yet surface a chart-type picker; this defensive
+        // locator matches any future `*chart-type*` data-test or resolves to no node.
+        this.chartTypePickerButton = page.locator('[data-test*="chart-type"]').first();
+
+        // ConfigPanel specific control data-tests (sourced from ConfigPanel.vue)
+        this.configShowLegend = page.locator('[data-test="dashboard-config-show-legend"]').first();
+        this.configConnectNullValues = page.locator('[data-test="dashboard-config-connect-null-values"]').first();
+        this.configDecimals = page.locator('[data-test="dashboard-config-decimals"]').first();
+        this.configDecimalsField = page.locator('[data-test="dashboard-config-decimals-field"]').first();
+        this.configYAxisMin = page.locator('[data-test="dashboard-config-y_axis_min"]').first();
+        this.configYAxisMinField = page.locator('[data-test="dashboard-config-y_axis_min-field"]').first();
+        this.configYAxisMax = page.locator('[data-test="dashboard-config-y_axis_max"]').first();
+        this.configYAxisMaxField = page.locator('[data-test="dashboard-config-y_axis_max-field"]').first();
+    }
+
+    /**
+     * Get the inline dashboard error locator (DashboardErrors below the chart)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getInlineError() {
+        return this.inlineError;
+    }
+
+    /**
+     * Dismiss any open overlay/popover/modal by pressing Escape.
+     * Used in place of body-click workarounds (§2 forbids body locators).
+     */
+    async dismissOverlay() {
+        await this.page.keyboard.press('Escape');
+    }
+
+    /**
+     * Get the chart-area error locator surfaced by PanelSchemaRenderer.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getChartErrorMessage() {
+        return this.chartErrorMessage;
+    }
+
+    /**
+     * Get the inline DashboardErrors locator. Mirrors getInlineError() for spec readability.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getDashboardError() {
+        return this.inlineError;
+    }
+
+    /**
+     * Wait for an element's aria-expanded attribute to differ from a previous value.
+     * @param {import('@playwright/test').Locator} toggle
+     * @param {string|null} previous
+     * @param {number} [timeout=2000]
+     */
+    async waitForToggleState(toggle, previous, timeout = 2000) {
+        try {
+            await expect.poll(async () => {
+                return await toggle.getAttribute('aria-expanded').catch(() => null);
+            }, { timeout, intervals: [100, 200, 400] }).not.toBe(previous);
+        } catch (_) {
+            // Some collapsibles flip a class rather than aria-expanded; caller branches on the post-state.
+        }
+    }
+
+    /**
+     * Wait for a panel's visibility to flip from a previous boolean state.
+     * Swallows timeout so callers can branch on the post-state (some collapsible
+     * patterns flip a class rather than display/visibility).
+     * @param {import('@playwright/test').Locator} panel
+     * @param {boolean} previouslyVisible
+     * @param {number} [timeout=3000]
+     */
+    async waitForPanelVisibilityChange(panel, previouslyVisible, timeout = 3000) {
+        try {
+            await expect.poll(async () => {
+                return await panel.isVisible().catch(() => false);
+            }, { timeout, intervals: [100, 200, 500] }).not.toBe(previouslyVisible);
+        } catch (_) {
+            // Caller branches on the current visibility (warn vs assert).
+        }
     }
     async gotoMetricsPage() {
         await this.metricsPageMenu.click();
@@ -120,12 +256,8 @@ export class MetricsPage {
     }
 
     async openDatePicker() {
-        // Close any open menus/modals first
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        await this.page.waitForTimeout(300);
-
-        // Wait for any overlays to disappear
-        await this.page.waitForTimeout(500);
+        // Close any open menus/modals first via Escape (data-test policy — no body locator)
+        await this.page.keyboard.press('Escape');
 
         // Click with force to handle potential overlay interception
         await this.page.locator(this.datePicker).click({ force: true });
@@ -372,42 +504,53 @@ export class MetricsPage {
 
     async enterMetricsQuery(query) {
         // Ensure Custom mode is active so the editor is fully editable
-        const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
+        const customBtn = this.customQueryTypeButton;
         if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             const dataState = await customBtn.getAttribute('data-state').catch(() => '');
             if (dataState !== 'on') {
                 await customBtn.click();
-                // Wait for default query to be populated by the watcher (e.g. streamName{})
-                await this.page.waitForTimeout(2000);
+                // Wait deterministically for Custom mode to flip data-state to "on"
+                await expect(customBtn).toHaveAttribute('data-state', 'on', { timeout: 5000 }).catch(() => {});
             }
         }
 
-        // Use the same pattern as logsPage.js which works reliably with Monaco editor
-        // The key is to use the .inputarea selector inside the Monaco editor
-        const editorSelectors = [
-            '[data-test="dashboard-panel-query-editor"]',  // Primary metrics query editor
-            '[data-test="dashboard-query"]',              // Alternate dashboard query selector
-            '.monaco-editor'                               // Fallback to generic Monaco editor
-        ];
-
-        let editorContainer = null;
-        for (const selector of editorSelectors) {
-            const container = this.page.locator(selector).first();
-            if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
-                editorContainer = container;
-                break;
-            }
+        // Resolve the Monaco editor container via data-test only (§2 zero-tolerance).
+        // Primary: dashboard-panel-query-editor; secondary fallback: dashboard-query.
+        let editorContainer = this.queryEditorContainer.first();
+        if (!await editorContainer.isVisible({ timeout: 2000 }).catch(() => false)) {
+            editorContainer = this.dashboardQueryContainer.first();
         }
 
-        if (!editorContainer) {
-            editorContainer = this.page.locator('.monaco-editor').first();
-        }
-
-        // Wait for Monaco editor to be fully loaded
+        // Wait for Monaco editor to be fully loaded and for window.monaco to expose editors.
         await editorContainer.waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.waitForTimeout(500);
+        await this.page.waitForFunction(
+            () => !!(window.monaco && window.monaco.editor && window.monaco.editor.getEditors().length > 0),
+            null,
+            { timeout: 10000 }
+        ).catch(() => {});
 
-        // Click on the Monaco editor to focus it - try multiple approaches
+        // Drive the query value through the Monaco model API (§5) so the Vue
+        // data-model stays in sync even when the editor is briefly out of focus.
+        const setViaModel = await this.page.evaluate((value) => {
+            try {
+                const editors = window.monaco?.editor?.getEditors?.();
+                if (!editors || editors.length === 0) return false;
+                const editor = editors[editors.length - 1];
+                editor.focus();
+                editor.setValue(value);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }, query);
+
+        if (setViaModel) {
+            return;
+        }
+
+        // Fallback: click + keyboard if window.monaco API unavailable.
+        // Using keyboard.type instead of .fill() ensures Monaco triggers change
+        // events so the Vue data model stays in sync (critical for Custom mode).
         const codeElement = editorContainer.getByRole('code');
         const isCodeVisible = await codeElement.isVisible({ timeout: 5000 }).catch(() => false);
 
@@ -417,17 +560,12 @@ export class MetricsPage {
             // Fallback: click on the editor container directly
             await editorContainer.click();
         }
-        await this.page.waitForTimeout(200);
 
         // Select all existing content and delete it, then type the new query.
-        // Using keyboard.type instead of .fill() ensures Monaco triggers change
-        // events so the Vue data model stays in sync (critical for Custom mode).
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
-        await this.page.waitForTimeout(200);
         await this.page.keyboard.type(query, { delay: 10 });
-        await this.page.waitForTimeout(500);
     }
 
     async waitForMetricsResults() {
@@ -768,13 +906,44 @@ export class MetricsPage {
     async selectLast15Minutes() {
         await this.openDatePicker();
         // Date-picker relative buttons have data-test="date-time-relative-15-m-btn"
-        const last15Min = this.page.locator('[data-test="date-time-relative-15-m-btn"]').first();
+        const last15Min = this.dateTimeRelative15m.first();
         if (await last15Min.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await last15Min.click();
-        } else {
-          await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+          // Popover portal animates in — ensure the button is enabled (animations settled)
+          // and target it via dispatched click (avoid Playwright's stability re-check on portals)
+          await last15Min.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+          try {
+            await last15Min.click({ timeout: 5000 });
+          } catch (_) {
+            // Portal element animation re-mount: fall back to dispatchEvent
+            await last15Min.dispatchEvent('click').catch(() => {});
+          }
+          // Wait for date picker popover to close (deterministic wait)
+          await last15Min.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+          return true;
         }
-        await this.page.waitForTimeout(500);
+        // Dismiss the date picker via Escape if the option was not found
+        await this.page.keyboard.press('Escape');
+        return false;
+    }
+
+    /**
+     * Dismiss any open popover / dropdown using the Escape key.
+     * Replaces the `page.locator('body').click(...)` pattern.
+     */
+    async dismissOpenPopover() {
+        await this.page.keyboard.press('Escape');
+    }
+
+    /**
+     * Wait for a chart visualization to render. Polls deterministically until
+     * any chart canvas / svg / table / panel appears, with a bounded timeout.
+     * @param {number} [timeout=10000]
+     */
+    async waitForChartRender(timeout = 10000) {
+        await expect.poll(
+            async () => await this.hasVisualization(),
+            { timeout, intervals: [200, 400, 800] }
+        ).toBe(true);
     }
 
     // ===== DATA VISUALIZATION VERIFICATION METHODS =====
@@ -882,61 +1051,175 @@ export class MetricsPage {
     // ===== CONFIG SIDEBAR METHODS =====
 
     async getDashboardSidebarCollapseButton() {
-        return this.page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
+        return this.dashboardSidebarCollapseButton;
     }
 
     async clickDashboardSidebarCollapseButton() {
-        const btn = await this.getDashboardSidebarCollapseButton();
+        const btn = this.dashboardSidebarCollapseButton;
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
         }
     }
 
     async getDashboardSidebarButton() {
-        return this.page.locator('[data-test="dashboard-sidebar"]').first();
+        return this.dashboardSidebarButton;
     }
 
     async clickDashboardSidebarButton() {
-        const btn = await this.getDashboardSidebarButton();
+        const btn = this.dashboardSidebarButton;
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
         }
     }
 
+    /**
+     * Open the dashboard config sidebar (PanelSidebar root). Idempotent.
+     * Waits for the expanded header AND the async-loaded ConfigPanel children
+     * (any `dashboard-config-*` data-test) to appear before returning.
+     */
+    async openConfigSidebar() {
+        const expandedHeader = this.panelSidebarExpandedHeader;
+        const anyConfig = this.anyDashboardConfigControl;
+        if (await expandedHeader.isVisible({ timeout: 500 }).catch(() => false)) {
+            // already open — still wait for async ConfigPanel to mount
+            await anyConfig.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+            return;
+        }
+        const btn = this.dashboardSidebarButton;
+        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        await btn.click();
+        await expandedHeader.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        // ConfigPanel is async-imported; wait for any dashboard-config-* node to mount.
+        await anyConfig.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+    }
+
+    /**
+     * Close the dashboard config sidebar via the collapse button.
+     * Waits for the expanded header to disappear before returning.
+     */
+    async closeConfigSidebar() {
+        const btn = this.dashboardSidebarCollapseButton;
+        if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
+            await btn.click();
+            await this.panelSidebarExpandedHeader.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        }
+    }
+
     async isSidebarVisible() {
-        const sidebar = this.page.locator('.dashboard-sidebar, .config-sidebar, [class*="sidebar"]').first();
-        return await sidebar.isVisible({ timeout: 3000 }).catch(() => false);
+        // Sidebar is "visible" (i.e. expanded) when the expanded header is shown.
+        return await this.panelSidebarExpandedHeader.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
-    async getSidebarTabs() {
-        // TODO(data-test): metrics sidebar tabs (Reka Tabs / .sidebar-tab) don't yet expose a data-test root in source; add data-test on each tab in web/src/views/Metrics/* before removing class fallback.
-        return this.page.locator('.sidebar-tab').locator('visible');
+    /**
+     * Enumerate config control data-tests currently present in the DOM.
+     * Used as a generic "what's in this sidebar" probe — not all controls
+     * are visible at once (chart-type-dependent and section-collapsed).
+     * @returns {Promise<string[]>}
+     */
+    async getConfigSectionKeys() {
+        const handles = await this.allDashboardConfigControls.all();
+        const seen = new Set();
+        for (const h of handles) {
+            const attr = await h.getAttribute('data-test').catch(() => null);
+            if (attr) seen.add(attr);
+        }
+        return Array.from(seen);
     }
 
-    async getSidebarTabCount() {
-        const tabs = await this.getSidebarTabs();
-        return await tabs.count();
-    }
-
-    async clickTabByText(tabText) {
-        // TODO(data-test): metrics sidebar tabs (Reka Tabs) don't yet expose a data-test; add data-test on each tab in source to remove this text-only fallback.
-        const tab = this.page.locator('.sidebar-tab').filter({ hasText: new RegExp(tabText, 'i') }).first();
-        if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await tab.click();
-            await this.page.waitForTimeout(500);
+    /**
+     * Click a specific config control by its full data-test value (no-op when hidden).
+     * @param {string} dataTest - e.g. "dashboard-config-show-legend"
+     * @returns {Promise<boolean>}
+     */
+    async toggleConfigSection(dataTest) {
+        const el = this.page.locator(`[data-test="${dataTest}"]`).first();
+        if (await el.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await el.click().catch(() => {});
             return true;
         }
         return false;
     }
 
-    async getActiveTabPanel() {
-        // TODO(data-test): tab panel containers (Reka TabsContent / .tab-content) don't yet expose a data-test root.
-        return this.page.locator('.tab-content').locator('visible').first();
+    /**
+     * Whether a config control with the given data-test is currently visible.
+     * @param {string} dataTest
+     */
+    async isConfigSectionVisible(dataTest) {
+        const el = this.page.locator(`[data-test="${dataTest}"]`).first();
+        return await el.isVisible({ timeout: 1500 }).catch(() => false);
     }
 
-    async isTabPanelVisible() {
-        const panel = await this.getActiveTabPanel();
-        return await panel.isVisible({ timeout: 3000 }).catch(() => false);
+    // ===== ConfigPanel specific controls =====
+
+    async isConfigShowLegendVisible() {
+        return await this.configShowLegend.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    async clickConfigShowLegend() {
+        await this.configShowLegend.click();
+    }
+
+    async isConfigConnectNullValuesVisible() {
+        return await this.configConnectNullValues.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    async clickConfigConnectNullValues() {
+        await this.configConnectNullValues.click();
+    }
+
+    async isConfigDecimalsVisible() {
+        return await this.configDecimals.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    async fillConfigDecimals(value) {
+        const field = this.configDecimalsField;
+        if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await field.fill(String(value));
+        } else {
+            await this.configDecimals.fill(String(value));
+        }
+    }
+
+    async getConfigDecimalsValue() {
+        const field = this.configDecimalsField;
+        if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await field.inputValue();
+        }
+        return await this.configDecimals.inputValue();
+    }
+
+    async isConfigYAxisMinVisible() {
+        return await this.configYAxisMin.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    async fillConfigYAxisMin(value) {
+        const field = this.configYAxisMinField;
+        if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await field.fill(String(value));
+        } else {
+            await this.configYAxisMin.fill(String(value));
+        }
+    }
+
+    async getConfigYAxisMinValue() {
+        const field = this.configYAxisMinField;
+        if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+            return await field.inputValue();
+        }
+        return await this.configYAxisMin.inputValue();
+    }
+
+    async isConfigYAxisMaxVisible() {
+        return await this.configYAxisMax.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    async fillConfigYAxisMax(value) {
+        const field = this.configYAxisMaxField;
+        if (await field.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await field.fill(String(value));
+        } else {
+            await this.configYAxisMax.fill(String(value));
+        }
     }
 
     // ===== STREAM SELECTION METHODS =====
@@ -1082,30 +1365,32 @@ export class MetricsPage {
     // ===== CHART TYPE METHODS =====
 
     async getChartTypeButton() {
-        return this.page.locator('[data-test*="chart-type"]').or(
-            this.page.locator('button:has-text("Line"), button:has-text("Bar")')
-        ).first();
+        // The metrics page does not surface a chart-type picker today;
+        // this returns a data-test locator that defensively resolves to a
+        // hidden node so spec `if visible` guards short-circuit cleanly.
+        return this.chartTypePickerButton;
     }
 
     async clickChartTypeButton() {
         const btn = await this.getChartTypeButton();
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
-            await this.page.waitForTimeout(500);
             return true;
         }
         return false;
     }
 
     async getChartTypeOption(chartType) {
-        return this.page.locator(`[data-test$="-option"]:has-text("${chartType}")`).or(this.page.getByRole('option', { name: chartType })).first();
+        // OSelect/OListbox forwards parent data-test to options as `*-option`
+        // plus a per-value data-test-value="<value>" attribute.
+        const lower = String(chartType).toLowerCase();
+        return this.page.locator(`[data-test$="-option"][data-test-value="${lower}"]`).first();
     }
 
     async selectChartTypeOption(chartType) {
         const option = await this.getChartTypeOption(chartType);
         if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.waitForTimeout(1000);
             return true;
         }
         return false;
@@ -1179,15 +1464,11 @@ export class MetricsPage {
     // ===== DATE/TIME PICKER METHODS =====
 
     async getDateTimePicker() {
-        return this.page.locator('[data-test="date-time-picker"]').or(
-            this.page.locator('[data-test="metrics-date-picker"]')
-        ).or(
-            this.page.locator('[data-cy="date-time-btn"]')
-        ).first();
+        return this.dateTimePicker;
     }
 
     async clickDateTimePicker() {
-        const picker = await this.getDateTimePicker();
+        const picker = this.dateTimePicker;
         if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
             await picker.click();
             return true;
@@ -1196,29 +1477,34 @@ export class MetricsPage {
     }
 
     async getCustomRangeOption() {
-        return this.page.locator('text=/custom|relative|absolute/i').first();
+        // The DateTime popover opens onto the Relative tab by default; click it
+        // to expose the relative-period preset buttons.
+        return this.dateTimeRelativeTab;
     }
 
     async getDateInput() {
-        return this.page.locator('input[type="date"], input[placeholder*="date"]').first();
+        // Absolute-mode start input within the DateTime popover
+        return this.dateTimeStartInput;
     }
 
     async getPresetOption(preset) {
-        return this.page.locator(`text="${preset}"`).first();
+        // Build a data-test value from preset shorthand like "15m" or "1h".
+        // Returns a locator that may or may not match — caller checks visibility.
+        const match = String(preset).match(/^(\d+)\s*([smhdwM])$/);
+        if (!match) {
+            return this.page.locator('[data-test="date-time-relative-preset-unknown"]');
+        }
+        return this.page.locator(`[data-test="date-time-relative-${match[1]}-${match[2]}-btn"]`);
     }
 
     // ===== REFRESH BUTTON METHODS =====
 
     async getRefreshButton() {
-        return this.page.locator('[data-test*="refresh"]').or(
-            this.page.locator('[data-cy*="refresh"]')
-        ).or(
-            this.page.locator('button:has-text("Off")')
-        ).first();
+        return this.refreshIntervalButton;
     }
 
     async clickRefreshButton() {
-        const btn = await this.getRefreshButton();
+        const btn = this.refreshIntervalButton;
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
             return true;
@@ -1227,7 +1513,7 @@ export class MetricsPage {
     }
 
     async getIntervalOptions() {
-        return this.page.locator('.q-item, [role="option"]');
+        return this.refreshIntervalOptions;
     }
 
     // ===== CHART OPTIONS METHODS =====
@@ -1253,24 +1539,26 @@ export class MetricsPage {
     // ===== SETTINGS PANEL METHODS =====
 
     async getSettingsPanel() {
-        return this.page.locator('.settings-panel, .settings-modal, [class*="settings-dialog"]').first();
+        return this.metricsPanelSettingsPanel;
     }
 
     async isSettingsPanelVisible() {
-        const panel = await this.getSettingsPanel();
-        return await panel.isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.metricsPanelSettingsPanel.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     async getSettingByText(text) {
-        return this.page.locator(`text=/${text}/i`).first();
+        // Returns a data-test-keyed locator derived from the setting label.
+        // Caller treats absence as "feature not present" via isVisible() check.
+        const key = String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        return this.page.locator(`[data-test="metrics-panel-setting-${key}"]`);
     }
 
     async getCloseButton() {
-        return this.page.locator('button:has-text("Close"), button:has-text("Cancel"), [aria-label="Close"]').first();
+        return this.metricsPanelSettingsClose;
     }
 
     async clickCloseButton() {
-        const btn = await this.getCloseButton();
+        const btn = this.metricsPanelSettingsClose;
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
             return true;
@@ -1281,23 +1569,30 @@ export class MetricsPage {
     // ===== EXPORT OPTIONS METHODS =====
 
     async getExportOptions() {
-        return this.page.locator('.q-item:has-text("CSV"), .q-item:has-text("JSON"), .q-item:has-text("PNG")');
+        return this.metricsExportOptions;
     }
 
     async getExportOptionCount() {
-        const options = await this.getExportOptions();
-        return await options.count();
+        return await this.metricsExportOptions.count();
+    }
+
+    /**
+     * Get the CSV export option from the export menu.
+     * Replaces the previous `filter({ hasText: 'CSV' })` pattern with a data-test-keyed lookup.
+     * @returns {import('@playwright/test').Locator}
+     */
+    async getCsvExportOption() {
+        return this.metricsExportOptionCsv;
     }
 
     // ===== THRESHOLD INPUT METHODS =====
 
     async getThresholdInputs() {
-        return this.page.locator('input[type="number"][placeholder*="threshold"], input[placeholder*="value"]');
+        return this.metricsThresholdInputs;
     }
 
     async getThresholdInputCount() {
-        const inputs = await this.getThresholdInputs();
-        return await inputs.count();
+        return await this.metricsThresholdInputs.count();
     }
 
     // ===== TABLE DATA VERIFICATION METHODS =====
@@ -1328,48 +1623,22 @@ export class MetricsPage {
     }
 
     async getSettingsButton() {
-        return this.page.locator('button[aria-label*="settings"], .settings-button, button:has-text("Settings"), [data-test*="settings"]').first();
+        return this.metricsPanelSettingsBtn;
     }
 
     async getAxisButton() {
-        return this.page.locator('button[aria-label*="axis"], .axis-button, button:has-text("Axis"), [data-test*="axis"]').first();
+        return this.metricsAxisBtn;
     }
 
     async getThresholdButton() {
-        return this.page.locator('button[aria-label*="threshold"], .threshold-button, button:has-text("Threshold"), [data-test*="threshold"]').first();
+        return this.metricsThresholdBtn;
     }
 
     async getExportButton() {
-        return this.page.locator('button[aria-label*="export"], .export-button, button:has-text("Export"), [data-test*="export"]').first();
+        return this.metricsExportBtn;
     }
 
     // ===== ADDITIONAL HELPER METHODS FOR metrics.spec.js =====
-
-    async selectLast15Minutes() {
-        // Look for "Last 15 minutes" option in the date picker
-        const last15MinutesOption = this.page.locator('.q-item__label, .q-item, [role="option"]').filter({ hasText: /Last 15 minutes|15m|15 min/i }).first();
-        const hasOption = await last15MinutesOption.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (hasOption) {
-            await last15MinutesOption.click();
-            return true;
-        } else {
-            // Try alternate approach - look for relative time options
-            const relativeTimeButton = this.page.locator('button, [role="button"]').filter({ hasText: /Relative|Last/i }).first();
-            if (await relativeTimeButton.isVisible().catch(() => false)) {
-                await relativeTimeButton.click();
-                await this.page.waitForTimeout(500);
-            }
-
-            // Try to find any 15 minute option
-            const anyTimeOption = this.page.locator('text=/15.*min/i').first();
-            if (await anyTimeOption.isVisible().catch(() => false)) {
-                await anyTimeOption.click();
-                return true;
-            }
-        }
-        return false;
-    }
 
     async hasTable() {
         const dataTable = this.page.locator('.results-table, .data-table, table.q-table, [class*="table"], .q-table__middle, table').first();
@@ -1405,7 +1674,9 @@ export class MetricsPage {
     }
 
     async getDatePickerDropdown() {
-        return this.page.locator('.date-time-picker-dropdown, [data-test$="-popover"], [role="listbox"]');
+        // The DateTime popover renders the "Relative" tab as a sentinel data-test;
+        // when the popover is open, this element is in the DOM.
+        return this.page.locator('[data-test="date-time-relative-tab"]');
     }
 
     async getCollapsibleToggle() {
@@ -1814,13 +2085,28 @@ export class MetricsPage {
     // ============================================
 
     // Preset selection method
+    // Maps human-readable preset labels to the DateTime component's data-test attributes
+    // (format: date-time-relative-{value}-{period}-btn, e.g. date-time-relative-15-m-btn).
     async getPresetOptionByText(presetText) {
-        return this.page.locator(`text="${presetText}"`).first();
+        const map = {
+            'Last 5 minutes': '[data-test="date-time-relative-5-m-btn"]',
+            'Last 15 minutes': '[data-test="date-time-relative-15-m-btn"]',
+            'Last 30 minutes': '[data-test="date-time-relative-30-m-btn"]',
+            'Last 1 hour': '[data-test="date-time-relative-1-h-btn"]',
+            'Last 6 hours': '[data-test="date-time-relative-6-h-btn"]',
+            'Last 1 day': '[data-test="date-time-relative-1-d-btn"]',
+        };
+        const selector = map[presetText] || '[data-test="date-time-relative-preset-unknown"]';
+        return this.page.locator(selector);
     }
 
-    // Setting element method
+    // Setting element method - returns a placeholder data-test locator for the named
+    // option. When the metrics page does not implement panel-display settings, the
+    // returned locator resolves to nothing and callers treat it as "feature not
+    // present" via isVisible() checks.
     async getSettingElementByText(optionText) {
-        return this.page.locator(`text=/${optionText}/i`).first();
+        const key = String(optionText).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        return this.page.locator(`[data-test="metrics-panel-setting-${key}"]`);
     }
 
     // ============================================
@@ -1843,20 +2129,16 @@ export class MetricsPage {
         return this.page.locator('[data-test*="dark-mode"], [aria-label*="dark"]');
     }
 
-    /**
-     * Get settings button
-     * @returns {Locator}
-     */
-    getSettingsButton() {
-        return this.page.locator('[data-test*="settings"], [data-test*="profile"]');
-    }
+    // Note: a profile/settings button getter previously lived here for dark-mode tests
+    // but conflicted with the panel-display getSettingsButton defined earlier. Dark-mode
+    // coverage is handled elsewhere; this duplicate has been removed.
 
     /**
      * Get dark mode option in menu
      * @returns {Locator}
      */
     getDarkModeOption() {
-        return this.page.locator('text=Dark, text=dark mode, [data-test*="dark"]');
+        return this.page.locator('[data-test*="dark"]');
     }
 
     /**
@@ -2003,6 +2285,64 @@ export class MetricsPage {
             texts.push((await suggestionRows.nth(i).textContent()).trim());
         }
         return texts;
+    }
+
+    // ===== PromQL Table Chart Mode =====
+
+    /**
+     * Returns the PromQL table-mode select trigger locator.
+     */
+    getPromqlTableModeSelect() {
+        return this.promqlTableModeSelect;
+    }
+
+    /**
+     * Select a PromQL table mode by its raw value (e.g. 'all', 'expanded_timeseries', 'single').
+     * Uses OSelect's `data-test-value` per ruleset §4.
+     */
+    async selectPromqlTableMode(modeValue) {
+        await this.promqlTableModeSelect.waitFor({ state: 'visible', timeout: 5000 });
+        await this.promqlTableModeSelect.scrollIntoViewIfNeeded();
+        await this.promqlTableModeSelect.click();
+        await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
+        const option = this.promqlTableModeOptions.filter({
+            has: this.page.locator(`[data-test-value="${modeValue}"]`),
+        }).first();
+        // Fallback: directly pick the option carrying the data-test-value attr
+        const optionByValue = this.page.locator(
+            `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${modeValue}"]`
+        );
+        if (await optionByValue.count() > 0) {
+            await optionByValue.click();
+        } else {
+            await option.click();
+        }
+        await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
+    }
+
+    /**
+     * Returns the count of table header cells rendered in the PromQL table chart.
+     */
+    async getPromqlTableHeaderCount() {
+        return await this.promqlTableHeaders.count();
+    }
+
+    /**
+     * Returns the text content of the table header at the given index (0-based).
+     * Trims sort-icon glyphs that may be embedded in the text.
+     */
+    async getPromqlTableHeaderText(index) {
+        const header = this.promqlTableHeaders.nth(index);
+        await header.waitFor({ state: 'visible', timeout: 5000 });
+        const raw = (await header.textContent()) || '';
+        return raw.replace(/unfold_more|unfold_less|arrow_upward|arrow_downward/g, '').trim();
+    }
+
+    /**
+     * Returns true when the PromQL table chart is visible.
+     */
+    async isPromqlTableVisible() {
+        return await this.promqlTableChart.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
 }

@@ -285,7 +285,25 @@ export class AlertsPage {
             alertListTabAll: '[data-test="tab-all"]',
             alertListTabScheduled: '[data-test="tab-scheduled"]',
             alertListTabRealtime: '[data-test="tab-realTime"]',
-            alertListFilterChip: '[data-test="alert-list-filter-chip"]'
+            alertListFilterChip: '[data-test="alert-list-filter-chip"]',
+
+            // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
+            addAlertTabCondition: '[data-test="add-alert-tab-condition"]',
+            addAlertTabAdvanced: '[data-test="add-alert-tab-advanced"]',
+
+            // v3 Deduplication step (Advanced tab)
+            // OSelect wrapper has data-test, popover auto-derived suffix `-popover`,
+            // options auto-derived suffix `-option` with `data-test-value="<value>"` per item.
+            dedupFingerprintFieldsSelect: '[data-test="alert-dedup-fingerprint-fields"]',
+            dedupFingerprintFieldsTrigger: '[data-test="alert-dedup-fingerprint-fields-trigger"]',
+            dedupFingerprintFieldsPopover: '[data-test="alert-dedup-fingerprint-fields-popover"]',
+            dedupFingerprintFieldsOption: '[data-test="alert-dedup-fingerprint-fields-option"]',
+            dedupTimeWindowInput: '[data-test="alert-dedup-time-window"]',
+            dedupTimeWindowInputField: '[data-test="alert-dedup-time-window-field"]',
+
+            // OToast (alerts module - success / error variants)
+            oToastSuccess: '[data-test="o-toast-success"]',
+            oToastError: '[data-test="o-toast-error"]'
         };
     }
 
@@ -446,6 +464,32 @@ export class AlertsPage {
 
     async verifyAlertTriggerInValidationStream(alertName, validationStreamName, logsPage, waitTimeMs = 30000) {
         return this.management.verifyAlertTriggerInValidationStream(alertName, validationStreamName, logsPage, waitTimeMs);
+    }
+
+    // ==================== ALERT EDIT — DEDUP REGRESSION ====================
+
+    async waitForAlertListReady(timeout) {
+        return this.management.waitForAlertListReady(timeout);
+    }
+
+    async openAlertEditByName(alertName) {
+        return this.management.openAlertEditByName(alertName);
+    }
+
+    async openAdvancedTab() {
+        return this.management.openAdvancedTab();
+    }
+
+    async getSelectedFingerprintFields() {
+        return this.management.getSelectedFingerprintFields();
+    }
+
+    async removeAllFingerprintFields() {
+        return this.management.removeAllFingerprintFields();
+    }
+
+    async submitAlertEdit() {
+        return this.management.submitAlertEdit();
     }
 
     // ==================== ALERT DETAILS DIALOG (PR #10470) ====================
@@ -1405,6 +1449,17 @@ export class AlertsPage {
     async getIncidentCount() {
         const rows = this.page.locator(this.locators.incidentRow);
         return await rows.count();
+    }
+
+    /**
+     * Wait for at least one incident row to appear within the given timeout.
+     * Deterministic replacement for static buffer waits during incident polling.
+     * Resolves when the first incident row becomes attached; rejects/times out otherwise.
+     * @param {number} timeoutMs - Maximum wait time in ms
+     */
+    async waitForIncidentRowsToAppear(timeoutMs = 15000) {
+        const firstRow = this.page.locator(this.locators.incidentRow).first();
+        await firstRow.waitFor({ state: 'attached', timeout: timeoutMs });
     }
 
     /**

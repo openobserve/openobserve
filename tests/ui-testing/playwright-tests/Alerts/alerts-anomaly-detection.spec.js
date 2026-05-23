@@ -82,17 +82,12 @@ test.describe("Anomaly Detection Alerts", () => {
       // Set retrain interval - it should already be set to "Never" by default, skip if not critical
       testLogger.info('Skipping retrain interval (default is Never)');
 
-      // Close any open menus by clicking outside
-      await page.locator('body').click({ position: { x: 10, y: 10 } });
-      await page.waitForTimeout(1000);
-
       // Disable alerting using POM method (alerting is enabled by default with no destination)
+      // Tab navigation inside disableAlerting() dismisses any open menus deterministically
       await pm.anomalyDetectionPage.disableAlerting();
 
       // Wait for Vue reactivity and validation to complete
-      await page.waitForTimeout(1500);
-
-      // Click save button using POM method
+      // clickSave() waits for the save button to be enabled deterministically
       await pm.anomalyDetectionPage.clickSave();
 
       // Verify we're back on the list and the anomaly appears
@@ -412,7 +407,9 @@ test.describe("Anomaly Detection Alerts", () => {
 
       // Wait for anomaly to be ready (may take time for training)
       // In real scenario, we'd poll for status or use a fixture with pre-trained anomaly
-      await page.waitForTimeout(3000);
+      // Use deterministic wait for the pause button to be ready instead of arbitrary delay
+      const pauseRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
+      await expect(pauseRow).toBeVisible({ timeout: 15000 });
 
       // Pause
       await pm.anomalyDetectionPage.clickPauseAnomaly(anomalyName);
@@ -617,9 +614,9 @@ test.describe("Anomaly Detection Alerts", () => {
 
       // Go to summary
       await pm.anomalyDetectionPage.clickTab('Summary');
-      await page.waitForTimeout(1000); // Wait for summary content to render
 
       // Verify summary text appears using POM methods
+      // expectSummaryVisible() waits for the summary container deterministically
       await pm.anomalyDetectionPage.expectSummaryVisible();
 
       // Verify summary contains key information

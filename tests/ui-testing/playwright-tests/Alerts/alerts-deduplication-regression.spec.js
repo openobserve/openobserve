@@ -26,8 +26,6 @@ const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test configuration
 const TEST_STREAM = 'e2e_automate';
-const SHORT_WAIT_MS = 1000;
-const UI_STABILIZATION_WAIT_MS = 2000;
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
 
 test.describe("Deduplication Regression Tests", {
@@ -238,7 +236,9 @@ test.describe("Deduplication Regression Tests", {
         const alertsUrl = `${process.env.ZO_BASE_URL}/web/alerts?org_identifier=${orgId}`;
         await page.goto(alertsUrl);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
+        // Wait for the alert list page chrome to mount via PO factory landmark.
+        await pm.alertsPage.waitForAlertListReady(NETWORK_IDLE_TIMEOUT_MS);
 
         testLogger.info('Navigated to alerts page');
 
@@ -261,98 +261,34 @@ test.describe("Deduplication Regression Tests", {
             await route.continue();
         });
 
-        // Search for the alert
+        // Search for the alert via PO (locator hoisted into AlertManagement)
         await pm.alertsPage.searchAlert(alertName);
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-        // The alert row uses partial matching - find by contains text
-        // The alert name might be truncated in display but we can find by partial match
-        const alertNamePrefix = alertName.substring(0, 20); // Use first 20 chars to match truncated text
-        testLogger.info('Looking for alert with prefix', { alertNamePrefix });
-
-        // Find the alert row
-        const alertRow = page.locator(`tr:has-text("${alertNamePrefix}")`).first();
-        await expect(alertRow).toBeVisible({ timeout: 10000 });
-        testLogger.info('Found alert row');
-
-        // Click the edit (pencil) icon in the Actions column, NOT the row itself
-        // Clicking the row opens Alert History, we need the edit button
-        const updateBtn = page.locator(`[data-test="alert-list-${alertName}-update-alert"]`).first();
-        if (await updateBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            testLogger.info('Clicking update button via data-test');
-            await updateBtn.click();
-        } else {
-            // Try finding the pencil/edit icon in the row by title/aria-label (more robust than positional index)
-            const pencilIcon = alertRow.locator('[title="Edit"], [aria-label="Edit"], [title*="edit" i], button:has(.OIcon[name*="edit"])').first();
-            if (await pencilIcon.isVisible({ timeout: 2000 }).catch(() => false)) {
-                testLogger.info('Clicking pencil icon in row');
-                await pencilIcon.click();
-            } else {
-                // Last resort: click the name to open history, then click edit there
-                testLogger.info('Clicking alert name to open history panel');
-                await alertRow.locator('td').nth(1).click();
-                await page.waitForTimeout(SHORT_WAIT_MS);
-
-                // Now click the edit icon in the history panel header
-                const editInPanel = page.locator('.q-drawer button, [class*="edit"]').filter({ has: page.locator('svg, i') }).first();
-                await expect(editInPanel).toBeVisible({ timeout: 5000 });
-                await editInPanel.click();
-            }
-        }
-
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
-
+        // Open the alert edit screen (clicks the update pencil button by alert name)
+        await pm.alertsPage.openAlertEditByName(alertName);
         testLogger.info('Opened alert for editing');
 
-        // Navigate through wizard to Step 5: Deduplication
-        // Scheduled alert wizard: Step 1 (Setup) → 2 (Conditions) → 3 (Compare) → 4 (Settings) → 5 (Dedup) → 6 (Advanced)
-        // When editing, wizard opens on Step 1. Click Continue 4 times to reach Step 5.
-        const continueBtn = page.getByRole('button', { name: 'Continue' });
-        for (let step = 1; step <= 4; step++) {
-            await expect(continueBtn).toBeVisible({ timeout: 5000 });
-            await continueBtn.click();
-            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await page.waitForTimeout(500);
-            testLogger.info(`Advanced past step ${step}`);
-        }
+        // v3 wizard: layout is single-pane with tabs (`condition` / `advanced`).
+        // Deduplication section is rendered inside the `advanced` tab.
+        await pm.alertsPage.openAdvancedTab();
+        testLogger.info('Switched to Advanced tab — deduplication panel ready');
 
-        // Verify we're on the Deduplication step by checking the fingerprint select is visible
-        const fingerprintSelect = page.locator('.fingerprint-select');
-        await expect(fingerprintSelect).toBeVisible({ timeout: 5000 });
-        testLogger.info('Navigated to deduplication step');
+        // Sanity check: dedup OSelect should report the seeded `log` fingerprint field.
+        const initialSelection = await pm.alertsPage.getSelectedFingerprintFields();
+        testLogger.info('Initial fingerprint selection (UI)', { initialSelection });
+        expect(initialSelection).toContain('log');
 
-        // Remove all fingerprint field chips from the fingerprint select
-        let removedCount = 0;
-        while (true) {
-            const chipRemoveBtn = fingerprintSelect.locator('[data-test*="chip"] [data-test*="remove"], [data-test*="badge"] [data-test*="remove"], .o-chip__icon--remove, [aria-label="Remove"]').first();
-            if (await chipRemoveBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await chipRemoveBtn.click();
-                await page.waitForTimeout(300);
-                removedCount++;
-                testLogger.info('Removed chip', { removedCount });
-            } else {
-                break;
-            }
-        }
+        // Remove all fingerprint field selections via the OSelect popover.
+        const removedCount = await pm.alertsPage.removeAllFingerprintFields();
         expect(removedCount).toBeGreaterThan(0);
         testLogger.info('Chip removal complete', { removedCount });
 
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        // Verify trigger reports empty selection before saving.
+        const postRemoval = await pm.alertsPage.getSelectedFingerprintFields();
+        expect(postRemoval.length).toBe(0);
 
-        // Navigate to Step 6 (Advanced)
-        await expect(continueBtn).toBeVisible({ timeout: 5000 });
-        await continueBtn.click();
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await page.waitForTimeout(500);
-
-        // Submit the alert
-        const submitBtn = page.locator('[data-test="add-alert-submit-btn"]');
-        await expect(submitBtn).toBeEnabled({ timeout: 5000 });
-        await submitBtn.click();
-
-        // Wait for success
-        await expect(page.getByText(/updated successfully|saved successfully/i)).toBeVisible({ timeout: 15000 });
+        // Submit the alert edit (Save) and wait for success toast.
+        await pm.alertsPage.submitAlertEdit();
         testLogger.info('Alert updated successfully');
 
         // ==================== VERIFY - The Critical Assertion ====================
@@ -383,8 +319,6 @@ test.describe("Deduplication Regression Tests", {
         }
 
         // ==================== Double-check via API ====================
-        await page.waitForTimeout(2000); // Wait for save to complete
-
         // Use the same alert_id to fetch updated details
         testLogger.info('Fetching final alert state', { alertId });
         const finalGetResponse = await page.request.get(

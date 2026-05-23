@@ -250,28 +250,77 @@ export class PipelinesPage {
     }
 
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
+        // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
+        // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
+        // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch
+        // HTML5 drag events. We dispatch the full HTML5 drag sequence
+        // (dragstart → dragover → drop) directly via DOM APIs using
+        // `page.evaluate`, sharing a single DataTransfer instance so the
+        // source's `event.dataTransfer.setData` and the drop's `clientX/Y`
+        // both flow through to useDnD.ts:onDrop.
         const targetBox = await this.vueFlowPane.boundingBox();
         const streamBox = await streamElement.boundingBox();
-        targetBox.x += offset.x;
-      targetBox.y += offset.y;
-        if (streamBox && targetBox) {
-          await this.page.mouse.move(streamBox.x + streamBox.width / 2, streamBox.y + streamBox.height / 2);
-          await this.page.mouse.down();
-          await this.page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
-          await this.page.mouse.up();
-        }
+        if (!streamBox || !targetBox) return;
+        const sourceX = streamBox.x + streamBox.width / 2;
+        const sourceY = streamBox.y + streamBox.height / 2;
+        const targetX = targetBox.x + targetBox.width / 2 + offset.x;
+        const targetY = targetBox.y + targetBox.height / 2 + offset.y;
+        // Resolve elements via DOM coordinates so we don't introduce
+        // non-data-test selectors here.
+        await this.page.evaluate(
+            ({ sx, sy, tx, ty }) => {
+                const sourceEl = document.elementFromPoint(sx, sy);
+                const targetEl = document.elementFromPoint(tx, ty);
+                if (!sourceEl || !targetEl) return;
+                // Walk up from sourceEl to find the [draggable=true] ancestor
+                let dragEl = sourceEl;
+                while (dragEl && dragEl !== document.body) {
+                    if (dragEl.getAttribute && dragEl.getAttribute('draggable') === 'true') break;
+                    dragEl = dragEl.parentElement;
+                }
+                if (!dragEl) dragEl = sourceEl;
+                const dt = new DataTransfer();
+                dragEl.dispatchEvent(new DragEvent('dragstart', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: sx, clientY: sy,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragenter', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragover', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('drop', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                dragEl.dispatchEvent(new DragEvent('dragend', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+            },
+            { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
+        );
+        // Wait for the input-node stream form dialog to render — `onDrop` sets
+        // pipelineObj.dialog.show=true which mounts add-stream-input-stream-routing-section.
+        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     async selectLogs() {
-        // Open the input-node stream-type OSelect via its trigger
-        // (`<parent>-trigger`, per OSelect convention). The wrapper div shares
-        // the same data-test, so we scope to the trigger explicitly.
-        const trigger = this.page.locator('[data-test="input-node-stream-type-select-trigger"]').first();
-        await trigger.waitFor({ state: 'visible', timeout: 15000 });
-        await trigger.click();
+        // Open the input-node stream-type OSelect. Stream-type uses the
+        // non-listbox SelectRoot branch (searchable=false, plain string opts),
+        // so there is no `<parent>-trigger` data-test. Click the wrapper.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
         // Wait for the OSelect popover to appear (data-test forwarded from parent).
         await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
-        // Pick the `logs` option by its `data-test-value` value-specific attribute.
+        // Pick the `logs` option — OSelectItem forwards parent data-test plus a
+        // per-value `data-test-value` (see OSelectItem.vue source mod).
         await this.inputNodeStreamTypeLogsOption.first().waitFor({ state: 'visible', timeout: 10000 });
         await this.inputNodeStreamTypeLogsOption.first().click();
     }

@@ -36,10 +36,10 @@ export class AlertTemplatesPage {
         // Template import locators
         this.templateImportButton = '[data-test="template-import"]';
         this.importUrlTab = '[data-test="tab-import_json_url"]';
-        this.importUrlInput = '[data-test="template-import-url-input"]';
+        this.importUrlInput = '[data-test="template-import-url-input-field"]';
         this.importJsonButton = '[data-test="template-import-json-btn"]';
-        this.importNameInput = '[data-test="template-import-name-input"]';
-        this.importFileInput = '[data-test="template-import-json-file-input"]';
+        this.importNameInput = '[data-test="template-import-name-input-field"]';
+        this.importFileInput = '[data-test="template-import-json-file-input-field"]';
         this.templateImportSuccessMessage = 'Successfully imported';
         this.templateImportErrorText = 'Template - 1: "email template" creation failed --> Reason: Template name cannot contain \':\', \'#\', \'?\', \'&\', \'%\', \'/\', quotes and space characters';
 
@@ -796,7 +796,14 @@ export class AlertTemplatesPage {
         await this.page.locator(this.importUrlTab).click();
         await this.page.locator(this.importUrlInput).click();
         await this.page.locator(this.importUrlInput).fill(url);
-        await this.page.waitForTimeout(1000); // Small delay after filling URL
+        // Dispatch a manual input event so OInput's @input handler fires and v-model
+        // propagates the URL to BaseImport's watcher that triggers the axios fetch.
+        await this.page.locator(this.importUrlInput).dispatchEvent('input');
+        // Wait until the URL fetch populated jsonStr (Monaco editor has content)
+        await this.page.waitForFunction(() => {
+          const eds = window.monaco?.editor?.getEditors?.() || [];
+          return eds.length > 0 && eds.some(e => (e.getValue?.() || '').trim().length > 10);
+        }, null, { timeout: 15000 }).catch(() => {});
         await this.page.locator(this.importJsonButton).click();
         // Wait for validation/preview to render — text contains Template index and field validation
         await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
@@ -808,7 +815,8 @@ export class AlertTemplatesPage {
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            const successToast = this.page.locator(`[data-test^="o-toast-"][data-test-message*="${this.templateImportSuccessMessage}"]`).first();
+            await expect(successToast).toBeVisible();
         }
     }
 
@@ -842,7 +850,8 @@ export class AlertTemplatesPage {
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            const successToast = this.page.locator(`[data-test^="o-toast-"][data-test-message*="${this.templateImportSuccessMessage}"]`).first();
+            await expect(successToast).toBeVisible();
         }
     }
 

@@ -8,21 +8,21 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
  *
  * IMPORTANT: Column Order feature availability by table mode:
  *
- * ✅ "Expanded Time series" (expanded_timeseries) - Column Order button IS visible
- * ✅ "Aggregate" (all) - Column Order button IS visible
- * ❌ "Time series" (single) - Column Order button NOT visible (default mode)
+ * "Expanded Time series" (expanded_timeseries) - Column Order button IS visible
+ * "Aggregate" (all) - Column Order button IS visible
+ * "Time series" (single) - Column Order button NOT visible (default mode)
  *
  * Most tests use "Expanded Time series" mode as it reliably shows the Column Order button.
  *
- * ⚠️ CRITICAL: Timestamp Column Behavior
+ * CRITICAL: Timestamp Column Behavior
  *
  * The "Timestamp" column is ALWAYS in the first position (table position 0) and is NOT reorderable.
  *
  * Column Order Popup:        Table Chart:
- * ├─ Position 0: __name__    ├─ Position 0: Timestamp (NOT in popup, always first)
- * ├─ Position 1: environment ├─ Position 1: __name__ (popup pos 0)
- * └─ Position 2: flag        ├─ Position 2: environment (popup pos 1)
- *                            └─ Position 3: flag (popup pos 2)
+ * Position 0: __name__       Position 0: Timestamp (NOT in popup, always first)
+ * Position 1: environment    Position 1: __name__ (popup pos 0)
+ * Position 2: flag           Position 2: environment (popup pos 1)
+ *                            Position 3: flag (popup pos 2)
  *
  * When testing column order, remember:
  * - Popup position 0 = Table position 1
@@ -53,19 +53,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   test.afterEach(async ({ page }, testInfo) => {
     // Close config sidebar if open using the collapse button
     await pm.metricsPage.clickDashboardSidebarCollapseButton();
-    await page.waitForTimeout(500);
     testLogger.info('Closed sidebar using collapse button');
 
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
-
-  // Helper function to extract column name from table header (removes sort icon text)
-  function extractColumnName(headerText) {
-    // Remove sorting icon text from column name.
-    // Quasar table used: arrow_upward, arrow_downward
-    // TanStack table uses: unfold_more, unfold_less, arrow_upward, arrow_downward
-    return headerText.replace(/unfold_more|unfold_less|arrow_upward|arrow_downward/g, '').trim();
-  }
 
   // Helper function to set up a table chart with data
   async function setupTableChart(page, tableMode = 'all') {
@@ -78,10 +69,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     if (selected) {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
-      await page.locator('body').click({ position: { x: 10, y: 10 } });
+      // Dismiss any open overlay via keyboard instead of body-click (§2)
+      await page.keyboard.press('Escape');
       testLogger.warn('Could not select specific time range, using default');
     }
-    await page.waitForTimeout(1000);
 
     // Execute a query that will produce multiple columns
     // Using a query with labels to get multiple columns in the table
@@ -90,13 +81,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await pm.metricsPage.enterMetricsQuery(query);
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
-    await page.waitForTimeout(2000);
 
     // Switch to table chart type
     testLogger.info('Switching to table chart type');
     const tableSelected = await pm.metricsPage.selectChartType('table');
     expect(tableSelected).toBe(true);
-    await page.waitForTimeout(1500);
 
     // Open chart configuration sidebar using PageManager method
     testLogger.info('Opening chart configuration sidebar');
@@ -104,7 +93,6 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await expect(configButton).toBeVisible({ timeout: 10000 });
 
     await pm.metricsPage.clickDashboardSidebarButton();
-    await page.waitForTimeout(1000);
 
     const sidebarVisible = await pm.metricsPage.isSidebarVisible();
     expect(sidebarVisible).toBe(true);
@@ -116,94 +104,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     if (tableMode !== 'single') {
       testLogger.info(`Setting table mode to: ${tableMode}`);
 
-      // Wait for config panel to be fully loaded
-      await page.waitForTimeout(2000);
-
-      // Find the PromQL Table Mode dropdown using the CORRECT data-test attribute
-      // The correct selector is: [data-test="dashboard-config-promql-table-mode"]
-      const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]').first();
-      const isDropdownVisible = await tableModeDropdown.isVisible({ timeout: 5000 }).catch(() => false);
+      const tableModeDropdown = pm.metricsPage.getPromqlTableModeSelect();
+      // Wait for the config panel to finish rendering the PromQL table-mode dropdown.
+      // The panel is mounted reactively after switching to the table chart type.
+      const isDropdownVisible = await tableModeDropdown
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .then(() => true)
+        .catch(() => false);
 
       if (isDropdownVisible) {
         testLogger.info('Found PromQL Table Mode dropdown');
-
-        // Scroll to ensure it's visible
-        await tableModeDropdown.scrollIntoViewIfNeeded();
-        await page.waitForTimeout(500);
-
-        // Get current mode value (from the span inside)
-        const currentModeSpan = tableModeDropdown.locator('span.ellipsis').first();
-        const currentModeText = await currentModeSpan.textContent().catch(() => 'unknown');
-        testLogger.info(`Current table mode: "${currentModeText}"`);
-
-        // Click the dropdown to open options — OSelect trigger
-        const tableModeSelect = page.locator('[data-test="dashboard-config-promql-table-mode"]').first();
-        testLogger.info('Clicking table mode dropdown');
-        await tableModeSelect.click();
-        await page.waitForTimeout(1000);
-
-        // Wait for dropdown popover (OSelect SelectContent) to appear
-        const dropdownMenu = page.locator('[data-test="dashboard-config-promql-table-mode-popover"]');
-        const isMenuVisible = await dropdownMenu.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (isMenuVisible) {
-          testLogger.info('Dropdown menu is visible');
-
-          // Log all available options for debugging
-          const allOptions = await page.locator('[data-test="dashboard-config-promql-table-mode-option"]').allTextContents();
-          testLogger.info(`Available options in dropdown: ${JSON.stringify(allOptions)}`);
-
-          // Select the appropriate mode option
-          const modeLabel = tableMode === 'all' ? 'Aggregate' : 'Expanded Time series';
-          testLogger.info(`Looking for mode option: "${modeLabel}"`);
-
-          // Find and click the option (more specific selector)
-          const modeOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"]')
-            .filter({ hasText: new RegExp(`^${modeLabel}$`, 'i') })
-            .first();
-
-          const optionVisible = await modeOption.isVisible({ timeout: 2000 }).catch(() => false);
-
-          if (optionVisible) {
-            testLogger.info(`Found and clicking option: "${modeLabel}"`);
-            await modeOption.click();
-            await page.waitForTimeout(2500);
-
-            // Verify the mode changed by checking the span text again
-            const newModeText = await currentModeSpan.textContent().catch(() => 'unknown');
-            testLogger.info(`Table mode after selection: "${newModeText}"`);
-
-            if (newModeText.toLowerCase().includes(modeLabel.toLowerCase().split(' ')[0])) {
-              testLogger.info(`✓ Table mode successfully set to: ${modeLabel}`);
-            } else {
-              testLogger.warn(`Table mode may not have changed. Expected: "${modeLabel}", Got: "${newModeText}"`);
-              await page.screenshot({ path: 'test-results/table-mode-not-changed.png', fullPage: true });
-            }
-          } else {
-            testLogger.error(`Could not find option "${modeLabel}" in dropdown`);
-            // Try clicking any option that contains the first word
-            const firstWord = modeLabel.split(' ')[0].toLowerCase();
-            const fallbackOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"]')
-              .filter({ hasText: new RegExp(firstWord, 'i') })
-              .first();
-            const fallbackVisible = await fallbackOption.isVisible({ timeout: 1000 }).catch(() => false);
-            if (fallbackVisible) {
-              testLogger.info(`Trying fallback option containing "${firstWord}"`);
-              await fallbackOption.click();
-              await page.waitForTimeout(2500);
-            } else {
-              // Close the dropdown
-              await page.locator('body').click({ position: { x: 10, y: 10 } });
-              await page.waitForTimeout(500);
-            }
-          }
-        } else {
-          testLogger.warn('Dropdown menu did not appear after clicking');
-          await page.screenshot({ path: 'test-results/dropdown-not-open.png', fullPage: true });
-        }
+        await pm.metricsPage.selectPromqlTableMode(tableMode);
+        testLogger.info(`Table mode set to: ${tableMode}`);
       } else {
         testLogger.warn('PromQL Table Mode dropdown not found in config panel');
-        await page.screenshot({ path: 'test-results/dropdown-not-found.png', fullPage: true });
       }
     }
   }
@@ -222,42 +136,8 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Config sidebar visible: ${sidebarVisible}`);
     expect(sidebarVisible).toBe(true);
 
-    // Wait a bit more for config panel to fully render
-    await page.waitForTimeout(1500);
-
-    // VERIFY: Check that table mode actually changed to Expanded Time series
-    testLogger.info('Verifying table mode was set correctly');
-    const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]').first();
-    if (await tableModeDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const currentModeSpan = tableModeDropdown.locator('span.ellipsis').first();
-      const currentMode = await currentModeSpan.textContent().catch(() => 'unknown');
-      testLogger.info(`Current PromQL Table Mode: "${currentMode}"`);
-
-      // If still on "Time series", take screenshot and fail with helpful message
-      if (currentMode.toLowerCase().includes('time series') && !currentMode.toLowerCase().includes('expanded')) {
-        await page.screenshot({ path: 'test-results/mode-still-time-series.png', fullPage: true });
-        testLogger.error(`Table mode is still "Time series" - Column Order button will not appear!`);
-        testLogger.error(`Expected: "Expanded Time series", Got: "${currentMode}"`);
-      } else {
-        testLogger.info(`✓ Table mode is set correctly: "${currentMode}"`);
-      }
-    }
-
     // Verify the Column Order button is visible
     const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-
-    // Log what's visible in the config panel for debugging
-    const visibleButtons = await page.locator('button').allTextContents();
-    testLogger.info(`Visible buttons in config: ${visibleButtons.slice(0, 10).join(', ')}`);
-
-    // Check if Column Order button exists before expecting it to be visible
-    const buttonExists = await columnOrderButton.count();
-    testLogger.info(`Column Order button count: ${buttonExists}`);
-
-    if (buttonExists === 0) {
-      testLogger.error('Column Order button NOT FOUND in DOM - mode selection likely failed');
-      await page.screenshot({ path: 'test-results/column-order-button-missing.png', fullPage: true });
-    }
 
     await expect(columnOrderButton).toBeVisible({ timeout: 10000 });
     testLogger.info('Column Order button is visible for Expanded Time series table mode');
@@ -276,9 +156,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Click the Column Order button
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
     testLogger.info('Clicked Column Order button');
 
     // Verify the popup/dialog opens
@@ -287,21 +165,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup opened successfully');
 
     // Verify description text is present (ODialog header carries the title via :title prop,
-    // it doesn't render a .q-table__title block any more — assert the body's caption instead).
-    const descriptionText = columnOrderPopup.locator('.text-caption').first();
+    // it doesn't render a .q-table__title block any more — assert the body's description data-test instead).
+    const descriptionText = pm.dashboardPanelConfigs.columnOrderDescription;
     await expect(descriptionText).toBeVisible();
     testLogger.info('Column Order popup has description text');
 
     // Verify Save and Cancel buttons are present (ODialog footer primary/secondary)
-    const saveButton = columnOrderPopup.locator('[data-test="o-dialog-primary-btn"]');
-    const cancelButton = columnOrderPopup.locator('[data-test="o-dialog-secondary-btn"]');
+    const saveButton = pm.dashboardPanelConfigs.columnOrderDialogPrimaryBtn;
+    const cancelButton = pm.dashboardPanelConfigs.columnOrderDialogSecondaryBtn;
     await expect(saveButton).toBeVisible();
     await expect(cancelButton).toBeVisible();
     testLogger.info('Save and Cancel buttons are visible');
 
     // Verify columns are listed
-    const columnRows = page.locator('[data-test^="column-order-row-"]');
-    const columnCount = await columnRows.count();
+    const columnCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
     expect(columnCount).toBeGreaterThan(0);
     testLogger.info(`Column Order popup displays ${columnCount} columns`);
 
@@ -318,33 +195,28 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get the initial order of columns
-    const columnRows = page.locator('[data-test^="column-order-row-"]');
-    const initialCount = await columnRows.count();
+    const initialCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
     expect(initialCount).toBeGreaterThan(1); // Need at least 2 columns to test reordering
     testLogger.info(`Initial column count: ${initialCount}`);
 
     // Get the text of the first two columns
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const secondColumnRow = page.locator('[data-test="column-order-row-1"]');
-
-    const firstColumnName = await firstColumnRow.locator('.column-name').textContent();
-    const secondColumnName = await secondColumnRow.locator('.column-name').textContent();
+    const firstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
+    const secondColumnName = await pm.dashboardPanelConfigs.getColumnName(1);
     testLogger.info(`Initial order - First column: ${firstColumnName}, Second column: ${secondColumnName}`);
 
-    // Click move up button on the second column (index 1)
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    // Click move up button on the second column (index 1) and wait for swap
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .toBe(secondColumnName);
     testLogger.info('Clicked move up button on second column');
 
     // Verify the order has changed
-    const newFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
-    const newSecondColumnName = await secondColumnRow.locator('.column-name').textContent();
+    const newFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
+    const newSecondColumnName = await pm.dashboardPanelConfigs.getColumnName(1);
     testLogger.info(`New order - First column: ${newFirstColumnName}, Second column: ${newSecondColumnName}`);
 
     // The second column should now be first
@@ -364,27 +236,23 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get the initial order of columns
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const secondColumnRow = page.locator('[data-test="column-order-row-1"]');
-
-    const firstColumnName = await firstColumnRow.locator('.column-name').textContent();
-    const secondColumnName = await secondColumnRow.locator('.column-name').textContent();
+    const firstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
+    const secondColumnName = await pm.dashboardPanelConfigs.getColumnName(1);
     testLogger.info(`Initial order - First column: ${firstColumnName}, Second column: ${secondColumnName}`);
 
-    // Click move down button on the first column (index 0)
-    const moveDownButton = page.locator('[data-test="column-order-move-down-0"]');
-    await moveDownButton.click();
-    await page.waitForTimeout(500);
+    // Click move down button on the first column (index 0) and wait for swap
+    await pm.dashboardPanelConfigs.moveColumnDown(0);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .toBe(secondColumnName);
     testLogger.info('Clicked move down button on first column');
 
     // Verify the order has changed
-    const newFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
-    const newSecondColumnName = await secondColumnRow.locator('.column-name').textContent();
+    const newFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
+    const newSecondColumnName = await pm.dashboardPanelConfigs.getColumnName(1);
     testLogger.info(`New order - First column: ${newFirstColumnName}, Second column: ${newSecondColumnName}`);
 
     // The first column should now be second
@@ -404,19 +272,16 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Check for drag handles
-    const dragHandles = page.locator('[data-test^="column-order-drag-handle-"]');
-    const handleCount = await dragHandles.count();
+    const handleCount = await pm.dashboardPanelConfigs.columnOrderDragHandles.count();
     testLogger.info(`Found ${handleCount} drag handles`);
 
     expect(handleCount).toBeGreaterThan(0);
 
     // Verify drag handles have the correct icon
-    const firstHandle = page.locator('[data-test="column-order-drag-handle-0"]');
+    const firstHandle = pm.dashboardPanelConfigs.columnOrderDragHandle(0);
     await expect(firstHandle).toBeVisible();
     testLogger.info('Drag handles are visible and properly configured');
 
@@ -432,30 +297,27 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Get the current table header order before reordering
-    const tableHeaders = page.locator('table thead th');
-    const initialHeaderCount = await tableHeaders.count();
+    const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Initial table has ${initialHeaderCount} columns`);
 
     if (initialHeaderCount > 1) {
-      const firstHeaderText = await tableHeaders.nth(0).textContent();
-      const secondHeaderText = await tableHeaders.nth(1).textContent();
+      const firstHeaderText = await pm.metricsPage.getPromqlTableHeaderText(0);
+      const secondHeaderText = await pm.metricsPage.getPromqlTableHeaderText(1);
       testLogger.info(`Initial header order: ${firstHeaderText}, ${secondHeaderText}`);
     }
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get the second column name
-    const secondColumnRow = page.locator('[data-test="column-order-row-1"]');
-    const secondColumnName = await secondColumnRow.locator('.column-name').textContent();
+    const secondColumnName = await pm.dashboardPanelConfigs.getColumnName(1);
     testLogger.info(`Moving column: ${secondColumnName} to first position`);
 
     // Move the second column up to first position
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .toBe(secondColumnName);
 
     // Save the new order
     await pm.dashboardPanelConfigs.saveColumnOrder();
@@ -466,16 +328,15 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after save');
 
-    // Wait for table to re-render with new column order
-    await page.waitForTimeout(1500);
-
-    // Verify the table reflects the new column order
-    const newTableHeaders = page.locator('table thead th');
-    const newHeaderCount = await newTableHeaders.count();
+    // Verify the table reflects the new column order — wait for header count to settle
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 5000 })
+      .toBe(initialHeaderCount);
+    const newHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table now has ${newHeaderCount} columns`);
 
     if (newHeaderCount > 1) {
-      const newFirstHeaderText = await newTableHeaders.nth(0).textContent();
+      const newFirstHeaderText = await pm.metricsPage.getPromqlTableHeaderText(0);
       testLogger.info(`First column after reorder: ${newFirstHeaderText}`);
 
       // The column we moved up should now be in a different position
@@ -493,22 +354,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get initial column order
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const initialFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const initialFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Initial first column: ${initialFirstColumnName}`);
 
     // Make a change (move second column up)
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(initialFirstColumnName);
 
     // Get the changed first column name
-    const changedFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const changedFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Changed first column: ${changedFirstColumnName}`);
     expect(changedFirstColumnName).not.toBe(initialFirstColumnName);
 
@@ -521,11 +380,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup closed after cancel');
 
     // Re-open the popup to verify changes were discarded
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Verify the original order is restored
-    const restoredFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const restoredFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`First column after cancel: ${restoredFirstColumnName}`);
     expect(restoredFirstColumnName).toBe(initialFirstColumnName);
     testLogger.info('Column order was successfully discarded after cancel');
@@ -542,21 +400,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Make a change
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const initialFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(initialFirstColumnName);
     testLogger.info('Made column order change');
 
     // Click the close (×) icon — ODialog renders it as o-dialog-close-btn
-    const closeIcon = pm.dashboardPanelConfigs.columnOrderDialog.locator('[data-test="o-dialog-close-btn"]');
+    const closeIcon = pm.dashboardPanelConfigs.columnOrderDialogCloseBtn;
     await expect(closeIcon).toBeVisible();
-    await closeIcon.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.closeColumnOrderViaCloseIcon();
     testLogger.info('Clicked close icon');
 
     // Verify the popup closed
@@ -574,10 +431,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Get the initial table column order from the actual table headers
     testLogger.info('Reading initial table column order');
-    await page.waitForTimeout(1000); // Wait for table to fully render
+    // Wait for table to fully render — count must stabilize
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 5000 })
+      .toBeGreaterThan(0);
 
-    const tableHeaders = page.locator('table thead th');
-    const initialHeaderCount = await tableHeaders.count();
+    const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table has ${initialHeaderCount} columns`);
 
     if (initialHeaderCount < 3) {
@@ -586,26 +445,25 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Read initial table state
-    const initialTimestamp = extractColumnName(await tableHeaders.nth(0).textContent());
-    const initialSecondColumn = extractColumnName(await tableHeaders.nth(1).textContent());
-    const initialThirdColumn = extractColumnName(await tableHeaders.nth(2).textContent());
+    const initialTimestamp = await pm.metricsPage.getPromqlTableHeaderText(0);
+    const initialSecondColumn = await pm.metricsPage.getPromqlTableHeaderText(1);
+    const initialThirdColumn = await pm.metricsPage.getPromqlTableHeaderText(2);
     testLogger.info(`Initial table order: 1st="${initialTimestamp}" (Timestamp), 2nd="${initialSecondColumn}", 3rd="${initialThirdColumn}"`);
 
     // STEP 2: Open Column Order popup and reorder
     testLogger.info('Opening Column Order popup');
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Move 2nd popup column to 1st position
     testLogger.info('Moving popup 2nd column (table 3rd column) to 1st position in popup');
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const beforeMoveFirst = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(beforeMoveFirst);
 
     // Get the column that's now in popup position 0 (should be table position 1 after save)
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const expectedSecondTableColumn = await firstColumnRow.locator('.column-name').textContent();
+    const expectedSecondTableColumn = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Column now in popup position 0: "${expectedSecondTableColumn}" (should be table position 1)`);
 
     // STEP 3: Save the column order
@@ -618,19 +476,20 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after save');
 
-    // STEP 5: Verify table shows the new column order
+    // STEP 5: Verify table shows the new column order — poll until second column updates
     testLogger.info('Reading new table column order after save');
-    await page.waitForTimeout(1500);
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .toBe(expectedSecondTableColumn);
 
-    const newTableHeaders = page.locator('table thead th');
-    const newHeaderCount = await newTableHeaders.count();
+    const newHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
     testLogger.info(`Table still has ${newHeaderCount} columns`);
     expect(newHeaderCount).toBe(initialHeaderCount);
 
     // Get the new column names
-    const newTimestamp = extractColumnName(await newTableHeaders.nth(0).textContent());
-    const newSecondColumn = extractColumnName(await newTableHeaders.nth(1).textContent());
-    const newThirdColumn = extractColumnName(await newTableHeaders.nth(2).textContent());
+    const newTimestamp = await pm.metricsPage.getPromqlTableHeaderText(0);
+    const newSecondColumn = await pm.metricsPage.getPromqlTableHeaderText(1);
+    const newThirdColumn = await pm.metricsPage.getPromqlTableHeaderText(2);
     testLogger.info(`New table order: 1st="${newTimestamp}" (Timestamp), 2nd="${newSecondColumn}", 3rd="${newThirdColumn}"`);
 
     // STEP 6: Verify the column order change was applied correctly
@@ -638,13 +497,13 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // Timestamp should always remain in position 0
     expect(newTimestamp).toBe(initialTimestamp);
-    testLogger.info(`✓ Timestamp remains in 1st position: "${newTimestamp}"`);
+    testLogger.info(`Timestamp remains in 1st position: "${newTimestamp}"`);
 
     // The column we moved to popup position 0 should now be in table position 1
     expect(newSecondColumn).toBe(expectedSecondTableColumn);
-    testLogger.info(`✓ Reordered column "${expectedSecondTableColumn}" is now in table position 1 (2nd column)`);
+    testLogger.info(`Reordered column "${expectedSecondTableColumn}" is now in table position 1 (2nd column)`);
 
-    testLogger.info('✓ Column order changes successfully applied to table chart!');
+    testLogger.info('Column order changes successfully applied to table chart!');
   });
 
   test("Verify column order persists after re-running the query", {
@@ -656,18 +515,17 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Move 2nd column to 1st position in the popup
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const beforeFirst = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(beforeFirst);
 
     // Get the expected column name after reorder (should be 1st in popup, 2nd in table)
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const expectedColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Expected column after reorder: "${expectedColumnName}"`);
 
     // Save the column order
@@ -677,38 +535,42 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // STEP 2: Verify table shows reordered columns
     // NOTE: Timestamp is always in position 0 (first column)
     // The reordered column should appear in position 1 (second column)
-    let tableHeaders = page.locator('table thead th');
-    const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .toBe(expectedColumnName);
+
+    const timestampColumn = await pm.metricsPage.getPromqlTableHeaderText(0);
     testLogger.info(`First column (always Timestamp): "${timestampColumn}"`);
 
-    let secondColumnAfterSave = extractColumnName(await tableHeaders.nth(1).textContent());
+    const secondColumnAfterSave = await pm.metricsPage.getPromqlTableHeaderText(1);
     testLogger.info(`Second column after save: "${secondColumnAfterSave}"`);
     expect(secondColumnAfterSave).toBe(expectedColumnName);
 
     // STEP 3: Close the config sidebar
     await pm.metricsPage.clickDashboardSidebarCollapseButton();
-    await page.waitForTimeout(500);
     testLogger.info('Closed config sidebar');
 
     // STEP 4: Re-run the query by clicking Apply button
     testLogger.info('Re-running the query');
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
-    await page.waitForTimeout(2000);
     testLogger.info('Query re-executed');
 
     // STEP 5: Verify column order is still maintained after query re-run
     // The reordered column should still be in position 1 (second column after Timestamp)
     testLogger.info('Verifying column order persists after re-running query');
-    tableHeaders = page.locator('table thead th');
-    const timestampAfterRerun = extractColumnName(await tableHeaders.nth(0).textContent());
-    const secondColumnAfterRerun = extractColumnName(await tableHeaders.nth(1).textContent());
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .toBe(expectedColumnName);
+
+    const timestampAfterRerun = await pm.metricsPage.getPromqlTableHeaderText(0);
+    const secondColumnAfterRerun = await pm.metricsPage.getPromqlTableHeaderText(1);
     testLogger.info(`First column after re-run (Timestamp): "${timestampAfterRerun}"`);
     testLogger.info(`Second column after re-running query: "${secondColumnAfterRerun}"`);
 
     expect(secondColumnAfterRerun).toBe(expectedColumnName);
-    testLogger.info('✓ Column order successfully persisted after re-running the query!');
-    testLogger.info('✓ Reordered column correctly appears in 2nd position (after Timestamp)');
+    testLogger.info('Column order successfully persisted after re-running the query!');
+    testLogger.info('Reordered column correctly appears in 2nd position (after Timestamp)');
   });
 
   test("Verify column order persists when switching between chart types", {
@@ -720,18 +582,17 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Move 2nd column to 1st position in the popup
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const beforeFirst = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(beforeFirst);
 
     // Get the expected column name (should be 1st in popup, 2nd in table after Timestamp)
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const expectedColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Expected column: "${expectedColumnName}"`);
 
     // Save the column order
@@ -741,27 +602,28 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // STEP 2: Switch to a different chart type (e.g., line chart)
     testLogger.info('Switching to line chart');
     await pm.metricsPage.selectChartType('line');
-    await page.waitForTimeout(1500);
     testLogger.info('Switched to line chart');
 
     // STEP 3: Switch back to table chart
     testLogger.info('Switching back to table chart');
     await pm.metricsPage.selectChartType('table');
-    await page.waitForTimeout(2000);
     testLogger.info('Switched back to table chart');
 
     // STEP 4: Verify column order is still maintained
     // NOTE: Timestamp is always in position 0, reordered column should be in position 1
     testLogger.info('Verifying column order persists after switching chart types');
-    const tableHeaders = page.locator('table thead th');
-    const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
-    const secondColumnAfterSwitch = extractColumnName(await tableHeaders.nth(1).textContent());
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .toBe(expectedColumnName);
+
+    const timestampColumn = await pm.metricsPage.getPromqlTableHeaderText(0);
+    const secondColumnAfterSwitch = await pm.metricsPage.getPromqlTableHeaderText(1);
     testLogger.info(`First column (Timestamp): "${timestampColumn}"`);
     testLogger.info(`Second column after switching back to table: "${secondColumnAfterSwitch}"`);
 
     expect(secondColumnAfterSwitch).toBe(expectedColumnName);
-    testLogger.info('✓ Column order successfully persisted when switching chart types!');
-    testLogger.info('✓ Reordered column correctly appears in 2nd position (after Timestamp)');
+    testLogger.info('Column order successfully persisted when switching chart types!');
+    testLogger.info('Reordered column correctly appears in 2nd position (after Timestamp)');
   });
 
   test("Verify column order is maintained with different queries on same metric", {
@@ -773,13 +635,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order for cpu_usage query
     testLogger.info('Setting custom column order for cpu_usage');
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get initial column count
-    const columnRows = page.locator('[data-test^="column-order-row-"]');
-    const initialColumnCount = await columnRows.count();
+    const initialColumnCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
     testLogger.info(`Initial column count: ${initialColumnCount}`);
 
     if (initialColumnCount < 2) {
@@ -789,13 +648,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Move 2nd column to 1st position in the popup
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const beforeFirst = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(beforeFirst);
 
     // Get the expected column name (should be 1st in popup, 2nd in table after Timestamp)
-    const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-    const expectedColumnName = await firstColumnRow.locator('.column-name').textContent();
+    const expectedColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
     testLogger.info(`Expected column (should be 2nd in table): "${expectedColumnName}"`);
 
     // Save the column order
@@ -804,36 +664,33 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // Close config sidebar
     await pm.metricsPage.clickDashboardSidebarCollapseButton();
-    await page.waitForTimeout(500);
 
     // STEP 2: Modify the query slightly (add a filter or aggregation)
     testLogger.info('Modifying query with aggregation');
     await pm.metricsPage.enterMetricsQuery('sum(cpu_usage)');
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
-    await page.waitForTimeout(2000);
 
     // STEP 3: Verify table still renders (may have different structure with aggregation)
-    const tableVisible = await page.locator('table').isVisible().catch(() => false);
+    const tableVisible = await pm.metricsPage.isPromqlTableVisible();
     testLogger.info(`Table visible after query change: ${tableVisible}`);
 
     if (tableVisible) {
-      const tableHeaders = page.locator('table thead th');
-      const headerCount = await tableHeaders.count();
+      const headerCount = await pm.metricsPage.getPromqlTableHeaderCount();
       testLogger.info(`Table has ${headerCount} columns after query change`);
 
       // Note: Column order behavior may differ based on whether the same columns are present
       // This test documents the behavior rather than enforcing specific expectations
       if (headerCount > 0) {
-        const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
+        const timestampColumn = await pm.metricsPage.getPromqlTableHeaderText(0);
         testLogger.info(`First column (Timestamp): "${timestampColumn}"`);
 
         if (headerCount > 1) {
-          const secondColumn = extractColumnName(await tableHeaders.nth(1).textContent());
+          const secondColumn = await pm.metricsPage.getPromqlTableHeaderText(1);
           testLogger.info(`Second column with modified query: "${secondColumn}"`);
         }
 
-        testLogger.info('✓ Table rendered successfully with modified query');
+        testLogger.info('Table rendered successfully with modified query');
       }
     } else {
       testLogger.info('Table not visible with aggregated query (may show different visualization)');
@@ -849,12 +706,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Check the move up button for the first column
-    const firstMoveUpButton = page.locator('[data-test="column-order-move-up-0"]');
+    const firstMoveUpButton = pm.dashboardPanelConfigs.columnOrderMoveUpBtn(0);
     await expect(firstMoveUpButton).toBeVisible();
 
     // Verify it's disabled
@@ -874,17 +729,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get the count of columns
-    const columnRows = page.locator('[data-test^="column-order-row-"]');
-    const columnCount = await columnRows.count();
+    const columnCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
     testLogger.info(`Total columns: ${columnCount}`);
 
     // Check the move down button for the last column
-    const lastMoveDownButton = page.locator(`[data-test="column-order-move-down-${columnCount - 1}"]`);
+    const lastMoveDownButton = pm.dashboardPanelConfigs.columnOrderMoveDownBtn(columnCount - 1);
     await expect(lastMoveDownButton).toBeVisible();
 
     // Verify it's disabled
@@ -904,15 +756,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // Note: 'single' mode corresponds to "Time series" in the UI
     await setupTableChart(page, 'single');
 
-    // Wait for config to fully render
-    await page.waitForTimeout(1500);
-
     // Verify the Column Order button is NOT visible
     const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     const isButtonVisible = await columnOrderButton.isVisible({ timeout: 3000 }).catch(() => false);
 
     expect(isButtonVisible).toBe(false);
-    testLogger.info('✓ Column Order button correctly NOT visible for Time series mode');
+    testLogger.info('Column Order button correctly NOT visible for Time series mode');
   });
 
   test("Verify Column Order feature works with Aggregate mode", {
@@ -922,17 +771,13 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     await setupTableChart(page, 'all');
 
-    // Wait a bit more for mode change
-    await page.waitForTimeout(1500);
-
     // Verify the Column Order button is visible for Aggregate mode
     const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     const isButtonVisible = await columnOrderButton.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (isButtonVisible) {
-      testLogger.info('✓ Column Order button is visible for Aggregate mode');
-      await columnOrderButton.click();
-      await page.waitForTimeout(500);
+      testLogger.info('Column Order button is visible for Aggregate mode');
+      await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
       // Verify the popup opens
       const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
@@ -940,19 +785,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
       testLogger.info('Column Order popup opened for Aggregate mode');
 
       // Verify columns are listed
-      const columnRows = page.locator('[data-test^="column-order-row-"]');
-      const columnCount = await columnRows.count();
+      const columnCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
       expect(columnCount).toBeGreaterThan(0);
       testLogger.info(`Column Order popup displays ${columnCount} columns in Aggregate mode`);
 
       // Close the popup
-      const cancelButton = pm.dashboardPanelConfigs.columnOrderDialog.locator('[data-test="o-dialog-secondary-btn"]');
-      await cancelButton.click();
-      await page.waitForTimeout(300);
+      await pm.dashboardPanelConfigs.cancelColumnOrder();
     } else {
       testLogger.warn('Column Order button not visible for Aggregate mode - mode may not have switched correctly');
-      // Take a screenshot for debugging
-      await page.screenshot({ path: 'test-results/aggregate-mode-debug.png', fullPage: true });
     }
   });
 
@@ -964,35 +804,32 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get initial column count
-    const columnRows = page.locator('[data-test^="column-order-row-"]');
-    const columnCount = await columnRows.count();
+    const columnCount = await pm.dashboardPanelConfigs.getColumnOrderRowCount();
     testLogger.info(`Working with ${columnCount} columns`);
 
     if (columnCount >= 3) {
       // Get initial third column name
-      const thirdColumnRow = page.locator('[data-test="column-order-row-2"]');
-      const thirdColumnName = await thirdColumnRow.locator('.column-name').textContent();
+      const thirdColumnName = await pm.dashboardPanelConfigs.getColumnName(2);
       testLogger.info(`Initial third column: ${thirdColumnName}`);
 
       // Move third column up twice to make it first
-      const moveUpButton2 = page.locator('[data-test="column-order-move-up-2"]');
-      await moveUpButton2.click();
-      await page.waitForTimeout(300);
+      await pm.dashboardPanelConfigs.moveColumnUp(2);
+      await expect
+        .poll(async () => await pm.dashboardPanelConfigs.getColumnName(1), { timeout: 5000 })
+        .toBe(thirdColumnName);
       testLogger.info('Moved column up once');
 
-      const moveUpButton1 = page.locator('[data-test="column-order-move-up-1"]');
-      await moveUpButton1.click();
-      await page.waitForTimeout(300);
+      await pm.dashboardPanelConfigs.moveColumnUp(1);
+      await expect
+        .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+        .toBe(thirdColumnName);
       testLogger.info('Moved column up twice');
 
       // Verify it's now in first position
-      const firstColumnRow = page.locator('[data-test="column-order-row-0"]');
-      const newFirstColumnName = await firstColumnRow.locator('.column-name').textContent();
+      const newFirstColumnName = await pm.dashboardPanelConfigs.getColumnName(0);
       testLogger.info(`New first column: ${newFirstColumnName}`);
       expect(newFirstColumnName).toBe(thirdColumnName);
       testLogger.info('Multiple consecutive reorders work correctly');
@@ -1012,23 +849,23 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Get column numbers before reordering
-    const firstColumnNumber = await page.locator('[data-test="column-order-row-0"] .column-number').textContent();
-    const secondColumnNumber = await page.locator('[data-test="column-order-row-1"] .column-number').textContent();
+    const firstColumnNumber = await pm.dashboardPanelConfigs.getColumnNumber(0);
+    const secondColumnNumber = await pm.dashboardPanelConfigs.getColumnNumber(1);
     testLogger.info(`Initial column numbers: ${firstColumnNumber}, ${secondColumnNumber}`);
 
     // Move second column up
-    const moveUpButton = page.locator('[data-test="column-order-move-up-1"]');
-    await moveUpButton.click();
-    await page.waitForTimeout(500);
+    const beforeFirst = await pm.dashboardPanelConfigs.getColumnName(0);
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getColumnName(0), { timeout: 5000 })
+      .not.toBe(beforeFirst);
 
     // Verify column numbers are still sequential (1, 2, 3...)
-    const newFirstNumber = await page.locator('[data-test="column-order-row-0"] .column-number').textContent();
-    const newSecondNumber = await page.locator('[data-test="column-order-row-1"] .column-number').textContent();
+    const newFirstNumber = await pm.dashboardPanelConfigs.getColumnNumber(0);
+    const newSecondNumber = await pm.dashboardPanelConfigs.getColumnNumber(1);
     testLogger.info(`After reorder column numbers: ${newFirstNumber}, ${newSecondNumber}`);
 
     expect(newFirstNumber).toBe('1.');
@@ -1047,18 +884,16 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
-    await columnOrderButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
     // Verify draggable list is shown (not empty state)
-    const draggableList = page.locator('[data-test="dashboard-column-order-drag"]');
+    const draggableList = pm.dashboardPanelConfigs.columnOrderDraggableList;
     await expect(draggableList).toBeVisible();
     testLogger.info('Draggable list is visible');
 
-    // Verify empty state icon is NOT shown
-    const emptyStateIcon = page.locator('.OIcon[name="view_column"]');
-    const isEmptyStateVisible = await emptyStateIcon.isVisible().catch(() => false);
+    // Verify empty state is NOT shown
+    const emptyState = pm.dashboardPanelConfigs.columnOrderEmptyState;
+    const isEmptyStateVisible = await emptyState.isVisible().catch(() => false);
     expect(isEmptyStateVisible).toBe(false);
     testLogger.info('Empty state is correctly not shown when columns are available');
 

@@ -8,7 +8,7 @@ import type {
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
 } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
@@ -117,6 +117,9 @@ if (import.meta.env.DEV) {
 // (Reka UI requires string values; this lets us recover number originals)
 const valueMap = new Map<string, SelectPrimitiveValue>();
 provide(SELECT_VALUE_MAP_KEY, valueMap);
+// Forward the parent OSelect's data-test to OSelectItem children so they can
+// auto-derive `<parent>-option` data-test attributes (non-listbox mode).
+provide(SELECT_PARENT_DATA_TEST_KEY, parentDataTest);
 
 const isPrimitiveSelectValue = (
   value: unknown,
