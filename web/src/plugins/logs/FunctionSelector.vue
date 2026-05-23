@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
-        <div v-if="filteredFunctionOptions.length">
+        <div v-if="filteredFunctionOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
           <ODropdownItem
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"

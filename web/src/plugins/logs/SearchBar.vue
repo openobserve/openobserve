@@ -1356,6 +1356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
+      title="Confirm"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="cancelConfirmDialog"
@@ -1386,6 +1387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
+    <div class="tw:flex tw:flex-col tw:gap-y-2">
       <p>{{ t("search.customDownloadMessage") }}</p>
       <OInput
         type="number"
@@ -1401,8 +1403,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('search.range')"
         class="tw:py-2"
       />
-      <div class="tw:py-2 file-type">
-        <label class="tw:pr-2">{{ t("search.fileType") }}</label
+      <div class="file-type">
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2">{{ t("search.fileType") }}</label
         ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -1419,6 +1421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ option.label }}</OButton
           >
         </OButtonGroup>
+      </div>
       </div>
     </ODialog>
     <ODialog
@@ -1465,22 +1468,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       :primary-button-loading="saveFunctionLoader"
-      @click:secondary="store.state.savedFunctionDialog = false"
+      @click:secondary="store.state.savedFunctionDialog = false; functionUpdateConfirm = false"
       @click:primary="saveFunction"
+      @update:open="(open) => { if (!open) functionUpdateConfirm = false }"
     >
-      <div class="tw:flex tw:items-center">
-        <span class="tw:mt-2">Update</span>
-        <OSwitch
-          data-test="saved-function-action-toggle"
-          :disabled="functionOptions.length == 0"
-          v-model="isSavedFunctionAction"
-          checked-value="create"
-          unchecked-value="update"
-          size="lg"
-          @update:model-value="savedFunctionName = ''"
-        />
-        <span class="tw:mt-2">Create</span>
-      </div>
+      <OToggleGroup
+        data-test="saved-function-action-toggle"
+        :model-value="isSavedFunctionAction"
+        :disabled="functionOptions.length == 0"
+        class="tw:mb-3"
+        @update:model-value="isSavedFunctionAction = $event; savedFunctionName = ''"
+      >
+        <OToggleGroupItem value="update" size="sm">Update</OToggleGroupItem>
+        <OToggleGroupItem value="create" size="sm">Create</OToggleGroupItem>
+      </OToggleGroup>
       <div v-if="isSavedFunctionAction == 'create'">
         <OInput
           data-test="saved-function-name-input"
@@ -1507,6 +1508,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
+
+    <!-- Function update confirmation dialog -->
+    <ConfirmDialog
+      data-test="search-bar-function-update-confirm-dialog"
+      title="Confirm Update"
+      :message="`Are you sure you want to update the function ${savedFunctionSelectedName}?`"
+      v-model="functionUpdateConfirm"
+      @update:ok="executeFunctionUpdate"
+      @update:cancel="functionUpdateConfirm = false"
+    />
     <ODialog
       data-test="search-bar-search-scheduler-job-dialog"
       v-model:open="searchSchedulerJob"
@@ -2228,6 +2239,7 @@ export default defineComponent({
     const savedFunctionSelectError = ref("");
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
+    const functionUpdateConfirm = ref(false);
 
     const isFocused = ref(false);
 
@@ -3005,7 +3017,7 @@ export default defineComponent({
           saveFunctionLoader.value = false;
           return;
         }
-        fnName = savedFunctionSelectedName.value.name;
+        fnName = savedFunctionSelectedName.value;
       }
 
       if (content.trim() == "") {
@@ -3065,55 +3077,62 @@ export default defineComponent({
             });
           });
       } else {
+        // Validate, set up formData, then show the teleported confirmation overlay
         saveFunctionLoader.value = false;
-        showConfirmDialog(() => {
-          saveFunctionLoader.value = true;
-          callTransform = jsTransformService.update(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
-
-          callTransform
-            .then((res: { data: any }) => {
-              toast({
-                variant: "success",
-                message: "Function updated successfully.",
-              });
-
-              const transformIndex = searchObj.data.transforms.findIndex(
-                (obj) => obj.name === formData.value.name,
-              );
-              if (transformIndex !== -1) {
-                searchObj.data.transforms[transformIndex].name =
-                  formData.value.name;
-                searchObj.data.transforms[transformIndex].function =
-                  formData.value.function;
-              }
-
-              functionOptions.value = searchObj.data.transforms;
-              store.dispatch("setSavedFunctionDialog", false);
-              isSavedFunctionAction.value = "create";
-              savedFunctionName.value = "";
-              saveFunctionLoader.value = false;
-              savedFunctionSelectedName.value = "";
-            })
-            .catch((err) => {
-              saveFunctionLoader.value = false;
-              toast({
-                variant: "error",
-                message:
-                  JSON.stringify(err.response.data["message"]) ||
-                  "Function updation failed",
-                timeout: 5000,
-              });
-            });
-        });
+        functionUpdateConfirm.value = true;
+        return;
       }
+    };
+
+    const executeFunctionUpdate = () => {
+      saveFunctionLoader.value = true;
+      const callTransform = jsTransformService.update(
+        store.state.selectedOrganization.identifier,
+        formData.value,
+      );
+
+      callTransform
+        .then((res: { data: any }) => {
+          toast({
+            variant: "success",
+            message: "Function updated successfully.",
+          });
+
+          const transformIndex = searchObj.data.transforms.findIndex(
+            (obj) => obj.name === formData.value.name,
+          );
+          if (transformIndex !== -1) {
+            searchObj.data.transforms[transformIndex].name =
+              formData.value.name;
+            searchObj.data.transforms[transformIndex].function =
+              formData.value.function;
+          }
+
+          functionOptions.value = searchObj.data.transforms;
+          store.dispatch("setSavedFunctionDialog", false);
+          functionUpdateConfirm.value = false;
+          isSavedFunctionAction.value = "create";
+          savedFunctionName.value = "";
+          saveFunctionLoader.value = false;
+          savedFunctionSelectedName.value = "";
+        })
+        .catch((err) => {
+          functionUpdateConfirm.value = false;
+          saveFunctionLoader.value = false;
+          toast({
+            variant: "error",
+            message:
+              JSON.stringify(err.response.data["message"]) ||
+              "Function updation failed",
+            timeout: 5000,
+          });
+        });
     };
 
     const resetFunctionContent = () => {
       fnEditorRef?.value?.setValue("");
       store.dispatch("setSavedFunctionDialog", false);
+      functionUpdateConfirm.value = false;
       isSavedFunctionAction.value = "create";
       savedFunctionName.value = "";
       saveFunctionLoader.value = false;
@@ -4873,6 +4892,8 @@ export default defineComponent({
       savedFunctionSelectError,
       savedFunctionSelectedName,
       saveFunctionLoader,
+      functionUpdateConfirm,
+      executeFunctionUpdate,
       shareURL,
       showSearchHistoryfn,
       getImageURL,
@@ -5374,13 +5395,13 @@ export default defineComponent({
 }
 
 .file-type label {
-  transform: translate(-0.75rem, -175%);
-  font-weight: var(--font-semibold);
-  font-size: var(--text-base);
-  color: var(--o2-text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #262626;
 }
+html.dark .file-type label,
 .body--dark .file-type label {
-  color: var(--o2-text-secondary);
+  color: #e5e5e5;
 }
 
 // Toolbar Icon and Toggle Styles

@@ -292,7 +292,8 @@ export default defineComponent({
 }
 
 .condition-logical-operator {
-  width: 60px;
+  width: fit-content;
+  max-width: 8rem;
 }
 
 :deep(.condition-logical-operator .q-field__control) {

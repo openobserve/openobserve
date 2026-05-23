@@ -122,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="splitterLimits"
           class="full-height tw:w-full analysis-splitter-smooth"
           @update:model-value="onSplitterUpdate"
-          horizontal
         >
           <!-- LEFT: Dimension Selector Sidebar -->
           <template #before>
