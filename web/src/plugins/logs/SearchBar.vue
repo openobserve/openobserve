@@ -1387,6 +1387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
+    <div class="tw:flex tw:flex-col tw:gap-y-2">
       <p>{{ t("search.customDownloadMessage") }}</p>
       <OInput
         type="number"
@@ -1402,8 +1403,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('search.range')"
         class="tw:py-2"
       />
-      <div class="tw:py-2 file-type">
-        <label class="tw:pr-2">{{ t("search.fileType") }}</label
+      <div class="file-type">
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2">{{ t("search.fileType") }}</label
         ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -1420,6 +1421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ option.label }}</OButton
           >
         </OButtonGroup>
+      </div>
       </div>
     </ODialog>
     <ODialog
@@ -5393,13 +5395,13 @@ export default defineComponent({
 }
 
 .file-type label {
-  transform: translate(-0.75rem, -175%);
-  font-weight: var(--font-semibold);
-  font-size: var(--text-base);
-  color: var(--o2-text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #262626;
 }
+html.dark .file-type label,
 .body--dark .file-type label {
-  color: var(--o2-text-secondary);
+  color: #e5e5e5;
 }
 
 // Toolbar Icon and Toggle Styles
