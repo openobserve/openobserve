@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-2">
+          <div v-else class="tw:flex tw:items-start tw:gap-2">
             <OFile
               data-test="setting_ent_custom_logo_img_file_upload"
               v-model="filesLight"
@@ -275,20 +275,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
+              :help-text="t('settings.fileFormatConstraint')"
               class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="tw:flex tw:gap-x-2 tw:mt-3">
+            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
               <OButton
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
                 @click="filesLight = null"
-              icon-left="close"
-            />
+                icon-left="close"
+              />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -300,12 +301,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mt-3">
-            <span class="individual-setting-description">
+          <span class="individual-setting-description tw:-translate-y-[5px]">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
-        </div>
 
         <!-- Dark Mode Logo -->
         <div class="settings-grid-item tw:ml-1">
@@ -338,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-2">
+          <div v-else class="tw:flex tw:items-start tw:gap-2">
             <OFile
               data-test="setting_ent_custom_logo_dark_img_file_upload"
               v-model="filesDark"
@@ -347,20 +346,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
+              :help-text="t('settings.fileFormatConstraint')"
               class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="tw:flex tw:gap-x-2 tw:mt-3">
+            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
               <OButton
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
                 @click="filesDark = null"
-              icon-left="close"
-            />
+                icon-left="close"
+              />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -372,12 +372,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mt-3">
-            <span class="individual-setting-description">
+          <span class="individual-setting-description tw:-translate-y-[5px]">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
-        </div>
       </div>
     </div>
   </div>

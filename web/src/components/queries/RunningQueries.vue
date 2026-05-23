@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 v-if="selectedSearchField == 'all'"
                 v-model="filterQuery"
-                class="tw:h-[36px] tw:w-[200px]"
+                class=" no-border o2-search-input"
                 :placeholder="t('queries.search')"
                 data-test="running-queries-search-input"
               >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else class="o2-select-input o2-input">
                 <OSelect
                   v-model="filterQuery"
-                  :label="filterQuery ? '' : 'Select option'"
+                  placeholder="Select option"
                   :options="otherFieldOptions"
                   labelKey="label"
                   valueKey="value"
