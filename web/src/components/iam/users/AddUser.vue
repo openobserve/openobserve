@@ -95,6 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="roles"
             class="showLabelOnTop tw:mt-2"
             data-test="user-role-field"
+            :error="!!roleError"
+            :error-message="roleError"
+            @update:model-value="roleError = ''"
           />
           <OSelect
             v-if="
@@ -314,6 +317,7 @@ export default defineComponent({
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref([...props.customRoles]);
     const emailError = ref('');
+    const roleError = ref('');
 
     watch(
       () => props.customRoles,
@@ -419,6 +423,7 @@ export default defineComponent({
       loggedInUserEmail,
       filterdOption,
       emailError,
+      roleError,
       invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
@@ -455,6 +460,14 @@ export default defineComponent({
       if (this.existingUser && !this.beingUpdated) {
         if (!this.formData.email || !emailRegex.test(this.formData.email)) {
           this.emailError = 'Please enter a valid email address.';
+          return;
+        }
+        if (
+          this.userRole !== 'member' &&
+          this.store.state.userInfo.email !== this.formData.email &&
+          !this.formData.role
+        ) {
+          this.roleError = 'Field is required';
           return;
         }
       }

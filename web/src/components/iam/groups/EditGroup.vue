@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
