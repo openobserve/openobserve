@@ -263,14 +263,17 @@ export class PipelinesPage {
     }
 
     async selectLogs() {
-        // Open the input-node stream-type OSelect via its wrapper data-test.
-        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
-        await this.inputNodeStreamTypeSelect.click();
+        // Open the input-node stream-type OSelect via its trigger
+        // (`<parent>-trigger`, per OSelect convention). The wrapper div shares
+        // the same data-test, so we scope to the trigger explicitly.
+        const trigger = this.page.locator('[data-test="input-node-stream-type-select-trigger"]').first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
         // Wait for the OSelect popover to appear (data-test forwarded from parent).
-        await this.inputNodeStreamTypePopover.waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
         // Pick the `logs` option by its `data-test-value` value-specific attribute.
-        await this.inputNodeStreamTypeLogsOption.waitFor({ state: 'visible', timeout: 10000 });
-        await this.inputNodeStreamTypeLogsOption.click();
+        await this.inputNodeStreamTypeLogsOption.first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.first().click();
     }
 
     /**
