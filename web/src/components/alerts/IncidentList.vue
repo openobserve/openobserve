@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:flex tw:mt-1">
-      <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+  <div data-test="incident-list" class="tw:flex tw:pt-1">
+    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
       <!-- Header with title and search -->
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container tw:mb-2.5">
         <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
           <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="incidents-list-title">
             {{ t("alerts.incidents.title") }}
@@ -47,8 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Incidents table -->
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-128px)]">
+      <div class="card-container tw:overflow-hidden tw:flex-1 tw:min-h-0">
         <OTable
           ref="qTableRef"
           :data="visibleIncidents"
@@ -63,9 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           :show-global-filter="false"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :class="{
-            'tw:h-[calc(100vh-128px)]': !loading && visibleIncidents.length > 0,
-          }"
           data-test="incident-list-table"
           @row-click="viewIncident"
         >
@@ -166,7 +162,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         </OTable>
       </div>
-    </div>
     </div>
   </div>
 </template>
