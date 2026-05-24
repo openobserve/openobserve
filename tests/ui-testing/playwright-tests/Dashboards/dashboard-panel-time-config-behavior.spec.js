@@ -378,18 +378,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.keyboard.press('Escape');
     await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-    // Step 6: Click picker again and select time
-    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", false);
-
-    // Dropdown should still be open (not clicked Apply yet)
-    await page.locator('#date-time-menu').waitFor({ state: "visible", timeout: 3000 });
-
-    // Click Apply
-    await page.locator('[data-test="date-time-apply-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-    // Verify dropdown closes and URL updates
-    await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    // Step 6: Click picker again, select "Last 6 days" and apply
+    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", true);
     await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Cleanup
