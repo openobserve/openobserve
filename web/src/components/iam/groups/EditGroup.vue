@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="tw:flex tw:flex-col" style="height: calc(100vh - var(--navbar-height) - 14px);">
+  <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="edit-group-section-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"

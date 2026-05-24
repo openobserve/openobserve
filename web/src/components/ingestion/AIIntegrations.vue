@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:h-[calc(100vh-var(--navbar-height)-100px)] tw:gap-0">
-    <div class="tw:w-[200px] tw:pl-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
+  <div class="tw:flex tw:h-full tw:gap-0">
+    <div class="tw:w-[200px] tw:flex tw:flex-col">
       <div class="card-container tw:flex-1 el-border-radius">
-        <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-100px)]">
+        <div class="tw:overflow-y-auto tw:h-full">
           <OTabs
             v-model="selectedCategory"
             orientation="vertical"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:w-[250px] tw:pb-[0.625rem] tw:flex tw:flex-col">
+    <div class="tw:w-[250px] tw:flex tw:flex-col">
       <div class="card-container tw:flex-1 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
           <OInput
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="search" size="sm" class="tw:cursor-pointer" />
             </template>
           </OInput>
-          <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">
+          <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
             <OTabs
               v-model="selectedIntegration"
               orientation="vertical"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:flex-1 tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
+    <div class="tw:flex-1 tw:flex tw:flex-col">
       <div class="card-container tw:flex-1 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
           <div class="tw:flex-1 tw:overflow-auto tw:min-h-0">

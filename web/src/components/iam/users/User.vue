@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
-    <div>
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
@@ -60,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
     </div>
-    <div class="tw:w-full">
-      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"
           :data="rows"
@@ -162,8 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    </div>
-
+    
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"

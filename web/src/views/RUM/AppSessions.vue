@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page">
     <template v-if="isSessionReplayEnabled">
-      <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+      <div class="tw:pb-[0.625rem]">
         <div class="card-container">
           <div
             class="tw:text-right tw:p-[0.375rem] tw:flex align-center tw:justify-between"
@@ -125,29 +125,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </template>
     <template v-else>
-      <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-        <div class="card-container">
-          <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
-            <div class="tw:pb-4">
-              <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
-                {{ t("rum.discoverSessionTitle") }}
-              </div>
-              <div class="tw:text-base tw:font-medium">
-                {{ t("rum.discoverSessionMessage") }}
-              </div>
-              <div>
-                <div></div>
-              </div>
+      <div class="card-container">
+        <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
+          <div class="tw:pb-4">
+            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
+              {{ t("rum.discoverSessionTitle") }}
             </div>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :title="t('common.getStartedRUM')"
-              @click="getStarted"
-            >
-              {{ t("common.getStarted") }}
-            </OButton>
+            <div class="tw:text-base tw:font-medium">
+              {{ t("rum.discoverSessionMessage") }}
+            </div>
+            <div>
+              <div></div>
+            </div>
           </div>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :title="t('common.getStartedRUM')"
+            @click="getStarted"
+          >
+            {{ t("common.getStarted") }}
+          </OButton>
         </div>
       </div>
     </template>

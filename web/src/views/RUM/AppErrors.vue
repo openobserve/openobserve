@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+    <div class="tw:pb-[0.625rem]">
       <div class="card-container">
         <div
           class="tw:text-right tw:p-[0.375rem] tw:flex align-center tw:justify-between"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <OSplitter
-      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
+      class="logs-horizontal-splitter tw:flex-1"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
@@ -80,32 +80,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:pr-[0.625rem] tw:h-full">
-          <div class="card-container tw:h-full">
-            <OTable
-              :data="tableErrors"
-              :columns="tableColumns"
-              :loading="isLoading.length > 0"
-              row-key="_rowKey"
-              pagination="none"
-              virtual-scroll
-              :dense="false"
-              :row-height="86"
-              :show-global-filter="false"
-              horizontal-scroll
-              class="tw:h-full"
-              data-test="rum-app-errors-table"
-              row-class="tw:cursor-pointer"
-              @row-click="handleRowClick"
-            >
-              <template #empty>
-                <NoData />
-              </template>
-              <template #cell-error="{ row }">
-                <ErrorDetail :column="row" />
-              </template>
-            </OTable>
-          </div>
+        <div class="card-container tw:h-full tw:overflow-hidden">
+          <OTable
+            :data="tableErrors"
+            :columns="tableColumns"
+            :loading="isLoading.length"
+            row-key="_rowKey"
+            pagination="none"
+            virtual-scroll
+            :dense="false"
+            :row-height="86"
+            :show-global-filter="false"
+            horizontal-scroll
+            class="tw:h-full"
+            data-test="rum-app-errors-table"
+            row-class="tw:cursor-pointer"
+            @row-click="handleRowClick"
+          >
+            <template #empty>
+              <NoData />
+            </template>
+            <template #cell-error="{ row }">
+              <ErrorDetail :column="row" />
+            </template>
+          </OTable>
         </div>
       </template>
     </OSplitter>

@@ -19,9 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
-    <div>
-      <div class="card-container tw:mb-[0.625rem]">
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+    <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
       >
 
@@ -53,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
       </div>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:h-full">
           <OTable
             :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
@@ -146,8 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTable>
       </div>
-      </div>
-  </div>
+    </div>
     <add-service-account
       v-model:open="showAddUserDialog"
       v-model="selectedUser"

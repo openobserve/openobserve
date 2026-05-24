@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:overflow-hidden tw:h-[calc(100vh-var(--navbar-height))]" data-test="iam-page">
+  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:px-2.5 tw:pb-2.5" data-test="iam-page">
     <OSplitter
       v-model="splitterModel"
       unit="px"
@@ -9,8 +9,8 @@
       style="height: 100%;"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container" style="height: calc(100vh - var(--navbar-height) - 14px);">
+        <div class="tw:w-full tw:h-full">
+        <div v-if="showSidebar" class="iam-tabs spitter-container card-container tw:h-full">
           <route-tabs
             ref="iamRouteTabsRef"
             dataTest="iam-tabs"
@@ -34,7 +34,7 @@
           </OButton>
       </template>
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+        <div class="tw:w-full tw:h-full">
           <div class="tw:overflow-hidden tw:h-full">
             <RouterView />
           </div>

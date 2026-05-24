@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="error-viewer-container tw:mx-[0.625rem] tw:mb-[0.375rem] card-container"
+    class="error-viewer-container card-container"
   >
     <template v-if="isLoading.length">
       <div
@@ -181,7 +181,7 @@ const getError = () => {
 
 <style scoped>
 .error-viewer-container {
-  height: calc(100vh - var(--navbar-height) - 1rem);
+  height: 100%;
   overflow-y: auto;
 }
 </style>

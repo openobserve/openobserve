@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="tw:p-0 tw:flex tw:flex-col">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-      <div class="card-container tw:mb-[0.625rem]">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pb-2.5 tw:pt-1">
+      <div class="card-container tw:mb-2.5">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
         >
@@ -97,104 +97,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-126px)]">
-          <OTable
-            data-test="log-stream-table"
-            :data="logStream"
-            :columns="columns"
-            row-key="_rowKey"
-            selection="multiple"
-            v-model:selected-ids="selectedIds"
-            pagination="server"
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-size-options="pageSizeOptions"
-            :total-count="totalCount"
-            sorting="server"
-            v-model:sort-by="sortBy"
-            v-model:sort-order="sortOrder"
-            :show-global-filter="false"
-            :default-columns="false"
-            :loading="loadingState"
-            width="100%"
-            :style="
-              logStream?.length
-                ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
-                : 'width: 100%'
-            "
-          >
-            <!--
-              Render the stream-name cell with a deterministic per-name data-test.
-              Tests can target a specific stream row via
-              `[data-test="log-stream-name-cell-<name>"]` and walk up to the OTable
-              row via `xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`
-              without needing element/text predicates. Mirrors the
-              `dashboard-name-cell-<name>` pattern in Dashboards.vue.
-            -->
-            <template #cell-name="{ row }">
-              <span :data-test="`log-stream-name-cell-${row.name}`">{{ row.name }}</span>
-            </template>
-
-            <template #cell-actions="{ row }">
-               <div class="tw:flex tw:items-center actions-container">
-                <OButton
-                  icon-left="search"
-                  :title="t('logStream.explore')"
-                  data-test="log-stream-explore-btn"
-                  variant="ghost"
-                  size="icon-sm"
-                  @click="exploreStream({ row })"
-                />
-                <OButton
-                  icon-left="description"
-                  :title="t('logStream.schemaHeader')"
-                  data-test="log-stream-schema-btn"
-                  variant="ghost"
-                  size="icon-sm"
-                  @click="listSchema({ row })"
-                />
-                <OButton
-                  icon-left="delete"
-                  :title="t('logStream.delete')"
-                  data-test="log-stream-delete-btn"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  @click="confirmDeleteAction({ row })"
-                />
-              </div>
-            </template>
-
-            <template #empty>
-              <div v-if="!loadingState">
-                <NoData />
-              </div>
-            </template>
-
-            <template #bottom="scope">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <OTable
+          data-test="log-stream-table"
+          :data="logStream"
+          :columns="columns"
+          row-key="_rowKey"
+          selection="multiple"
+          v-model:selected-ids="selectedIds"
+          pagination="server"
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-size-options="pageSizeOptions"
+          :total-count="totalCount"
+          sorting="server"
+          v-model:sort-by="sortBy"
+          v-model:sort-order="sortOrder"
+          :show-global-filter="false"
+          :default-columns="false"
+          :loading="loadingState"
+          width="100%"
+          :style="
+            logStream?.length
+              ? 'width: 100%; height: 100%'
+              : 'width: 100%'
+          "
+        >
+          <!--
+            Render the stream-name cell with a deterministic per-name data-test.
+            Tests can target a specific stream row via
+            `[data-test="log-stream-name-cell-<name>"]` and walk up to the OTable
+            row via `xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`
+            without needing element/text predicates. Mirrors the
+            `dashboard-name-cell-<name>` pattern in Dashboards.vue.
+          -->
+          <template #cell-name="{ row }">
+            <span :data-test="`log-stream-name-cell-${row.name}`">{{ row.name }}</span>
+          </template>
+          <template #cell-actions="{ row }">
+             <div class="tw:flex tw:items-center actions-container">
+              <OButton
+                icon-left="search"
+                :title="t('logStream.explore')"
+                data-test="log-stream-explore-btn"
+                variant="ghost"
+                size="icon-sm"
+                @click="exploreStream({ row })"
+              />
+              <OButton
+                icon-left="description"
+                :title="t('logStream.schemaHeader')"
+                data-test="log-stream-schema-btn"
+                variant="ghost"
+                size="icon-sm"
+                @click="listSchema({ row })"
+              />
+              <OButton
+                icon-left="delete"
+                :title="t('logStream.delete')"
+                data-test="log-stream-delete-btn"
+                variant="ghost-destructive"
+                size="icon-sm"
+                @click="confirmDeleteAction({ row })"
+              />
+            </div>
+          </template>
+          <template #empty>
+            <div v-if="!loadingState">
+              <NoData />
+            </div>
+          </template>
+          <template #bottom="scope">
+            <div
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+            >
               <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+                class="tw:flex tw:items-center tw:w-full tw:font-bold tw:text-[14px]"
               >
-                <div
-                  class="tw:flex tw:items-center tw:w-full tw:font-bold tw:text-[14px]"
+                {{ scope.totalRows }} Stream(s)
+                <OButton
+                  v-if="selectedIds.length > 0"
+                  icon-left="delete"
+                  variant="outline-destructive"
+                  size="sm-action"
+                  class="tw:ml-4"
+                  :disabled="isDeleting"
+                  @click="confirmBatchDeleteAction"
                 >
-                  {{ scope.totalRows }} Stream(s)
-                  <OButton
-                    v-if="selectedIds.length > 0"
-                    icon-left="delete"
-                    variant="outline-destructive"
-                    size="sm-action"
-                    class="tw:ml-4"
-                    :disabled="isDeleting"
-                    @click="confirmBatchDeleteAction"
-                  >
-                    {{ isDeleting ? "Deleting..." : "Delete" }}
-                  </OButton>
-                </div>
+                  {{ isDeleting ? "Deleting..." : "Delete" }}
+                </OButton>
               </div>
-            </template>
-          </OTable>
-        </div>
+            </div>
+          </template>
+        </OTable>
       </div>
     </div>
 

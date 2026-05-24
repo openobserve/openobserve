@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+    <div class="tw:pb-[0.625rem]">
       <div class="card-container">
         <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
           <div class="performance_title">
@@ -68,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="tw:pb-[0.375rem] tw:px-[0.625rem] tw:h-[calc(100%-101px)]!">
+        <div class="tw:flex-1 tw:min-h-0">
           <div
-            class="card-container tw:py-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="card-container tw:h-full tw:overflow-hidden"
           >
             <component
               :is="Component"
