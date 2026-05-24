@@ -561,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
                           :label="'Frequency *'"
-                          class="tw:pt-2 tw:pb-0 showLabelOnTop no-case"
+                          class="showLabelOnTop no-case"
                           :error="!!periodError"
                           :error-message="periodError"
                           @update:model-value="periodError = ''"
