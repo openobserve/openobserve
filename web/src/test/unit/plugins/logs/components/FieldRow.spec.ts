@@ -79,7 +79,8 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(true);
     });
 
     it("should show simple field for non-schema fields", () => {
@@ -96,7 +97,8 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(true);
     });
 
     it("should show expansion slot for fields with values", () => {
@@ -118,7 +120,8 @@ describe("FieldRow.vue", () => {
       });
 
       expect(wrapper.find(".expansion-content").exists()).toBe(true);
-      expect(wrapper.find(".field-container").exists()).toBe(false);
+      // When expansion slot is used, the simple OFieldRow element is not rendered
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(false);
     });
   });
 
@@ -285,7 +288,8 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icon = wrapper.find('.field_label [data-test="log-search-index-list-interesting-status-field-btn"]');
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -304,7 +308,8 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -319,9 +324,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      // Interesting icon is inside .field_label in the refactored component
+      // Interesting icon is rendered directly inside OFieldRow
       const icon = wrapper.find(
-        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
       );
       await icon.trigger("click");
 
@@ -365,8 +370,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
       const icon = wrapper.find(
-        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
       );
       expect(icon.exists()).toBe(true);
       expect(icon.classes()).toContain("tw:cursor-pointer");
@@ -384,8 +390,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
       const icon = wrapper.find(
-        '.field_label [data-test="log-search-index-list-interesting-status-field-btn"]',
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
       );
       expect(icon.exists()).toBe(true);
     });
@@ -400,7 +407,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field_overlay").exists()).toBe(true);
+      // Non-timestamp fields render action buttons (filter + add icons) in the #actions slot
+      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-status-field-btn"]');
+      expect(filterBtn.exists()).toBe(true);
     });
 
     it("should not render field overlay for timestamp column", () => {
@@ -417,7 +426,9 @@ describe("FieldRow.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field_overlay").exists()).toBe(false);
+      // Timestamp column has no action buttons rendered in the #actions slot
+      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-_timestamp-field-btn"]');
+      expect(filterBtn.exists()).toBe(false);
     });
   });
 

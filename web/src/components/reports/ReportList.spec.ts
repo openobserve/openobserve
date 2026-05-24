@@ -69,6 +69,57 @@ vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn(() => Promise.resolve()),
 }));
 
+// Stub the toast module so `toast({ timeout: 2000 })` never fires real setTimeouts.
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+  toastRecords: [],
+  useToast: () => ({ toast: vi.fn(() => vi.fn()), toasts: [] }),
+}));
+
+// Stub OTable to bypass the 2-second minimum-skeleton-hold timer.
+// The real OTable uses `setTimeout(2000)` after `loading` flips to false before
+// it renders rows. In tests this makes every beforeEach that does `flushPromises()`
+// wait 2+ seconds. The stub renders cell slots directly with row data so tests
+// are fast and action-button data-test attributes are immediately available.
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
+  default: {
+    name: "OTable",
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "rowKey",
+      "pagination",
+      "selection",
+      "selectedIds",
+      "showGlobalFilter",
+      "style",
+    ],
+    emits: ["update:selectedIds"],
+    inheritAttrs: true,
+    template: `
+      <div v-bind="$attrs">
+        <div v-if="loading" data-test="o-table-stub-loading">Loading...</div>
+        <template v-else>
+          <div
+            v-for="(row, idx) in (data || [])"
+            :key="row[rowKey || 'id'] || idx"
+            :data-test="'o-table-stub-row-' + idx"
+          >
+            <slot :name="'cell-actions'" :row="row" />
+            <slot :name="'cell-name'" :row="row" />
+            <slot :name="'cell-folder_name'" :row="row" />
+          </div>
+          <div v-if="!data || data.length === 0">
+            <slot name="empty" />
+          </div>
+        </template>
+        <slot name="bottom" :pagination="{}" :pagesNumber="1" />
+      </div>
+    `,
+  },
+}));
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
@@ -156,6 +207,12 @@ function mountComponent() {
       stubs: {
         ODrawer: ODrawerStub,
         MoveAcrossFolders: MoveAcrossFoldersStub,
+        FolderList: { template: '<div data-test="folder-list-stub" />' },
+        OSplitter: {
+          name: "OSplitter",
+          props: ["modelValue", "unit", "limits", "horizontal"],
+          template: '<div><slot name="before" /><slot name="after" /></div>',
+        },
       },
     },
     attachTo: document.body,

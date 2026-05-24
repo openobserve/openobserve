@@ -450,12 +450,11 @@ watch(internalOpen, (open) => {
         </div>
 
         <!-- ── Content (scrollable body) ───────────────────── -->
-        <!-- min-h-0 is required for flex children to overflow correctly -->
-        <!-- No flex-1: panel shrinks to content, footer flows below body (not pinned to bottom) -->
+        <!-- min-h-0 + flex-1: body fills remaining height so footer is always pinned to the bottom -->
         <div
           ref="bodyRef"
           :class="[
-            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:text-dialog-content-text',
             canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',

@@ -485,7 +485,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-7 tw:rounded tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-7 tw:rounded tw:border tw:border-datepicker-inner-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
@@ -507,14 +507,14 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="tw:rounded tw:border tw:border-datepicker-border tw:overflow-hidden"
+              class="tw:rounded tw:border tw:border-datepicker-inner-border tw:overflow-hidden"
             >
               <input
                 v-model="tzSearch"
                 type="text"
                 placeholder="Search timezone..."
                 autofocus
-                class="tw:w-full tw:h-7 tw:px-2 tw:text-xs tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                class="tw:w-full tw:h-7 tw:px-2 tw:text-xs tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-inner-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
                 data-test="datetimerange-timezone-search"
               />
               <div class="tw:overflow-y-auto tw:max-h-36 tw:bg-datepicker-bg">
@@ -659,7 +659,7 @@ const triggerClasses = computed(() => [
           </p>
 
           <!-- Start / End time -->
-          <div v-if="!hideTime" class="tw:flex tw:gap-3">
+          <div v-if="!hideTime" class="tw:flex tw:gap-3 tw:[--color-datepicker-border:var(--color-datepicker-inner-border)]">
             <OTime
               v-model="stagedStartTime"
               label="Start time"
@@ -684,7 +684,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-9 tw:rounded-md tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-sm tw:px-3 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-9 tw:rounded-md tw:border tw:border-datepicker-inner-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-sm tw:px-3 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
@@ -706,14 +706,14 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="tw:rounded-md tw:border tw:border-datepicker-border tw:overflow-hidden"
+              class="tw:rounded-md tw:border tw:border-datepicker-inner-border tw:overflow-hidden"
             >
               <input
                 v-model="tzSearch"
                 type="text"
                 placeholder="Search timezone..."
                 autofocus
-                class="tw:w-full tw:h-9 tw:px-3 tw:text-sm tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                class="tw:w-full tw:h-9 tw:px-3 tw:text-sm tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-inner-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
                 data-test="datetimerange-timezone-search"
               />
               <div class="tw:overflow-y-auto tw:max-h-40 tw:bg-datepicker-bg">

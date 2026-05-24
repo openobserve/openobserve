@@ -91,14 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:mx-2 tw:pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="tw:flex tw:mt-[0.725rem] tw:h-[64px]">
+                    <div class="tw:flex tw:mt-3 tw:mb-3">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
                           size="md"
                           :placeholder="t('dashboard.addURL')"
                         />
-
                     </div>
                   </slot>
 
@@ -137,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
+                          helpText=".json files only"
                         >
                           <template v-slot:prepend>
                             <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
@@ -148,7 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="tw:cursor-pointer"
                             />
                           </template>
-                          <template v-slot:hint> .json files only </template>
                         </OFile>
                       </div>
                     </div>

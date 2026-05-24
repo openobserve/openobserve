@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
       class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
-      data-test="dashboard-variable-custom-value-selector"
+      :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       :select-all="variableItem.multiSelect"
       @update:model-value="emit('update:modelValue', $event)"

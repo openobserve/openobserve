@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="opt in interestingFieldsToggleOptions"
           :key="opt.value"
           :value="opt.value"
-          size="xs"
+          size="sm"
           :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
         >
           <template v-if="opt.slot === 'all_fields_slot'">

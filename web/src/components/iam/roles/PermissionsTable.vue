@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
+        :class="level > 0 ? 'tw:overflow-y-auto tw:overflow-x-hidden' : ''"
         :style="{
           maxHeight: level > 0 ? '400px' : undefined,
         }"

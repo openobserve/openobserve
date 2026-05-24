@@ -108,8 +108,12 @@ describe("GroupRoles Component", () => {
     });
 
     it("switches display option when button is clicked", async () => {
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      await allButton.trigger("click");
+      // Reka UI ToggleGroupItem does not fire update:modelValue via .trigger("click")
+      // in jsdom — use the public updateUserTable method directly (same pattern used
+      // throughout this spec for display-switching tests).
+      expect(wrapper.find('[data-test="iam-roles-selection-show-all-btn"]').exists()).toBe(true);
+
+      await wrapper.vm.updateUserTable("all");
 
       expect(wrapper.vm.usersDisplay).toBe("all");
     });

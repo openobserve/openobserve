@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <div class="tw:flex-1 tw:min-w-0 tw:flex">
+      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
         <!-- Main Panel -->
         <main
           data-test="main-content"
@@ -76,16 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <div class="o2-content-scroll tw:flex-1 tw:overflow-y-auto">
-            <div
-              v-show="isLoading"
-              :key="store.state.selectedOrganization?.identifier"
-              class="tw:h-[calc(100vh-var(--navbar-height))]!"
-            >
-              <router-view v-slot="{ Component }">
-                <component :is="Component" @sendToAiChat="sendToAiChat" />
-              </router-view>
-            </div>
+          <div               
+            v-show="isLoading"
+            :key="store.state.selectedOrganization?.identifier"
+            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
+          >
+            <router-view v-slot="{ Component }">
+              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+            </router-view>
           </div>
         </main>
 

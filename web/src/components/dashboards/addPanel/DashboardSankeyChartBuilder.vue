@@ -735,7 +735,8 @@ export default defineComponent({
   flex: 1;
   width: 100%;
   // white-space: nowrap;
-  overflow-x: auto;
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .layout-separator {

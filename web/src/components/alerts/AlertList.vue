@@ -566,22 +566,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
-        <template #header-left>
-          <div
-            data-test="add-alert-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
-            title="Go Back"
-            @click="showForm = false"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-          </div>
-        </template>
         <div>
           <OInput
             data-test="to-be-clone-alert-name"

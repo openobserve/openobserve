@@ -217,18 +217,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert if row -->
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <OSelect
-                    v-model="selectedFunction"
-                    :options="logFunctionOptions"
-                    labelKey="label"
-                    valueKey="value"
-                    class="alert-v3-select"
-                    style="min-width: 130px; max-width: 180px;"
-                    @update:model-value="onMetricFunctionChange"
-                  >
+                <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
+                  <div class="tw:min-w-[130px] tw:max-w-[180px]">
+                    <OSelect
+                      v-model="selectedFunction"
+                      :options="logFunctionOptions"
+                      labelKey="label"
+                      valueKey="value"
+                      class="alert-v3-select"
+                      @update:model-value="onMetricFunctionChange"
+                    />
                     <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
-                  </OSelect>
+                  </div>
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
@@ -245,9 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="alert-v3-select"
                         :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
-                      >
-                        <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" content="Metrics streams store their measurement in the &quot;value&quot; field by default" :delay="300" side="bottom" />
-                      </OSelect>
+                      />
+                      <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" content="Metrics streams store their measurement in the &quot;value&quot; field by default" :delay="300" side="bottom" />
                     </div>
                     <span class="condition-text">is</span>
                   </template>

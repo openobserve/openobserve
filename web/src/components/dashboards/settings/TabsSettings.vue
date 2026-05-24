@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           class="draggable-row"
           data-test="dashboard-tab-settings-draggable-row"
+          :data-test-tab-name="tab.name"
         >
           <div class="draggable-handle">
             <OIcon

@@ -173,7 +173,18 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
+<<<<<<< test/ux-revamp/e2e-testcases-V1
     await pm.logsPage.typeInQueryEditor("_invalid_field_does_not_exist");
+=======
+    await pm.logsPage.typeInQueryEditor("kubernetes");
+    // Monaco's onDidChangeModelContent is debounced 100 ms before emitting
+    // update:query → searchObj.data.query. waitForQueryEditorValue confirms
+    // the Monaco model has the value; the extra 200 ms wait lets the debounce
+    // fire so the store is also updated before Run is clicked.
+    // Without this wait the old empty query runs (returns results, no error).
+    await pm.logsPage.waitForQueryEditorValue("kubernetes");
+    await page.waitForTimeout(200);
+>>>>>>> feat/ux-revamp-main
     // Use runQueryAndWaitForResults -- it waits for any in-flight auto-search
     // to settle (button exits Cancel state) before clicking, so the click
     // actually triggers the new (invalid) search instead of cancelling.

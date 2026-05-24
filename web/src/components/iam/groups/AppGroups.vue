@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
         <div
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <OTable
           data-test="iam-groups-table-section"
           :data="rows"

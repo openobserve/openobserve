@@ -46,7 +46,7 @@ export class LogsPage {
         this.indexDropDownTrigger = '[data-test="log-search-index-list-select-stream-trigger"]';
         this.indexDropDownPopover = '[data-test="log-search-index-list-select-stream-popover"]';
         this.indexDropDownSearch = '[data-test="log-search-index-list-select-stream-search"]';
-        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
+        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] [data-state]';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the state on an inner
@@ -64,7 +64,7 @@ export class LogsPage {
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
         this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"]';
+        this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
         this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"]';
         this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"]';
@@ -110,13 +110,13 @@ export class LogsPage {
         this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewByLabel = '[data-test$="-option"]';
         this.notificationMessage = '[role="alert"]';
-        this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
+        this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
         this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
-        this.notificationErrorMessage = '[role="alert"]:has-text("error")';
+        this.notificationErrorMessage = '[data-test="o-toast-error"]';
         this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
@@ -311,9 +311,9 @@ export class LogsPage {
         this.metricSelectorButton = '[data-test="metric-selector-button"]';
         // Correlation tabs in detail drawer (tab names, not data-test)
         // TODO(data-test): Reka Tabs render real ARIA roles; add data-test to the correlation tabs in web/src/plugins/logs/JsonPreview.vue (and AppTabs.vue if needed) — currently only flattened/unflattened exist; the trace details sidebar uses data-test="trace-details-sidebar-tabs-correlated-logs/metrics".
-        this.correlatedLogsTab = '[role="tablist"] [role="tab"]:has-text("Logs"):not([data-test="log-detail-json-tab"]):not([data-test="log-detail-table-tab"])';
-        this.correlatedMetricsTab = '[role="tab"]:has-text("Metrics")';
-        this.correlatedTracesTab = '[role="tab"]:has-text("Traces")';
+        this.correlatedLogsTab = '[data-test="correlated-logs-tab"]';
+        this.correlatedMetricsTab = '[data-test="correlated-metrics-tab"]';
+        this.correlatedTracesTab = '[data-test="correlated-traces-tab"]';
         // Correlation loading and error states
         this.correlationLoadingSpinner = '[data-test="logs-correlation-loading-indicator"]';
         this.correlationErrorMessage = '.tw\\:text-red-500';
@@ -332,7 +332,7 @@ export class LogsPage {
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
         this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-message"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
@@ -356,7 +356,7 @@ export class LogsPage {
         this.historyPanel = '.history-panel, [data-test*="history"]';
 
         // Table and pagination CSS selectors
-        this.tableBottom = '.q-table__bottom';
+        this.tableBottom = '[data-test="logs-search-result-pagination"]';
         this.tableBodyRow = 'tbody tr';
         this.tableBodyRowWithIndex = 'tbody tr[data-index]';
         this.tableHeaderCell = 'thead th';
@@ -1492,23 +1492,24 @@ export class LogsPage {
         await quickMode.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
-    // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
+    // Click on the Quick Mode toggle menu item (wrapper ODropdownItem) - for testing #10821
     async clickQuickModeTextLabel() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        // Click on the text label "Quick Mode" instead of the toggle switch
-        await this.page.locator(this.quickModeToggle).getByText('Quick Mode').click();
-        // Close the utilities menu to match the pattern in getQuickModeState()
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        // Click the ODropdownItem wrapper that contains the quick-mode toggle
+        await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click();
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     // Get the current quick mode state (true/false)
     async getQuickModeState() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        // OSwitch exposes data-state="checked|unchecked" on its inner toggle button
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        const state = await toggleInner.getAttribute('data-state').catch(() => null);
+        const isOn = state === 'checked';
+        await this.page.keyboard.press('Escape').catch(() => {});
         return isOn;
     }
 
@@ -2095,10 +2096,10 @@ export class LogsPage {
         await this.clearAndFillQueryEditor(query);
         await this.page.waitForTimeout(2000);
 
-        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isSqlEnabled = await sqlModeSwitch.isChecked();
+        // OSwitch: check data-state on the inner button; click the wrapper to toggle
+        const isSqlEnabled = await this.isSqlModeEnabled();
         if (!isSqlEnabled) {
-            await sqlModeSwitch.click();
+            await this.page.locator(this.sqlModeToggle).first().click();
             await this.page.waitForTimeout(1000);
         }
 
@@ -2179,20 +2180,31 @@ export class LogsPage {
 
     // Organization methods
     async selectOrganization() {
-        await this.page.locator('[data-test="navbar-organizations-select"]').click();
-        await this.page.getByRole('option', { name: 'default', exact: true }).locator('div').nth(2).click();
+        await this.page.locator('[data-test="navbar-organizations-select-trigger"]').click();
+        // Header.vue adds data-test="organization-menu-item-label-item-label" on each org row
+        // and :data-test-org-identifier="row.identifier" for per-org targeting
+        const orgItem = this.page.locator('[data-test-org-identifier="default"]').first();
+        await orgItem.waitFor({ state: 'visible', timeout: 5000 });
+        await orgItem.click();
     }
 
-    // Copy share methods
+    // Copy share methods — no "Copy Share" data-test exists yet; use the profile icon + menu
     async copyShare() {
         await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
-        await this.page.getByText('Copy Share').click();
+        // Click the first menu item that contains clipboard/copy share action
+        // (No dedicated data-test yet — fall back to text match inside the profile menu)
+        const profileMenu = this.page.locator('[data-test="header-my-account-profile-icon"]').locator('..').locator('[role="menu"], [data-test*="profile-menu"]').first();
+        const copyItem = profileMenu.locator('button, [role="menuitem"]').filter({ hasText: /copy.*share/i }).first();
+        if (await copyItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await copyItem.click();
+        }
     }
 
     // Sign out methods
     async signOut() {
         await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
-        await this.page.getByText('Sign Out').click();
+        // Header.vue data-test="menu-link-logout-item" on the Sign Out menu item
+        await this.page.locator('[data-test="menu-link-logout-item"]').click();
     }
 
     // LogsQueryPage methods - delegate to LogsQueryPage
@@ -2379,7 +2391,8 @@ export class LogsPage {
     }
 
     async clickQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).getByRole('code').click();
+        // Monaco does not expose a stable [role="code"] — click the editor wrapper directly
+        return await this.page.locator(this.queryEditor).click();
     }
 
     async fillQueryEditor(query) {
@@ -2387,8 +2400,10 @@ export class LogsPage {
     }
 
     async clearQueryEditor() {
-        await this.page.locator(this.queryEditor).getByRole('textbox').press('ControlOrMeta+a');
-        return await this.page.locator(this.queryEditor).getByRole('textbox').press('Backspace');
+        // Monaco editor keyboard approach: click the wrapper, then Ctrl+A + Backspace
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press('ControlOrMeta+a');
+        return await this.page.keyboard.press('Backspace');
     }
 
     async typeInQueryEditor(text) {
@@ -2719,13 +2734,17 @@ export class LogsPage {
     }
 
     async clickSavedViewByTitle(title) {
-        const element = this.page.getByTitle(title);
+        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${title}"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async clickDeleteButton() {
-        return await this.page.getByText('delete').click();
+        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{name}-saved-view-btn"
+        // Click the first visible delete button in the saved views area
+        const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
+        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        return await deleteBtn.click();
     }
 
     async clickConfirmButton() {
@@ -2773,11 +2792,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        return await this.page.click(`:text("${text}")`);
+        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first();
+        await element.waitFor({ state: 'visible', timeout: 10000 });
+        return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.waitForSelector(`:text("${text}")`);
+        return await this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -3087,10 +3108,9 @@ export class LogsPage {
         // Wait for tabs to appear - correlation tabs are enterprise feature
         await this.page.waitForTimeout(2000);
 
-        // TODO(data-test): Reka Tabs render real ARIA roles; add data-test on each correlation tab in web/src/plugins/logs/JsonPreview.vue so we don't need to rely on hasText filters.
-        const logsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' });
-        const metricsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
-        const tracesTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
+        const logsTab = this.page.locator(this.correlatedLogsTab);
+        const metricsTab = this.page.locator(this.correlatedMetricsTab);
+        const tracesTab = this.page.locator(this.correlatedTracesTab);
 
         // At least one correlation tab should be visible
         const anyCorrelationTabVisible = await logsTab.or(metricsTab).or(tracesTab).first().isVisible().catch(() => false);
@@ -3103,8 +3123,8 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedLogsTab() {
-        // TODO(data-test): add data-test to correlated-logs tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
-        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' }).last();
+        const tab = this.page.locator(this.correlatedLogsTab);
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
         testLogger.info('Clicked Correlated Logs tab');
         await this.page.waitForTimeout(1000);
@@ -3115,8 +3135,8 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedMetricsTab() {
-        // TODO(data-test): add data-test to correlated-metrics tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
-        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
+        const tab = this.page.locator(this.correlatedMetricsTab);
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
         testLogger.info('Clicked Correlated Metrics tab');
         await this.page.waitForTimeout(1000);
@@ -3127,8 +3147,8 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedTracesTab() {
-        // TODO(data-test): add data-test to correlated-traces tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
-        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
+        const tab = this.page.locator(this.correlatedTracesTab);
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
         testLogger.info('Clicked Correlated Traces tab');
         await this.page.waitForTimeout(1000);
@@ -3194,13 +3214,22 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        return await this.page.locator(this.savedViewByLabel).getByText(new RegExp(label)).first().click({ force: true });
+        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${label}"]`).first();
+        await element.waitFor({ state: 'visible', timeout: 10000 });
+        return await element.click({ force: true });
     }
 
     async expectNotificationMessage(text) {
-        await expect(
-            this.page.locator(this.notificationMessage).filter({ hasText: text }).first()
-        ).toBeVisible({ timeout: 15000 });
+        const escaped = String(text).replace(/"/g, '\\"');
+        const selector = [
+            `[data-test="o-toast-success"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-error"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-info"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-warning"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-loading"][data-test-message*="${escaped}"]`,
+            `[data-test="o-toast-default"][data-test-message*="${escaped}"]`,
+        ].join(', ');
+        await expect(this.page.locator(selector).first()).toBeVisible({ timeout: 15000 });
     }
 
     watchForNotification(timeout = 15000) {
@@ -3230,6 +3259,17 @@ export class LogsPage {
             `[data-test$="-error"][data-test-error-text*="${escaped}"]`,
         ].join(', ');
         await this.page.locator(selector).first().waitFor({ state: 'visible', timeout });
+    }
+
+    async expectSavedViewNameValidationError(expectedText = 'Input must be alphanumeric') {
+        // OInput error convention: data-test="${parentDataTest}-error".
+        // The saved view name OInput has data-test="add-alert-name-input", so its
+        // inline validation error renders at data-test="add-alert-name-input-error".
+        // This replaces the old toast-based check — special-char validation now sets
+        // savedViewNameError (inline) instead of firing a toast.
+        const errorEl = this.page.locator('[data-test="add-alert-name-input-error"]');
+        await errorEl.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(errorEl).toContainText(expectedText);
     }
 
     async expectIndexFieldSearchInputVisible() {
@@ -3607,10 +3647,15 @@ export class LogsPage {
     }
 
     async clickCloseDialogForce() {
-        // The log-detail drawer's close button may sit outside the current viewport when the
-        // drawer is taller than the visible area. Scroll it into view before clicking.
+        // The ODrawer uses a 300 ms slide-in animation (slide-in-from-right).
+        // `waitForLogDetailDialogVisible` resolves at the START of the animation
+        // (element is non-hidden), but the close button is still outside the viewport
+        // mid-animation. Wait for the animation to finish before attempting the click.
         const closeBtn = this.page.locator(this.closeDialog);
-        await closeBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await expect(closeBtn).toBeInViewport({ timeout: 2000 }).catch(async () => {
+            // Fallback: wait the full animation duration + buffer if toBeInViewport times out
+            await this.page.waitForTimeout(400);
+        });
         return await closeBtn.click({ force: true });
     }
 
@@ -3788,22 +3833,22 @@ export class LogsPage {
     }
 
     async clickPaginationPage(pageNumber) {
-        return await this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first().click();
+        return await this.page.locator(this.resultPaginationPageBtn(pageNumber)).first().click();
     }
 
     async getPaginationPageCount() {
-        const pageButtons = this.page.locator(`${this.resultPagination} button`).filter({ hasText: /^\d+$/ });
+        const pageButtons = this.page.locator(`[data-test^="logs-search-result-pagination-page-"]`);
         return await pageButtons.count();
     }
 
     async getPaginationPageClasses(pageNumber) {
-        const pageButton = this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first();
-        return await pageButton.getAttribute('class');
+        const pageButton = this.page.locator(this.resultPaginationPageBtn(pageNumber)).first();
+        return await pageButton.getAttribute('data-test-active');
     }
 
     async isPaginationPageActive(pageNumber) {
-        const classes = await this.getPaginationPageClasses(pageNumber);
-        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+        const activeAttr = await this.getPaginationPageClasses(pageNumber);
+        return activeAttr === 'true';
     }
 
     async getActivePaginationPageText() {
@@ -3996,15 +4041,15 @@ export class LogsPage {
     }
 
     async clickSearchFunctionInput() {
-        return await this.page.getByPlaceholder(this.searchFunctionInput.placeholder).click();
+        return await this.page.locator('[data-test="function-search-input"]').click();
     }
 
     async fillSearchFunctionInput(text) {
-        return await this.page.getByPlaceholder(this.searchFunctionInput.placeholder).fill(text);
+        return await this.page.locator('[data-test="function-search-input"]').fill(text);
     }
 
     async clickDeleteFunctionButton() {
-        return await this.page.getByRole('button', { name: 'Delete Function' }).click();
+        return await this.page.locator('[data-test="function-list-delete-function-btn"]').first().click();
     }
 
     async clickFunctionDropdownSave() {
@@ -4018,8 +4063,8 @@ export class LogsPage {
                 // Try TransformSelector save button (when actions are enabled)
                 await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
             } catch (transformError) {
-                // Fallback: Try old dropdown approach
-                await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+                // Fallback: Try the save function button directly
+                await this.page.locator('[data-test="logs-search-bar-save-function-btn"], [data-test="logs-search-bar-save-transform-btn"]').first().click();
             }
         }
     }
@@ -4148,11 +4193,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsSelectFrom() {
-        return await this.page.locator(this.queryEditor)
-            .locator('.view-lines')
-            .locator('.view-line')
-            .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-            .nth(0);
+        return await expect(this.page.locator(this.queryEditor)).toContainText('SELECT * FROM "e2e_automate"');
     }
 
     generateRandomString() {
@@ -4701,14 +4742,29 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Clear any existing query and ensure editor is focused
+        // Click the Monaco editor wrapper, then wait for the inner inputarea (Monaco's
+        // hidden textarea) to be visible so keyboard events land in the editor.
         await this.page.locator(this.queryEditor).click();
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        const inputarea = this.page.locator(this.queryEditor).locator('.inputarea');
+        await inputarea.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+        // Select all and delete — this clears Monaco's content and triggers its
+        // onChange, which debounces the update to searchObj.data.query (100 ms).
+        await this.page.locator(this.queryEditor).press(
+            process.platform === "darwin" ? "Meta+A" : "Control+A"
+        );
         await this.page.keyboard.press("Backspace");
 
-        // Try to run the blank query with cmd+enter — the error banner appears
-        // synchronously after the keyboard event; expectBlankQueryError waits on it.
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        // Wait for the 100 ms debounce to propagate searchObj.data.query = "".
+        // Without this pause, Ctrl+Enter fires before the store update, so the old
+        // SELECT query is used and the run succeeds (no error banner).
+        await this.page.waitForTimeout(300);
+
+        // Run the blank query — Monaco's internal Ctrl+Enter keybinding emits
+        // "run-query" which propagates to SearchBar's handleRunQueryFn.
+        await this.page.locator(this.queryEditor).press(
+            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"
+        );
     }
 
     async expectBlankQueryError() {
@@ -4741,8 +4797,9 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isQuickModeOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        const state = await toggleInner.getAttribute('data-state').catch(() => null);
+        const isQuickModeOn = state === 'checked';
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
@@ -4750,7 +4807,7 @@ export class LogsPage {
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+            await this.page.keyboard.press('Escape').catch(() => {});
         }
 
         // Check if there's a direct include button (newer UI)
@@ -4781,8 +4838,8 @@ export class LogsPage {
         } else {
             throw new Error('No include/exclude buttons found in log details');
         }
-        // Wait for menu to appear (with proper wait instead of fixed timeout)
-        const includeMenuItem = this.page.getByText('Include Search Term', { exact: true });
+        // Wait for the Include Search Term menu item (data-test="log-details-include-field-btn")
+        const includeMenuItem = this.page.locator('[data-test="log-details-include-field-btn"]').first();
 
         try {
             await includeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -4792,17 +4849,7 @@ export class LogsPage {
             // Take screenshot for debugging if menu doesn't appear
             await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
             testLogger.info('Screenshot saved after clicking include/exclude button');
-
-            // Try alternative selectors
-            const includePartial = this.page.getByText(/Include.*Search/i);
-            const partialCount = await includePartial.count();
-            testLogger.info(`Found partial match menus: ${partialCount}`);
-
-            if (partialCount > 0) {
-                await includePartial.first().click();
-            } else {
-                throw new Error('Include Search Term menu item not found');
-            }
+            throw new Error('Include Search Term menu item not found (data-test="log-details-include-field-btn")');
         }
 
         await this.page.waitForTimeout(1000);
@@ -6864,8 +6911,9 @@ export class LogsPage {
      * @returns {Promise<string|null>} The aria-checked value
      */
     async getSQLModeState() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        return await sqlModeToggle.getAttribute('aria-checked');
+        const stateBtn = this.page.locator(this.sqlModeToggleInnerBtn).first();
+        await stateBtn.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        return await stateBtn.getAttribute('data-state');
     }
 
     /**
@@ -6882,7 +6930,7 @@ export class LogsPage {
      * Check if Last 1 hour button is visible and click it, fallback to 15 min
      */
     async clickRelative1HourOrFallback() {
-        const oneHourButton = this.page.getByText('Last 1 hour');
+        const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
             return 'Last 1 hour';
@@ -6897,8 +6945,8 @@ export class LogsPage {
      * Tries: Last 1 hour → Last 12 hours → Last 15 minutes (fallback)
      */
     async clickWideRelativeTimeRangeOrFallback() {
-        const oneHourButton = this.page.getByText('Last 1 hour');
-        const twelveHourButton = this.page.getByText('Last 12 hours');
+        const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        const twelveHourButton = this.page.locator('[data-test="date-time-relative-12-h-btn"]');
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
             return 'Last 1 hour';
@@ -8181,19 +8229,18 @@ export class LogsPage {
      * Verify SQL Mode auto-enables when switching to Build tab
      */
     async verifySqlModeAutoEnablesOnBuild() {
-        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
-        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        const isSqlEnabled = await this.isSqlModeEnabled();
 
-        if (isChecked === 'true') {
-            await sqlModeToggle.click();
+        if (isSqlEnabled) {
+            await this.page.locator(this.sqlModeToggleBtn).first().click();
             await this.page.waitForTimeout(500);
         }
 
         await this.clickBuildToggle();
         await this.page.waitForTimeout(1000);
 
-        const isNowChecked = await sqlModeToggle.getAttribute('aria-checked');
-        if (isNowChecked === 'true') {
+        const isNowEnabled = await this.isSqlModeEnabled();
+        if (isNowEnabled) {
             testLogger.info('SQL Mode auto-enabled on Build tab switch');
             return true;
         } else {
@@ -8709,7 +8756,7 @@ export class LogsPage {
      * @returns {Locator}
      */
     getIncludeSearchTermMenuItem() {
-        return this.page.getByText('Include Search Term', { exact: true });
+        return this.page.locator('[data-test="log-details-include-field-btn"]').first();
     }
 
     /**
@@ -8914,9 +8961,11 @@ export class LogsPage {
      */
     async isToggleActive(toggle) {
         return await toggle.evaluate(el => {
-            return el.classList.contains('q-toggle--checked') ||
-                   el.getAttribute('aria-checked') === 'true' ||
-                   el.querySelector('.q-toggle__inner--truthy') !== null;
+            // OSwitch: the inner button has data-state="checked" when active
+            const inner = el.querySelector('[data-state]');
+            if (inner) return inner.getAttribute('data-state') === 'checked';
+            // Fallback: aria-checked on the element itself
+            return el.getAttribute('aria-checked') === 'true';
         }).catch(() => null);
     }
 
@@ -8947,7 +8996,6 @@ export class LogsPage {
             '[data-test="start-time-field"] input',
             '[data-test="end-time-field"] input',
             'input[type="time"]',
-            '.q-time input',
             '[aria-label*="time" i] input',
             '[aria-label*="Time" i]',
         ];
@@ -9258,7 +9306,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getQuasarTimePicker() {
-        return this.page.locator('.q-time');
+        return this.page.locator('[data-test="datetime-time-picker"], [role="dialog"] [aria-label*="time" i]').first();
     }
 
     /**

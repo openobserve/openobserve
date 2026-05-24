@@ -23,7 +23,7 @@ export default class DashboardDrilldownPage {
 
     // Dashboard view — drilldown trigger overlay
     this.drilldownMenu = page.locator('[data-test="drilldown-menu"]');
-    this.drilldownMenuFirstItem = page.locator('[data-test="drilldown-menu-item"]').first();
+    this.drilldownMenuFirstItem = page.locator('[data-test^="drilldown-menu-item"]').first();
 
     // Per-name factory helpers for OSelect options (use data-test-value lookup, per §4)
     this.folderOptionByValue = (value) =>

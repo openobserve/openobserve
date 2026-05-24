@@ -36,9 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span class="tw:flex-1 tw:text-start tw:truncate">{{
-          displayValue
-        }}</span>
+        <span
+          class="tw:flex-1 tw:text-start tw:truncate"
+          :data-test="`variable-selector-${variableItem.name}-inner-value`"
+        >{{ displayValue }}</span>
       </template>
       <template #before-options>
         <template v-if="computedOptions.length > 0">
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ currentSearchTerm }}
           <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
         </div>
-        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2">
+        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2" data-test="variable-query-value-selector-no-data">
           No Data Found
         </div>
       </template>
@@ -324,19 +325,7 @@ export default defineComponent({
     watch(
       () => props.variableItem.options,
       () => {
-        // Only update input if dropdown is open AND it's a multiSelect
-        // For single-select, don't interfere as the dropdown should close after selection
-        if (isOpen.value && selectRef.value && props.variableItem.multiSelect) {
-          nextTick(() => {
-            if (selectRef.value) {
-              if (!filterText.value) {
-                (selectRef.value as any).updateInputValue();
-              } else {
-                filterOptions(filterText.value, () => {});
-              }
-            }
-          });
-        }
+        // OSelect handles its own display — nothing to do when options reload
       },
       { deep: true },
     );

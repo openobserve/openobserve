@@ -1,12 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:p-1.5!">
-    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold">
+  <div class="tw:w-full tw:h-full tw:p-1.5! tw:flex tw:flex-col">
+    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold tw:flex-shrink-0">
       {{ t("panel.fields") }}
     </div>
     <OFieldList
       ref="fieldListRef"
+      class="tw:flex-1 tw:min-h-0"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
@@ -69,7 +70,6 @@
         <div
           class="field-group-header tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:pl-2 tw:pr-1"
           :title="row.groupName"
-          :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
         >
           <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
         </div>
@@ -1038,15 +1038,14 @@ defineExpose({ fieldListRef });
 }
 
 // Stream/section header — visually distinct band so each joined stream renders
-// as its own section in the field list (matches previous behavior where each
-// stream's fields lived under a clearly delineated stream-name band).
-// No border: in dark mode `--o2-border-color` resolves to `rgba(255,255,255,0.40)`
-// and renders as a glaring white hairline; the band's own background tint is
-// enough delineation between the header and its fields.
+// as its own section in the field list. Uses --o2-section-header-bg which is
+// defined for both light and dark mode in _variables.scss, so no JS theme
+// check is needed.
 .field-group-header {
   font-size: 0.75rem;
   cursor: default;
   user-select: none;
-  color: var(--o2-text-primary);
+  background-color: var(--o2-section-header-bg);
+  color: var(--o2-text-secondary);
 }
 </style>

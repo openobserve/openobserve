@@ -462,27 +462,12 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(`[data-test="variable-selector-${var1}"]`).waitFor({ state: "visible", timeout: 10000 });
     await page.locator(`[data-test="variable-selector-${var2}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Set both values
-    const dropdown1 = page.locator(`[data-test="variable-selector-${var1}"]`);
-    await dropdown1.waitFor({ state: "visible", timeout: 5000 });
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await dropdown1.click();
-    // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${var1}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${var1}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${var1}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, `[data-test="variable-selector-${var1}-inner-popover"]`, { timeout: 3000 });
+    // Set both values using the established POM method (uses inner-trigger, proven reliable)
+    await scopedVars.changeVariableValue(var1, { optionIndex: 0 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const dropdown2 = page.locator(`[data-test="variable-selector-${var2}"]`);
-    await dropdown2.waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.changeVariableValue(var2, { optionIndex: 0 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await dropdown2.click();
-    // Wait for dropdown menu to open
-    await page.locator(`[data-test="variable-selector-${var2}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${var2}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(`[data-test="variable-selector-${var2}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, `[data-test="variable-selector-${var2}-inner-popover"]`, { timeout: 3000 });
 
     // Click refresh
     await page.locator(SELECTORS.REFRESH_BTN).click();
@@ -610,7 +595,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(`[data-test="variable-selector-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Set values
-    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}"]`);
+    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}-inner-trigger"]`);
     await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await globalDropdown.click();
@@ -621,7 +606,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}"]`);
+    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}-inner-trigger"]`);
     await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await tabDropdown.click();

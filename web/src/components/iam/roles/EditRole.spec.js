@@ -279,8 +279,9 @@ describe('EditRole - filtering & visibility', () => {
 
   it('countVisibleResources counts nested visible rows', async () => {
     const wrapper = await mountEditRole();
+    // Nested entities are only counted when the parent has expand: true
     const permissions = [
-      { show: true, entities: [{ show: true, entities: [] }] },
+      { show: true, expand: true, entities: [{ show: true, entities: [] }] },
       { show: false, entities: [] },
     ];
     const count = wrapper.vm.countVisibleResources(permissions);

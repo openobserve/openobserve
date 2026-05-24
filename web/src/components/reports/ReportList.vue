@@ -86,15 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Splitter: folder list left, table right -->
     <div
-      class="tw:w-full report-list-table"
-      style="height: calc(100vh - 118px)"
+      class="tw:w-full report-list-table tw:flex-1 tw:min-h-0 tw:overflow-hidden"
     >
       <OSplitter
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
         :horizontal="false"
-        style="height: calc(100vh - 118px)"
+        style="height: 100%"
         data-test="report-list-splitter"
       >
         <!-- Left: folder list -->
@@ -125,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 100%"
                 :style="
                   hasVisibleRows
-                    ? 'width: 100%; height: calc(100vh - 124px)'
+                    ? 'width: 100%; height: 100%'
                     : 'width: 100%'
                 "
                 :show-global-filter="false"

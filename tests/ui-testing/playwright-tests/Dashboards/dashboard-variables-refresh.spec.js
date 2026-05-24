@@ -311,9 +311,6 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
     await scopedVars.waitForDashboardReady();
 
-    // Wait a bit for the panel ID to be set in the DOM
-    await page.waitForTimeout(1000);
-
     // Get the panel container that has data-test-panel-id attribute
     const panelContainer1 = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
@@ -617,7 +614,6 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
     await scopedVars.waitForDashboardReady();
 
-    await page.waitForTimeout(1000);
     const panelContainer = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer.waitFor({ state: "attached", timeout: 5000 });
     const panelId = await panelContainer.getAttribute("data-test-panel-id");
@@ -695,7 +691,6 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
     await scopedVars.waitForDashboardReady();
 
-    await page.waitForTimeout(1000);
     const panelContainer1 = page.locator(SELECTORS.PANEL_CONTAINER).first();
     await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
     const panelId1 = await panelContainer1.getAttribute("data-test-panel-id");
@@ -720,7 +715,6 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     // Wait for second panel to be added to dashboard and get panel ID
     await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
 
-    await page.waitForTimeout(1000);
     const panelContainer2 = page.locator(SELECTORS.PANEL_CONTAINER).nth(1);
     await panelContainer2.waitFor({ state: "attached", timeout: 5000 });
     const panelId2 = await panelContainer2.getAttribute("data-test-panel-id");

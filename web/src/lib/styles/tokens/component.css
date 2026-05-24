@@ -499,6 +499,7 @@
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
   --color-datepicker-border: var(--color-border-default);
+  --color-datepicker-inner-border: var(--color-grey-100);
   --color-datepicker-hover-border: var(--color-primary-400);
   --color-datepicker-focus-border: var(--color-primary-500);
   --color-datepicker-focus-ring: var(--color-primary-400);
@@ -888,6 +889,7 @@
   /* Date / Time / Color (ODate, OTime, OColor) */
   --color-datepicker-bg: var(--color-datepicker-bg);
   --color-datepicker-border: var(--color-datepicker-border);
+  --color-datepicker-inner-border: var(--color-datepicker-inner-border);
   --color-datepicker-hover-border: var(--color-datepicker-hover-border);
   --color-datepicker-focus-border: var(--color-datepicker-focus-border);
   --color-datepicker-focus-ring: var(--color-datepicker-focus-ring);

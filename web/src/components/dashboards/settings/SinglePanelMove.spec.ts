@@ -317,10 +317,8 @@ describe("SinglePanelMove", () => {
       await wrapper.vm.$nextTick();
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(wrapper.vm.selectedMoveTabId).toEqual({
-        label: "Tab 1",
-        value: "tab1",
-      });
+      // Component stores the .value string from the first option, not the full object
+      expect(wrapper.vm.selectedMoveTabId).toEqual("tab1");
     });
 
     it("should handle empty tab options when only current tab exists", async () => {
@@ -457,8 +455,8 @@ describe("SinglePanelMove", () => {
 
       expect(wrapper.emitted("update:ok")).toBeTruthy();
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
-      // First option is set as full {label, value} object on mount.
-      expect(wrapper.emitted("update:ok")?.[0]).toEqual([{ label: "Tab 1", value: "tab1" }]);
+      // Component emits the .value string from the selected option, not the full object
+      expect(wrapper.emitted("update:ok")?.[0]).toEqual(["tab1"]);
     });
 
     it("should not emit update:ok when secondary (cancel) is clicked", async () => {

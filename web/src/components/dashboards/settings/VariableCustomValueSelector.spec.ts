@@ -127,7 +127,7 @@ describe("VariableCustomValueSelector", () => {
     it("renders with data-test attribute", () => {
       wrapper = mountComponent();
       expect(
-        wrapper.find('[data-test="dashboard-variable-custom-value-selector"]').exists()
+        wrapper.find('[data-test="variable-selector-environment-inner"]').exists()
       ).toBe(true);
     });
 

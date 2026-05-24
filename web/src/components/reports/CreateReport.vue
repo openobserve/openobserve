@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1 tw:pb-[0.625rem]">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1 tw:pb-[0.625rem]">
     <div data-test="add-report-section" class="tw:w-full create-report-page">
       <div
         class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
@@ -48,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="tw:flex card-container tw:mb-[0.675rem]"
-        style="height: calc(100vh - 192px); overflow: auto"
+        class="tw:flex card-container tw:mb-[0.675rem] tw:h-[calc(100vh-12.5rem)] tw:overflow-auto"
       >
         <div
           ref="addAlertFormRef"
@@ -729,8 +728,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
-      style="position: sticky; bottom: 0.375rem; z-index: 2"
+      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container tw:sticky! tw:bottom-2.5"
+      style="z-index: 2"
       :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       :style="{
         'box-shadow':
