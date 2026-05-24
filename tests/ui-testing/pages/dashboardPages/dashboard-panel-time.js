@@ -282,9 +282,15 @@ export default class DashboardPanelTime {
     // Select the time range within the dialog
     const timeOptionLocator = this.timeRangeBtn(timeRange);
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
-    // Use dispatchEvent to bypass Playwright's stability check — the ODropdown
-    // open animation causes "element is not stable" / "element was detached" retries.
-    await timeOptionLocator.dispatchEvent('click');
+    // Use evaluate(el.click()) to bypass Playwright's stability check — the ODropdown
+    // open animation can cause "element is not stable" / "element was detached" retries.
+    await timeOptionLocator.evaluate(el => el.click());
+
+    // Wait for the Apply button to be visible and stable before returning.
+    // With auto-apply-dashboard="false" the time button click does NOT emit (only the
+    // Apply button does), so the dropdown should stay open and stable here.
+    const applyBtnLocator = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
+    await applyBtnLocator.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
 
     if (clickApply) {
       // Click apply button within the dialog

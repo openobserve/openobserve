@@ -1508,7 +1508,6 @@ export default defineComponent({
         return;
       }
 
-      // Write the new value now that we know it's changed
       if (newValue) {
         panelTimeValues.value[panelId] = newValue;
       }

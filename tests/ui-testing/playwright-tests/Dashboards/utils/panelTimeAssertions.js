@@ -58,10 +58,14 @@ export async function assertPanelTimeDisplay(page, panelId, expectedText) {
 export async function assertPanelTimeInURL(page, panelId, expectedValue) {
   testLogger.info('Asserting panel time in URL', { panelId, expectedValue });
 
-  const url = page.url();
   const expectedParam = `pt-period.${panelId}=${expectedValue}`;
 
-  expect(url).toContain(expectedParam);
+  // Vue Router uses history.replaceState() which doesn't trigger networkidle.
+  // Poll until the URL reflects the reactive write from onPanelTimeApply.
+  await expect.poll(
+    async () => page.url(),
+    { intervals: [100, 200, 500, 1000], timeout: 5000 }
+  ).toContain(expectedParam);
 
   testLogger.info('Panel time parameter found in URL', { panelId, expectedValue });
 }
