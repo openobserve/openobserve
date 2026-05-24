@@ -593,14 +593,20 @@ test.describe("Autocomplete Value Suggestions", () => {
         // Hard refresh the page
         await page.reload({ waitUntil: 'domcontentloaded' });
 
-        // Verify values are still in IndexedDB
+        // Verify values are still in IndexedDB.
+        // After reload the page may auto-search and add new values — the
+        // persistence guarantee is that ALL values captured before the refresh
+        // are still present (subset check, not exact equality).
         const recordAfter = await getFieldRecord(page, orgName, 'logs', streamName, fieldName);
         expect(recordAfter).not.toBeNull();
         expect(recordAfter.values.length).toBeGreaterThanOrEqual(valuesBefore.length);
         testLogger.info(`Values after refresh: ${recordAfter.values.length}`);
 
-        // Verify the values are persisted (subset check — see note above).
-        expect(recordAfter.values).toEqual(expect.arrayContaining(valuesBefore));
+        // Verify all pre-refresh values are still present (per-value subset
+        // check gives better failure diagnostics than arrayContaining).
+        for (const v of valuesBefore) {
+            expect(recordAfter.values).toContain(v);
+        }
 
         testLogger.info('Persistence test PASSED');
     });

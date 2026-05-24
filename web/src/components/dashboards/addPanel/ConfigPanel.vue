@@ -1186,7 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-basemap"
         />
 
-        <div v-if="dashboardPanelData.data.type == 'geomap'">
+        <div v-if="dashboardPanelData.data.type == 'geomap'" class="tw:flex tw:flex-col tw:gap-y-3">
           <span>{{ t("dashboard.initialView") }}</span>
           <div class="tw:flex tw:gap-2">
             <OInput
