@@ -52,8 +52,8 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await typeSelect.click();
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').click();
     await expect(valueInput).toBeVisible();
-    await valueInput.fill("100");
-    await page.locator('[data-test="dashboard-config-markline-name-0"]').fill("threshold");
+    await valueInput.locator('[data-test$="-field"]').fill("100");
+    await page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]').fill("threshold");
     testLogger.info("Mark line configured: yAxis, value=100, label=threshold");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -68,8 +68,8 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(valueAfter);
     // q-select uses emit-value without map-options → displays raw stored value ("yAxis" not "Y-Axis")
     await expect(page.locator('[data-test="dashboard-config-markline-type-0"]')).toContainText("yAxis");
-    await expect(valueAfter).toHaveValue("100");
-    await expect(nameAfter).toHaveValue("threshold");
+    await expect(valueAfter.locator('[data-test$="-field"]')).toHaveValue("100");
+    await expect(nameAfter.locator('[data-test$="-field"]')).toHaveValue("threshold");
     testLogger.info("Mark line type, value and label persisted");
 
     await pm.dashboardPanelActions.savePanel();
@@ -92,7 +92,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await type0.waitFor({ state: 'visible', timeout: 5000 });
     await type0.click();
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').click();
-    await page.locator('[data-test="dashboard-config-markline-name-0"]').fill("avg");
+    await page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]').fill("avg");
 
     // Add second mark line
     await pm.dashboardPanelConfigs.scrollSidebarToElement(addBtn);
@@ -101,7 +101,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await type1.waitFor({ state: 'visible', timeout: 5000 });
     await type1.click();
     await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').click();
-    await page.locator('[data-test="dashboard-config-markline-name-1"]').fill("max");
+    await page.locator('[data-test="dashboard-config-markline-name-1"]').locator('[data-test$="-field"]').fill("max");
 
     await expect(type0).toContainText("average");
     await expect(type1).toContainText("max");
@@ -110,7 +110,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     // Remove first row — second shifts to index 0
     await page.locator('[data-test="dashboard-addpanel-config-markline-remove-0"]').click();
     await expect(type1).not.toBeVisible();
-    await expect(page.locator('[data-test="dashboard-config-markline-name-0"]')).toHaveValue("max");
+    await expect(page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]')).toHaveValue("max");
     testLogger.info("First mark line removed, second shifted to index 0");
 
     await pm.dashboardPanelActions.applyDashboardBtn();

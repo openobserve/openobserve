@@ -36,7 +36,7 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-label-rotate"]'
     );
     this.noValueReplacement = page.locator(
-      '[data-test="dashboard-config-no-value-replacement"] input'
+      '[data-test="dashboard-config-no-value-replacement-field"]'
     );
     this.trellisLayout = page.locator('[data-test="dashboard-trellis-chart"]');
     this.queryLimit = page.locator('[data-test="dashboard-config-limit"]');
@@ -188,15 +188,13 @@ export default class DashboardPanelConfigs {
   //Decimals
   async selectDecimals(decimal) {
     await this.decimals.waitFor({ state: "visible" });
-    await this.decimals.click();
-    await this.decimals.fill(decimal);
+    await this.decimals.locator('[data-test$="-field"]').fill(decimal);
   }
 
   //Query limit
   async selectQueryLimit(limit) {
     await this.queryLimit.waitFor({ state: "visible" });
-    await this.queryLimit.click();
-    await this.queryLimit.fill(limit);
+    await this.queryLimit.locator('[data-test$="-field"]').fill(limit);
   }
 
   //No value replacement
@@ -209,20 +207,17 @@ export default class DashboardPanelConfigs {
   //Axis width
   async selectAxisWidth(width) {
     await this.axisWidth.waitFor({ state: "visible" });
-    await this.axisWidth.click();
-    await this.axisWidth.fill(width);
+    await this.axisWidth.locator('[data-test$="-field"]').fill(width);
   }
   //YAxis Min and Max
   async Y_AxisMin(min) {
     await this.yAxisMin.waitFor({ state: "visible" });
-    await this.yAxisMin.click();
-    await this.yAxisMin.fill(min);
+    await this.yAxisMin.locator('[data-test$="-field"]').fill(min);
   }
   // YAxis Max
   async Y_AxisMax(max) {
     await this.yAxisMax.waitFor({ state: "visible" });
-    await this.yAxisMax.click();
-    await this.yAxisMax.fill(max);
+    await this.yAxisMax.locator('[data-test$="-field"]').fill(max);
   }
 
   // Value position
@@ -235,8 +230,7 @@ export default class DashboardPanelConfigs {
   // Value rotate
   async selectValueRotate(rotate) {
     await this.valueRotate.waitFor({ state: "visible" });
-    await this.valueRotate.click();
-    await this.valueRotate.fill(rotate);
+    await this.valueRotate.locator('[data-test$="-field"]').fill(rotate);
   }
 
   //show symbols
@@ -255,14 +249,16 @@ export default class DashboardPanelConfigs {
   // Line thickness
   async selectLineThickness(thickness) {
     await this.lineThickness.waitFor({ state: "visible" });
-    await this.lineThickness.click();
-    await this.lineThickness.fill(thickness);
+    await this.lineThickness.locator('[data-test$="-field"]').fill(thickness);
   }
   //Trellis Layout
   async selectTrellisLayout(layout) {
-    await this.trellisLayout.waitFor({ state: "visible" });
-    await this.trellisLayout.click();
-    await this.page.locator(`[data-test="dashboard-trellis-chart-option"][data-test-label="${layout}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-trellis-chart-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-trellis-chart-option"][data-test-label="${layout}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //GEO Map Configs
@@ -278,22 +274,18 @@ export default class DashboardPanelConfigs {
   //Lattitude
   async selectLatitude(lat) {
     await this.latitude.waitFor({ state: "visible" });
-    await this.latitude.click();
-    await this.latitude.fill(lat);
+    await this.latitude.locator('[data-test$="-field"]').fill(lat);
   }
   //Longitude
   async selectLongitude(long) {
     await this.longitude.waitFor({ state: "visible" });
-
-    await this.longitude.click();
-    await this.longitude.fill(long);
+    await this.longitude.locator('[data-test$="-field"]').fill(long);
   }
 
   //Zoom
   async selectZoom(zoom) {
     await this.zoom.waitFor({ state: "visible" });
-    await this.zoom.click();
-    await this.zoom.fill(zoom);
+    await this.zoom.locator('[data-test$="-field"]').fill(zoom);
   }
 
   //Symbol size
@@ -306,14 +298,12 @@ export default class DashboardPanelConfigs {
   //Minimum and maximum size
   async selectMinimumMaximumSize(minimum) {
     await this.minimumSize.waitFor({ state: "visible" });
-    await this.minimumSize.click();
-    await this.minimumSize.fill(minimum);
+    await this.minimumSize.locator('[data-test$="-field"]').fill(minimum);
   }
   //Maximum size
   async selectMaximumSize(maximum) {
     await this.maximumSize.waitFor({ state: "visible" });
-    await this.maximumSize.click();
-    await this.maximumSize.fill(maximum);
+    await this.maximumSize.locator('[data-test$="-field"]').fill(maximum);
   }
 
   //layer type
@@ -326,8 +316,7 @@ export default class DashboardPanelConfigs {
   //weight
   async selectWeight(Weight) {
     await this.weight.waitFor({ state: "visible" });
-    await this.weight.click();
-    await this.weight.fill(Weight);
+    await this.weight.locator('[data-test$="-field"]').fill(Weight);
   }
 
   //Map configs
@@ -422,10 +411,10 @@ export default class DashboardPanelConfigs {
 
     const valueInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]');
     await valueInput.waitFor({ state: "visible", timeout: 5000 });
-    await valueInput.fill(value);
+    await valueInput.locator('[data-test$="-field"]').fill(value);
 
     const textInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]');
-    await textInput.fill(text);
+    await textInput.locator('[data-test$="-field"]').fill(text);
 
     if (setColor) {
       const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
@@ -545,26 +534,21 @@ export default class DashboardPanelConfigs {
   //Guage chart configs
   async selectGuageMin(min) {
     await this.gaugeMin.waitFor({ state: "visible" });
-    await this.gaugeMin.click();
-    await this.gaugeMin.fill(min);
+    await this.gaugeMin.locator('[data-test$="-field"]').fill(min);
   }
   //Guage Max
   async selectGuageMax(max) {
     await this.gaugeMax.waitFor({ state: "visible" });
-    await this.gaugeMax.click();
-    await this.gaugeMax.fill(max);
+    await this.gaugeMax.locator('[data-test$="-field"]').fill(max);
   }
 
   // Get connect null values toggle state
   async getConnectNullValuesState() {
     await this.connectNullValuesToggle.waitFor({ state: "visible", timeout: 10000 });
-
-    // Check aria-checked attribute - this is the most reliable indicator
-    let ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-checked");
-    if (ariaChecked === null) {
-      ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-pressed");
-    }
-
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and aria-checked
+    const ariaChecked = await this.connectNullValuesToggle
+      .locator('[data-test$="-btn"]')
+      .getAttribute("aria-checked");
     return ariaChecked === "true";
   }
 
@@ -659,21 +643,22 @@ export default class DashboardPanelConfigs {
    * @returns {string} The selected series name
    */
   async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
-    const autoComplete = this.colorBySeriesPopup
-      .locator('[data-test="common-auto-complete"]')
-      .nth(rowIndex);
-    await autoComplete.waitFor({ state: "visible" });
-    await autoComplete.click();
+    // OCombobox input — `dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input`
+    const comboboxInput = this.colorBySeriesPopup.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input"]`
+    );
+    await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
+    await comboboxInput.click();
 
+    // OCombobox option items: `*-option` with `data-test-label`
     const optionLocators = this.colorBySeriesPopup.locator(
-      '[data-test="common-auto-complete-option"]'
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
     );
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
 
     let targetOption;
 
     if (matchText) {
-      // Find option containing the match text (e.g., "ago" for comparison series)
       const count = await optionLocators.count();
       for (let i = 0; i < count; i++) {
         const text = await optionLocators.nth(i).textContent();
@@ -682,7 +667,6 @@ export default class DashboardPanelConfigs {
           break;
         }
       }
-      // Fallback to last option if no match (comparison series is usually last)
       if (!targetOption && count > 1) {
         targetOption = optionLocators.nth(count - 1);
       } else if (!targetOption) {
@@ -692,7 +676,7 @@ export default class DashboardPanelConfigs {
       targetOption = optionLocators.nth(optionIndex ?? 0);
     }
 
-    const seriesName = await targetOption.textContent();
+    const seriesName = await targetOption.getAttribute("data-test-label");
     await targetOption.click();
 
     return seriesName?.trim() || "";

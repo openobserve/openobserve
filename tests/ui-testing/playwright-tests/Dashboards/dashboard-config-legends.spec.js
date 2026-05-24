@@ -40,7 +40,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying show legends toggle persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show-legend"]')).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator('[data-test="dashboard-config-show-legend"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -69,8 +69,7 @@ test.describe("ConfigPanel — Legends", () => {
     await expect(page.locator('[data-test="dashboard-config-legend-width-unit-active"]').first()).toBeVisible();
 
     // Set width value in % (30% keeps enough chart area for canvas pixel check)
-    await legendWidthInput.click();
-    await legendWidthInput.fill("30");
+    await legendWidthInput.locator('[data-test$="-field"]').fill("30");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Legend position Right: width set to 30% and unit toggled to %");
@@ -81,7 +80,7 @@ test.describe("ConfigPanel — Legends", () => {
     testLogger.info("Verifying legend position Right persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("right");
-    await expect(page.locator('[data-test="dashboard-config-legend-width"]')).toHaveValue("30");
+    await expect(page.locator('[data-test="dashboard-config-legend-width"]').locator('[data-test$="-field"]')).toHaveValue("30");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -104,8 +103,7 @@ test.describe("ConfigPanel — Legends", () => {
     await expect(page.locator('[data-test="dashboard-config-legend-width"]')).not.toBeVisible();
 
     // Set height value
-    await legendHeightInput.click();
-    await legendHeightInput.fill("100");
+    await legendHeightInput.locator('[data-test$="-field"]').fill("100");
 
     // Toggle unit from px to %
     await expect(page.locator('[data-test="dashboard-config-legend-height-unit-active"]').first()).toBeVisible();
@@ -121,7 +119,7 @@ test.describe("ConfigPanel — Legends", () => {
     testLogger.info("Verifying legend position Bottom persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("bottom");
-    await expect(page.locator('[data-test="dashboard-config-legend-height"]')).toHaveValue("100");
+    await expect(page.locator('[data-test="dashboard-config-legend-height"]').locator('[data-test$="-field"]')).toHaveValue("100");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

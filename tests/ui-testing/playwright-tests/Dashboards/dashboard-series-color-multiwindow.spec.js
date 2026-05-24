@@ -178,9 +178,9 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Verify the series name is still the comparison series
     const popup = pm.dashboardPanelConfigs.colorBySeriesPopup;
-    const savedSeriesInput = popup
-      .locator('[data-test="common-auto-complete"]')
-      .first();
+    const savedSeriesInput = popup.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-series-select-0-input"]'
+    );
     const savedSeriesValue = await savedSeriesInput.inputValue();
     testLogger.info("Verifying saved series name", { savedSeriesValue });
     // The stored config value is the base field name (e.g., "Kubernetes Container Name").

@@ -41,8 +41,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(stepValueInput).toBeVisible();
 
     // Clear and set step value to 5m
-    await stepValueInput.click();
-    await stepValueInput.fill("5m");
+    await stepValueInput.locator('[data-test$="-field"]').fill("5m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Step value set to 5m");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -51,7 +50,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying step value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-step-value"]')).toHaveValue("5m");
+    await expect(page.locator('[data-test="dashboard-config-step-value"]').locator('[data-test$="-field"]')).toHaveValue("5m");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -165,8 +164,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     const toggle = page.locator('[data-test="dashboard-config-sticky-first-column"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(toggle);
-    // q-toggle renders with role="checkbox" and aria-checked attribute
-    const ariaChecked = await toggle.getAttribute("aria-checked");
+    const ariaChecked = await toggle.locator('[data-test$="-btn"]').getAttribute("aria-checked");
     expect(ariaChecked).toBe("true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -193,7 +191,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     const toggleAfter = page.locator('[data-test="dashboard-config-connect-null-values"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
-    const ariaChecked = await toggleAfter.getAttribute("aria-checked");
+    const ariaChecked = await toggleAfter.locator('[data-test$="-btn"]').getAttribute("aria-checked");
     expect(ariaChecked).toBe("true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -219,7 +217,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     const toggleAfter = page.locator('[data-test="dashboard-config-wrap-table-cells"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
-    const ariaChecked = await toggleAfter.getAttribute("aria-checked");
+    const ariaChecked = await toggleAfter.locator('[data-test$="-btn"]').getAttribute("aria-checked");
     expect(ariaChecked).toBe("true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -384,10 +382,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     const stickyFirstColToggle = page.locator('[data-test="dashboard-config-sticky-first-column"]');
     const stickyColsInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
+    const stickyColsTrigger = page.locator('[data-test="dashboard-config-sticky-columns-trigger"]');
 
     // Scroll sticky columns into view to verify initial state
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
-    await expect(stickyColsInput).not.toBeDisabled();
+    await expect(stickyColsTrigger).not.toBeDisabled();
     testLogger.info("Sticky columns is initially enabled");
 
     // Enable sticky_first_column — sticky columns select should become disabled
@@ -396,7 +395,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Sticky first column toggle enabled");
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
-    await expect(stickyColsInput).toBeDisabled();
+    await expect(stickyColsTrigger).toBeDisabled();
     testLogger.info("Sticky columns input is disabled");
 
     // Disable sticky_first_column — sticky columns select should be enabled again
@@ -405,7 +404,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Sticky first column toggle disabled");
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
-    await expect(stickyColsInput).not.toBeDisabled();
+    await expect(stickyColsTrigger).not.toBeDisabled();
     testLogger.info("Sticky columns input is re-enabled");
 
     await pm.dashboardPanelActions.savePanel();
@@ -550,9 +549,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(lonInput).toBeVisible();
     await expect(weightInput).toBeVisible();
 
-    await latInput.fill("lat_field");
-    await lonInput.fill("lon_field");
-    await weightInput.fill("weight_field");
+    await latInput.locator('[data-test$="-field"]').fill("lat_field");
+    await lonInput.locator('[data-test$="-field"]').fill("lon_field");
+    await weightInput.locator('[data-test$="-field"]').fill("weight_field");
     testLogger.info("Geo lat/lon/weight labels set");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -567,9 +566,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const weightAfter = page.locator('[data-test="dashboard-config-geo-weight-label"]');
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(latAfter);
-    await expect(latAfter).toHaveValue("lat_field");
-    await expect(lonAfter).toHaveValue("lon_field");
-    await expect(weightAfter).toHaveValue("weight_field");
+    await expect(latAfter.locator('[data-test$="-field"]')).toHaveValue("lat_field");
+    await expect(lonAfter.locator('[data-test$="-field"]')).toHaveValue("lon_field");
+    await expect(weightAfter.locator('[data-test$="-field"]')).toHaveValue("weight_field");
     testLogger.info("Geo lat/lon/weight labels persisted after save");
 
     await pm.dashboardPanelActions.savePanel();
@@ -592,7 +591,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelInput);
     await expect(nameLabelInput).toBeVisible();
 
-    await nameLabelInput.fill("country_name");
+    await nameLabelInput.locator('[data-test$="-field"]').fill("country_name");
     testLogger.info("Maps name label set to 'country_name'");
 
     // Map type select — click and choose "World" (label is capitalized via t("dashboard.world"))
@@ -613,7 +612,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const mapTypeAfter = page.locator('[data-test="dashboard-config-map-type"]');
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
-    await expect(nameLabelAfter).toHaveValue("country_name");
+    await expect(nameLabelAfter.locator('[data-test$="-field"]')).toHaveValue("country_name");
 
     // OSelect root contains the selected value text
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeAfter);

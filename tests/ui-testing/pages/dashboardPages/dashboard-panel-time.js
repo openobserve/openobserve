@@ -18,8 +18,8 @@ export default class DashboardPanelTime {
     const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
 
-    // Check if already enabled
-    const isChecked = await toggleLocator.getAttribute('aria-checked');
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and aria-checked
+    const isChecked = await toggleLocator.locator('[data-test$="-btn"]').getAttribute('aria-checked');
     if (isChecked !== 'true') {
       await toggleLocator.click();
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -35,8 +35,8 @@ export default class DashboardPanelTime {
     const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
 
-    // Check if already disabled
-    const isChecked = await toggleLocator.getAttribute('aria-checked');
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and aria-checked
+    const isChecked = await toggleLocator.locator('[data-test$="-btn"]').getAttribute('aria-checked');
     if (isChecked === 'true') {
       await toggleLocator.click();
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -48,7 +48,8 @@ export default class DashboardPanelTime {
    */
   async isPanelTimeEnabled() {
     const toggleLocator = this.page.locator('[data-test="dashboard-config-allow-panel-time"]');
-    const isChecked = await toggleLocator.getAttribute('aria-checked');
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and aria-checked
+    const isChecked = await toggleLocator.locator('[data-test$="-btn"]').getAttribute('aria-checked');
     return isChecked === 'true';
   }
 

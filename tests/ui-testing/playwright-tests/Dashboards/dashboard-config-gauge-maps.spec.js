@@ -45,8 +45,8 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying gauge min/max persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-gauge-min"]')).toHaveValue("10");
-    await expect(page.locator('[data-test="dashboard-config-gauge-max"]')).toHaveValue("500");
+    await expect(page.locator('[data-test="dashboard-config-gauge-min"]').locator('[data-test$="-field"]')).toHaveValue("10");
+    await expect(page.locator('[data-test="dashboard-config-gauge-max"]').locator('[data-test$="-field"]')).toHaveValue("500");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -73,9 +73,9 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying geomap lat/lng/zoom persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-latitude"]')).toHaveValue("40.7128");
-    await expect(page.locator('[data-test="dashboard-config-longitude"]')).toHaveValue("-74.006");
-    await expect(page.locator('[data-test="dashboard-config-zoom"]')).toHaveValue("5");
+    await expect(page.locator('[data-test="dashboard-config-latitude"]').locator('[data-test$="-field"]')).toHaveValue("40.7128");
+    await expect(page.locator('[data-test="dashboard-config-longitude"]').locator('[data-test$="-field"]')).toHaveValue("-74.006");
+    await expect(page.locator('[data-test="dashboard-config-zoom"]').locator('[data-test$="-field"]')).toHaveValue("5");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -92,10 +92,8 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     const symbolMaxInput = page.locator('[data-test="dashboard-config-map-symbol-max"]');
     await expect(symbolMinInput).toBeVisible();
     await expect(symbolMaxInput).toBeVisible();
-    await symbolMinInput.click();
-    await symbolMinInput.fill("5");
-    await symbolMaxInput.click();
-    await symbolMaxInput.fill("30");
+    await symbolMinInput.locator('[data-test$="-field"]').fill("5");
+    await symbolMaxInput.locator('[data-test$="-field"]').fill("30");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Symbol size By Value with min=5 and max=30");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -156,8 +154,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await expect(weightInput).toBeVisible({ timeout: 5000 });
     testLogger.info("Weight (fixed) input visible for geomap");
 
-    await weightInput.click();
-    await weightInput.fill("2");
+    await weightInput.locator('[data-test$="-field"]').fill("2");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Applied with weight_fixed = 2");
@@ -167,7 +164,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying weight value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-weight"]')).toHaveValue("2");
+    await expect(page.locator('[data-test="dashboard-config-weight"]').locator('[data-test$="-field"]')).toHaveValue("2");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
