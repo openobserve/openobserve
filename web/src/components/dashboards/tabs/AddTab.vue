@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="add-tab-dialog"
     :open="open"
-    size="md"
+    :width="20"
     :title="editMode ? 'Edit Tab' : 'Add Tab'"
     secondary-button-label="Cancel"
     primary-button-label="Save"
