@@ -525,55 +525,8 @@ class SchemaPage {
     // the rendered `data-test-value` attribute can lag behind the option's
     // true value when DOM rows are reused on a filter narrow.
     async _pickStreamOption(stream) {
-        // DEBUG: capture trigger element state pre-click so CI logs reveal
-        // whether the OSelect trigger was actually visible/enabled/correctly
-        // located. Helps diagnose intermittent "popover never visible" failures.
-        const triggerInfo = await this.page.evaluate(() => {
-            const el = document.querySelector('[data-test="log-search-index-list-select-stream"]');
-            if (!el) return { exists: false };
-            const rect = el.getBoundingClientRect();
-            return {
-                exists: true,
-                tag: el.tagName,
-                visible: rect.width > 0 && rect.height > 0,
-                rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
-                disabled: el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
-                dataState: el.getAttribute('data-state'),
-                outerHtml: (el.outerHTML || '').slice(0, 300),
-            };
-        }).catch(() => ({ error: 'evaluate-failed' }));
-        testLogger.info('[_pickStreamOption] pre-click trigger state', { stream, triggerInfo });
-
         await this.logSearchIndexSelectStream.click();
-
-        // DEBUG: capture state immediately after click + log all elements with
-        // matching prefix to diagnose what data-tests actually exist.
-        const postClickInfo = await this.page.evaluate(() => {
-            const tests = Array.from(document.querySelectorAll('[data-test^="log-search-index-list-select-stream"]'))
-                .map(e => ({
-                    dt: e.getAttribute('data-test'),
-                    ds: e.getAttribute('data-state'),
-                    visible: (() => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })(),
-                }));
-            return { matchCount: tests.length, tests: tests.slice(0, 10) };
-        }).catch(() => ({ error: 'evaluate-failed' }));
-        testLogger.info('[_pickStreamOption] post-click DOM state', { postClickInfo });
-
-        try {
-            await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
-        } catch (err) {
-            testLogger.warn('[_pickStreamOption] popover never visible — capturing final state');
-            const finalState = await this.page.evaluate(() => ({
-                allLogSearch: Array.from(document.querySelectorAll('[data-test*="log-search-index-list"]'))
-                    .map(e => e.getAttribute('data-test')).slice(0, 20),
-                anyPopover: Array.from(document.querySelectorAll('[data-test*="-popover"]'))
-                    .map(e => e.getAttribute('data-test')).slice(0, 10),
-                openDialogs: Array.from(document.querySelectorAll('[data-state="open"]'))
-                    .map(e => e.getAttribute('data-test')).slice(0, 10),
-            })).catch(() => ({ error: 'evaluate-failed' }));
-            testLogger.error('[_pickStreamOption] final-state dump', { finalState });
-            throw err;
-        }
+        await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
 
         // Defensive clear via Ctrl/Meta+A → Backspace handles reka-ui's
         // ComboboxInput internal searchTerm state surviving a `.fill()` overwrite.
