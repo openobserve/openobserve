@@ -298,5 +298,6 @@ export default defineComponent({
 
 .axis-container {
   margin: 5px;
+  flex-wrap: wrap;
 }
 </style>

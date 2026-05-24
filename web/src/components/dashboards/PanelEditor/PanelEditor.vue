@@ -403,13 +403,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Chart Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'custom_chart'"
-        class="tw:flex tw:flex-col"
-        style="
-          overflow-y: auto;
-          display: flex;
-          flex-direction: row;
-          overflow-x: hidden;
-        "
+        class="tw:flex"
+        :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
       >
         <!-- Collapsed field list bar for custom chart -->
         <div
@@ -488,10 +483,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               class="tw:flex card-container"
-              :style="{ height: contentHeight, overflowY: 'auto' }"
+              :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div
-                class="tw:flex tw:flex-col scroll tw:w-full tw:h-full"
+                class="tw:flex tw:flex-col scroll tw:flex-1 tw:min-w-0 tw:h-full"
               >
                 <!-- Editor/Preview splitter -->
                 <div style="height: 500px; flex-shrink: 0; overflow: hidden">
@@ -929,9 +924,6 @@ const splitterLimits = computed(() => {
 
 // Splitter style
 const splitterStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
   return {
     width: dashboardPanelData.layout.showFieldList
       ? "100%"
