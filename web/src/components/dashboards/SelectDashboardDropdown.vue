@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-dashboard-new-add"
       variant="outline"
       size="icon-sm"
-      class="tw:mb-1"
       @click="
         () => {
           showAddDashboardDialog = true;

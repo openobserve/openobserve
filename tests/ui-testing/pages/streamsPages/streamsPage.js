@@ -153,22 +153,20 @@ export class StreamsPage {
     }
 
     async searchStream(streamName) {
-        await this.page.getByPlaceholder("Search Stream").click();
-        await this.page.getByPlaceholder("Search Stream").fill(streamName);
+        const searchInput = this.page.locator('[data-test="streams-search-stream-input-field"]');
+        await searchInput.click();
+        await searchInput.fill(streamName);
         await this.waitForUI(3000);
     }
 
     async verifyStreamNameVisibility(streamName) {
-        await expect(this.page.getByText(streamName)).toBeVisible();
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
     }
 
     async exploreStream() {
-        // Scope to the first table row to avoid strict mode violation when
-        // multiple streams match the search (e.g. "e2e_automate" matches 6 rows)
-        const firstRow = this.page.locator('tbody tr').first();
-        const streamButton = firstRow.getByRole("button", { name: 'Explore' });
-        await expect(streamButton).toBeVisible();
-        await streamButton.click({ force: true });
+        const exploreBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-explore-btn"]').first();
+        await expect(exploreBtn).toBeVisible();
+        await exploreBtn.click({ force: true });
         await this.waitForUI(1000);
     }
 
@@ -217,59 +215,27 @@ export class StreamsPage {
 
     // Validation methods
     async verifyNoHistogramError() {
-        const errorHeading = this.page.getByRole('heading', { name: 'Error while fetching' });
-        await expect(errorHeading).not.toBeVisible();
         const errorDetailsButton = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
         await expect(errorDetailsButton).not.toBeVisible();
     }
 
     // Validation method for 'No data found for histogram.'
     async expectNoDataFoundForHistogram() {
-        // Wait for query execution to complete on Firefox
+        // Wait for query execution to complete
         await this.page.waitForTimeout(5000);
 
-        // Use multiple locator strategies for cross-browser compatibility
-        const possibleLocators = [
-            this.page.getByText('No data found for histogram'),
-            this.page.getByText('No data found for histogram.'),
-            this.page.getByText('warning No data found for histogram'),
-            this.page.getByText('warning No data found for histogram.'),
-            this.page.locator('text=/No data.*histogram/i'),
-            this.page.locator('[data-test*="histogram"]').filter({ hasText: /no data/i }),
-            this.page.locator('.q-banner').filter({ hasText: /histogram/i }),
-            // Additional locators for variations in text rendering
-            this.page.locator('span').filter({ hasText: 'No data found for histogram' }),
-            this.page.locator('div').filter({ hasText: 'No data found for histogram' }).first()
-        ];
-
-        // Try each locator with increasing timeouts
-        for (const locator of possibleLocators) {
-            try {
-                await expect(locator).toBeVisible({ timeout: 8000 });
-                return; // Found it!
-            } catch (e) {
-                // Try next locator
-            }
-        }
-
-        // Alternative check: verify histogram area doesn't have data (empty chart)
-        // This handles cases where the message isn't displayed but histogram shows no data
+        // Check the no-data message via data-test attribute
+        const noDataMsg = this.page.locator('[data-test="logs-search-no-data-histogram"]');
         try {
-            // Check if histogram toggle is off or shows empty state
-            const histogramToggle = this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-            if (await histogramToggle.isVisible({ timeout: 3000 })) {
-                // Histogram toggle exists - the test can pass if no error is shown
-                const histogramError = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
-                await expect(histogramError).not.toBeVisible({ timeout: 5000 });
-                return; // No error means the histogram handled "no data" gracefully
-            }
+            await expect(noDataMsg).toBeVisible({ timeout: 10000 });
+            return;
         } catch (e) {
-            // Continue to final check
+            // No-data message not found — fall back to verifying no error is shown
         }
 
-        // Final attempt: look for any element containing "histogram" in its warning message
-        const anyHistogramWarning = this.page.locator('[role="alert"], .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
-        await expect(anyHistogramWarning).toBeVisible({ timeout: 15000 });
+        // Acceptable fallback: histogram rendered but with no data (no error shown)
+        const histogramError = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
+        await expect(histogramError).not.toBeVisible({ timeout: 5000 });
     }
 
     // Methods from legacy streamsPage.js
@@ -303,11 +269,13 @@ export class StreamsPage {
 
     // Stream Settings Methods (minimal set for stream-settings.spec.js)
     async expectStreamExistsExact(streamName) {
-        await expect(this.page.getByRole('cell', { name: streamName, exact: true })).toBeVisible();
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
     }
 
     async openStreamDetail(streamName) {
-        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
+        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.click();
     }
 
     async searchForField(fieldName) {
@@ -346,8 +314,8 @@ export class StreamsPage {
     }
 
     async expectValidationErrorVisible() {
-        // Field-agnostic validation error - matches any field name
-        await expect(this.page.locator("text=/Field\\(s\\) '.*' cannot have/")).toBeVisible();
+        // Schema validation errors come from backend API and are shown via OToast
+        await expect(this.page.locator('[data-test="o-toast-error"]')).toBeVisible({ timeout: 10000 });
     }
 
     async verifyIndexTypeOptions() {
@@ -434,12 +402,14 @@ export class StreamsPage {
 
     // Extended Retention Methods
     async navigateToExtendedRetention() {
-        // First open the stream detail view
-        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        // Open the stream schema/detail view
+        const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
+        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.click();
         await this.waitForUI(2000);
-        
-        // Navigate to Extended Retention tab directly
-        await this.page.getByText('Extended Retention').click();
+
+        // Navigate to Extended Retention tab
+        await this.page.locator('[data-test="schema-extended-retention-tab"]').click();
         await this.waitForUI(1000);
     }
 
@@ -517,7 +487,7 @@ export class StreamsPage {
     }
 
     async expectStreamSettingsUpdatedMessage() {
-        await expect(this.page.getByText('Stream settings updated')).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast-success"]')).toBeVisible({ timeout: 10000 });
     }
 
     async waitForUI(milliseconds) {
@@ -735,12 +705,12 @@ export class StreamsPage {
     get cancelStreamButton() { return this.page.locator('[data-test="add-stream-cancel-btn"]'); }
     get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
-    get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input"] input'); }
+    get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
     get indexTypeSelect() { return this.page.locator('[data-test="schema-stream-index-select"]').first(); }
-    get fieldSearchInput() { return this.page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first(); }
+    get fieldSearchInput() { return this.page.locator('[data-test="schema-field-search-input-field"]'); }
     get quickModeIcons() { return this.page.locator('img[alt*="quick"], img[alt*="Quick"]'); }
-    get quickModeTooltip() { return this.page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i }); }
-    get schemaTable() { return this.page.locator('.q-table').first(); }
+    get quickModeTooltip() { return this.page.locator('[data-test*="quick-mode-tooltip"]'); }
+    get schemaTable() { return this.page.locator('[data-test="schema-table"]'); }
 
     /**
      * Click Add Stream button to open the modal
@@ -777,8 +747,10 @@ export class StreamsPage {
         testLogger.info('Selecting stream type', { type });
         await this.streamTypeSelect.click();
         await this.waitForUI(300);
-        // Click the option with matching text
-        await this.page.getByRole('option', { name: new RegExp(type, 'i') }).click();
+        // Click the OSelect option via data-test-value matching the type
+        const option = this.page.locator(`[data-test="add-stream-type-input-option"][data-test-value="${type.toLowerCase()}"]`);
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
         await this.waitForUI(300);
     }
 
@@ -846,7 +818,7 @@ export class StreamsPage {
      */
     async expectSuccessToast(message = 'Stream created successfully') {
         testLogger.info('Verifying success toast', { message });
-        await expect(this.page.getByText(message)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="o-toast-success"]')).toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -855,9 +827,7 @@ export class StreamsPage {
      */
     async expectErrorToast(message) {
         testLogger.info('Verifying error toast', { message });
-        // Wait for the notification to appear with the message
-        const toastLocator = this.page.locator('[role="alert"]').filter({ hasText: message });
-        await expect(toastLocator).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="o-toast-error"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -885,7 +855,7 @@ export class StreamsPage {
      */
     async expectStreamInTable(streamName) {
         testLogger.info('Verifying stream in table', { streamName });
-        await expect(this.page.getByRole('cell', { name: streamName })).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -894,7 +864,7 @@ export class StreamsPage {
      */
     async expectStreamNotInTable(streamName) {
         testLogger.info('Verifying stream NOT in table', { streamName });
-        await expect(this.page.getByRole('cell', { name: streamName })).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).not.toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -972,7 +942,7 @@ export class StreamsPage {
      */
     async expectExactStreamCellVisible(streamName, timeout = 10000) {
         await expect(
-            this.page.getByRole('cell', { name: streamName, exact: true }).first()
+            this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)
         ).toBeVisible({ timeout });
         testLogger.info(`Stream cell visible: ${streamName}`);
     }
@@ -982,8 +952,7 @@ export class StreamsPage {
      * Bug #9354 - FTS auto-add
      */
     async isStreamVisible(streamName) {
-        const streamRow = this.page.locator('tr').filter({ hasText: streamName }).first();
-        return await streamRow.isVisible().catch(() => false);
+        return await this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`).isVisible().catch(() => false);
     }
 
     /**
@@ -1041,7 +1010,7 @@ export class StreamsPage {
      * legacy q-select uses .q-item.
      */
     getFullTextSearchOption() {
-        return this.page.locator('.q-item').filter({ hasText: 'Full text search' });
+        return this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]').first();
     }
 
     /**

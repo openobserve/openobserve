@@ -450,11 +450,11 @@ watch(internalOpen, (open) => {
         </div>
 
         <!-- ── Content (scrollable body) ───────────────────── -->
-        <!-- min-h-0 + flex-1: body fills remaining height so footer is always pinned to the bottom -->
+        <!-- min-h-0 keeps the body from overflowing the flex container; footer stays after content -->
         <div
           ref="bodyRef"
           :class="[
-            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:text-dialog-content-text',
             canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
