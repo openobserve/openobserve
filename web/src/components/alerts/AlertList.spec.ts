@@ -1124,15 +1124,16 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(alertsSvc.create_by_alert_id).toHaveBeenCalled();
   });
 
-  it("clone dialog header-left back button closes the dialog", async () => {
+  it("clone dialog secondary button (Cancel) closes the dialog", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.showForm = true;
     await wrapper.vm.$nextTick();
 
-    const backBtn = wrapper.find('[data-test="add-alert-back-btn"]');
-    expect(backBtn.exists()).toBe(true);
-    await backBtn.trigger("click");
+    const dialog = wrapper.findComponent({ name: "ODialog" });
+    expect(dialog.exists()).toBe(true);
+    await dialog.vm.$emit("click:secondary");
+    await wrapper.vm.$nextTick();
     expect(wrapper.vm.showForm).toBe(false);
   });
 

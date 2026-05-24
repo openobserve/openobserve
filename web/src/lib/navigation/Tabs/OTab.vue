@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from './OTab.types'
-import { computed, inject, type ComputedRef } from 'vue'
+import { computed, inject, useAttrs, type ComputedRef } from 'vue'
+
+defineOptions({ inheritAttrs: false })
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
@@ -13,6 +15,9 @@ const props = withDefaults(defineProps<OTabProps>(), {
 })
 
 defineSlots<OTabSlots>()
+
+const $attrs = useAttrs()
+const parentDataTest = computed(() => $attrs['data-test'] as string | undefined)
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 
@@ -78,11 +83,12 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
+  <span v-bind="$attrs" :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
       aria-disabled is passed explicitly for screen-reader compatibility.
+      data-test is forwarded so Playwright can reliably target the clickable button.
     -->
     <TabsTrigger
       :value="name"
@@ -91,6 +97,7 @@ const heightClasses = computed<string>(() => {
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses]"
+      :data-test="parentDataTest"
     >
       <!--
         If label or icon props are provided, render them (prop-driven mode).

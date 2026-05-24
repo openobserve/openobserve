@@ -143,12 +143,14 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
-    await pm.logsPage.fillSavedViewName("e2e@@@@@");
+    // Use '#' — '@' is explicitly allowed by the regex /^[-A-Za-z0-9 /@/_]+$/
+    // so "e2e@@@@@" would pass validation. '#' is outside the allowed set.
+    await pm.logsPage.fillSavedViewName("e2e#####");
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    // Wait for the specific validation notification — using text-filtered wait
-    // avoids false matches when another toast (e.g. streaming) stacks first.
     await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.waitForNotificationWithText("Please provide valid view name", 15000);
+    // After O2 migration, special-char validation sets savedViewNameError (inline OInput error)
+    // instead of firing a toast. Check the inline error at data-test="add-alert-name-input-error".
+    await pm.logsPage.expectSavedViewNameValidationError('Input must be alphanumeric');
 
     testLogger.info('Saved views special characters validation test completed');
   });
