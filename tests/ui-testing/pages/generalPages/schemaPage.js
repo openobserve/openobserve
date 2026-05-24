@@ -525,6 +525,7 @@ class SchemaPage {
     // the rendered `data-test-value` attribute can lag behind the option's
     // true value when DOM rows are reused on a filter narrow.
     async _pickStreamOption(stream) {
+        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
         await this.logSearchIndexSelectStream.click();
         await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -545,7 +546,13 @@ class SchemaPage {
         const option = this.getStreamPopoverOptions().first();
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
+        // In multiple/listbox mode the popover stays open after option click —
+        // deterministically dismiss it and wait for the trigger to report
+        // `aria-expanded="false"` so the next _pickStreamOption call can safely
+        // open it again. Without this gate, the next trigger click toggles the
+        // still-open popover to closed and the popover-visible wait times out.
         await this.page.keyboard.press('Escape').catch(() => {});
+        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
     }
 
     // Refresh stream stats and delete
