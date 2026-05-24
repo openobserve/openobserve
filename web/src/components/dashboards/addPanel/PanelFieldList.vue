@@ -1,12 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:p-1.5!">
-    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold">
+  <div class="tw:w-full tw:h-full tw:p-1.5! tw:flex tw:flex-col">
+    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold tw:flex-shrink-0">
       {{ t("panel.fields") }}
     </div>
     <OFieldList
       ref="fieldListRef"
+      class="tw:flex-1 tw:min-h-0"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"

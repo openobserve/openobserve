@@ -1445,7 +1445,7 @@ export default defineComponent({
   width: 100%;
   text-align: center;
   // white-space: nowrap;
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .layout-separator {
