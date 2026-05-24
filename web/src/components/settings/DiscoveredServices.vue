@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="reset-discovered-services-btn"
               variant="outline"
-              size="sm-action"
+              size="sm"
               :loading="resetting"
               @click="confirmResetServices"
             >

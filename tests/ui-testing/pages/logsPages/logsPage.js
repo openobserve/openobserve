@@ -3642,10 +3642,15 @@ export class LogsPage {
     }
 
     async clickCloseDialogForce() {
-        // The log-detail drawer's close button may sit outside the current viewport when the
-        // drawer is taller than the visible area. Scroll it into view before clicking.
+        // The ODrawer uses a 300 ms slide-in animation (slide-in-from-right).
+        // `waitForLogDetailDialogVisible` resolves at the START of the animation
+        // (element is non-hidden), but the close button is still outside the viewport
+        // mid-animation. Wait for the animation to finish before attempting the click.
         const closeBtn = this.page.locator(this.closeDialog);
-        await closeBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await expect(closeBtn).toBeInViewport({ timeout: 2000 }).catch(async () => {
+            // Fallback: wait the full animation duration + buffer if toBeInViewport times out
+            await this.page.waitForTimeout(400);
+        });
         return await closeBtn.click({ force: true });
     }
 
