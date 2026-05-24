@@ -91,23 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="tw:flex tw:justify-end tw:mt-3">
-            <span class="tw:text-xs tw:font-bold">
-              Last Data Refresh Time: {{ lastRefreshed }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-          <div
-            v-if="selectedQueryTypeTab === 'all'"
-            class="tw:flex tw:justify-end tw:items-center tw:px-4 tw:py-2 tw:border-b-[1px]"
-          >
+          <div class="tw:flex tw:justify-end tw:items-center tw:gap-4 tw:mt-3">
             <OToggleGroup
+              v-if="selectedQueryTypeTab === 'all'"
               :model-value="selectedSearchType"
               @update:model-value="onChangeSearchType($event as string)"
               data-test="running-queries-search-type-tabs"
@@ -121,8 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ searchTypeLabels[visual] ?? visual }}
               </OToggleGroupItem>
             </OToggleGroup>
+            <span class="tw:text-xs tw:font-bold">
+              Last Data Refresh Time: {{ lastRefreshed }}
+            </span>
           </div>
+        </div>
+      </div>
+    </div>
 
+    <div>
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
           <div
             v-show="selectedQueryTypeTab === 'all'"
             data-test="running-queries-all-queries-list"

@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:gap-3">
               <!-- Destination Type (Read-only) -->
               <div class="tw:w-1/2">
-                <div class="tw:text-sm tw:font-medium tw:mb-1">
+                <div class="tw:text-sm tw:font-medium tw:mb-1 tw:leading-tight">
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
