@@ -43,7 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             :error="showNameError"
             :error-message="nameErrorMessage"
-            @update:model-value="showNameError = false"
+            :help-text="!showNameError ? 'Use alphanumeric characters, space and underscore only.' : undefined"
+            @update:model-value="showNameError = !!organizationData.name && !isValidOrgName"
             data-test="org-name"
             maxlength="100"
           />

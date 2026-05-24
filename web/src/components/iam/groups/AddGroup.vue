@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-group-groupname-input-btn"
         :error="showNameError"
         :error-message="nameErrorMessage"
-        @update:model-value="showNameError = false"
+        :help-text="!showNameError ? `Use alphanumeric and '_' characters only, without spaces.` : undefined"
+        @update:model-value="showNameError = !!name && !isValidGroupName"
       />
 
       <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
@@ -60,7 +61,7 @@ import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -97,6 +98,16 @@ const isValidGroupName = computed(() => {
 });
 
 const showNameError = ref(false);
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      name.value = props.group?.name || "";
+      showNameError.value = false;
+    }
+  }
+);
 const nameErrorMessage = computed(() =>
   !name.value ? t('common.nameRequired') : `Use alphanumeric and '_' characters only, without spaces.`
 );

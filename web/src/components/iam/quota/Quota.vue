@@ -1703,4 +1703,9 @@ export default defineComponent({
   height: 10px !important;
 }
 
+/* Center sortable column headers for all non-first columns in the quota table */
+.quota-page th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"]) [data-test="o2-table-th-sort-trigger"] {
+  justify-content: center;
+}
+
 </style>
