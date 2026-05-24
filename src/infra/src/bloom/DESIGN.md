@@ -1,10 +1,10 @@
 # Bloom-filter pruning above tantivy
 
 > **Status:** experimental / POC — transposed layout + sub-grouping
-> **Layer:** above the existing parquet + tantivy search path
-> **Scope:** positive equality / IN lookups on user-declared `bloom_filter_fields ∩ index_fields`
+> **Layer:** built **on top of** tantivy — a field must be a tantivy secondary index (`index_fields`) *and* opted into `bloom_filter_fields`; only the intersection is built (§11.0)
+> **Scope:** positive equality / IN lookups; meaningful only for **random** high-cardinality fields (§11)
 
-This document describes the bloom-filter pruning layer that sits above tantivy in OpenObserve's search path.
+This document describes the bloom-filter pruning layer that sits above tantivy in OpenObserve's search path. **Read §11 before enabling it** — it is a win for random high-cardinality ids and a net cost for time-ordered ones.
 
 ---
 
@@ -384,12 +384,17 @@ When `false`:
 - Compactor never builds `.bf`.
 - Search side never enters the prune step.
 
-Per-stream opt-in is via the existing `StreamSettings`:
+Per-stream opt-in is via the existing `StreamSettings` — a field must be
+in **both** lists for a bloom to be built (bloom reads the tantivy term
+dict, so the field must be a secondary index first — see §11.0):
 
-- `index_fields`: SecondaryIndex (raw-tokenized in tantivy)
-- `bloom_filter_fields`: BloomFilter
+- `index_fields`: SecondaryIndex (the tantivy secondary index — **required**)
+- `bloom_filter_fields`: BloomFilter (opt the field into bloom)
 
-Only the **intersection** is bloom-targeted. A field listed only in one isn't built.
+Only the **intersection** `index_fields ∩ bloom_filter_fields` is
+bloom-targeted. A field in only one list builds no bloom and prunes
+nothing. Values are not inspected — the operator decides which fields are
+worth it (see §11.2 / §11.3 for guidance).
 
 Build-side sizing / chunking:
 
@@ -464,18 +469,63 @@ one block-row per group. Query read cost for a hour of `F` files ≈
 
 ---
 
-## 11. When to enable (decision table)
+## 11. When to enable — operator's call, here's the guidance
 
-The layer is a net cost unless **both** hold: the indexed field is
-high-cardinality **and random** (not time-ordered), and queries are
-frequent enough to amortize the extra `.bf` storage.
+### 11.0 Prerequisite: bloom is built **on top of** tantivy
 
-| Field | Cache | Verdict |
-|---|---|---|
-| Time-ordered high-cardinality (UUIDv7, snowflake, ts-prefixed ids) | any | **Off.** Tantivy's footer-cached sparse index range-rejects with ~0 IO; bloom is redundant and only adds storage. |
-| Fully-random high-cardinality (UUIDv4, W3C 16-byte trace_id, random request_id) | footer-cache only (no disk cache) | **On — this is the target.** Tantivy must read ~`F` blocks; bloom reads `ceil(F / 256)` rows + `K` survivors. |
-| Fully-random high-cardinality | disk cache available | On; both bloom rows and tantivy blocks are local, bloom still cuts tantivy's `F` to `K`. |
-| Low-cardinality / non-indexed / range / regex / `!=` / OR | any | **Off.** Predicates are skipped by `bloom_predicate::extract`; bloom can't help. |
+A `.bf` is built by iterating the **tantivy term dictionary** of each
+file (`build_blooms_from_index`), not by scanning parquet. So a field
+only gets a bloom if it is **already a tantivy secondary index**. The
+builder targets exactly `index_fields ∩ bloom_filter_fields`:
+
+- A field in `bloom_filter_fields` but **not** in `index_fields` → no
+  `.ttv` term dict to read → **no bloom is ever built** for it (and the
+  search-side predicate finds the field absent from every `.bf`, so it
+  prunes nothing).
+- **Both must be set on the stream** for bloom to take effect.
+
+This is by design: bloom is a *pruning accelerator for tantivy*, not a
+standalone index. It exists to cut how many `.ttv` files tantivy must
+open, so it can only cover fields tantivy already indexes.
+
+### 11.1 No value inspection — the operator decides
+
+The build does **not** sample field values to decide whether a bloom is
+worthwhile (e.g. detect time-ordered vs random). Whatever the operator
+puts in `bloom_filter_fields ∩ index_fields` gets a bloom. The guidance
+below is advisory; enforcement is left to the operator because only they
+know their id scheme and query mix.
+
+### 11.2 Decision table
+
+The layer is a net cost unless the indexed field is high-cardinality
+**and random** (not time-ordered), and queries are frequent enough to
+amortize the extra `.bf` storage.
+
+| Field | Verdict |
+|---|---|
+| **Fully-random high-cardinality** (UUIDv4, W3C 16-byte trace_id, random request_id, random hash) | **Enable — this is the target.** Tantivy can't range-prune, so it must open every `.ttv`; bloom cuts that to ~the real matches. |
+| **Time-ordered high-cardinality** (UUIDv7, snowflake, ts-prefixed ids) | **Leave off.** Tantivy's footer-cached sparse index already range-rejects with ~0 IO; bloom only adds latency + storage. |
+| Low-cardinality / non-indexed / range / `LIKE` / regex / `!=` / OR | **Off (no effect).** Either not built, or skipped by `bloom_predicate::extract`. |
+
+### 11.3 Measured results (S3, no disk cache, 170 files / 14.64 GB index, 1 group)
+
+Same stream `benchtest`, two fields — one random, one time-ordered —
+queried for a single matching row:
+
+| Field | Type | tantivy only | bloom + tantivy | Outcome |
+|---|---|---|---|---|
+| `trace_id` = `1fb3487f…` (16-byte random) | random | **2584 ms** (opens all 170 `.ttv`) | 24 ms prune + 65 ms tantivy = **89 ms** | **~29× faster** |
+| `request_id` = `019e588a-…-7e74-…` (UUIDv7) | time-ordered | **154 ms** (range-prunes to ~1 file) | 42 ms prune + 187 ms tantivy = **229 ms** | ~1.5× **slower** |
+
+The transposed read cost was confirmed minimal: the whole 170-file group
+was answered by **one row read of 5440 bytes** (`170 × 32`) + a cached
+footer — total bloom traffic across the run ≈ 170 KB / ~30 requests.
+
+Takeaways:
+- For the random field, tantivy alone degrades to a full 170-file scan (2.6 s); bloom prunes to 1 file first, so it's a large win.
+- For the UUIDv7 field, tantivy's sparse index already does the pruning in memory; bloom is pure overhead.
+- Same code, same data — the **only** variable is whether the field's values are time-correlated. That's why the choice is the operator's.
 
 ## 12. Limitations
 
