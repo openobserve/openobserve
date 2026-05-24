@@ -416,7 +416,8 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.waitForSelector('[role="alert"]:has-text("View created successfully")', {
+      await page.locator('[data-test="o-toast-success"]').waitFor({
+        state: 'visible',
         timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });
       testLogger.info('Success toast validated: Multistream view created successfully');
