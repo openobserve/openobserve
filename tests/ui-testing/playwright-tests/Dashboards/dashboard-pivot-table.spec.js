@@ -480,15 +480,20 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       );
 
       // Apply and verify table has "Total" text in it
+      const streamPromise2 = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender();
+      await streamPromise2;
+      await pm.chartTypeSelector.waitForTableDataLoad();
 
-      // Verify a pivot header cell with label "Total" is visible.
-      // OTableHeader renders pivot headers with data-test="o2-table-pivot-th-{level}-{cell}"
+      // Verify "Total" column header is visible (added by showRowTotals).
+      // With single breakdown + single y-axis, buildPivotHeaderLevels returns []
+      // (no multi-row header needed), so the Total column is rendered as a regular
+      // column header: data-test="o2-table-th-Total_y_axis_1".
       const totalHeader = page
-        .locator('[data-test^="o2-table-pivot-th-"]')
-        .filter({ hasText: "Total" })
+        .locator('[data-test^="o2-table-th-"]')
+        .filter({ hasText: /^Total$/ })
         .first();
+
       await expect(totalHeader).toBeVisible();
 
       testLogger.info("Verified Total row/column appears in pivot table");
