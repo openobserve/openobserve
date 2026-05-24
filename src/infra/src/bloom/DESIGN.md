@@ -531,7 +531,7 @@ queried for a single matching row:
 | Field | Type | tantivy only | bloom + tantivy | Outcome |
 |---|---|---|---|---|
 | `trace_id` = `1fb3487f…` (16-byte random) | random | **2584 ms** (opens all 170 `.ttv`) | 24 ms prune + 65 ms tantivy = **89 ms** | **~29× faster** |
-| `request_id` = `019e588a-…-7e74-…` (UUIDv7) | time-ordered | **154 ms** (range-prunes to ~1 file) | 42 ms prune + 187 ms tantivy = **229 ms** | ~1.5× **slower** |
+| `request_id` = `019e588a-…-7e74-…` (UUIDv7) | time-ordered | **154 ms** (range-prunes to ~1 file) | 42 ms prune + 154 ms tantivy = **196 ms** | ~1.3× **slower** |
 
 The transposed read cost was confirmed minimal: the whole 170-file group
 was answered by **one row read of 5440 bytes** (`170 × 32`) + a cached
