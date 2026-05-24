@@ -2,7 +2,7 @@
 
 > **Status:** experimental / POC — transposed layout + sub-grouping
 > **Layer:** built **on top of** tantivy — a field must be a tantivy secondary index (`index_fields`) *and* opted into `bloom_filter_fields`; only the intersection is built (§11.0)
-> **Scope:** positive equality / IN lookups; meaningful only for **random** high-cardinality fields (§11)
+> **Scope:** positive equality / IN lookups; meaningful only when the field is high-cardinality **and** random **and** the stream has many files/hour (§11)
 
 This document describes the bloom-filter pruning layer that sits above tantivy in OpenObserve's search path. **Read §11 before enabling it** — it is a win for random high-cardinality ids and a net cost for time-ordered ones.
 
@@ -48,9 +48,13 @@ prune costs `O(groups)` reads instead of `O(files)` — `N → ~ceil(files /
 max_files_per_bf)`. That, plus a high prune rate, is what can beat
 tantivy's `N` for random fields.
 
-**Net:** enable bloom for high-cardinality **random** fields; leave it off
-for time-ordered ids (tantivy wins) and for deployments where neither
-applies. See §11 for the precise decision table.
+**Net:** enable bloom only when **all three** hold — the field is
+high-cardinality, its values are **random** (not time-ordered), and the
+stream produces **many files per hour** (hourly volume ≳ 10 ×
+`ZO_COMPACT_MAX_FILE_SIZE`, so there are ≳10 files to prune). Leave it off
+for time-ordered ids (tantivy's sparse index wins) and for low-volume
+hours (too few files to bother). See §11 for the full decision table and
+measured results.
 
 ---
 
@@ -496,16 +500,27 @@ puts in `bloom_filter_fields ∩ index_fields` gets a bloom. The guidance
 below is advisory; enforcement is left to the operator because only they
 know their id scheme and query mix.
 
-### 11.2 Decision table
+### 11.2 The three conditions (all must hold)
 
-The layer is a net cost unless the indexed field is high-cardinality
-**and random** (not time-ordered), and queries are frequent enough to
-amortize the extra `.bf` storage.
+Bloom produces a meaningful speed-up only when **all three** are true:
+
+1. **High cardinality** — the field has many distinct values (otherwise tantivy is already cheap and the SBBF is mostly wasted bits).
+2. **Random / not time-ordered values** — so tantivy's sparse index *can't* range-prune and is forced to open every `.ttv`. For time-ordered ids (UUIDv7, snowflake) tantivy already prunes in memory; bloom is pure overhead.
+3. **Many files per hour to prune** — i.e. the stream's **hourly volume ≳ 10 × `ZO_COMPACT_MAX_FILE_SIZE`** (default 2 GB), so an hour holds ≳ 10 parquet/`.ttv` files. Bloom's whole job is "turn N file opens into ~1"; if an hour is only 1–2 files there is nothing to prune and bloom's own row read is net overhead.
+
+Why condition 3 matters: tantivy opens one `.ttv` per parquet file, so
+`files_per_hour ≈ hourly_volume / ZO_COMPACT_MAX_FILE_SIZE`. Bloom packs
+all of an hour's (up to `max_files_per_bf`) files into **one** `.bf` and
+answers them in one row read — the bigger `files_per_hour`, the more file
+opens that one read replaces. In the §11.3 experiment one hour had **170**
+files (≈170× the file-size target) answered by a single `.bf` → the 29×
+win. At 1–2 files/hour the same query would see ~no benefit.
 
 | Field | Verdict |
 |---|---|
-| **Fully-random high-cardinality** (UUIDv4, W3C 16-byte trace_id, random request_id, random hash) | **Enable — this is the target.** Tantivy can't range-prune, so it must open every `.ttv`; bloom cuts that to ~the real matches. |
-| **Time-ordered high-cardinality** (UUIDv7, snowflake, ts-prefixed ids) | **Leave off.** Tantivy's footer-cached sparse index already range-rejects with ~0 IO; bloom only adds latency + storage. |
+| **Random high-cardinality** (UUIDv4, W3C 16-byte trace_id, random request_id/hash) **+ ≳10 files/hour** | **Enable — this is the target.** Tantivy can't range-prune, must open every `.ttv`; bloom cuts that to ~the real matches in one read. |
+| **Time-ordered high-cardinality** (UUIDv7, snowflake, ts-prefixed ids) | **Leave off.** Tantivy's footer-cached sparse index range-rejects with ~0 IO; bloom only adds latency + storage. |
+| Low file count per hour (hourly volume ≲ `ZO_COMPACT_MAX_FILE_SIZE`) | **Off.** Too few files to prune; bloom's row read isn't amortized. |
 | Low-cardinality / non-indexed / range / `LIKE` / regex / `!=` / OR | **Off (no effect).** Either not built, or skipped by `bloom_predicate::extract`. |
 
 ### 11.3 Measured results (S3, no disk cache, 170 files / 14.64 GB index, 1 group)
