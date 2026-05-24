@@ -809,9 +809,9 @@ export class AlertsPage {
      * @param {string} name - Alert name
      */
     async fillAlertName(name) {
-        const input = this.page.locator(this.locators.alertNameInput);
-        await input.waitFor({ state: 'visible', timeout: 3000 });
-        await input.fill(name);
+        // OInput renders data-test on outer <div>; wait on wrapper for visibility, fill on inner -field input
+        await this.page.locator(this.locators.alertNameInput).waitFor({ state: 'visible', timeout: 3000 });
+        await this.page.locator(this.locators.alertNameInputField).fill(name);
         testLogger.info(`Filled alert name: ${name}`);
     }
 
@@ -1059,11 +1059,9 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation.
-        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
-        // fillable); the inner native <input> auto-derives `-field`. We click the
-        // wrapper to focus the field, then clear the `-field` variant.
-        await this.page.locator(this.locators.alertNameInput).click();
+        // v3 UI validates non-empty name — clear input and submit to trigger validation
+        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
+        await this.page.locator(this.locators.alertNameInputField).click();
         await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
@@ -1091,9 +1089,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertNameInput).click();
-        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
-        // fillable); the inner native <input> auto-derives `-field` — fill that variant.
+        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
+        await this.page.locator(this.locators.alertNameInputField).click();
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
@@ -2373,7 +2370,8 @@ export class AlertsPage {
      * Fill the alert name input
      */
     async fillAlertName(alertName) {
-        await this.page.locator(this.locators.alertNameInput).fill(alertName);
+        // OInput renders data-test on outer <div>; use -field suffix for the native input
+        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
         testLogger.info('Filled alert name', { alertName });
     }
 
