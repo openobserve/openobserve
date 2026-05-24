@@ -35,6 +35,13 @@ export interface OVirtualScrollProps<T = any> {
    * When omitted the container grows to fill its parent (height: 100%).
    */
   height?: string;
+
+  /**
+   * When true, enables per-element DOM measurement via ResizeObserver so
+   * items with variable heights (wrapped text, expandable rows) are
+   * tracked correctly. When false (default), all items use estimateSize.
+   */
+  dynamicRowHeight?: boolean;
 }
 
 export interface OVirtualScrollEmits {

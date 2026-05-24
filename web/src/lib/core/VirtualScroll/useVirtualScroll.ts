@@ -14,6 +14,12 @@ export interface UseVirtualScrollOptions {
   estimateSize?: number;
   /** Extra items rendered outside the visible viewport. @default 5 */
   overscan?: number;
+  /**
+   * When true, enables per-element DOM measurement via ResizeObserver +
+   * measureElement, so items with variable heights are tracked correctly.
+   * When false (default), all items use the static estimateSize.
+   */
+  dynamicRowHeight?: boolean;
 }
 
 /**
@@ -29,9 +35,11 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     scrollTarget,
     estimateSize = 40,
     overscan = 5,
+    dynamicRowHeight = false,
   } = options;
 
   const scrollMargin = ref(0);
+  const measuredHeights = ref<Record<number, number>>({});
 
   /**
    * Recompute scrollMargin when using an external scroll target.
@@ -59,13 +67,43 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     watch(scrollTarget, () => updateScrollMargin());
   }
 
+  // Reset measured heights when items array changes (stale heights
+  // from old items would misposition the virtualizer).
+  watch(
+    () => items.value.length,
+    () => {
+      measuredHeights.value = {};
+    },
+  );
+
   const virtualizerOptions = computed(() => ({
     count: items.value.length,
     getScrollElement: () =>
       (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
-    estimateSize: () => estimateSize,
+    estimateSize: dynamicRowHeight
+      ? (index: number) => measuredHeights.value[index] || estimateSize
+      : () => estimateSize,
     overscan,
     scrollMargin: scrollMargin.value,
+    ...(dynamicRowHeight
+      ? {
+          indexAttribute: "data-virtual-index" as const,
+          measureElement:
+            typeof window !== "undefined"
+              ? (element: HTMLElement) => {
+                  const height = (element as HTMLElement).getBoundingClientRect().height;
+                  const index = parseInt(
+                    (element as HTMLElement).getAttribute("data-virtual-index") ?? "",
+                    10,
+                  );
+                  if (!isNaN(index)) {
+                    measuredHeights.value[index] = height;
+                  }
+                  return height;
+                }
+              : undefined,
+        }
+      : {}),
   }));
 
   const virtualizer = useVirtualizer(virtualizerOptions);
@@ -90,6 +128,10 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     virtualizer.value.measure();
   }
 
+  function measureElement(node: any) {
+    if (!dynamicRowHeight) return;
+    virtualizer.value.measureElement(node);
+  }
   return {
     virtualItems,
     totalSize,
@@ -98,5 +140,6 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     scrollToIndex,
     scrollToTop,
     measure,
+    measureElement
   };
 }
