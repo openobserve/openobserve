@@ -1098,6 +1098,12 @@ pub struct Common {
     )]
     pub bloom_filter_ndv_ratio: u64,
     #[env_config(
+        name = "ZO_BLOOM_FILTER_MAX_FILES_PER_BF",
+        default = 256,
+        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). One hour bucket is split into ceil(files / this) `.bf` files."
+    )]
+    pub bloom_filter_max_files_per_bf: usize,
+    #[env_config(
         name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
         default = "",
         help = "Comma separated list of fields to use for search around"

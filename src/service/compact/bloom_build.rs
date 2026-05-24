@@ -126,108 +126,120 @@ pub async fn build_for_bucket(
 
     // Build blooms only for the *new* files (bloom_ver = 0). Existing
     // files keep their assigned bloom_ver and continue to reference
-    // their original `.bf`. This is what makes the layer
-    // **append-only**: we never re-stamp a previously-blessed row, so
-    // dumped rows that point at an older `bloom_ver` always have their
-    // `.bf` preserved (no rebuild ever supersedes it).
+    // their original `.bf` (append-only — never re-stamp a blessed row).
     //
-    // Files we couldn't build for (or that produced no blooms because
-    // the field isn't in their schema) keep `bloom_ver = 0` so search
-    // doesn't pay a wasted `.bf` fetch only to find them missing.
-    // Transposed `.bf` layout requires a group-uniform `num_blocks` so a
-    // value maps to the same block index across all files. Size it from
-    // the group's MAX record count (records is in file metadata — no extra
-    // IO), divided by the configured ndv ratio, at the default FPP. Every
-    // file in this build gets this same B.
+    // **Sub-grouping**: a single hour can hold thousands of files. Since
+    // the transposed `.bf` holds every file's SBBF in memory before
+    // serialize (M × B × 32 bytes), one giant `.bf` would OOM the
+    // compactor at high volume (e.g. 1000 files × 16 MB = 16 GB). So we
+    // split the new files into chunks of at most `max_files_per_bf` and
+    // write one `.bf` per chunk, each with its own `bloom_ver`. The
+    // search side already groups by `(date, bloom_ver)`, so it naturally
+    // reads one block-row per chunk. Read bytes stay `M × 32` total; only
+    // the request count grows to `ceil(M / max_files_per_bf)`.
+    //
+    // Files are sorted by record count first so similar-sized files share
+    // a chunk — this minimizes the uniform-`B` padding waste (B is sized
+    // to each chunk's max cardinality).
     const BLOOM_BUILD_FPP: f64 = 0.01;
     let ndv_ratio = cfg.common.bloom_filter_ndv_ratio.max(1);
-    let max_records = files
-        .iter()
-        .filter(|f| f.meta.bloom_ver == 0)
-        .map(|f| f.meta.records.max(0) as u64)
-        .max()
-        .unwrap_or(0);
-    let group_ndv = (max_records / ndv_ratio).max(1);
-    let num_blocks = infra::bloom::num_blocks_for(group_ndv, BLOOM_BUILD_FPP);
-    log::debug!(
-        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: group num_blocks={num_blocks} (max_records={max_records}, ndv_ratio={ndv_ratio})"
-    );
+    let max_files_per_bf = cfg.common.bloom_filter_max_files_per_bf.max(1);
 
-    let mut all_blooms: Vec<FieldBloom> = Vec::new();
-    let mut contributing_ids: Vec<i64> = Vec::new();
-    let mut considered: usize = 0;
-    for f in &files {
-        if f.meta.bloom_ver != 0 {
-            continue; // already stamped; do not touch
+    let mut new_files: Vec<&FileKey> = files.iter().filter(|f| f.meta.bloom_ver == 0).collect();
+    new_files.sort_by(|a, b| b.meta.records.cmp(&a.meta.records));
+
+    let base_ver = now_micros();
+    let mut wrote_any = false;
+    let mut total_covered = 0usize;
+    let chunk_total = new_files.len().div_ceil(max_files_per_bf);
+
+    for (chunk_idx, chunk) in new_files.chunks(max_files_per_bf).enumerate() {
+        // B for this chunk = max record count in the chunk / ndv ratio.
+        let max_records = chunk
+            .iter()
+            .map(|f| f.meta.records.max(0) as u64)
+            .max()
+            .unwrap_or(0);
+        let chunk_ndv = (max_records / ndv_ratio).max(1);
+        let num_blocks = infra::bloom::num_blocks_for(chunk_ndv, BLOOM_BUILD_FPP);
+
+        let mut all_blooms: Vec<FieldBloom> = Vec::new();
+        let mut contributing_ids: Vec<i64> = Vec::new();
+        for f in chunk {
+            match build_blooms_for_file(f, &target_fields, num_blocks).await {
+                Ok(mut blooms) if !blooms.is_empty() => {
+                    all_blooms.append(&mut blooms);
+                    contributing_ids.push(f.id);
+                }
+                Ok(_) => {} // no blooms (no index / field absent) — leave at 0
+                Err(e) => {
+                    log::warn!("[BLOOM_BUILD] skipping {} (bloom build failed): {e}", f.key);
+                }
+            }
         }
-        considered += 1;
-        match build_blooms_for_file(f, &target_fields, num_blocks).await {
-            Ok(mut blooms) if !blooms.is_empty() => {
-                all_blooms.append(&mut blooms);
-                contributing_ids.push(f.id);
-            }
-            Ok(_) => {
-                // No blooms produced (no index, or fields not in this file's
-                // schema). Not an error.
-            }
+        if all_blooms.is_empty() {
+            continue;
+        }
+
+        // Distinct bloom_ver per chunk (base + idx) → distinct `.bf` path.
+        let bloom_ver = base_ver + chunk_idx as i64;
+        let blob = match BloomWriter::serialize(all_blooms) {
+            Ok(b) => b,
             Err(e) => {
-                log::warn!("[BLOOM_BUILD] skipping {} (bloom build failed): {e}", f.key);
+                log::warn!(
+                    "[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key} chunk {chunk_idx}: {e}"
+                );
+                config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
+                    .with_label_values(&[org_id, stream_type.as_str(), "serialize"])
+                    .inc();
+                continue;
             }
+        };
+        let bf_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
+        let bf_account = storage::get_account(org_id, &bf_path).unwrap_or_default();
+        if let Err(e) = storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
+            log::warn!("[BLOOM_BUILD] upload {bf_path} failed: {e}");
+            config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
+                .with_label_values(&[org_id, stream_type.as_str(), "upload"])
+                .inc();
+            continue;
         }
-    }
-    if all_blooms.is_empty() {
-        log::debug!(
-            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: no blooms produced from {considered} new file(s); skipping"
-        );
-        return Ok(());
-    }
 
-    // Pack + upload.
-    let bloom_ver = now_micros();
-    let blob = match BloomWriter::serialize(all_blooms) {
-        Ok(b) => b,
-        Err(e) => {
+        debug_assert!(
+            contributing_ids.iter().all(|id| *id > 0),
+            "bloom builder must only stamp file_list rows with assigned ids"
+        );
+        if let Err(e) = infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver).await {
             log::warn!(
-                "[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}"
+                "[BLOOM_BUILD] update_bloom_ver failed for {org_id}/{stream_type}/{stream_name}/{date_key} chunk {chunk_idx}: {e}"
             );
             config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
-                .with_label_values(&[org_id, stream_type.as_str(), "serialize"])
+                .with_label_values(&[org_id, stream_type.as_str(), "update_file_list"])
                 .inc();
-            return Ok(());
+            continue;
         }
-    };
-    let bf_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
-    let bf_account = storage::get_account(org_id, &bf_path).unwrap_or_default();
-    if let Err(e) = storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
-        log::warn!("[BLOOM_BUILD] upload {bf_path} failed: {e}");
-        config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
-            .with_label_values(&[org_id, stream_type.as_str(), "upload"])
-            .inc();
-        return Ok(());
-    }
 
-    // Stamp the contributing rows (and only those) with the new bloom_ver.
-    let covered = contributing_ids.len();
-    debug_assert!(
-        contributing_ids.iter().all(|id| *id > 0),
-        "bloom builder must only stamp file_list rows with assigned ids; \
-         a 0 here means we ran the build before write_file_list — caller bug"
-    );
-    if let Err(e) = infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver).await {
-        log::warn!(
-            "[BLOOM_BUILD] update_bloom_ver failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}"
+        config::metrics::BLOOM_FILE_BUILT_TOTAL
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc();
+        total_covered += contributing_ids.len();
+        wrote_any = true;
+        log::debug!(
+            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} (chunk {}/{chunk_total}, num_blocks={num_blocks}) covering {} file(s)",
+            chunk_idx + 1,
+            contributing_ids.len(),
         );
-        config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
-            .with_label_values(&[org_id, stream_type.as_str(), "update_file_list"])
-            .inc();
-        return Ok(());
     }
 
-    config::metrics::BLOOM_FILE_BUILT_TOTAL
-        .with_label_values(&[org_id, stream_type.as_str()])
-        .inc();
+    if !wrote_any {
+        log::debug!(
+            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: no blooms produced from {} new file(s); skipping",
+            new_files.len()
+        );
+        return Ok(());
+    }
     log::info!(
-        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} covering {covered} new file(s) (out of {} in bucket)",
+        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {chunk_total} `.bf`(s) covering {total_covered} new file(s) (out of {} in bucket, max {max_files_per_bf}/bf)",
         files.len()
     );
 
