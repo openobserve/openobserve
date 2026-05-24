@@ -100,23 +100,23 @@ export class ServiceGraphPage {
 
   async switchToGraphView() {
     await this.page.locator(this.graphViewTab).click();
-    // Wait for the graph button to become selected (OToggleGroup uses data-state="on")
-    await expect(this.page.locator(this.graphViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    await expect(this.page.locator(`${this.graphViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async switchToTreeView() {
     await this.page.locator(this.treeViewTab).click();
-    // Wait for the tree button to become selected (OToggleGroup uses data-state="on")
-    await expect(this.page.locator(this.treeViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    await expect(this.page.locator(`${this.treeViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async getActiveViewTab() {
-    // Check which view toggle button has data-state="on" (OToggleGroup)
-    const treeSelected = await this.page.locator(this.treeViewTab)
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    const treeSelected = await this.page.locator(`${this.treeViewTab} [data-state]`)
       .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (treeSelected) return 'Tree View';
 
-    const graphSelected = await this.page.locator(this.graphViewTab)
+    const graphSelected = await this.page.locator(`${this.graphViewTab} [data-state]`)
       .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (graphSelected) return 'Graph View';
 

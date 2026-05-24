@@ -3280,9 +3280,13 @@ export class LogsPage {
     }
 
     async expectErrorMessageVisible() {
-        // Search execution + render of the error template can lag on the pentest backend.
-        // Use a longer explicit timeout instead of the default 5s.
-        return await expect(this.page.locator(this.errorMessage).first()).toBeVisible({ timeout: 30000 });
+        // Covers two error display paths in Index.vue:
+        // - errorMsg path: data-test="logs-search-error-message" (query/backend error)
+        // - filterErrMsg path: data-test="logs-search-filter-error-message" (quickmode filter parse error)
+        const errorLocator = this.page.locator(
+            `[data-test="logs-search-error-message"], [data-test="logs-search-filter-error-message"]`
+        ).first();
+        return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
     /**
@@ -7492,7 +7496,8 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        await expect(this.page.locator(this.patternsToggle)).toHaveAttribute('data-state', 'on');
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        await expect(this.page.locator(`${this.patternsToggle} [data-state]`)).toHaveAttribute('data-state', 'on');
         testLogger.info('Patterns toggle is in selected state');
     }
 
@@ -7968,8 +7973,9 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
-        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        const builderStateBtn = this.page.locator(`${this.builderQueryType} [data-state]`);
+        await expect(builderStateBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -7979,8 +7985,9 @@ export class LogsPage {
     async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // Verify "Custom" button is active (OToggleGroupItem uses data-state="on")
-        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        const customStateBtn = this.page.locator(`${this.customQueryType} [data-state]`);
+        await expect(customStateBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
 
@@ -8004,8 +8011,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        // Wait for the toggle group to reflect the Custom selection (OToggleGroupItem data-state="on")
-        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        await expect(this.page.locator(`${this.customQueryType} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 

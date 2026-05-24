@@ -506,11 +506,13 @@ export class MetricsPage {
         // Ensure Custom mode is active so the editor is fully editable
         const customBtn = this.customQueryTypeButton;
         if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            const dataState = await customBtn.getAttribute('data-state').catch(() => '');
+            // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+            const innerBtn = customBtn.locator('[data-state]');
+            const dataState = await innerBtn.getAttribute('data-state').catch(() => '');
             if (dataState !== 'on') {
                 await customBtn.click();
                 // Wait deterministically for Custom mode to flip data-state to "on"
-                await expect(customBtn).toHaveAttribute('data-state', 'on', { timeout: 5000 }).catch(() => {});
+                await expect(innerBtn).toHaveAttribute('data-state', 'on', { timeout: 5000 }).catch(() => {});
             }
         }
 
