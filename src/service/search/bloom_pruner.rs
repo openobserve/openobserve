@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Search-side bloom prune layer — single-block point check.
+//! Search-side bloom prune layer — transposed (block-major) read.
 //!
 //! Given a candidate `Vec<FileKey>` and the bloom-prunable predicates
 //! extracted by [`super::bloom_predicate`], this module:
@@ -22,15 +22,13 @@
 //!    latter pass through untouched.
 //! 2. Groups "has bloom" files by `(date, bloom_ver)` so all files sharing a `.bf` are tested with
 //!    one footer fetch.
-//! 3. For each group, fetches **only the bytes the query needs**:
-//!    - footer cache hit → 0 GETs
-//!    - footer cache miss → 1 suffix GET (16 KB)
-//!    - then **one batched `get_ranges` call** that pulls every required 32-byte SBBF block for all
-//!      `(file, value)` targets in the bucket. `infra::cache::storage::get_ranges` internally
-//!      coalesces adjacent ranges via `object_store::coalesce_ranges`.
-//! 4. For each `(file_id, predicate value)`, runs the SBBF point check on the fetched 32-byte
-//!    block. A file is kept iff every predicate's bloom returns *maybe* for at least one of its
-//!    values (OR within a predicate, AND across predicates).
+//! 3. For each group, fetches **one block row per `(predicate, value)`** — a single contiguous `M ×
+//!    32`-byte range (M = files in the group) that holds every file's SBBF block for that value
+//!    (see the transposed layout in `infra::bloom`). So the per-group remote cost is
+//!    O(predicate×value) reads, not O(files): a single trace_id lookup is **one read per group**.
+//! 4. For each file, slices its column out of the fetched row and runs the SBBF point check. A file
+//!    is kept iff every predicate's bloom returns *maybe* for at least one of its values (OR within
+//!    a predicate, AND across predicates).
 //!
 //! Any failure (fetch, parse, schema mismatch) **falls back to "keep
 //! all"** for the affected group — bloom is performance, not correctness.
@@ -124,37 +122,25 @@ pub async fn prune(
         groups.entry((date, f.meta.bloom_ver)).or_default().push(i);
     }
 
-    // 3. Plan per-group work: target (file_idx, pred_idx, value_idx) tuples and the bytes each one
-    //    needs. file_idx is into with_bloom for later result-folding.
+    // 3. Plan per-group work. With the transposed layout the fetch unit is one block-row per
+    //    (predicate, value) — shared by every file in the group — so we just carry the group's file
+    //    indices.
     struct GroupSpec {
         group: Group,
         account: String,
         path: String,
-        /// One entry per (file_idx, pred_idx, value_idx) tuple in this bucket.
-        targets: Vec<TargetSpec>,
+        file_idxs: Vec<usize>,
     }
     let specs: Vec<GroupSpec> = groups
         .into_iter()
         .map(|((date, ver), idxs)| {
             let path = bloom_path(org_id, stream_type, stream_name, &date, ver);
             let account = infra::storage::get_account(org_id, &path).unwrap_or_default();
-            let mut targets: Vec<TargetSpec> = Vec::with_capacity(idxs.len() * predicates.len());
-            for &i in &idxs {
-                for (pi, pred) in predicates.iter().enumerate() {
-                    for vi in 0..pred.values.len() {
-                        targets.push(TargetSpec {
-                            file_idx: i,
-                            pred_idx: pi,
-                            value_idx: vi,
-                        });
-                    }
-                }
-            }
             GroupSpec {
                 group: (date, ver),
                 account,
                 path,
-                targets,
+                file_idxs: idxs,
             }
         })
         .collect();
@@ -171,7 +157,7 @@ pub async fn prune(
                 trace_id,
                 &spec.account,
                 &spec.path,
-                &spec.targets,
+                &spec.file_idxs,
                 predicates,
                 with_bloom_ref,
             )
@@ -280,19 +266,9 @@ pub async fn prune(
     kept
 }
 
-/// One scheduled point check inside a group: a tuple identifying which
-/// `(file, predicate, value)` it belongs to. The actual byte range and
-/// hash are computed later, after the footer is parsed.
-struct TargetSpec {
-    file_idx: usize,
-    pred_idx: usize,
-    value_idx: usize,
-}
-
 /// Outcome of running one (date, bloom_ver) bucket. The `Ok` variant carries
-/// one tuple per `(file_idx, pred_idx, value_idx)` whose block range was
-/// resolvable; missing entries imply "no info" for that target and are
-/// handled by the caller.
+/// one tuple per resolvable `(file_idx, pred_idx, value_idx)`; missing
+/// entries imply "no info" for that target and are handled by the caller.
 enum GroupResult {
     Ok(Vec<(usize, usize, usize, bool)>),
     Err(String, FetchError),
@@ -306,136 +282,105 @@ enum FetchError {
     Store(#[from] object_store::Error),
     #[error("bloom parse: {0:?}")]
     Parse(infra::bloom::ReadError),
-    #[error("short block: expected {expected} got {got}")]
-    ShortBlock { expected: usize, got: usize },
+    #[error("row count mismatch: expected {expected} got {got}")]
+    RowMismatch { expected: usize, got: usize },
 }
 
 async fn run_group(
     trace_id: &str,
     account: &str,
     path: &str,
-    targets: &[TargetSpec],
+    file_idxs: &[usize],
     predicates: &[BloomPredicate],
     with_bloom: &[FileKey],
 ) -> GroupResult {
-    // Step 1: get the footer suffix bytes + total file size. Footer cache
-    // first, then a single suffix-range GET on miss. `.bf` files are
-    // immutable so cache entries are valid for the file's lifetime.
+    // Step 1: footer (cache → suffix GET on miss). `.bf` is immutable so the
+    // footer cache entry is valid for the file's lifetime.
     let (total_size, suffix) = match get_footer_suffix(account, path).await {
         Ok(x) => x,
         Err(e) => return GroupResult::Err(path.to_string(), e),
     };
-
     let reader = match BloomReader::parse_suffix(&suffix, total_size) {
         Ok(r) => r,
         Err(e) => return GroupResult::Err(path.to_string(), FetchError::Parse(e)),
     };
 
-    // Step 2: compute (range, hash) per target. Targets with no range
-    // (unknown field/file in this .bf) are dropped from the planned work —
-    // the absence is recorded later as "no info" by the caller.
-    struct Planned {
-        file_idx: usize,
+    // Step 2: one block-ROW per (predicate, value) — shared across all files
+    // in this group. This is the transposed-layout win: O(predicate×value)
+    // reads per group instead of O(files).
+    struct RowPlan {
         pred_idx: usize,
         value_idx: usize,
         range: std::ops::Range<u64>,
         hash: u64,
     }
-    let mut planned: Vec<Planned> = Vec::with_capacity(targets.len());
-    let mut missing_field_count = 0usize;
-    let mut missing_file_count = 0usize;
-    for t in targets {
-        let pred = &predicates[t.pred_idx];
-        let value = pred.values[t.value_idx].as_bytes();
-        let file_id = with_bloom[t.file_idx].id as u64;
-        if let Some((range, hash)) = reader.block_range_for(&pred.field, file_id, value) {
-            planned.push(Planned {
-                file_idx: t.file_idx,
-                pred_idx: t.pred_idx,
-                value_idx: t.value_idx,
-                range,
-                hash,
-            });
-        } else if reader.fields().any(|f| f == pred.field.as_str()) {
-            // Field is in the footer but this file_id isn't — most likely a
-            // file_list-row that wasn't part of the build, or a file_id-domain
-            // mismatch.
-            missing_file_count += 1;
-        } else {
-            missing_field_count += 1;
+    let mut rows: Vec<RowPlan> = Vec::new();
+    for (pi, pred) in predicates.iter().enumerate() {
+        for (vi, value) in pred.values.iter().enumerate() {
+            if let Some((range, hash)) = reader.row_range(&pred.field, value.as_bytes()) {
+                rows.push(RowPlan {
+                    pred_idx: pi,
+                    value_idx: vi,
+                    range,
+                    hash,
+                });
+            }
+            // field absent in this .bf → no row → those (file, pred) pairs
+            // stay "no info" and are conservatively kept by the caller.
         }
     }
-    if planned.is_empty() {
-        // Diagnose: dump what the footer DOES carry vs what we asked for so
-        // operators can see (a) field-name mismatch (build-time settings
-        // differed from query-time), (b) file_id domain mismatch.
+    if rows.is_empty() {
         let footer_fields: Vec<&str> = reader.fields().collect();
         let requested_fields: Vec<&str> = predicates.iter().map(|p| p.field.as_str()).collect();
-        let sample_requested_file_ids: Vec<u64> = targets
-            .iter()
-            .take(5)
-            .map(|t| with_bloom[t.file_idx].id as u64)
-            .collect();
-        // Pick one field present in the footer to show sample file_ids from.
-        let footer_sample_file_ids: Vec<u64> = reader
-            .inspect()
-            .first()
-            .map(|fi| fi.file_ids.iter().take(5).copied().collect())
-            .unwrap_or_default();
         log::warn!(
-            "[bloom-prune] [trace_id {trace_id}] group `{path}`: no targets resolved \
-             ({} missing-field, {} missing-file_id) — footer fields=[{}], requested=[{}], \
-             requested_file_ids_sample={:?}, footer_file_ids_sample={:?}. \
-             Likely cause: stream `bloom_filter_fields ∩ index_fields` at build time differed \
-             from current query field, or file_list ids changed since build. Keeping all files \
-             in this group.",
-            missing_field_count,
-            missing_file_count,
+            "[bloom-prune] [trace_id {trace_id}] group `{path}`: no rows resolved — \
+             footer fields=[{}], requested=[{}]. Likely cause: stream \
+             `bloom_filter_fields ∩ index_fields` at build time differed from the queried \
+             field. Keeping all files in this group.",
             footer_fields.join(", "),
             requested_fields.join(", "),
-            sample_requested_file_ids,
-            footer_sample_file_ids,
         );
         return GroupResult::Ok(Vec::new());
     }
 
-    // Step 3: fetch all 32-byte blocks in one call. `get_ranges` internally
-    // coalesces adjacent ranges via `object_store::coalesce_ranges` and
-    // returns one `Bytes` per input range, in input order. For trace_id
-    // queries each range is a separate 32 B block at random offsets inside
-    // the SBBF — coalescing rarely merges, but the single API call still
-    // saves N round trips of per-range overhead.
-    let ranges: Vec<std::ops::Range<u64>> = planned.iter().map(|p| p.range.clone()).collect();
+    // Step 3: fetch the rows. One contiguous range each (M×32 bytes), batched
+    // into a single `get_ranges` call. For the canonical single-value query
+    // this is exactly ONE remote read for the whole group.
+    let ranges: Vec<std::ops::Range<u64>> = rows.iter().map(|r| r.range.clone()).collect();
     let fetched = match infra::cache::storage::get_ranges(account, &path.into(), &ranges).await {
         Ok(v) => v,
         Err(e) => return GroupResult::Err(path.to_string(), FetchError::Store(e)),
     };
-    if fetched.len() != planned.len() {
+    if fetched.len() != rows.len() {
         return GroupResult::Err(
             path.to_string(),
-            FetchError::ShortBlock {
-                expected: planned.len(),
+            FetchError::RowMismatch {
+                expected: rows.len(),
                 got: fetched.len(),
             },
         );
     }
 
-    // Step 4: run check_block for each planned target against its 32-byte
-    // block. Order matches `planned`.
-    let mut outcomes: Vec<(usize, usize, usize, bool)> = Vec::with_capacity(planned.len());
-    for (p, buf) in planned.iter().zip(fetched.iter()) {
-        if buf.len() < BLOCK_BYTES {
-            return GroupResult::Err(
-                path.to_string(),
-                FetchError::ShortBlock {
-                    expected: BLOCK_BYTES,
-                    got: buf.len(),
-                },
-            );
+    // Step 4: for each file, slice its column out of each fetched row and run
+    // the 8-bit check. A file whose column is absent from a row's field stays
+    // "no info" for that predicate.
+    let mut outcomes: Vec<(usize, usize, usize, bool)> = Vec::new();
+    for (r, row_bytes) in rows.iter().zip(fetched.iter()) {
+        let field = &predicates[r.pred_idx].field;
+        for &file_idx in file_idxs {
+            let file_id = with_bloom[file_idx].id as u64;
+            let Some(col) = reader.column_index(field, file_id) else {
+                continue; // file not a column for this field → no info
+            };
+            let off = col * BLOCK_BYTES;
+            if off + BLOCK_BYTES > row_bytes.len() {
+                // Shouldn't happen if footer + body agree; treat as no info.
+                continue;
+            }
+            let block: &[u8; BLOCK_BYTES] = row_bytes[off..off + BLOCK_BYTES].try_into().unwrap();
+            let hit = BloomReader::check_block_with_hash(block, r.hash);
+            outcomes.push((file_idx, r.pred_idx, r.value_idx, hit));
         }
-        let block: &[u8; BLOCK_BYTES] = buf[..BLOCK_BYTES].try_into().unwrap();
-        let hit = BloomReader::check_block_with_hash(block, p.hash);
-        outcomes.push((p.file_idx, p.pred_idx, p.value_idx, hit));
     }
 
     GroupResult::Ok(outcomes)
@@ -478,19 +423,22 @@ mod tests {
         let id_a: u64 = 101;
         let id_b: u64 = 102;
 
+        // Both files share a uniform B (transposed layout requirement).
+        let nb = infra::bloom::num_blocks_for(100, 0.01);
         let mut bb = BloomBuilder::new();
-        let i_a = bb.begin(id_a, "trace_id", 100);
+        let i_a = bb.begin_with_blocks(id_a, "trace_id", nb);
         bb.insert(i_a, b"present-A");
-        let i_b = bb.begin(id_b, "trace_id", 100);
+        let i_b = bb.begin_with_blocks(id_b, "trace_id", nb);
         bb.insert(i_b, b"present-B");
         let blob = BloomWriter::serialize(bb.finish()).unwrap();
         let r = BloomReader::parse(&blob).unwrap();
 
         let check = |field: &str, file_id: u64, v: &[u8]| {
-            let (range, h) = r.block_range_for(field, file_id, v).unwrap();
-            let s = range.start as usize;
-            let e = range.end as usize;
-            let block: &[u8; BLOCK_BYTES] = blob[s..e].try_into().unwrap();
+            let (range, h) = r.row_range(field, v).unwrap();
+            let col = r.column_index(field, file_id).unwrap();
+            let row = &blob[range.start as usize..range.end as usize];
+            let off = col * BLOCK_BYTES;
+            let block: &[u8; BLOCK_BYTES] = row[off..off + BLOCK_BYTES].try_into().unwrap();
             BloomReader::check_block_with_hash(block, h)
         };
 

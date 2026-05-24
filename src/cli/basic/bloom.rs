@@ -48,13 +48,10 @@ pub fn inspect(file: &str) -> Result<(), anyhow::Error> {
     for fi in &inspect {
         println!("── field: {} ────────────────────────", fi.field);
         println!("  file_count        : {}", fi.file_count);
+        println!("  num_blocks (B)    : {}", fi.num_blocks);
+        // bytes a single query reads for this field = one block row.
+        println!("  row_bytes (1 read): {}", fi.row_bytes);
         println!("  total_body_bytes  : {}", fi.total_body_bytes);
-        let per_file_avg = if fi.file_count > 0 {
-            fi.total_body_bytes as f64 / fi.file_count as f64
-        } else {
-            0.0
-        };
-        println!("  per_file_avg_bytes: {:.1}", per_file_avg);
         if !fi.file_ids.is_empty() {
             let min = fi.file_ids.first().copied().unwrap_or(0);
             let max = fi.file_ids.last().copied().unwrap_or(0);

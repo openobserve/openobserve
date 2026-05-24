@@ -142,9 +142,16 @@ pub struct Sbbf {
 impl Sbbf {
     /// Allocate an empty SBBF sized for `ndv` items at `fpp`.
     pub fn new_with_ndv_fpp(ndv: u64, fpp: f64) -> Self {
-        let n = num_blocks_for(ndv, fpp) as usize;
+        Self::new_with_num_blocks(num_blocks_for(ndv, fpp))
+    }
+
+    /// Allocate an empty SBBF with an explicit block count. Used by the
+    /// transposed `.bf` layout where every file in a group must share the
+    /// same `num_blocks` so a single value maps to the same block index
+    /// across all files (enabling one contiguous read per group).
+    pub fn new_with_num_blocks(num_blocks: u32) -> Self {
         Self {
-            blocks: vec![[0u32; 8]; n],
+            blocks: vec![[0u32; 8]; num_blocks.max(1) as usize],
         }
     }
 

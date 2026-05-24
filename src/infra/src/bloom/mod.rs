@@ -21,16 +21,18 @@
 //! after the microsecond timestamp at which it was built; see
 //! `bloom::path` for the naming scheme.
 //!
-//! Layout:
+//! Layout (**transposed / block-major** — POC for O(groups) read cost):
 //!
 //! ```text
 //! 0     ────────────────────────────────────
 //!       MAGIC      4B   "O2BF"
 //!       VERSION    1B   0x01
 //! ────────────────────────────────────────────
-//!       BODY            (concat of raw SBBF bitsets — each is exactly
-//!                        `num_blocks × 32` little-endian bytes, no
-//!                        header, no framing)
+//!       BODY            per field: a transposed bit-matrix.
+//!                       All M files of a field share num_blocks=B.
+//!                       Row j (j in 0..B) = every file's block j,
+//!                       back to back: [f0.bj][f1.bj]…[f(M-1).bj],
+//!                       each 32 bytes → row is M×32 bytes.
 //! ────────────────────────────────────────────
 //!       FOOTER          (thrift-free, hand-rolled)
 //!         field_count   u32 LE
@@ -38,11 +40,11 @@
 //!           name_len    u16 LE
 //!           name        bytes
 //!           algo        u8           (0x01 = SBBF + gxhash64)
-//!           file_count  u32 LE
-//!           per file:
+//!           num_blocks  u32 LE       (B, uniform across files)
+//!           file_count  u32 LE       (M)
+//!           body_offset u64 LE       (start of this field's matrix)
+//!           per file (column order):
 //!             file_id     u64 LE
-//!             body_offset u64 LE
-//!             body_size   u32 LE
 //!             n_items     u32 LE
 //! ────────────────────────────────────────────
 //!       FOOTER_LEN  4B  (LE)
@@ -50,14 +52,16 @@
 //! EOF   ────────────────────────────────────
 //! ```
 //!
-//! Each per-(file, field) bloom is our own [`sbbf::Sbbf`] (Parquet's SBBF
-//! algorithm, our own bytes). The body is **just the raw bitset**: a
-//! contiguous run of 32-byte blocks. Combined with the footer's
-//! `body_offset` + `body_size`, this lets the search side fetch any
-//! single 32-byte block by absolute offset and run
-//! [`sbbf::check_block`] against it without ever loading the surrounding
-//! bytes — which is the whole point of switching off
-//! `parquet::bloom_filter::Sbbf`'s eagerly-decoded API.
+//! **Why transposed.** `block_index = fastmap(hash(value), B)` depends
+//! only on `B`. With a group-uniform `B`, one query value maps to the
+//! same block index `bi` across every file. Laying the body out
+//! block-major means the blocks a query needs — one per file — are a
+//! single contiguous row at `bi`. So the search side reads **one
+//! `M × 32` range per group** instead of one tiny range per file,
+//! turning prune IO from O(files) into O(groups). This is the form that
+//! can beat tantivy on S3 for fully-random high-cardinality fields,
+//! where tantivy's sparse-index range pruning can't reject and it must
+//! touch every file. See DESIGN.md §6.
 
 pub mod footer_cache;
 pub mod path;

@@ -30,9 +30,12 @@ use infra::bloom::{BloomBuilder, FieldBloom};
 use tantivy::Index;
 use tantivy_utils::puffin_directory::reader::warm_up_terms;
 
-/// Build blooms for the given fields against an already-opened tantivy
-/// `Index`. The caller pairs the resulting `FieldBloom`s with their
-/// `file_id` (the file_list row id of the originating parquet file).
+/// Build per-field SBBFs for one file using a group-uniform `num_blocks`.
+///
+/// Every file in a (stream, hour, bloom_ver) group must pass the same
+/// `num_blocks` so the transposed `.bf` layout can read one block-row per
+/// group (see `infra::bloom` module docs). The caller derives it once from
+/// the configured expected cardinality.
 ///
 /// Behavior:
 /// - Fields not present in the schema are silently skipped — the compactor passes the union of
@@ -44,7 +47,7 @@ pub async fn build_blooms_from_index(
     index: &Index,
     file_id: u64,
     fields: &[String],
-    fpp: f64,
+    num_blocks: u32,
 ) -> anyhow::Result<Vec<FieldBloom>> {
     if fields.is_empty() {
         return Ok(Vec::new());
@@ -78,29 +81,30 @@ pub async fn build_blooms_from_index(
     )
     .await?;
 
-    let mut builder = BloomBuilder::new().with_fpp(fpp);
+    let mut builder = BloomBuilder::new();
 
     for field_name in fields {
         let Ok(field) = schema.get_field(field_name) else {
             continue;
         };
 
-        // Estimate the number of unique terms across all segments. This is
-        // an upper bound — duplicates across segments inflate it slightly,
-        // but oversizing the bloom is cheap and FPR-safe.
-        let mut term_estimate: usize = 0;
+        // Skip fields with no terms in this file so they don't become an
+        // empty column in the transposed matrix.
+        let mut has_terms = false;
         for seg in searcher.segment_readers() {
-            let inv = match seg.inverted_index(field) {
-                Ok(i) => i,
-                Err(_) => continue,
-            };
-            term_estimate = term_estimate.saturating_add(inv.terms().num_terms());
+            if let Ok(inv) = seg.inverted_index(field)
+                && inv.terms().num_terms() > 0
+            {
+                has_terms = true;
+                break;
+            }
         }
-        if term_estimate == 0 {
+        if !has_terms {
             continue;
         }
 
-        let idx = builder.begin(file_id, field_name, term_estimate);
+        // Uniform block count across the whole group (caller-provided).
+        let idx = builder.begin_with_blocks(file_id, field_name, num_blocks);
 
         for seg in searcher.segment_readers() {
             let inv = match seg.inverted_index(field) {
@@ -183,6 +187,7 @@ mod tests {
         .unwrap()
         .expect("index built");
 
+        let num_blocks = infra::bloom::num_blocks_for(200, 0.01);
         let blooms = build_blooms_from_index(
             &index,
             42,
@@ -192,7 +197,7 @@ mod tests {
                 "level".to_string(),
                 "missing_field".to_string(),
             ],
-            0.01,
+            num_blocks,
         )
         .await
         .unwrap();
@@ -204,18 +209,18 @@ mod tests {
             assert!(!b.bytes.is_empty());
         }
 
-        // Round-trip via the .bf format and verify positives match.
-        // Uses the same single-block API the pruner uses in production:
-        // `block_range_for` → fetch 32 B → `check_block_with_hash`.
+        // Round-trip via the transposed `.bf` format: row_range → slice the
+        // file's column → check_block (the same path the pruner uses).
         use infra::bloom::{BloomReader, BloomWriter, sbbf::BLOCK_BYTES};
         let blob = BloomWriter::serialize(blooms).unwrap();
         let reader = BloomReader::parse(&blob).unwrap();
 
         let check = |field: &str, file_id: u64, v: &[u8]| -> Option<bool> {
-            let (range, h) = reader.block_range_for(field, file_id, v)?;
-            let s = range.start as usize;
-            let e = range.end as usize;
-            let block: &[u8; BLOCK_BYTES] = blob[s..e].try_into().unwrap();
+            let (range, h) = reader.row_range(field, v)?;
+            let col = reader.column_index(field, file_id)?;
+            let row = &blob[range.start as usize..range.end as usize];
+            let off = col * BLOCK_BYTES;
+            let block: &[u8; BLOCK_BYTES] = row[off..off + BLOCK_BYTES].try_into().unwrap();
             Some(BloomReader::check_block_with_hash(block, h))
         };
 
@@ -260,7 +265,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let blooms = build_blooms_from_index(&index, 1, &[], 0.01).await.unwrap();
+        let blooms = build_blooms_from_index(&index, 1, &[], 256).await.unwrap();
         assert!(blooms.is_empty());
     }
 }

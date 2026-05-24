@@ -134,6 +134,25 @@ pub async fn build_for_bucket(
     // Files we couldn't build for (or that produced no blooms because
     // the field isn't in their schema) keep `bloom_ver = 0` so search
     // doesn't pay a wasted `.bf` fetch only to find them missing.
+    // Transposed `.bf` layout requires a group-uniform `num_blocks` so a
+    // value maps to the same block index across all files. Size it from
+    // the group's MAX record count (records is in file metadata — no extra
+    // IO), divided by the configured ndv ratio, at the default FPP. Every
+    // file in this build gets this same B.
+    const BLOOM_BUILD_FPP: f64 = 0.01;
+    let ndv_ratio = cfg.common.bloom_filter_ndv_ratio.max(1);
+    let max_records = files
+        .iter()
+        .filter(|f| f.meta.bloom_ver == 0)
+        .map(|f| f.meta.records.max(0) as u64)
+        .max()
+        .unwrap_or(0);
+    let group_ndv = (max_records / ndv_ratio).max(1);
+    let num_blocks = infra::bloom::num_blocks_for(group_ndv, BLOOM_BUILD_FPP);
+    log::debug!(
+        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: group num_blocks={num_blocks} (max_records={max_records}, ndv_ratio={ndv_ratio})"
+    );
+
     let mut all_blooms: Vec<FieldBloom> = Vec::new();
     let mut contributing_ids: Vec<i64> = Vec::new();
     let mut considered: usize = 0;
@@ -142,7 +161,7 @@ pub async fn build_for_bucket(
             continue; // already stamped; do not touch
         }
         considered += 1;
-        match build_blooms_for_file(f, &target_fields).await {
+        match build_blooms_for_file(f, &target_fields, num_blocks).await {
             Ok(mut blooms) if !blooms.is_empty() => {
                 all_blooms.append(&mut blooms);
                 contributing_ids.push(f.id);
@@ -218,6 +237,7 @@ pub async fn build_for_bucket(
 async fn build_blooms_for_file(
     file: &FileKey,
     target_fields: &[String],
+    num_blocks: u32,
 ) -> anyhow::Result<Vec<FieldBloom>> {
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
         return Ok(Vec::new()); // not an indexable file
@@ -245,5 +265,5 @@ async fn build_blooms_for_file(
     // happened in `write_file_list` before this build runs. Always > 0
     // by the time we get here.
     let file_id = file.id as u64;
-    build_blooms_from_index(&index, file_id, target_fields, 0.01).await
+    build_blooms_from_index(&index, file_id, target_fields, num_blocks).await
 }
