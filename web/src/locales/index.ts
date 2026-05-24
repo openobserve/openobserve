@@ -28,6 +28,7 @@ import jaLocale from "./languages/ja.json";
 import koLocale from "./languages/ko.json";
 import nlLocale from "./languages/nl.json";
 import ptLocale from "./languages/pt.json";
+import zhTWLocale from "./languages/zh_TW.json";
 
 const messages = {
   "en-gb": {
@@ -62,6 +63,9 @@ const messages = {
   },
   pt: {
     ...ptLocale,
+  },
+  "zh-tw": {
+    ...zhTWLocale,
   },
 };
 
