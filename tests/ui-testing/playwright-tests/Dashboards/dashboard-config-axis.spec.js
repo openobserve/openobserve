@@ -144,7 +144,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label position and rotate persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-label-position"]')).toContainText("Top");
+    await expect(page.locator('[data-test="dashboard-config-label-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'top');
     await expect(page.locator('[data-test="dashboard-config-label-rotate"]').locator('[data-test$="-field"]')).toHaveValue("45");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -178,7 +178,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const truncateInput = page.locator('[data-test="dashboard-config-axis-label-truncate-width"]');
+    const truncateInput = page.locator('[data-test="dashboard-config-axis-label-truncate"]');
     await expect(truncateInput).toBeVisible();
     await truncateInput.locator('[data-test$="-field"]').fill("50");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -189,7 +189,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label truncate width persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-axis-label-truncate-width"]').locator('[data-test$="-field"]')).toHaveValue("50");
+    await expect(page.locator('[data-test="dashboard-config-axis-label-truncate"]').locator('[data-test$="-field"]')).toHaveValue("50");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

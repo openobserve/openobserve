@@ -65,7 +65,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying trellis Custom layout and 16 columns persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toContainText("custom");
+    await expect(page.locator('[data-test="dashboard-trellis-chart-trigger"]')).toHaveAttribute('data-test-selected-value', 'custom');
     await expect(page.locator('[data-test="trellis-chart-num-of-columns"]').locator('[data-test$="-field"]')).toHaveValue("16");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

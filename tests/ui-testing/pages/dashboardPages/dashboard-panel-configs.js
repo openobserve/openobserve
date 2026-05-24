@@ -166,6 +166,29 @@ export default class DashboardPanelConfigs {
       '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
   }
+  /**
+   * Atomically find and click a virtual-list option.
+   * OSelect uses TanStack Virtual — items can detach/re-attach during layout.
+   * page.waitForFunction runs synchronously in the browser, so querySelector
+   * and click() happen in the same JS tick with no detach window between them.
+   */
+  async _clickVirtualOption(dataTestParent, label) {
+    await this.page.waitForFunction(
+      (args) => {
+        const parent = args[0];
+        const lbl = args[1];
+        const el = document.querySelector(
+          '[data-test="' + parent + '-option"][data-test-label="' + lbl + '"]'
+        );
+        if (!el) return false;
+        el.click();
+        return true;
+      },
+      [dataTestParent, label],
+      { timeout: 15000 }
+    );
+  }
+
   /// Open the config panel
   async openConfigPanel() {
     await this.configBtn.waitFor({ state: "visible" });
@@ -173,16 +196,26 @@ export default class DashboardPanelConfigs {
   }
   // Select legend position
   async legendPosition(position) {
-    await this.legend.waitFor({ state: "visible" });
-    await this.legend.click();
-    await this.page.locator(`[data-test="dashboard-config-legend-position-option"][data-test-label="${position}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-legend-position-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-legend-position-option"][data-test-label="${position}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   // Select unit
   async selectUnit(unit) {
-    await this.unit.waitFor({ state: "visible" });
-    await this.unit.click();
-    await this.page.locator(`[data-test="dashboard-config-unit-option"][data-test-label="${unit}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-unit-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    // OSelect is virtualised — type in the search input to bring the option into the DOM
+    const searchInput = this.page.locator('[data-test="dashboard-config-unit-search"]');
+    await searchInput.waitFor({ state: "visible" });
+    await searchInput.fill(unit);
+    const option = this.page.locator(`[data-test="dashboard-config-unit-option"][data-test-label="${unit}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //Decimals
@@ -222,9 +255,12 @@ export default class DashboardPanelConfigs {
 
   // Value position
   async selectValuePosition(position) {
-    await this.valuePosition.waitFor({ state: "visible" });
-    await this.valuePosition.click();
-    await this.page.locator(`[data-test="dashboard-config-label-position-option"][data-test-label="${position}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-label-position-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-label-position-option"][data-test-label="${position}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   // Value rotate
@@ -235,15 +271,17 @@ export default class DashboardPanelConfigs {
 
   //show symbols
   async selectSymbols(symbols) {
-    await this.showSymbols.waitFor({ state: "visible" });
-    await this.showSymbols.click();
-    await this.page.locator(`[data-test="dashboard-config-show_symbol-option"][data-test-label="${symbols}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-show_symbol-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-show_symbol", symbols);
   }
   // Line interpolation
   async selectLineInterpolation(interpolation) {
-    await this.lineInterpolation.waitFor({ state: "visible" });
-    await this.lineInterpolation.click();
-    await this.page.locator(`[data-test="dashboard-config-line_interpolation-option"][data-test-label="${interpolation}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-line_interpolation-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-line_interpolation", interpolation);
   }
 
   // Line thickness
@@ -265,9 +303,12 @@ export default class DashboardPanelConfigs {
 
   //Base Map
   async selectBaseMap(map) {
-    await this.baseMap.waitFor({ state: "visible" });
-    await this.baseMap.click();
-    await this.page.locator(`[data-test="dashboard-config-basemap-option"][data-test-label="${map}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-basemap-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-basemap-option"][data-test-label="${map}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //Lattitude and longitude
@@ -290,9 +331,12 @@ export default class DashboardPanelConfigs {
 
   //Symbol size
   async selectSymbolSize(size) {
-    await this.symbolSize.waitFor({ state: "visible" });
-    await this.symbolSize.click();
-    await this.page.locator(`[data-test="dashboard-config-symbol-option"][data-test-label="${size}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-symbol-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-symbol-option"][data-test-label="${size}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //Minimum and maximum size
@@ -308,9 +352,12 @@ export default class DashboardPanelConfigs {
 
   //layer type
   async selectLayerType(type) {
-    await this.layerType.waitFor({ state: "visible" });
-    await this.layerType.click();
-    await this.page.locator(`[data-test="dashboard-config-layer-type-option"][data-test-label="${type}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-layer-type-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-layer-type-option"][data-test-label="${type}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //weight
@@ -321,9 +368,12 @@ export default class DashboardPanelConfigs {
 
   //Map configs
   async selectMapType(type) {
-    await this.mapType.waitFor({ state: "visible" });
-    await this.mapType.click();
-    await this.page.locator(`[data-test="dashboard-config-map-type-option"][data-test-label="${type}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-map-type-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-map-type-option"][data-test-label="${type}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //table chast configs
@@ -526,9 +576,12 @@ export default class DashboardPanelConfigs {
   //Metric Text
   //BG color
   async selectBGColor(color) {
-    await this.bgColor.waitFor({ state: "visible" });
-    await this.bgColor.click();
-    await this.page.locator(`[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    const option = this.page.locator(`[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`);
+    await option.waitFor({ state: "visible" });
+    await option.click();
   }
 
   //Guage chart configs

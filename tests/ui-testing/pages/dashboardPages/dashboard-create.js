@@ -46,9 +46,6 @@ export default class DashboardCreate {
     const importBtn = this.page.locator('[data-test="dashboard-import"]');
     await importBtn.waitFor({ state: "visible", timeout: 10000 });
     await importBtn.waitFor({ state: "attached", timeout: 5000 });
-
-    // Small wait for any animations to complete
-    await this.page.waitForTimeout(500);
   }
 
   //Create Dashboard
@@ -91,7 +88,7 @@ export default class DashboardCreate {
     await this.submitBtn.click();
 
     // Wait for the success notification to confirm dashboard was created
-    await this.page.getByText('Dashboard added successfully.').first().waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator('[data-test="o-toast-success"]').waitFor({ state: 'visible', timeout: 15000 });
 
     // Wait for navigation to the new dashboard view page
     await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
@@ -101,8 +98,8 @@ export default class DashboardCreate {
       // Ignore timeout - continue anyway
     });
 
-    // Additional wait for Vue components to mount
-    await this.page.waitForTimeout(2000);
+    // Wait for Vue components to mount — use deterministic check on panel editor or back button
+    await this.page.locator('[data-test="dashboard-back-btn"]').waitFor({ state: 'visible', timeout: 15000 });
   }
 
   //back to dashboard list
@@ -152,7 +149,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
       await this.addPanelIfEmptyBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await this.addPanelIfEmptyBtn.click();
@@ -166,7 +162,6 @@ export default class DashboardCreate {
           throw new Error(`addPanel: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 
@@ -185,7 +180,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await addPanelBtn.waitFor({ state: "visible", timeout: 15000 });
       await addPanelBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await addPanelBtn.click();
@@ -199,7 +193,6 @@ export default class DashboardCreate {
           throw new Error(`addPanelToExistingDashboard: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 
@@ -223,7 +216,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await targetBtn.waitFor({ state: "visible", timeout: 15000 });
       await targetBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await targetBtn.click();
@@ -237,7 +229,6 @@ export default class DashboardCreate {
           throw new Error(`addPanelSmart: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 

@@ -110,7 +110,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol size Fixed persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-symbol"]')).toContainText("fixed");
+    await expect(page.locator('[data-test="dashboard-config-symbol-trigger"]')).toHaveAttribute('data-test-selected-value', 'fixed');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -138,7 +138,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying layer type Heatmap persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-layer-type"]')).toContainText("heatmap");
+    await expect(page.locator('[data-test="dashboard-config-layer-type-trigger"]')).toHaveAttribute('data-test-selected-value', 'heatmap');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -185,7 +185,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying map type World persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-map-type"]')).toContainText("world");
+    await expect(page.locator('[data-test="dashboard-config-map-type-trigger"]')).toHaveAttribute('data-test-selected-value', 'world');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

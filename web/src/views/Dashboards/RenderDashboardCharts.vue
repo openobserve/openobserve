@@ -212,11 +212,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
-                          v-model="panelTimeValues[item.id]"
+                          :modelValue="panelTimeValues[item.id]"
                           :auto-apply-dashboard="false"
                           size="sm"
                           class="panel-time-picker-widget"
-                          @update:modelValue="onPanelTimeApply(item.id)"
+                          @update:modelValue="
+                            (val) => onPanelTimeApply(item.id, val)
+                          "
                           :data-test="`panel-time-picker-${item.id}`"
                           :ref="
                             (el) => {
@@ -255,7 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- view panel dialog -->
-      <ODialog data-test="render-dashboard-charts-view-panel-dialog"
+      <ODialog
+        data-test="render-dashboard-charts-view-panel-dialog"
         v-model:open="showViewPanel"
         :width="98"
         :show-close="false"
@@ -323,7 +326,10 @@ import {
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
-import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
+import {
+  panelDownloadRegistry,
+  panelCsvRegistry,
+} from "@/utils/panelDownloadRegistry";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const ViewPanel = defineAsyncComponent(() => {
@@ -400,8 +406,8 @@ export default defineComponent({
     VariablesValueSelector,
     ViewPanel,
     TabList,
-    ODialog: defineAsyncComponent(() =>
-      import("@/lib/overlay/Dialog/ODialog.vue")
+    ODialog: defineAsyncComponent(
+      () => import("@/lib/overlay/Dialog/ODialog.vue"),
     ),
   },
   setup(props: any, { emit }) {
@@ -1246,7 +1252,14 @@ export default defineComponent({
         const currentDateTime = innerDateTimePicker.getConsumableDateTime();
 
         if (currentDateTime) {
-          panelTimeValues.value[panelId] = currentDateTime;
+          if (
+            !arePickerValuesEqual(
+              panelTimeValues.value[panelId],
+              currentDateTime,
+            )
+          ) {
+            panelTimeValues.value[panelId] = currentDateTime;
+          }
         }
       } finally {
         // Unmark after a short delay to allow events to settle
@@ -1370,6 +1383,25 @@ export default defineComponent({
       return props.selectedDateForViewPanel;
     });
 
+    // Semantic equality for picker values — used in both initializePanelTimes and onPanelTimeApply.
+    // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
+    // so we compare semantically: for relative, only compare the period string.
+    const arePickerValuesEqual = (v1: any, v2: any) => {
+      if (!v1 || !v2) return v1 === v2;
+
+      const type1 = v1.valueType || v1.type;
+      const type2 = v2.valueType || v2.type;
+      if (type1 !== type2) return false;
+
+      // For relative: only the period matters (startTime/endTime are computed & change over time)
+      if (type1 === "relative") {
+        return v1.relativeTimePeriod === v2.relativeTimePeriod;
+      }
+
+      // For absolute: compare start and end times
+      return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
+    };
+
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
@@ -1379,25 +1411,6 @@ export default defineComponent({
 
           // Mark this panel as initializing to prevent change events
           panelsInitializing.value.add(panelId);
-
-          // Helper to check if two picker values represent the same time
-          // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
-          // so we compare semantically: for relative, only compare the period string
-          const arePickerValuesEqual = (v1: any, v2: any) => {
-            if (!v1 || !v2) return v1 === v2;
-
-            const type1 = v1.valueType || v1.type;
-            const type2 = v2.valueType || v2.type;
-            if (type1 !== type2) return false;
-
-            // For relative: only the period matters (startTime/endTime are computed & change over time)
-            if (type1 === "relative") {
-              return v1.relativeTimePeriod === v2.relativeTimePeriod;
-            }
-
-            // For absolute: compare start and end times
-            return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
-          };
 
           // When panel has no custom time (panel_time_range is null) and no URL panel params,
           // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
@@ -1473,7 +1486,7 @@ export default defineComponent({
     };
 
     // Handle Apply button click on panel time picker
-    const onPanelTimeApply = async (panelId: string) => {
+    const onPanelTimeApply = async (panelId: string, newValue?: any) => {
       // Guard against infinite recursion during state synchronization
       if (panelsSyncingDateTime.value.has(panelId)) {
         return;
@@ -1483,6 +1496,21 @@ export default defineComponent({
       // This prevents null-config panels from creating spurious URL params
       if (panelsInitializing.value.has(panelId)) {
         return;
+      }
+
+      // Skip when DateTime.vue emits its current value on mount (open-picker cascade).
+      // We use :modelValue (not v-model) so panelTimeValues is NOT auto-written before
+      // this handler runs — enabling a true before/after equality check here.
+      if (
+        newValue &&
+        arePickerValuesEqual(panelTimeValues.value[panelId], newValue)
+      ) {
+        return;
+      }
+
+      // Write the new value now that we know it's changed
+      if (newValue) {
+        panelTimeValues.value[panelId] = newValue;
       }
 
       // Use the local helper which handles state syncing, URL update and variable freeze for this panel
@@ -1556,7 +1584,10 @@ export default defineComponent({
       // Report-server helper — returns { [panelId]: { title, csv } } as a plain
       // JS object so the report server can capture it via page.evaluate().
       // Usage:  window.oo_getAllPanelsCsv()
-      (window as any).oo_getAllPanelsCsv = (): Record<string, { title: string; csv: string }> => {
+      (window as any).oo_getAllPanelsCsv = (): Record<
+        string,
+        { title: string; csv: string }
+      > => {
         const result: Record<string, { title: string; csv: string }> = {};
         panelCsvRegistry.forEach((fn, id) => {
           try {

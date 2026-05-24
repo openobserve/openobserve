@@ -46,7 +46,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol No persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show_symbol"]')).toContainText("No");
+    await expect(page.locator('[data-test="dashboard-config-show_symbol-trigger"]')).toHaveAttribute('data-test-selected-value', 'false');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -71,7 +71,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line interpolation Step After persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-line_interpolation"]')).toContainText("Step After");
+    await expect(page.locator('[data-test="dashboard-config-line_interpolation-trigger"]')).toHaveAttribute('data-test-selected-value', 'step-end');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

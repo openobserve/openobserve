@@ -67,7 +67,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     const nameAfter = page.locator('[data-test="dashboard-config-markline-name-0"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(valueAfter);
     // q-select uses emit-value without map-options → displays raw stored value ("yAxis" not "Y-Axis")
-    await expect(page.locator('[data-test="dashboard-config-markline-type-0"]')).toContainText("yAxis");
+    await expect(page.locator('[data-test="dashboard-config-markline-type-0-trigger"]')).toHaveAttribute('data-test-selected-value', 'yAxis');
     await expect(valueAfter.locator('[data-test$="-field"]')).toHaveValue("100");
     await expect(nameAfter.locator('[data-test$="-field"]')).toHaveValue("threshold");
     testLogger.info("Mark line type, value and label persisted");
@@ -103,8 +103,8 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').click();
     await page.locator('[data-test="dashboard-config-markline-name-1"]').locator('[data-test$="-field"]').fill("max");
 
-    await expect(type0).toContainText("average");
-    await expect(type1).toContainText("max");
+    await expect(page.locator('[data-test="dashboard-config-markline-type-0-trigger"]')).toHaveAttribute('data-test-selected-value', 'average');
+    await expect(page.locator('[data-test="dashboard-config-markline-type-1-trigger"]')).toHaveAttribute('data-test-selected-value', 'max');
     testLogger.info("Two mark lines added with independent types");
 
     // Remove first row — second shifts to index 0

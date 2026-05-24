@@ -111,15 +111,19 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(tableModeDropdown).toBeVisible();
 
     // Switch to "Expanded Time series"
-    await tableModeDropdown.click();
-    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Expanded Time series"]').click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').click();
+    const expandedOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Expanded Time series"]');
+    await expandedOption.waitFor({ state: "visible" });
+    await expandedOption.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Expanded Time series");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Switch to "Aggregate"
-    await tableModeDropdown.click();
-    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').click();
+    const aggregateOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]');
+    await aggregateOption.waitFor({ state: "visible" });
+    await aggregateOption.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Aggregate");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -234,8 +238,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
   async function switchToAggregateMode(page, pm) {
     const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
-    await tableModeDropdown.click();
-    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').click();
+    const option = page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]');
+    await option.waitFor({ state: "visible" });
+    await option.click();
     testLogger.info("Table mode switched to Aggregate");
   }
 
@@ -251,8 +257,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(aggDropdown).toBeVisible();
 
     // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last (+1 more)"
-    await aggDropdown.click();
-    await page.locator('[data-test="dashboard-config-table-aggregations-option"][data-test-label="Avg (average)"]').click();
+    await page.locator('[data-test="dashboard-config-table-aggregations-trigger"]').click();
+    const avgOption = page.locator('[data-test="dashboard-config-table-aggregations-option"][data-test-label="Avg (average)"]');
+    await avgOption.waitFor({ state: "visible" });
+    await avgOption.click();
     await page.keyboard.press('Escape');
     testLogger.info("Table aggregations: added Avg (now last + avg)");
 
@@ -282,11 +290,13 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(visibleColsInput).toBeVisible();
 
     // Type a custom column name and press Enter (new-value-mode="add-unique")
-    // Explicit click ensures focus in headless CI before typing
-    await visibleColsInput.click();
-    await visibleColsInput.pressSequentially("instance");
-    await visibleColsInput.press("Enter");
-    await visibleColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
+    // Click the trigger to open the dropdown, then type in the portal search input
+    await page.locator('[data-test="dashboard-config-visible-columns-trigger"]').click();
+    const visibleSearchInput = page.locator('[data-test="dashboard-config-visible-columns-search"]');
+    await visibleSearchInput.waitFor({ state: "visible" });
+    await visibleSearchInput.fill("instance");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
 
     // OSelect root contains the selected chip text
@@ -317,10 +327,12 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenColsInput);
     await expect(hiddenColsInput).toBeVisible();
 
-    await hiddenColsInput.click();
-    await hiddenColsInput.pressSequentially("job");
-    await hiddenColsInput.press("Enter");
-    await hiddenColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
+    await page.locator('[data-test="dashboard-config-hidden-columns-trigger"]').click();
+    const hiddenSearchInput = page.locator('[data-test="dashboard-config-hidden-columns-search"]');
+    await hiddenSearchInput.waitFor({ state: "visible" });
+    await hiddenSearchInput.fill("job");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
 
     await expect(hiddenColsInput).toContainText("job");
@@ -351,10 +363,12 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
     await expect(stickyColsInput).toBeVisible();
 
-    await stickyColsInput.click();
-    await stickyColsInput.pressSequentially("instance");
-    await stickyColsInput.press("Enter");
-    await stickyColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
+    await page.locator('[data-test="dashboard-config-sticky-columns-trigger"]').click();
+    const stickySearchInput = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
+    await stickySearchInput.waitFor({ state: "visible" });
+    await stickySearchInput.fill("instance");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
 
     await expect(stickyColsInput).toContainText("instance");
@@ -597,8 +611,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     // Map type select — click and choose "World" (label is capitalized via t("dashboard.world"))
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeSelect);
     await expect(mapTypeSelect).toBeVisible();
-    await mapTypeSelect.click();
-    await page.locator('[data-test="dashboard-config-map-type-option"][data-test-label="World"]').click();
+    await page.locator('[data-test="dashboard-config-map-type-trigger"]').click();
+    const worldOption = page.locator('[data-test="dashboard-config-map-type-option"][data-test-label="World"]');
+    await worldOption.waitFor({ state: "visible" });
+    await worldOption.click();
     testLogger.info("Maps map type set to 'World'");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -614,9 +630,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
     await expect(nameLabelAfter.locator('[data-test$="-field"]')).toHaveValue("country_name");
 
-    // OSelect root contains the selected value text
+    // OSelect trigger carries data-test-selected-value with the raw stored value
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeAfter);
-    await expect(mapTypeAfter).toContainText("world");
+    await expect(page.locator('[data-test="dashboard-config-map-type-trigger"]')).toHaveAttribute('data-test-selected-value', 'world');
     testLogger.info("Maps name label and map type persisted after save");
 
     await pm.dashboardPanelActions.savePanel();
@@ -663,8 +679,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Set legend for Query 1 (currentQueryIndex = 0 by default)
     const legendInput = page.locator('[data-test="common-auto-complete"]');
+    const legendField = legendInput.locator('[data-test$="-field"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
-    await legendInput.fill("Legend Q1");
+    await legendField.fill("Legend Q1");
     testLogger.info("Legend set for Query 1");
 
     // Add a second query via query editor add button (data-test has literal backticks — use *=)
@@ -685,7 +702,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Set legend for Query 2
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
-    await legendInput.fill("Legend Q2");
+    await legendField.fill("Legend Q2");
     testLogger.info("Legend set for Query 2");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -702,14 +719,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await tab0After.click();
     await expect(tab0After).toHaveAttribute("aria-selected", "true");
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
-    await expect(legendInput).toHaveValue("Legend Q1");
+    await expect(legendField).toHaveValue("Legend Q1");
     testLogger.info("Query 1 legend persisted");
 
     // Query 2 tab should show "Legend Q2"
     await tab1After.click();
     await expect(tab1After).toHaveAttribute("aria-selected", "true");
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
-    await expect(legendInput).toHaveValue("Legend Q2");
+    await expect(legendField).toHaveValue("Legend Q2");
     testLogger.info("Query 2 legend persisted");
 
     await pm.dashboardPanelActions.savePanel();
