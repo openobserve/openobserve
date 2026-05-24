@@ -166,6 +166,13 @@ code {
 // ═══════════════════════════════════════════════════════════════
 // 5. Card Surfaces
 // ═══════════════════════════════════════════════════════════════
+.o2-custom-bg {
+  background: var(--o2-body-secondary-bg);
+  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
+  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
+  overflow: hidden;
+}
+
 .card-container {
   background-color: var(--o2-card-bg);
   border-radius: 0.375rem;
