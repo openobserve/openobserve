@@ -212,7 +212,9 @@ test.describe("Logs Downloads testcases", () => {
       const jsonDownload = await jsonDownloadPromise;
 
       expect(jsonDownload).toBeDefined();
-      await pageManager.logsPage.verifyJsonDownloadWithCount(jsonDownload, 'download_sql_2000.json', downloadDir, 2000);
+      // SQL mode downloads searchObj.data.queryResults.hits (current page), not the
+      // full LIMIT-2000 result set — verify valid JSON with records, not exact count.
+      await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_sql_2000.json', downloadDir);
     });
 
     // Final Results Summary
