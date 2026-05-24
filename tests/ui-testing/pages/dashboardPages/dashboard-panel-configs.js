@@ -1,6 +1,8 @@
 //dashboard panel configs page object
 //methods: All configs related to dashboard panels
 
+import { expect } from "@playwright/test";
+
 export default class DashboardPanelConfigs {
   constructor(page) {
     this.page = page;
@@ -199,9 +201,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-legend-position-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-legend-position-option"][data-test-label="${position}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 
   // Select unit
@@ -209,13 +209,11 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-unit-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    // OSelect is virtualised — type in the search input to bring the option into the DOM
+    // OSelect has 18+ items; use search to filter before clicking
     const searchInput = this.page.locator('[data-test="dashboard-config-unit-search"]');
     await searchInput.waitFor({ state: "visible" });
     await searchInput.fill(unit);
-    const option = this.page.locator(`[data-test="dashboard-config-unit-option"][data-test-label="${unit}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-unit", unit);
   }
 
   //Decimals
@@ -258,9 +256,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-label-position-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-label-position-option"][data-test-label="${position}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-label-position", position);
   }
 
   // Value rotate
@@ -293,10 +289,10 @@ export default class DashboardPanelConfigs {
   async selectTrellisLayout(layout) {
     const trigger = this.page.locator('[data-test="dashboard-trellis-chart-trigger"]');
     await trigger.waitFor({ state: "visible" });
+    // Trellis is disabled when breakdown field is empty; wait for it to be enabled
+    await expect(trigger).toBeEnabled({ timeout: 15000 });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-trellis-chart-option"][data-test-label="${layout}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-trellis-chart", layout);
   }
 
   //GEO Map Configs
@@ -306,9 +302,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-basemap-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-basemap-option"][data-test-label="${map}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-basemap", map);
   }
 
   //Lattitude and longitude
@@ -334,9 +328,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-symbol-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-symbol-option"][data-test-label="${size}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-symbol", size);
   }
 
   //Minimum and maximum size
@@ -355,9 +347,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-layer-type-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-layer-type-option"][data-test-label="${type}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-layer-type", type);
   }
 
   //weight
@@ -371,9 +361,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-map-type-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-map-type-option"][data-test-label="${type}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-map-type", type);
   }
 
   //table chast configs
@@ -579,9 +567,7 @@ export default class DashboardPanelConfigs {
     const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
     await trigger.waitFor({ state: "visible" });
     await trigger.click();
-    const option = this.page.locator(`[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`);
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    await this._clickVirtualOption("dashboard-config-color-mode", color);
   }
 
   //Guage chart configs
