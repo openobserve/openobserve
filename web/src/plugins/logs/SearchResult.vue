@@ -208,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             class="histogram-empty"
+            data-test="logs-search-no-data-histogram"
             v-else-if="
               searchObj.meta.showHistogram &&
               !searchObj.loadingHistogram &&
