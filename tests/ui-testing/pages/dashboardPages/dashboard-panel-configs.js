@@ -113,7 +113,7 @@ export default class DashboardPanelConfigs {
     this.overrideTypeSelect = page.locator(
       '[data-test="dashboard-addpanel-config-type-select-0"]'
     );
-    this.sidebarScrollContainer = page.locator('.sidebar-content.scroll');
+    this.sidebarScrollContainer = page.locator('[data-test="panel-sidebar-content"]');
     this.connectNullValuesToggle = page.locator(
       '[data-test="dashboard-config-connect-null-values"]'
     );
@@ -175,14 +175,14 @@ export default class DashboardPanelConfigs {
   async legendPosition(position) {
     await this.legend.waitFor({ state: "visible" });
     await this.legend.click();
-    await this.page.getByRole("option", { name: position }).click();
+    await this.page.locator(`[data-test="dashboard-config-legend-position-option"][data-test-label="${position}"]`).click();
   }
 
   // Select unit
   async selectUnit(unit) {
     await this.unit.waitFor({ state: "visible" });
     await this.unit.click();
-    await this.page.getByRole("option", { name: unit, exact: true }).click();
+    await this.page.locator(`[data-test="dashboard-config-unit-option"][data-test-label="${unit}"]`).click();
   }
 
   //Decimals
@@ -229,7 +229,7 @@ export default class DashboardPanelConfigs {
   async selectValuePosition(position) {
     await this.valuePosition.waitFor({ state: "visible" });
     await this.valuePosition.click();
-    await this.page.getByRole("option", { name: position, exact: true }).click();
+    await this.page.locator(`[data-test="dashboard-config-label-position-option"][data-test-label="${position}"]`).click();
   }
 
   // Value rotate
@@ -243,13 +243,13 @@ export default class DashboardPanelConfigs {
   async selectSymbols(symbols) {
     await this.showSymbols.waitFor({ state: "visible" });
     await this.showSymbols.click();
-    await this.page.getByRole("option", { name: symbols }).click();
+    await this.page.locator(`[data-test="dashboard-config-show_symbol-option"][data-test-label="${symbols}"]`).click();
   }
   // Line interpolation
   async selectLineInterpolation(interpolation) {
     await this.lineInterpolation.waitFor({ state: "visible" });
     await this.lineInterpolation.click();
-    await this.page.getByRole("option", { name: interpolation }).click();
+    await this.page.locator(`[data-test="dashboard-config-line_interpolation-option"][data-test-label="${interpolation}"]`).click();
   }
 
   // Line thickness
@@ -262,16 +262,16 @@ export default class DashboardPanelConfigs {
   async selectTrellisLayout(layout) {
     await this.trellisLayout.waitFor({ state: "visible" });
     await this.trellisLayout.click();
-    await this.page.getByRole("option", { name: layout }).click();
+    await this.page.locator(`[data-test="dashboard-trellis-chart-option"][data-test-label="${layout}"]`).click();
   }
 
   //GEO Map Configs
 
   //Base Map
-  async selectBaseMap() {
+  async selectBaseMap(map) {
     await this.baseMap.waitFor({ state: "visible" });
     await this.baseMap.click();
-    await this.page.getByRole("option", { name: map }).click();
+    await this.page.locator(`[data-test="dashboard-config-basemap-option"][data-test-label="${map}"]`).click();
   }
 
   //Lattitude and longitude
@@ -300,7 +300,7 @@ export default class DashboardPanelConfigs {
   async selectSymbolSize(size) {
     await this.symbolSize.waitFor({ state: "visible" });
     await this.symbolSize.click();
-    await this.page.getByRole("option", { name: size }).click();
+    await this.page.locator(`[data-test="dashboard-config-symbol-option"][data-test-label="${size}"]`).click();
   }
 
   //Minimum and maximum size
@@ -320,7 +320,7 @@ export default class DashboardPanelConfigs {
   async selectLayerType(type) {
     await this.layerType.waitFor({ state: "visible" });
     await this.layerType.click();
-    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator(`[data-test="dashboard-config-layer-type-option"][data-test-label="${type}"]`).click();
   }
 
   //weight
@@ -334,7 +334,7 @@ export default class DashboardPanelConfigs {
   async selectMapType(type) {
     await this.mapType.waitFor({ state: "visible" });
     await this.mapType.click();
-    await this.page.getByRole("option", { name: type }).click();
+    await this.page.locator(`[data-test="dashboard-config-map-type-option"][data-test-label="${type}"]`).click();
   }
 
   //table chast configs
@@ -380,7 +380,7 @@ export default class DashboardPanelConfigs {
     // OSelect forwards parent data-test to ListboxItem (`*-option`).
     const columnOptions = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"]');
     if (columnName) {
-      const columnOption = columnOptions.filter({ hasText: columnName }).first();
+      const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`);
       await columnOption.waitFor({ state: "visible", timeout: 5000 });
       await columnOption.click();
     } else {
@@ -393,7 +393,7 @@ export default class DashboardPanelConfigs {
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
     await unitSelect.click();
     const unitOption = this.page
-      .locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"]', { hasText: unitName })
+      .locator(`[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"][data-test-label="${unitName}"]`)
       .first();
     await unitOption.click();
 
@@ -428,8 +428,9 @@ export default class DashboardPanelConfigs {
     await textInput.fill(text);
 
     if (setColor) {
-      await popup.getByText("Set color").click();
-      await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
+      const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
+      await setColorBtn.click();
+      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
     }
 
     // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
@@ -467,30 +468,30 @@ export default class DashboardPanelConfigs {
     // Select column
     await this.overrideColumnSelect.waitFor({ state: "visible" });
     await this.overrideColumnSelect.click();
-    const columnOption = this.page.getByRole("option", { name: columnName }).first();
+    const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`).first();
     await columnOption.waitFor({ state: "visible" });
     await columnOption.click();
 
     // Select type
     await this.overrideTypeSelect.waitFor({ state: "visible" });
     await this.overrideTypeSelect.click();
-    const typeOption = this.page.getByRole("option", { name: typeName }).first();
+    const typeOption = this.page.locator(`[data-test="dashboard-addpanel-config-type-select-0-option"][data-test-label="${typeName}"]`).first();
     await typeOption.waitFor({ state: "visible" });
     await typeOption.click();
 
     // Optionally enable checkbox corresponding to the selected type
     if (enableTypeCheckbox) {
-      const typeCheckbox = this.page.getByRole("checkbox", { name: typeName });
+      const typeCheckbox = this.page.locator('[data-test="dashboard-addpanel-config-override-unique-value-checkbox-0"]');
       await typeCheckbox.waitFor({ state: "visible" });
       await typeCheckbox.click();
     }
-      const saveBtn = this.page.getByRole('button', { name: 'Save' });
+      const saveBtn = this.page.locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-primary-btn"]');
       await saveBtn.waitFor({ state: "visible", timeout: 5000 });
       await saveBtn.click();
   } 
   // Click-hold on the sidebar and scroll down until the Override button is visible
   async scrollDownSidebarUntilOverrideVisible() {
-    const sidebar = this.page.locator('.sidebar-content');
+    const sidebar = this.sidebarScrollContainer;
     await sidebar.waitFor({ state: "visible" });
 
     // Bring sidebar into view and hover so wheel events target it
@@ -510,10 +511,7 @@ export default class DashboardPanelConfigs {
       await this.page.evaluate((selector) => {
         const el = document.querySelector(selector);
         if (el) el.scrollTop = el.scrollHeight;
-      }, ".sidebar-content");
-
-      // Wait a bit for scroll to complete
-      await this.page.waitForTimeout(500);
+      }, '[data-test="panel-sidebar-content"]');
     }
 
     // Ensure the button is actually visible before proceeding
@@ -531,7 +529,6 @@ export default class DashboardPanelConfigs {
           button.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       });
-      await this.page.waitForTimeout(1000);
     }
 
     // Finally wait for it to be visible
@@ -542,7 +539,7 @@ export default class DashboardPanelConfigs {
   async selectBGColor(color) {
     await this.bgColor.waitFor({ state: "visible" });
     await this.bgColor.click();
-    await this.page.getByRole("option", { name: color }).click();
+    await this.page.locator(`[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`).click();
   }
 
   //Guage chart configs
@@ -591,14 +588,13 @@ export default class DashboardPanelConfigs {
    * @param {import('@playwright/test').Locator} targetLocator - Element to scroll to
    */
   async scrollSidebarToElement(targetLocator) {
-    const sidebar = this.page.locator('.sidebar-content');
+    const sidebar = this.sidebarScrollContainer;
     await sidebar.waitFor({ state: "visible" });
     await sidebar.hover();
 
     for (let i = 0; i < 15; i++) {
       if (await targetLocator.isVisible().catch(() => false)) break;
       await this.page.mouse.wheel(0, 300);
-      await this.page.waitForTimeout(200);
     }
 
     if (!(await targetLocator.isVisible().catch(() => false))) {
@@ -609,14 +605,13 @@ export default class DashboardPanelConfigs {
         return el.getAttribute('data-test')
           ? `[data-test="${el.getAttribute('data-test')}"]`
           : null;
-      }).catch(() => null) || '.sidebar-content');
+      }).catch(() => null) || '[data-test="panel-sidebar-content"]');
 
       // Fallback: scroll sidebar to bottom
       await this.page.evaluate(() => {
-        const el = document.querySelector('.sidebar-content');
+        const el = document.querySelector('[data-test="panel-sidebar-content"]');
         if (el) el.scrollTop = el.scrollHeight;
       });
-      await this.page.waitForTimeout(500);
     }
 
     await targetLocator.waitFor({ state: "visible", timeout: 15000 });
@@ -710,10 +705,10 @@ export default class DashboardPanelConfigs {
    */
   async setColorForSeriesRow(rowIndex = 0, color = "#5960b2") {
     // Click "Set color" button if the color picker is not yet initialized
-    const setColorBtn = this.colorBySeriesPopup.getByText("Set color");
-    if (await setColorBtn.first().isVisible().catch(() => false)) {
-      await setColorBtn.first().click();
-      await this.page.waitForTimeout(500);
+    const setColorBtn = this.colorBySeriesPopup.locator(`[data-test="dashboard-addpanel-config-color-by-series-set-color-btn-${rowIndex}"]`);
+    if (await setColorBtn.isVisible().catch(() => false)) {
+      await setColorBtn.click();
+      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
     }
 
     // Strategy 1: Set color via Vue's reactive data (setupState).
@@ -740,9 +735,9 @@ export default class DashboardPanelConfigs {
         }
 
         // Strategy 2: Native input events fallback (works in prod builds)
-        // Find the color input for the given row and set value via native setter + events
-        const colorInputs = popup.querySelectorAll(".color-section input");
-        const input = colorInputs[rowIndex];
+        // Find the color input scoped to the specific row's color section
+        const colorSection = popup.querySelector(`[data-test="dashboard-addpanel-config-color-by-series-color-section-${rowIndex}"]`);
+        const input = colorSection ? colorSection.querySelector('input') : null;
         if (input) {
           const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
             window.HTMLInputElement.prototype, "value"
@@ -761,8 +756,6 @@ export default class DashboardPanelConfigs {
     if (!result.success) {
       throw new Error(`Failed to set color: ${result.reason}`);
     }
-
-    await this.page.waitForTimeout(500);
   }
 
   /**

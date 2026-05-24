@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <th
               v-for="(cell, cellIdx) in level.cells"
               :key="'c_' + levelIdx + '_' + cellIdx"
+              :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
               :colspan="cell.colspan"
               :rowspan="cell.rowspan || 1"
               class="tw:px-2"

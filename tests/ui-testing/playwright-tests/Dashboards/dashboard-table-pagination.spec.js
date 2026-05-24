@@ -910,25 +910,25 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Select table chart type and stream first — the field list is populated from
-    // the stream schema. Without a stream, searchAndAddField would find no rows
-    // because custom SQL mode does not auto-populate the field list.
+    // Select table chart type and stream first in builder mode.
+    // searchAndAddField requires builder mode — in custom SQL mode, showStandardActions()
+    // hides action buttons for fields not yet in customQueryFields (populated only after apply).
+    // The Y-axis field added here persists when switching to custom SQL mode because
+    // removeXYFilters() skips clearing when customQuery is already true.
     await pm.chartTypeSelector.selectChartType("table");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
-    // Open Custom SQL editor
+    // Switch to Custom SQL editor (Y field from builder mode is preserved)
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
-    // Focus on the editor
+    // Fill the SQL query
     await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('code').click();
     await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
-
-    // Add field for table (field list is populated from e2e_automate stream)
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
