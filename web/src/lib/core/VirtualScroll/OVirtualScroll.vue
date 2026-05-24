@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<OVirtualScrollProps<T>>(), {
   overscan: 5,
   scrollTarget: null,
   height: "100%",
+  dynamicRowHeight: false
 });
 
 const emit = defineEmits<OVirtualScrollEmits>();
@@ -43,13 +44,14 @@ const scrollTargetRef = computed(() => props.scrollTarget ?? null);
 
 const itemsRef = computed(() => props.items);
 
-const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measure } =
+const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measure, measureElement } =
   useVirtualScroll({
     items: itemsRef,
     parentRef,
     scrollTarget: scrollTargetRef,
     estimateSize: props.estimateSize,
     overscan: props.overscan,
+    dynamicRowHeight: props.dynamicRowHeight,
   });
 
 // Emit virtual-scroll event on mount and whenever the rendered range changes.
@@ -80,8 +82,14 @@ const containerStyle = computed(() => {
   };
 });
 
+
 // Expose scroll helpers for parent components.
-defineExpose({ scrollToIndex, scrollToTop, measure });
+defineExpose({
+  scrollToIndex,
+  scrollToTop,
+  measure,
+  ...(props.dynamicRowHeight ? { measureElement } : {}),
+});
 </script>
 
 <template>
@@ -108,6 +116,7 @@ defineExpose({ scrollToIndex, scrollToTop, measure });
           width: '100%',
           transform: `translateY(${vItem.start}px)`,
         }"
+        :ref="(node) => dynamicRowHeight && vItem && measureElement(node)"
       >
         <slot :item="(items[vItem.index] as T)" :index="vItem.index" />
       </div>

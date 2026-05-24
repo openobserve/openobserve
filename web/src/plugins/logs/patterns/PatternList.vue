@@ -55,9 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Patterns List with Virtual Scroll -->
       <OVirtualScroll
+        ref="virtualScrollRef"
         :items="patterns"
         :overscan="5"
         :scroll-target="scrollTarget ?? null"
+        :dynamic-row-height="wrap"
       >
         <template #default="{ item: pattern, index }">
           <PatternCard
@@ -128,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
@@ -136,7 +139,7 @@ import useWildcardHover from "./useWildcardHover";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 
-defineProps<{
+const props = defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
@@ -154,6 +157,17 @@ defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
+
+const virtualScrollRef = ref<{ measure: () => void } | null>(null);
+
+// When wrap toggles, reset the virtualizer's measurement cache so
+// cards reposition at their new heights immediately.
+watch(
+  () => props.wrap,
+  () => {
+    nextTick(() => virtualScrollRef.value?.measure());
+  },
+);
 
 const {
   hoveredToken,
