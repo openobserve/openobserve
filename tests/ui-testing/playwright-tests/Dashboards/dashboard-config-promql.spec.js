@@ -299,13 +299,12 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleColsInput);
     await expect(visibleColsInput).toBeVisible();
 
-    // Type a custom column name and press Enter (new-value-mode="add-unique")
-    // Click the trigger to open the dropdown, then type in the portal search input
+    // Click trigger → type to filter → click the filtered option to select it
     await page.locator('[data-test="dashboard-config-visible-columns-trigger"]').click();
     const visibleSearchInput = page.locator('[data-test="dashboard-config-visible-columns-search"]');
     await visibleSearchInput.waitFor({ state: "visible" });
     await visibleSearchInput.fill("instance");
-    await page.keyboard.press("Enter");
+    await page.locator('[data-test="dashboard-config-visible-columns-option"][data-test-label="instance"]').click();
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
 
@@ -341,7 +340,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const hiddenSearchInput = page.locator('[data-test="dashboard-config-hidden-columns-search"]');
     await hiddenSearchInput.waitFor({ state: "visible" });
     await hiddenSearchInput.fill("job");
-    await page.keyboard.press("Enter");
+    await page.locator('[data-test="dashboard-config-hidden-columns-option"][data-test-label="job"]').click();
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
 
@@ -377,7 +376,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const stickySearchInput = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
     await stickySearchInput.waitFor({ state: "visible" });
     await stickySearchInput.fill("instance");
-    await page.keyboard.press("Enter");
+    await page.locator('[data-test="dashboard-config-sticky-columns-option"][data-test-label="instance"]').click();
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
 

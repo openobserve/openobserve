@@ -168,27 +168,12 @@ export default class DashboardPanelConfigs {
       '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
   }
-  /**
-   * Atomically find and click a virtual-list option.
-   * OSelect uses TanStack Virtual — items can detach/re-attach during layout.
-   * page.waitForFunction runs synchronously in the browser, so querySelector
-   * and click() happen in the same JS tick with no detach window between them.
-   */
   async _clickVirtualOption(dataTestParent, label) {
-    await this.page.waitForFunction(
-      (args) => {
-        const parent = args[0];
-        const lbl = args[1];
-        const el = document.querySelector(
-          '[data-test="' + parent + '-option"][data-test-label="' + lbl + '"]'
-        );
-        if (!el) return false;
-        el.click();
-        return true;
-      },
-      [dataTestParent, label],
-      { timeout: 15000 }
+    const option = this.page.locator(
+      `[data-test="${dataTestParent}-option"][data-test-label="${label}"]`
     );
+    await option.waitFor({ state: "visible", timeout: 15000 });
+    await option.click();
   }
 
   /// Open the config panel
