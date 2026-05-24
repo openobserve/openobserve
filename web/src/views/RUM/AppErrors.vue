@@ -19,35 +19,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:pb-[0.625rem]">
       <div class="card-container">
         <div
-          class="tw:text-right tw:p-[0.375rem] tw:flex align-center tw:justify-between"
+          class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
         >
           <syntax-guide />
-          <div class="tw:flex align-center tw:justify-end metrics-date-time">
-            <date-time
-              auto-apply
-              :default-type="errorTrackingState.data.datetime?.valueType"
-              :default-absolute-time="{
-                startTime: errorTrackingState.data.datetime.startTime,
-                endTime: errorTrackingState.data.datetime.endTime,
-              }"
-              :default-relative-time="
-                errorTrackingState.data.datetime.relativeTimePeriod
-              "
-              data-test="logs-search-bar-date-time-dropdown"
-              class="tw:mr-2"
-              @on:date-change="updateDateChange"
-            />
-            <OButton
-              data-test="metrics-explorer-run-query-button"
-              data-cy="metrics-explorer-run-query-button"
-              variant="primary"
-              size="sm-toolbar"
-              :title="t('metrics.runQuery')"
-              @click="runQuery"
-            >
-              {{ t("metrics.runQuery") }}
-            </OButton>
-          </div>
+          <date-time
+            auto-apply
+            :default-type="errorTrackingState.data.datetime?.valueType"
+            :default-absolute-time="{
+              startTime: errorTrackingState.data.datetime.startTime,
+              endTime: errorTrackingState.data.datetime.endTime,
+            }"
+            :default-relative-time="
+              errorTrackingState.data.datetime.relativeTimePeriod
+            "
+            data-test="logs-search-bar-date-time-dropdown"
+            @on:date-change="updateDateChange"
+          />
+          <OButton
+            data-test="metrics-explorer-run-query-button"
+            data-cy="metrics-explorer-run-query-button"
+            variant="primary"
+            size="sm-toolbar"
+            :title="t('metrics.runQuery')"
+            @click="runQuery"
+          >
+            {{ t("metrics.runQuery") }}
+          </OButton>
         </div>
         <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
           <query-editor
