@@ -1040,6 +1040,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await paginationToggle.click();
 
     // Set rows per page
+    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
     await rowsPerPageInput.waitFor({ state: "visible" });
     await expect(rowsPerPageInput).toBeVisible();
 
