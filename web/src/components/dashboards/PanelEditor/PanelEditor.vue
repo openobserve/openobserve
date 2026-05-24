@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="tw:flex tw:flex-col scroll card-container"
+                class="tw:flex tw:flex-col card-container"
                 :style="fieldListContainerStyle"
               >
                 <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
@@ -982,9 +982,9 @@ const fieldListWrapperClass = computed(() => {
 // Field list container style
 const fieldListContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return { height: "100%", overflowY: "auto" };
+    return { height: "100%" };
   }
-  return { height: contentHeight.value, overflowY: "auto" };
+  return { height: contentHeight.value };
 });
 
 // Field list inner div style - logs/build needs height: 100%
