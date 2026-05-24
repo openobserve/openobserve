@@ -265,7 +265,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Click dropdown and pick the first available option
     await alignDropdown.click();
-    const options = page.locator('[role="listbox"] [role="option"]');
+    const options = page.locator('[data-test="dashboard-config-chart-align-option"]');
     await options.first().waitFor({ state: "visible", timeout: 5000 });
     const firstOptionText = await options.first().textContent();
     await options.first().click();

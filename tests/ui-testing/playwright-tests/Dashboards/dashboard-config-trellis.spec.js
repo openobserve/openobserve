@@ -81,7 +81,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
 
     // aria-disabled is on the root q-field wrapper, not the inner native div that data-test resolves to.
     // Use CSS :has() to find the disabled wrapper that contains the trellis data-test element.
-    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toBeDisabled();
     testLogger.info("Trellis disabled with no breakdown field");
 
     await pm.dashboardPanelActions.savePanel();
@@ -95,7 +95,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-trellis-chart"]')).toBeDisabled();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();

@@ -54,7 +54,7 @@ test.describe("ConfigPanel — Legends", () => {
     // Width input requires legends_type=plain AND legends_position=right — set type first
     const legendTypeDropdown = page.locator('[data-test="dashboard-config-legends-scrollable"]');
     await legendTypeDropdown.click();
-    await page.getByRole("option", { name: "Plain" }).click();
+    await page.locator('[data-test="dashboard-config-legends-scrollable-option"][data-test-label="Plain"]').click();
     await pm.dashboardPanelConfigs.legendPosition("Right");
 
     // Width input appears, height input does not
@@ -95,7 +95,7 @@ test.describe("ConfigPanel — Legends", () => {
     // Height input requires legends_type=plain AND legends_position=bottom — set type first
     const legendTypeDropdown = page.locator('[data-test="dashboard-config-legends-scrollable"]');
     await legendTypeDropdown.click();
-    await page.getByRole("option", { name: "Plain" }).click();
+    await page.locator('[data-test="dashboard-config-legends-scrollable-option"][data-test-label="Plain"]').click();
     await pm.dashboardPanelConfigs.legendPosition("Bottom");
 
     // Height input appears, width input does not
@@ -157,14 +157,14 @@ test.describe("ConfigPanel — Legends", () => {
     await expect(legendTypeDropdown).toBeVisible();
 
     await legendTypeDropdown.click();
-    await page.getByRole("option", { name: "Scroll" }).click();
+    await page.locator('[data-test="dashboard-config-legends-scrollable-option"][data-test-label="Scroll"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Legend type set to Scroll");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     await legendTypeDropdown.click();
-    await page.getByRole("option", { name: "Plain" }).click();
+    await page.locator('[data-test="dashboard-config-legends-scrollable-option"][data-test-label="Plain"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Legend type set to Plain");
     await pm.dashboardPanelActions.waitForChartToRender();

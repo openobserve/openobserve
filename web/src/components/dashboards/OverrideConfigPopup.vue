@@ -60,6 +60,7 @@
             v-model="overrideConfig.config[0].autoColor"
             :label="t('dashboard.overrideConfigUniqueValueColor')"
             :disabled="!overrideConfig.field.value"
+            :data-test="`dashboard-addpanel-config-override-unique-value-checkbox-${index}`"
           />
         </div>
 

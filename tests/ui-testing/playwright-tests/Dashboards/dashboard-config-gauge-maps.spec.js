@@ -68,7 +68,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Geomap lat/lng/zoom set");
     await pm.dashboardPanelActions.waitForChartToRender();
-    await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="dashboard-geomap-renderer"]').first()).toBeVisible({ timeout: 10000 });
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying geomap lat/lng/zoom persist after save");
@@ -99,7 +99,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Symbol size By Value with min=5 and max=30");
     await pm.dashboardPanelActions.waitForChartToRender();
-    await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="dashboard-geomap-renderer"]').first()).toBeVisible({ timeout: 10000 });
 
     // Fixed — fixed input appears, min/max hidden
     await pm.dashboardPanelConfigs.selectSymbolSize("Fixed");
@@ -129,13 +129,13 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Layer type set to Scatter");
     await pm.dashboardPanelActions.waitForChartToRender();
-    await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="dashboard-geomap-renderer"]').first()).toBeVisible({ timeout: 10000 });
 
     await pm.dashboardPanelConfigs.selectLayerType("Heatmap");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Layer type set to Heatmap");
     await pm.dashboardPanelActions.waitForChartToRender();
-    await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="dashboard-geomap-renderer"]').first()).toBeVisible({ timeout: 10000 });
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying layer type Heatmap persists after save");
@@ -162,7 +162,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Applied with weight_fixed = 2");
     await pm.dashboardPanelActions.waitForChartToRender();
-    await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="dashboard-geomap-renderer"]').first()).toBeVisible({ timeout: 10000 });
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying weight value persists after save");

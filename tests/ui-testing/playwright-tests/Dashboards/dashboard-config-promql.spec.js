@@ -81,14 +81,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Change aggregation to Max — full option label is "Max (maximum value)"
     await aggregationDropdown.click();
-    await page.getByRole("option", { name: /^Max/i }).first().click();
+    await page.locator('[data-test="dashboard-config-aggregation-option"][data-test-label="Max (maximum value)"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Max");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Change aggregation to Avg — full option label is "Avg (average)"
     await aggregationDropdown.click();
-    await page.getByRole("option", { name: /^Avg/i }).first().click();
+    await page.locator('[data-test="dashboard-config-aggregation-option"][data-test-label="Avg (average)"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Avg");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -113,14 +113,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Switch to "Expanded Time series"
     await tableModeDropdown.click();
-    await page.getByRole("option", { name: "Expanded Time series" }).click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Expanded Time series"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Expanded Time series");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Switch to "Aggregate"
     await tableModeDropdown.click();
-    await page.getByRole("option", { name: "Aggregate" }).click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Aggregate");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -147,7 +147,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
     await tableModeDropdown.click();
-    await page.getByRole("option", { name: "Aggregate" }).click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').click();
     testLogger.info("Table mode set to Aggregate — sticky column controls now visible");
 
     const stickyFirstCol = page.locator('[data-test="dashboard-config-sticky-first-column"]');
@@ -237,7 +237,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
     await tableModeDropdown.click();
-    await page.getByRole("option", { name: "Aggregate" }).click();
+    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').click();
     testLogger.info("Table mode switched to Aggregate");
   }
 
@@ -254,8 +254,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last (+1 more)"
     await aggDropdown.click();
-    await page.getByRole("option", { name: /^Avg/i }).first().click();
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.locator('[data-test="dashboard-config-table-aggregations-option"][data-test-label="Avg (average)"]').click();
+    await page.keyboard.press('Escape');
     testLogger.info("Table aggregations: added Avg (now last + avg)");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -279,10 +279,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
     await switchToAggregateMode(page, pm);
 
-    // data-test is on the <input> element itself (Quasar passes attrs to native input)
-    // Use xpath to find the parent q-field wrapper for display-value assertions
     const visibleColsInput = page.locator('[data-test="dashboard-config-visible-columns"]');
-    const visibleColsWrapper = visibleColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleColsInput);
     await expect(visibleColsInput).toBeVisible();
 
@@ -294,8 +291,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await visibleColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
 
-    // Display-value in the q-field wrapper should now show "instance"
-    await expect(visibleColsWrapper).toContainText("instance");
+    // OSelect root contains the selected chip text
+    await expect(visibleColsInput).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -305,9 +302,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     await switchToAggregateMode(page, pm);
     const visibleAfterInput = page.locator('[data-test="dashboard-config-visible-columns"]');
-    const visibleAfterWrapper = visibleAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleAfterInput);
-    await expect(visibleAfterWrapper).toContainText("instance");
+    await expect(visibleAfterInput).toContainText("instance");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -320,7 +316,6 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
 
     const hiddenColsInput = page.locator('[data-test="dashboard-config-hidden-columns"]');
-    const hiddenColsWrapper = hiddenColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenColsInput);
     await expect(hiddenColsInput).toBeVisible();
 
@@ -330,7 +325,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await hiddenColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
 
-    await expect(hiddenColsWrapper).toContainText("job");
+    await expect(hiddenColsInput).toContainText("job");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -340,9 +335,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     await switchToAggregateMode(page, pm);
     const hiddenAfterInput = page.locator('[data-test="dashboard-config-hidden-columns"]');
-    const hiddenAfterWrapper = hiddenAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenAfterInput);
-    await expect(hiddenAfterWrapper).toContainText("job");
+    await expect(hiddenAfterInput).toContainText("job");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -356,7 +350,6 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Sticky columns multi-select is disabled when sticky_first_column=true — leave that toggle off
     const stickyColsInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
-    const stickyColsWrapper = stickyColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
     await expect(stickyColsInput).toBeVisible();
 
@@ -366,7 +359,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await stickyColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
 
-    await expect(stickyColsWrapper).toContainText("instance");
+    await expect(stickyColsInput).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -376,9 +369,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     await switchToAggregateMode(page, pm);
     const stickyAfterInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
-    const stickyAfterWrapper = stickyAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyAfterInput);
-    await expect(stickyAfterWrapper).toContainText("instance");
+    await expect(stickyAfterInput).toContainText("instance");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -607,7 +599,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeSelect);
     await expect(mapTypeSelect).toBeVisible();
     await mapTypeSelect.click();
-    await page.getByRole("option", { name: "World", exact: true }).click();
+    await page.locator('[data-test="dashboard-config-map-type-option"][data-test-label="World"]').click();
     testLogger.info("Maps map type set to 'World'");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -623,10 +615,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
     await expect(nameLabelAfter).toHaveValue("country_name");
 
-    // Map type wrapper contains "world" (raw value — q-select uses emit-value without map-options)
+    // OSelect root contains the selected value text
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeAfter);
-    const mapTypeWrapper = mapTypeAfter.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
-    await expect(mapTypeWrapper).toContainText("world");
+    await expect(mapTypeAfter).toContainText("world");
     testLogger.info("Maps name label and map type persisted after save");
 
     await pm.dashboardPanelActions.savePanel();
@@ -648,7 +639,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Aggregation dropdown visible for donut chart");
 
     await aggregationDropdown.click();
-    await page.getByRole("option", { name: /^Min/i }).first().click();
+    await page.locator('[data-test="dashboard-config-aggregation-option"][data-test-label="Min (minimum value)"]').click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Min on donut");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
