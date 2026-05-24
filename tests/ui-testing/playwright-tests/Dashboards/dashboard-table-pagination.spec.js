@@ -910,6 +910,13 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
+    // Select table chart type and stream first — the field list is populated from
+    // the stream schema. Without a stream, searchAndAddField would find no rows
+    // because custom SQL mode does not auto-populate the field list.
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
@@ -920,10 +927,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
 
-    // Select table chart type
-    await pm.chartTypeSelector.selectChartType("table");
-
-    // Add field for table
+    // Add field for table (field list is populated from e2e_automate stream)
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Apply

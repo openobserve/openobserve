@@ -29,7 +29,7 @@ const parentDataTest = computed(() => $attrs['data-test'] as string | undefined)
  * matching the same selector).
  */
 const spanAttrs = computed(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const { 'data-test': _dt, ...rest } = $attrs
   return rest
 })

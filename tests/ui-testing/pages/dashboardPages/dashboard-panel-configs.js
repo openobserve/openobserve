@@ -926,16 +926,21 @@ export default class DashboardPanelConfigs {
    * Toggle show row totals for pivot table
    */
   async togglePivotRowTotals() {
-    await this.pivotRowTotals.waitFor({ state: "visible" });
-    await this.pivotRowTotals.click();
+    // Click the inner toggle button directly — the label slot contains an OButton
+    // with @click.stop that would block propagation if the wrapper center lands on it.
+    const innerBtn = this.pivotRowTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
    * Toggle show column totals for pivot table
    */
   async togglePivotColTotals() {
-    await this.pivotColTotals.waitFor({ state: "visible" });
-    await this.pivotColTotals.click();
+    // Click the inner toggle button directly — same @click.stop concern as row totals.
+    const innerBtn = this.pivotColTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
@@ -943,8 +948,9 @@ export default class DashboardPanelConfigs {
    * (only visible when row totals is enabled)
    */
   async togglePivotStickyColTotals() {
-    await this.pivotStickyColTotals.waitFor({ state: "visible" });
-    await this.pivotStickyColTotals.click();
+    const innerBtn = this.pivotStickyColTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
@@ -952,8 +958,9 @@ export default class DashboardPanelConfigs {
    * (only visible when column totals is enabled)
    */
   async togglePivotStickyRowTotals() {
-    await this.pivotStickyRowTotals.waitFor({ state: "visible" });
-    await this.pivotStickyRowTotals.click();
+    const innerBtn = this.pivotStickyRowTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**

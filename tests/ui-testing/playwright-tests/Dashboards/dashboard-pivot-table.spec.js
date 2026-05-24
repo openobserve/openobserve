@@ -85,6 +85,15 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Search again and verify +P IS visible for table chart
       await pm.chartTypeSelector.searchField("kubernetes_container_name");
+
+      // Hover over the field row to reveal the action buttons (they are hidden
+      // by CSS until the row is hovered — see OFieldRow.__actions display:none)
+      const fieldRow = page
+        .locator('[data-test="o-field-list-row-kubernetes_container_name"]')
+        .first();
+      await fieldRow.waitFor({ state: "visible", timeout: 5000 });
+      await fieldRow.hover();
+
       await pivotButton.waitFor({ state: "visible", timeout: 5000 });
       await expect(pivotButton).toBeVisible();
 
