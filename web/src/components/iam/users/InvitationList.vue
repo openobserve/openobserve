@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full ">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
         <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="invitation-title-text">
@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+    <div class="tw:w-full tw:h-full tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:h-full">
         <OTable
           :data="invitations"
           :columns="columns"

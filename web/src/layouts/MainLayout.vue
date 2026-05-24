@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
           >
             <router-view v-slot="{ Component }">
-              <component :is="Component" @sendToAiChat="sendToAiChat" />
+              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
             </router-view>
           </div>
         </main>

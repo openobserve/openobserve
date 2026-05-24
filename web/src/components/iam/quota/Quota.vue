@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="tw:rounded-md quota-page tw:text-left card-container"
+  <div class="tw:rounded-md quota-page tw:text-left card-container tw:h-full"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
-    style="min-height: inherit; height: calc(100vh - var(--navbar-height) - 14px); overflow: hidden;"
   >
     <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:h-full">
       <div class="card-container tw:mb-[0.625rem]">
