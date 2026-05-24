@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="source-maps-container tw:mx-[0.625rem] card-container tw:flex tw:flex-col"
-    style="height: calc(100vh - var(--navbar-height) - 4.4rem)"
+    class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
   >
     <!-- Filters Section -->
     <div class="filters-section tw:p-3">
@@ -502,7 +501,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .source-maps-container {
-  height: calc(100vh - var(--navbar-height) - 4.1rem);
+  height: 100%;
   overflow-y: auto;
 }
 

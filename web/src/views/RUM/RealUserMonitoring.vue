@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-[calc(100vh-var(--navbar-height)-10px)] tw:overflow-hidden tw:pt-[0.325rem]">
+  <div class="tw:h-full tw:overflow-hidden tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
     <template v-if="isLoading.length">
       <div
         class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+      <div v-if="showTabs" class="tw:pb-[0.625rem]">
         <div class="card-container tw:px-4 tw:pt-2">
           <OTabs v-model="activeTab" align="left" dense @change="changeTab">
             <OTab
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
-            :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'"
+            class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col"
           >
             <component
               :is="Component"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'">
+          <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="">
         <div
-          class="card-container tw:p-4 tw:mx-[0.625rem] tw:max-w-full tw:h-[calc(100vh - 3.125rem)]"
+          class="card-container tw:p-4 tw:max-w-full tw:flex-1 tw:min-h-0"
         >
           <div class="tw:pb-4">
             <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">

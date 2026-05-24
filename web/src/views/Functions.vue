@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:h-[calc(100vh-var(--navbar-height))] tw:flex tw:flex-col tw:overflow-hidden">
+  <div class="tw:rounded-md tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
       <OSplitter
         v-model="splitterModel"
         unit="px"
