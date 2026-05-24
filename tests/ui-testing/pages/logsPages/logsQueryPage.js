@@ -19,7 +19,9 @@ export class LogsQueryPage {
     // OSwitch states explicitly to avoid the strict-mode collision.
     this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
     this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
-    this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+    this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
+    this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
     this._autoQueryEnabledCache = undefined;
@@ -51,19 +53,16 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    // Page-level search — the "No data" text may be in:
-    //   SearchResult.vue  histogram-empty span (warning icon + "No data found for histogram.")
-    //   Index.vue         h6[data-test="logs-search-error-message"] (info icon + "No events found…")
-    //   Index.vue         div[data-test="logs-search-result-not-found-text"] ("Result not found.")
-    // Use specific enough substrings to avoid matching unrelated empty-states.
-    const patterns = [
-      'No data found for',
-      'No events found',
-      'Result not found',
-      'No data found',
+    // Try data-test selectors in priority order:
+    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
+    //   logs-search-error-message     — Index.vue "No events found" heading
+    //   logs-search-result-not-found-text — Index.vue "Result not found" div
+    const locators = [
+      this.page.locator('[data-test="logs-search-no-data-histogram"]'),
+      this.page.locator('[data-test="logs-search-error-message"]'),
+      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
     ];
-    for (const pattern of patterns) {
-      const locator = this.page.getByText(pattern).first();
+    for (const locator of locators) {
       try {
         await locator.waitFor({ state: 'visible', timeout: 10000 });
         await locator.click({ force: true });
@@ -72,7 +71,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message matched — expected one of: ' + patterns.join(', '));
+    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
   }
 
   async clickResultDetail() {
@@ -102,25 +101,20 @@ export class LogsQueryPage {
   }
 
   async isSQLModeOn() {
-    const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
-    return await sw.isChecked();
+    return (await this.page.locator(this.sqlModeToggleCheckedBtn).count()) > 0;
   }
 
   async ensureSQLMode() {
     if (!(await this.isSQLModeOn())) {
-      const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
-      await sw.click();
-      // Wait for switch state to flip rather than time-based settle.
-      await expect.poll(async () => await sw.isChecked(), { timeout: 5000 }).toBe(true);
+      await this.page.locator(this.sqlModeToggle).first().click();
+      await expect.poll(async () => await this.isSQLModeOn(), { timeout: 5000 }).toBe(true);
     }
   }
 
   async ensureFTSMode() {
     if (await this.isSQLModeOn()) {
-      const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
-      await sw.click();
-      // Wait for switch state to flip rather than time-based settle.
-      await expect.poll(async () => await sw.isChecked(), { timeout: 5000 }).toBe(false);
+      await this.page.locator(this.sqlModeToggle).first().click();
+      await expect.poll(async () => await this.isSQLModeOn(), { timeout: 5000 }).toBe(false);
     }
   }
 

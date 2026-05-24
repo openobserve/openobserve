@@ -19,7 +19,6 @@
     <template #group-header="{ row, groupName }">
       <div
         class="field-group-header tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
-        :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
         @click="$emit('toggle-group', row.group)"
       >
         <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
@@ -305,5 +304,7 @@ defineExpose({
   font-size: 0.75rem;
   padding: 0.125rem 0.325rem;
   cursor: pointer;
+  color: var(--color-field-list-group-text);
+  background-color: var(--color-surface-subtle);
 }
 </style>
