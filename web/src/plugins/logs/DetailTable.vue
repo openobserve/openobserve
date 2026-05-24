@@ -35,16 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
           <OTab
+            data-test="correlated-logs-tab"
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
           <OTab
+            data-test="correlated-metrics-tab"
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-metrics"
             :label="t('correlation.correlatedMetrics')"
           />
           <OTab
+            data-test="correlated-traces-tab"
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-traces"
             :label="t('correlation.correlatedTraces')"
