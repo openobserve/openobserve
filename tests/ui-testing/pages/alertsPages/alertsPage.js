@@ -1092,7 +1092,9 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill('abc');
+        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
+        // fillable); the inner native <input> auto-derives `-field` — fill that variant.
+        await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();

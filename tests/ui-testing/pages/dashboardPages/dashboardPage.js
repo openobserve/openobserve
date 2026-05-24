@@ -271,8 +271,10 @@ export class DashboardPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(5000);
 
-    // Search for the dashboard before deleting
-    await this.dashboardSearch.fill(this.dashboardName);
+    // Search for the dashboard before deleting. `dashboardSearch` is the
+    // OInput wrapper <div> (not fillable); fill the inner `-field` native
+    // input via `dashboardSearchInput` per AGENT_RULES §4.
+    await this.dashboardSearchInput.fill(this.dashboardName);
     await this.page.waitForTimeout(2000);
 
     await this.dashboardDelete.click({ force: true });
@@ -412,11 +414,10 @@ export class DashboardPage {
     // Wait for the dashboard add button to be visible
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Click on the search input
-    await this.dashboardSearch.click();
-
-    // Fill the search input with the dashboard name
-    await this.dashboardSearch.fill(this.dashboardName);
+    // Click on the search input — fill the inner `-field` native input per
+    // AGENT_RULES §4 (`dashboardSearch` is the OInput wrapper, non-fillable).
+    await this.dashboardSearchInput.click();
+    await this.dashboardSearchInput.fill(this.dashboardName);
 
     // Check that the dashboard table contains the text 'No data available'
     await expect(this.dashboardTable).toContainText('No data available');

@@ -158,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
           <OSelect
+            data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"

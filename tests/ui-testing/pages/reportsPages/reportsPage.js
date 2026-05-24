@@ -53,9 +53,12 @@ export class ReportsPage {
     this.scheduleNowBtn = page.locator('[data-test="add-report-schedule-scheduleNow-btn"]');
     this.scheduleLaterBtn = page.locator('[data-test="add-report-schedule-scheduleLater-btn"]');
 
-    // Schedule-later inputs
-    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"]');
-    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"]');
+    // Schedule-later inputs — the `-field` data-test is stamped on BOTH the
+    // OFormInput wrapper div AND the inner datepicker `role="group"` element.
+    // Scope to the actual datepicker via `[role="group"]` to disambiguate the
+    // strict-mode collision (wrapper is not clickable, the group is).
+    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"][role="group"]');
+    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"][role="group"]');
     this.scheduleTimezoneSelect = page.locator('[data-test="add-report-schedule-start-timezone-select"]');
     this.scheduleTimezoneTrigger = page.locator('[data-test="add-report-schedule-start-timezone-select"] [data-test-selected-value]');
     this.scheduleTimezonePopover = page.locator('[data-test="add-report-schedule-start-timezone-select-popover"]');
@@ -406,8 +409,11 @@ export class ReportsPage {
     // Click save button
     await this.saveButton.click();
 
-    // Wait for save to process
-    await this.page.waitForTimeout(2000);
+    // Wait for save to process — gate on the reports list page returning to
+    // a state where the search input is visible (proves navigation back from
+    // the edit form completed and ReportList re-mounted). Replaces the legacy
+    // 2s waitForTimeout which raced the navigation under CI load.
+    await this.reportSearchInputField.waitFor({ state: 'visible', timeout: 30000 });
 
     // Search for the report to filter and verify the update appears
     await this.reportSearchInputField.fill(reportName);
