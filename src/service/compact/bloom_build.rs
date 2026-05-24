@@ -142,7 +142,6 @@ pub async fn build_for_bucket(
     // a chunk — this minimizes the uniform-`B` padding waste (B is sized
     // to each chunk's max cardinality).
     const BLOOM_BUILD_FPP: f64 = 0.01;
-    let ndv_ratio = cfg.common.bloom_filter_ndv_ratio.max(1);
     let max_files_per_bf = cfg.common.bloom_filter_max_files_per_bf.max(1);
 
     let mut new_files: Vec<&FileKey> = files.iter().filter(|f| f.meta.bloom_ver == 0).collect();
@@ -154,14 +153,20 @@ pub async fn build_for_bucket(
     let chunk_total = new_files.len().div_ceil(max_files_per_bf);
 
     for (chunk_idx, chunk) in new_files.chunks(max_files_per_bf).enumerate() {
-        // B for this chunk = max record count in the chunk / ndv ratio.
+        // B for this chunk is sized from the chunk's MAX record count, used
+        // as a safe NDV upper bound: a file can't hold more distinct values
+        // than rows. This never under-sizes (no saturation) for the target
+        // high-cardinality fields where distinct ≈ rows. It over-sizes for
+        // fields that repeat heavily (distinct ≪ rows) — acceptable for a
+        // POC; exact sizing would read each file's tantivy term count in a
+        // pre-pass to pick max distinct instead of max rows.
         let max_records = chunk
             .iter()
             .map(|f| f.meta.records.max(0) as u64)
             .max()
-            .unwrap_or(0);
-        let chunk_ndv = (max_records / ndv_ratio).max(1);
-        let num_blocks = infra::bloom::num_blocks_for(chunk_ndv, BLOOM_BUILD_FPP);
+            .unwrap_or(0)
+            .max(1);
+        let num_blocks = infra::bloom::num_blocks_for(max_records, BLOOM_BUILD_FPP);
 
         let mut all_blooms: Vec<FieldBloom> = Vec::new();
         let mut contributing_ids: Vec<i64> = Vec::new();

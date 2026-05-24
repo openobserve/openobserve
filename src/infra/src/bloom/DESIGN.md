@@ -223,7 +223,7 @@ This is the core invariant: **`bloom_ver` is set once per file and never re-stam
 3. **Trigger gate**: rebuild iff at least one file has `bloom_ver = 0`. If every file already has a `bloom_ver` (even mixed non-zero values across rows that were stamped at different times), return early.
 4. Take the new (`bloom_ver = 0`) files, **sort by record count descending**, and **chunk into groups of ≤ `bloom_filter_max_files_per_bf`** (default 256). Sorting co-locates similar-sized files so the uniform-`B` padding waste within a chunk is small.
 5. For each chunk:
-   - `B = num_blocks_for(max_records_in_chunk / bloom_filter_ndv_ratio, 0.01)` — sized from metadata, no extra IO. Every file in the chunk uses this `B` (required for the transposed layout).
+   - `B = num_blocks_for(max_records_in_chunk, 0.01)` — record count is a safe NDV upper bound (distinct ≤ rows), so this never under-sizes the SBBF (no saturation) for the target high-cardinality fields where distinct ≈ rows. Sized from metadata, no extra IO. Every file in the chunk uses this `B` (required for the transposed layout). Over-sizes for heavily-repeating fields; exact term-count sizing is future work.
    - For each file: open `.ttv` via `get_tantivy_directory` (cache-friendly), iterate the target fields' term dictionaries (`service::tantivy::bloom_builder::build_blooms_from_index`, terms come back deduped + sorted, no extra IO since `.ttv` is warm), insert into a `B`-sized SBBF.
    - `BloomWriter::serialize` (transposes the chunk's SBBFs) → `storage::put` to `bloom_path(... bloom_ver = base_ts + chunk_idx)` → `update_bloom_ver(chunk_ids, bloom_ver)`.
 
@@ -394,9 +394,15 @@ Only the **intersection** is bloom-targeted. A field listed only in one isn't bu
 Build-side sizing / chunking:
 
 ```
-ZO_BLOOM_FILTER_NDV_RATIO       = 100   # NDV estimate = records / ratio; sizes B = num_blocks_for(NDV, 0.01)
 ZO_BLOOM_FILTER_MAX_FILES_PER_BF = 256  # files per `.bf` chunk (caps build memory & object size; query reads = ceil(files / this))
 ```
+
+`B` is sized as `num_blocks_for(max_records_in_chunk, 0.01)` — record
+count is the NDV upper bound, so the SBBF never saturates for
+high-cardinality fields. (`ZO_BLOOM_FILTER_NDV_RATIO` is **not** used by
+this path; sizing from `records / ratio` under-sizes unique fields by the
+ratio and saturates the filter — the bug that made an early build keep
+every file.)
 
 `max_files_per_bf` is the main scale knob: bigger → fewer reads per query
 but more compactor memory at build (`≈ files × per-file-SBBF`); smaller →
@@ -433,7 +439,7 @@ A `.bf` is **never deleted by the bloom layer**. With append-only writes:
 
 ### 10.2 Storage cost
 
-`.bf` body per `.bf` chunk = `B × M × 32`, where `B = num_blocks_for(max_records_in_chunk / ndv_ratio, 0.01)` and `M ≤ max_files_per_bf`.
+`.bf` body per `.bf` chunk = `B × M × 32`, where `B = num_blocks_for(max_records_in_chunk, 0.01)` and `M ≤ max_files_per_bf`.
 
 | per-file unique values | B (blocks) | per-file SBBF | one 256-file `.bf` |
 |---|---|---|---|
