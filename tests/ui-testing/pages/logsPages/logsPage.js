@@ -3256,6 +3256,17 @@ export class LogsPage {
         await this.page.locator(selector).first().waitFor({ state: 'visible', timeout });
     }
 
+    async expectSavedViewNameValidationError(expectedText = 'Input must be alphanumeric') {
+        // OInput error convention: data-test="${parentDataTest}-error".
+        // The saved view name OInput has data-test="add-alert-name-input", so its
+        // inline validation error renders at data-test="add-alert-name-input-error".
+        // This replaces the old toast-based check — special-char validation now sets
+        // savedViewNameError (inline) instead of firing a toast.
+        const errorEl = this.page.locator('[data-test="add-alert-name-input-error"]');
+        await errorEl.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(errorEl).toContainText(expectedText);
+    }
+
     async expectIndexFieldSearchInputVisible() {
         // Post-OFieldList migration: legacy [data-cy="index-field-search-input"] is gone.
         // The OFieldList search input is now data-test="o-field-list-search" (wrapper)
@@ -4687,14 +4698,29 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Clear any existing query and ensure editor is focused
+        // Click the Monaco editor wrapper, then wait for the inner inputarea (Monaco's
+        // hidden textarea) to be visible so keyboard events land in the editor.
         await this.page.locator(this.queryEditor).click();
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        const inputarea = this.page.locator(this.queryEditor).locator('.inputarea');
+        await inputarea.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+        // Select all and delete — this clears Monaco's content and triggers its
+        // onChange, which debounces the update to searchObj.data.query (100 ms).
+        await this.page.locator(this.queryEditor).press(
+            process.platform === "darwin" ? "Meta+A" : "Control+A"
+        );
         await this.page.keyboard.press("Backspace");
 
-        // Try to run the blank query with cmd+enter — the error banner appears
-        // synchronously after the keyboard event; expectBlankQueryError waits on it.
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        // Wait for the 100 ms debounce to propagate searchObj.data.query = "".
+        // Without this pause, Ctrl+Enter fires before the store update, so the old
+        // SELECT query is used and the run succeeds (no error banner).
+        await this.page.waitForTimeout(300);
+
+        // Run the blank query — Monaco's internal Ctrl+Enter keybinding emits
+        // "run-query" which propagates to SearchBar's handleRunQueryFn.
+        await this.page.locator(this.queryEditor).press(
+            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"
+        );
     }
 
     async expectBlankQueryError() {
