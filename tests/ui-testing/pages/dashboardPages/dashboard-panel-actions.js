@@ -70,9 +70,12 @@ export default class DashboardactionPage {
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
-      
-    // Wait for save to complete
-    // await this.page.waitForLoadState("networkidle");
+    // Wait for navigation away from add_panel so backToDashboardList can
+    // immediately find dashboard-back-btn on ViewDashboard without racing.
+    await this.page.waitForURL(
+      (url) => !url.pathname.includes("/add_panel"),
+      { timeout: 20000 }
+    ).catch(() => {});
   }
 
   //Apply dashboard button

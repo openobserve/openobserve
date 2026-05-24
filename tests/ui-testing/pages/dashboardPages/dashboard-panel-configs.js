@@ -689,8 +689,9 @@ export default class DashboardPanelConfigs {
     await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
     await comboboxInput.click();
 
-    // OCombobox option items: `*-option` with `data-test-label`
-    const optionLocators = this.colorBySeriesPopup.locator(
+    // OCombobox uses ComboboxPortal — options are rendered at document root, outside the popup.
+    // Must use page-level locator, not colorBySeriesPopup-scoped locator.
+    const optionLocators = this.page.locator(
       `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
     );
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });

@@ -239,9 +239,19 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
     await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').click();
-    const option = page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]');
-    await option.waitFor({ state: "visible" });
-    await option.click();
+    // Use atomic waitForFunction click — virtualised list items can detach between
+    // waitFor({state:'visible'}) and click(), causing intermittent "element detached" errors.
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector(
+          '[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]'
+        );
+        if (!el) return false;
+        el.click();
+        return true;
+      },
+      { timeout: 15000 }
+    );
     testLogger.info("Table mode switched to Aggregate");
   }
 
@@ -256,7 +266,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(aggDropdown);
     await expect(aggDropdown).toBeVisible();
 
-    // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last (+1 more)"
+    // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last +1 more"
     await page.locator('[data-test="dashboard-config-table-aggregations-trigger"]').click();
     const avgOption = page.locator('[data-test="dashboard-config-table-aggregations-option"][data-test-label="Avg (average)"]');
     await avgOption.waitFor({ state: "visible" });
@@ -273,7 +283,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
     const aggAfter = page.locator('[data-test="dashboard-config-table-aggregations"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(aggAfter);
-    await expect(aggAfter).toContainText("(+1 more)");
+    await expect(aggAfter).toContainText("+1 more");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -677,9 +687,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     await setupPromQLPanelWithConfig(page, pm, dashboardName);
 
-    // Set legend for Query 1 (currentQueryIndex = 0 by default)
-    const legendInput = page.locator('[data-test="common-auto-complete"]');
-    const legendField = legendInput.locator('[data-test$="-field"]');
+    // Set legend for Query 1 (currentQueryIndex = 0 by default).
+    // The PromQL legend uses OCombobox (data-test="dashboard-config-promql-legend");
+    // its inner input carries data-test="dashboard-config-promql-legend-input".
+    const legendInput = page.locator('[data-test="dashboard-config-promql-legend"]');
+    const legendField = legendInput.locator('[data-test="dashboard-config-promql-legend-input"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
     await legendField.fill("Legend Q1");
     testLogger.info("Legend set for Query 1");

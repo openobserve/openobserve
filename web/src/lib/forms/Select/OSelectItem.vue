@@ -42,6 +42,7 @@ onUnmounted(() => {
     :disabled="props.disabled"
     :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
     :data-test-value="rekaValue"
+    :data-test-label="props.label"
     :class="[
       'tw:relative tw:flex tw:items-center tw:w-full',
       'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
