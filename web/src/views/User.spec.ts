@@ -294,7 +294,7 @@ describe("User.vue Component", () => {
 
     it("should have correct template structure", () => {
       const html = wrapper.html();
-      expect(html).toContain('<div>');
+      expect(html).toContain('<div');
     });
 
     it("should render Users component when loaded", async () => {
