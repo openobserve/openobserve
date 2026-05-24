@@ -143,7 +143,10 @@ export class SanityPage {
         this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
         this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
         this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
-        this.streamSelectDropdown = page.locator('[data-test="log-search-index-list-select-stream"]');
+        // OSelect (multiple) renders the wrapper div with the consumer-supplied
+        // data-test and the clickable PopoverTrigger as `${parent}-trigger`.
+        // Click the `-trigger` to actually open the popover.
+        this.streamSelectDropdown = page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
         this.e2eAutomateStreamOption = page.locator('[data-test="log-search-index-list-select-stream-option"][data-test-value="e2e_automate"]');
 
         // ============================================================

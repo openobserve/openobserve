@@ -8167,6 +8167,31 @@ export class LogsPage {
                 `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
             );
         } catch (error) {
+            // DEBUG: dump the actual chart-selection DOM state so CI logs reveal
+            // WHY the expected chart wasn't selected (e.g., different chart was
+            // auto-selected, or no `data-selected="true"` attribute at all).
+            const diagnostic = await this.page.evaluate((cid) => {
+                const all = Array.from(
+                    document.querySelectorAll('[data-test^="selected-chart-"]')
+                ).map((el) => {
+                    const parent = el.parentElement;
+                    const r = el.getBoundingClientRect();
+                    return {
+                        dt: el.getAttribute('data-test'),
+                        parentDataSelected: parent?.getAttribute('data-selected'),
+                        parentClassNameHint: (parent?.className || '').slice(0, 120),
+                        offsetParent: !!(/** @type {HTMLElement} */ (el).offsetParent),
+                        rect: { w: r.width, h: r.height },
+                    };
+                });
+                return {
+                    targetChartId: cid,
+                    totalItems: all.length,
+                    items: all.slice(0, 20),
+                    selectedNow: all.find((i) => i.parentDataSelected === 'true')?.dt ?? null,
+                };
+            }, chartId).catch(() => ({ error: 'evaluate-failed' }));
+            testLogger.error('[verifyChartTypeSelected] timeout diagnostic', { diagnostic });
             throw new Error(
                 `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
                 `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
@@ -8566,6 +8591,27 @@ export class LogsPage {
         }, { intervals: [200, 200, 200, 500, 500, 1000, 1000], timeout: 5000 }).toBe('stable').catch(() => {});
         count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
+
+        // DEBUG (CI diagnostic): on count===0 dump candidate locators so we can
+        // confirm whether the source actually rendered zero filter rows OR the
+        // data-test pattern changed. Keep cost low — only fires when count===0.
+        if (count === 0) {
+            const diagnostic = await this.page.evaluate(() => {
+                const byPrefix = (p) => Array.from(document.querySelectorAll(`[data-test^="${p}"]`))
+                    .map(e => e.getAttribute('data-test')).slice(0, 20);
+                return {
+                    addConditionLabel: byPrefix('dashboard-add-condition-label-'),
+                    addCondition: byPrefix('dashboard-add-condition'),
+                    builderFilters: byPrefix('dashboard-builder-filter'),
+                    panelAddCondition: byPrefix('panel-add-condition'),
+                    groupRows: byPrefix('dashboard-add-condition-group'),
+                    // Any element with `dashboard-add-condition` substring
+                    allAddCondition: Array.from(document.querySelectorAll('[data-test*="dashboard-add-condition"]'))
+                        .map(e => e.getAttribute('data-test')).slice(0, 20),
+                };
+            }).catch(() => ({ error: 'evaluate-failed' }));
+            testLogger.warn('[getFilterConditionCount] count===0 diagnostic', { diagnostic });
+        }
         return count;
     }
 
