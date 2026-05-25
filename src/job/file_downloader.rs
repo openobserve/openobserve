@@ -61,6 +61,24 @@ mod processing_files {
     }
 }
 
+mod queued_files {
+    use hashbrown::HashSet;
+    use parking_lot::RwLock;
+
+    use super::*;
+
+    static QUEUED_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
+    /// Returns true if newly inserted (caller should enqueue), false if already present (skip).
+    pub fn try_add(file_name: &str) -> bool {
+        QUEUED_FILES.write().insert(file_name.to_string())
+    }
+
+    pub fn remove(file_name: &str) {
+        QUEUED_FILES.write().remove(file_name);
+    }
+}
+
 struct DownloadQueue {
     sender: Sender<FileInfo>,
     receiver: Arc<Mutex<Receiver<FileInfo>>>,
@@ -73,26 +91,49 @@ impl DownloadQueue {
 }
 
 struct PriorityDownloadQueue {
-    sender: Sender<FileInfo>,
-    receiver: Arc<Mutex<Receiver<FileInfo>>>,
-    stack: Arc<Mutex<VecDeque<FileInfo>>>,
+    stack: Mutex<VecDeque<FileInfo>>,
+    notify: tokio::sync::Notify,
+    max_size: usize,
 }
 
 impl PriorityDownloadQueue {
-    fn new(sender: Sender<FileInfo>, receiver: Arc<Mutex<Receiver<FileInfo>>>) -> Self {
+    fn new(max_size: usize) -> Self {
         Self {
-            sender,
-            receiver,
-            stack: Arc::new(Mutex::new(VecDeque::new())),
+            stack: Mutex::new(VecDeque::with_capacity(max_size)),
+            notify: tokio::sync::Notify::new(),
+            max_size,
         }
     }
 
-    async fn push(&self, file_info: FileInfo) {
-        self.stack.lock().await.push_back(file_info);
+    // Returns false if at cap — caller must remove from queued_files and skip metric inc.
+    async fn push(&self, file_info: FileInfo) -> bool {
+        let mut stack = self.stack.lock().await;
+        if stack.len() >= self.max_size {
+            return false;
+        }
+        stack.push_back(file_info);
+        drop(stack);
+        self.notify.notify_one();
+        true
     }
 
-    async fn pop(&self) -> Option<FileInfo> {
-        self.stack.lock().await.pop_front()
+    // Blocks until an item is available. LIFO via pop_back.
+    // notified() is created before the lock check to avoid missed-wakeup race.
+    // Chains notify_one() so all workers drain the queue under burst load.
+    async fn pop(&self) -> FileInfo {
+        loop {
+            let notified = self.notify.notified();
+            {
+                let mut stack = self.stack.lock().await;
+                if let Some(item) = stack.pop_back() {
+                    if !stack.is_empty() {
+                        self.notify.notify_one();
+                    }
+                    return item;
+                }
+            }
+            notified.await;
+        }
     }
 }
 
@@ -102,15 +143,12 @@ static FILE_DOWNLOAD_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
 });
 
-static PRIORITY_FILE_DOWNLOAD_CHANNEL: Lazy<PriorityDownloadQueue> = Lazy::new(|| {
-    let (tx, rx) = tokio::sync::mpsc::channel::<FileInfo>(FILE_DOWNLOAD_QUEUE_SIZE);
-    PriorityDownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
-});
+static PRIORITY_FILE_DOWNLOAD_CHANNEL: Lazy<PriorityDownloadQueue> =
+    Lazy::new(|| PriorityDownloadQueue::new(FILE_DOWNLOAD_QUEUE_SIZE));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // handle normal queue download
-    // move files
+    // worker tasks: handle normal queue download (FIFO via mpsc channel)
     for thread in 0..cfg.limit.file_download_thread_num {
         let rx = FILE_DOWNLOAD_CHANNEL.receiver.clone();
         tokio::spawn(async move {
@@ -122,6 +160,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, id, account, file, file_size, cache)) => {
+                        // transition: queued → not-queued (must run before any skip path)
+                        queued_files::remove(&file);
+
                         // check if the file is already being downloaded
                         if processing_files::is_processing(&file) {
                             log::warn!(
@@ -170,93 +211,54 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    // main task: add files to priority queue
-    let rx = PRIORITY_FILE_DOWNLOAD_CHANNEL.receiver.clone();
-    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-
-    tokio::spawn(async move {
-        loop {
-            let ret = rx.lock().await.recv().await;
-            match ret {
-                None => {
-                    log::debug!("[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] Receiving channel is closed");
-                    if shutdown_tx.send(true).is_err() {
-                        log::error!(
-                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] Failed to send disconnect signal"
-                        );
-                    }
-                    break;
-                }
-                Some((trace_id, id, account, file, file_size, cache)) => {
-                    PRIORITY_FILE_DOWNLOAD_CHANNEL
-                        .push((trace_id, id, account, file, file_size, cache))
-                        .await;
-                }
-            }
-        }
-    });
-
-    // worker tasks: handle priority queue download
+    // worker tasks: handle priority queue download (LIFO via VecDeque::pop_back)
     for thread in 0..cfg.limit.file_download_priority_queue_thread_num {
-        let mut shutdown_rx = shutdown_rx.clone();
         tokio::spawn(async move {
             loop {
-                tokio::select! {
-                    _ = shutdown_rx.changed() => {
-                        log::warn!(
-                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] Received shutdown signal, exiting"
-                        );
-                        break;
-                    }
-                    _ = async {
-                        let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
-                        match file_info {
-                            Some((trace_id, id, account, file, file_size, cache)) => {
-                                 // check if the file is already being downloaded
-                                if processing_files::is_processing(&file) {
-                                    log::warn!(
-                                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
-                                    );
-                                    // update metrics
-                                    metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                        .with_label_values(&[])
-                                        .dec();
-                                    return;
-                                }
+                let (trace_id, id, account, file, file_size, cache) =
+                    PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
 
-                                // add the file to processing set
-                                processing_files::add(&file);
+                // transition: queued → not-queued (must run before any skip path)
+                queued_files::remove(&file);
 
-                                // download the file
-                                match download_file(thread, &trace_id, id, &account, &file, file_size, cache).await {
-                                    Ok(data_len) => {
-                                        if data_len > 0 && data_len != file_size {
-                                            log::warn!(
-                                                "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
-                                            );
-                                        }
-                                    }
-                                    Err(e) => {
-                                        log::error!(
-                                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} to cache {cache:?} err: {e}",
-                                        );
-                                    }
-                                }
-
-                                // remove the file from processing set
-                                processing_files::remove(&file);
-
-                                // update metrics
-                                metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                    .with_label_values(&[])
-                                    .dec();
-                            }
-                            None => {
-                                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                            }
-                        }
-                    } => {}
+                // check if the file is already being downloaded
+                if processing_files::is_processing(&file) {
+                    log::warn!(
+                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
+                    );
+                    metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                        .with_label_values(&[])
+                        .dec();
+                    continue;
                 }
+
+                // add the file to processing set
+                processing_files::add(&file);
+
+                // download the file
+                match download_file(thread, &trace_id, id, &account, &file, file_size, cache).await
+                {
+                    Ok(data_len) => {
+                        if data_len > 0 && data_len != file_size {
+                            log::warn!(
+                                "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} to cache {cache:?} err: {e}",
+                        );
+                    }
+                }
+
+                // remove the file from processing set
+                processing_files::remove(&file);
+
+                // update metrics
+                metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                    .with_label_values(&[])
+                    .dec();
             }
         });
     }
@@ -491,33 +493,56 @@ pub async fn queue_download(
     log::debug!(
         "[FILE_CACHE_DOWNLOAD:JOB] [trace_id {trace_id}] enqueue file: {file}, size: {size}, ts: {ts}"
     );
+
+    // skip if already queued or already being downloaded
+    if !queued_files::try_add(&file) {
+        return Ok(());
+    }
+    if processing_files::is_processing(&file) {
+        queued_files::remove(&file);
+        return Ok(());
+    }
+
     let cfg = get_config();
     if cfg.limit.file_download_enable_priority_queue
         && should_prioritize_file(ts, cfg.limit.file_download_priority_queue_window_secs)
     {
-        PRIORITY_FILE_DOWNLOAD_CHANNEL
-            .sender
-            .send((trace_id, id, account, file, size as usize, cache_type))
-            .await?;
-
-        // update metrics
-        metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-            .with_label_values(&[])
-            .inc();
+        if PRIORITY_FILE_DOWNLOAD_CHANNEL
+            .push((
+                trace_id,
+                id,
+                account,
+                file.clone(),
+                size as usize,
+                cache_type,
+            ))
+            .await
+        {
+            metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                .with_label_values(&[])
+                .inc();
+        } else {
+            queued_files::remove(&file);
+            log::warn!(
+                "[FILE_CACHE_DOWNLOAD:JOB] priority queue full ({FILE_DOWNLOAD_QUEUE_SIZE}), dropping file: {file}"
+            );
+        }
     } else {
-        FILE_DOWNLOAD_CHANNEL
+        if let Err(e) = FILE_DOWNLOAD_CHANNEL
             .sender
             .send((
                 trace_id,
                 id,
                 account,
-                file.to_owned(),
+                file.clone(),
                 size as usize,
                 cache_type,
             ))
-            .await?;
-
-        // update metrics
+            .await
+        {
+            queued_files::remove(&file);
+            return Err(e.into());
+        }
         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
             .with_label_values(&[])
             .inc();
@@ -530,4 +555,111 @@ fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
     let window_micros = window_secs * 1_000_000;
     let now = now_micros();
     ts > now - window_micros
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FileInfo, PriorityDownloadQueue, file_data, processing_files, queued_files};
+
+    #[test]
+    fn test_is_processing_false_initially() {
+        assert!(!processing_files::is_processing(
+            "unique_not_added_file_abc123.parquet"
+        ));
+    }
+
+    #[test]
+    fn test_add_and_is_processing() {
+        let name = "test_add_file_xyz999.parquet";
+        processing_files::add(name);
+        assert!(processing_files::is_processing(name));
+        processing_files::remove(name);
+    }
+
+    #[test]
+    fn test_remove_clears_processing() {
+        let name = "test_remove_file_qqq888.parquet";
+        processing_files::add(name);
+        processing_files::remove(name);
+        assert!(!processing_files::is_processing(name));
+    }
+
+    #[test]
+    fn test_normal_queue_cap_honored() {
+        let cap = 3;
+        let (tx, _rx) = tokio::sync::mpsc::channel::<FileInfo>(cap);
+
+        for i in 0..cap {
+            let result = tx.try_send((
+                format!("trace-{i}"),
+                i as i64,
+                "org".into(),
+                format!("file-{i}.parquet"),
+                1024,
+                file_data::CacheType::Disk,
+            ));
+            assert!(result.is_ok(), "send {i} should succeed under cap");
+        }
+
+        let overflow = tx.try_send((
+            "trace-overflow".into(),
+            99,
+            "org".into(),
+            "overflow.parquet".into(),
+            1024,
+            file_data::CacheType::Disk,
+        ));
+        assert!(overflow.is_err(), "send beyond cap must fail");
+    }
+
+    #[test]
+    fn test_queued_files_no_duplicates() {
+        let file = "dedup_test_unique_zz1234.parquet";
+
+        // first add succeeds
+        assert!(queued_files::try_add(file));
+        // same file rejected while already queued
+        assert!(!queued_files::try_add(file));
+
+        // after remove, can be queued again
+        queued_files::remove(file);
+        assert!(queued_files::try_add(file));
+
+        // cleanup
+        queued_files::remove(file);
+    }
+
+    #[tokio::test]
+    async fn test_priority_queue_cap_honored() {
+        let cap = 3;
+        let queue = PriorityDownloadQueue::new(cap);
+
+        // fill to cap — all succeed
+        for i in 0..cap {
+            let ok = queue
+                .push((
+                    format!("trace-{i}"),
+                    i as i64,
+                    "org".into(),
+                    format!("file-{i}.parquet"),
+                    1024,
+                    file_data::CacheType::Disk,
+                ))
+                .await;
+            assert!(ok, "push {i} should succeed under cap");
+        }
+
+        // one more must be rejected
+        let overflow = queue
+            .push((
+                "trace-overflow".into(),
+                99,
+                "org".into(),
+                "overflow.parquet".into(),
+                1024,
+                file_data::CacheType::Disk,
+            ))
+            .await;
+        assert!(!overflow, "push beyond cap must return false");
+    }
 }
