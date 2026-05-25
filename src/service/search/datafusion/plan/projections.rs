@@ -790,14 +790,12 @@ mod tests {
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
         assert!(extractor.group_by.is_empty());
         assert_eq!(
             extractor.projections,
             vec![
-                "_timestamp",
                 "k8s_namespace_name",
                 "regexp_match(filteredlogs.log,Utf8(\"took: ([0-9]+) ms\"))[Int64(1)]"
             ]

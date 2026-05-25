@@ -15,7 +15,7 @@
 
 use std::ops::ControlFlow;
 
-use sqlparser::ast::{Expr, Query, SelectItem, SetExpr, Statement, Visit, Visitor};
+use sqlparser::ast::{Query, SelectItem, SetExpr, Statement, Visit, Visitor};
 
 // only check the query like `select * from table`, do not check the union
 pub fn has_wildcard(statement: &Statement) -> bool {
@@ -39,21 +39,10 @@ impl WildcardVisitor {
 impl Visitor for WildcardVisitor {
     type Break = ();
 
-    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
-        if matches!(expr, Expr::Wildcard(_) | Expr::QualifiedWildcard(..)) {
-            self.has_wildcard = true;
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
-    }
-
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
         if let SetExpr::Select(select) = query.body.as_ref() {
             for item in &select.projection {
-                if matches!(
-                    item,
-                    SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(..)
-                ) {
+                if matches!(item, SelectItem::Wildcard(_)) {
                     self.has_wildcard = true;
                     return ControlFlow::Break(());
                 }
