@@ -107,8 +107,8 @@ export default defineComponent({
       (item: any) => item.folderId === props.activeFolderId,
     );
     const selectedFolder = ref({
-      label: activeFolder.name,
-      value: activeFolder.folderId,
+      label: activeFolder?.name ?? props.activeFolderId ?? "default",
+      value: activeFolder?.folderId ?? props.activeFolderId ?? "default",
     });
 
     //generate random integer number for dashboard Id

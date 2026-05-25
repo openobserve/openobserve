@@ -53,11 +53,12 @@ export class ReportsPage {
     this.scheduleNowBtn = page.locator('[data-test="add-report-schedule-scheduleNow-btn"]');
     this.scheduleLaterBtn = page.locator('[data-test="add-report-schedule-scheduleLater-btn"]');
 
-    // ODate / OTime forward $attrs to their outer wrapper <div>; `role="group"`
-    // is on the inner wrapper div (not the same element). Use a descendant
-    // combinator to find the interactive group inside the data-test wrapper.
-    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"] [role="group"]');
-    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"] [role="group"]');
+    // Schedule-later inputs — ODate forwards consumer data-test to its outer wrapper <div>
+    // via v-bind="$attrs"; the interactable role="group" segments container carries
+    // `${parentDataTest}-group` (added to ODate.vue). OTime places data-test directly
+    // on its role="group" element (compound selector ok).
+    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field-group"]');
+    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"][role="group"]');
     this.scheduleTimezoneSelect = page.locator('[data-test="add-report-schedule-start-timezone-select"]');
     this.scheduleTimezoneTrigger = page.locator('[data-test="add-report-schedule-start-timezone-select"] [data-test-selected-value]');
     this.scheduleTimezonePopover = page.locator('[data-test="add-report-schedule-start-timezone-select-popover"]');
@@ -255,17 +256,15 @@ export class ReportsPage {
     // popover that opens. The actual datetime value isn't asserted by these
     // tests — they cover the Schedule Later flow end-to-end.
     await this.scheduleStartDateField.click({ force: true });
-    await this.page.waitForTimeout(200);
     await this.page.keyboard.type('29');
     await this.page.keyboard.type('12');
-    await this.page.keyboard.type('2025');
+    await this.page.keyboard.type('2027');
     await this.page.keyboard.press('Escape');
-    await this.page.waitForTimeout(200);
 
+    await this.scheduleStartTimeField.waitFor({ state: 'visible', timeout: 5000 });
     await this.scheduleStartTimeField.click({ force: true });
-    await this.page.waitForTimeout(200);
     await this.page.keyboard.press('Escape');
-    await this.page.waitForTimeout(200);
+    await this.scheduleStartTimeField.waitFor({ state: 'visible', timeout: 5000 });
   }
 
   async createReportZone() {
@@ -275,7 +274,7 @@ export class ReportsPage {
     const opt = this.scheduleTimezoneOption('UTC');
     await opt.waitFor({ state: 'visible', timeout: 10000 });
     await opt.click({ force: true });
-    await this.page.waitForTimeout(2000);
+    await this.scheduleTimezonePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async setTimeZone(zone) {
@@ -318,10 +317,8 @@ export class ReportsPage {
 
     // Search for the report
     await this.reportSearchInputField.fill(reportName);
-    await this.page.waitForTimeout(2000);
-
-    // Verify report appears in the list
-    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 5000 });
+    // Wait for the search results to filter
+    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 10000 });
   }
 
   async createReport(dashboardName) {
