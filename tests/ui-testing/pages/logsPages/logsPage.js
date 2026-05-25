@@ -2022,9 +2022,9 @@ export class LogsPage {
         await subfieldAddBtn.click();
     }
 
-    async kubernetesContainerNameJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.waitForEditorValue('FROM "default"');
+    async kubernetesContainerNameJoin(streamA = 'default', streamB = 'e2e_automate') {
+        await this.clearAndFillQueryEditor(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
+        await this.waitForEditorValue(`FROM "${streamA}"`);
     }
 
     async kubernetesContainerNameJoinLimit() {
