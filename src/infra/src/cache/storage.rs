@@ -396,7 +396,7 @@ mod tests {
         assert!(matches!(result.unwrap_err(), Error::Generic { .. }));
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_fs_get_ranges() {
         let cache_fs = CacheFS {};
         let location = Path::from("test/file.txt");
