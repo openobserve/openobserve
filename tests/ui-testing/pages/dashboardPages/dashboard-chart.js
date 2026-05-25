@@ -163,8 +163,10 @@ export default class ChartTypeSelector {
     await fieldItem.first().scrollIntoViewIfNeeded();
     await fieldItem.first().hover();
 
-    // Now locate and click the button within the field item
-    const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
+    // Now locate and click the button within the field item.
+    // Use .first() — in join panels the same field name can appear multiple times
+    // (once per joined stream), which would cause a strict mode violation.
+    const button = fieldItem.first().locator(`[data-test="${buttonTestId}"]`);
     await button.waitFor({ state: "visible", timeout: 5000 });
     await button.click();
     await searchInput.fill(""); // Clear the search input
