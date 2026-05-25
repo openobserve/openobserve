@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
+          <div class=" tw:min-h-0 tw:overflow-y-auto">
             <div class="tw:flex tw:flex-col tw:pb-2 tw:px-2">
               <OCollapsible
                 v-if="
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.nodetype')"
                   class="tw:mt-2"
                 >
-                  <div class="tw:p-0">
+                  <div class="tw:px-1">
                     <OTable
                       data-test="nodes-nodetype-table"
                       :data="nodetypeRows"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.status')"
                   class="tw:mt-2"
                 >
-                  <div class="tw:p-0">
+                  <div class="tw:px-1">
                     <OTable
                       data-test="nodes-status-table"
                       :data="statusesRows"
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.cpuusage')"
                   class="tw:mt-2"
                 >
-                  <div class="tw:p-0">
+                  <div class="tw:px-1">
                     <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.memoryusage')"
                   class="tw:mt-2"
                 >
-                  <div class="tw:p-0">
+                  <div class="tw:px-1">
                     <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.tcpusage')"
                   class="tw:mt-2"
                 >
-                  <div class="tw:p-0">
+                  <div class="tw:px-1">
                     <OCheckbox
                       type="checkbox"
                       v-model="establishedToggle"
