@@ -643,6 +643,28 @@ pub async fn create_external_contract(
         return MetaHttpResponse::bad_request("end_date must be in the future");
     }
 
+    let membership =
+        match o2_enterprise::enterprise::cloud::billing_group::list_billing_membership_of(
+            &req.org_id,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error listing membership of {} : {e}", req.org_id);
+                return MetaHttpResponse::internal_error(format!(
+                    "Error getting membership of {}: {e}",
+                    req.org_id
+                ));
+            }
+        };
+
+    if membership.is_some() {
+        return MetaHttpResponse::bad_request(
+            "org is part of a billing group, cannot have external contract",
+        );
+    }
+
     // Block if the org already has any active billing record to avoid silently
     // overwriting a live Stripe/AWS/Azure subscription.
     if let Ok(Some(existing)) =
@@ -669,12 +691,24 @@ pub async fn create_external_contract(
     billing.end_date = Some(req.end_date);
     billing.expiry_notified_stage = None;
 
-    match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
-        Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
-        Err(e) => {
-            MetaHttpResponse::internal_error(format!("Failed to create external contract: {e}"))
-        }
+    if let Err(e) = o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
+        return MetaHttpResponse::internal_error(format!(
+            "Failed to create external contract: {e}"
+        ));
     }
+
+    if let Err(e) = o2_enterprise::enterprise::cloud::billing_group::reinstate_billing_group_of(
+        &admin.email,
+        &req.org_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::internal_error(format!(
+            "External contract created, but failed to reinstate billing group members: {e}"
+        ));
+    }
+
+    MetaHttpResponse::json(serde_json::json!({"status": "ok"}))
 }
 
 /// ExtendExternalContract
@@ -788,6 +822,17 @@ pub async fn revoke_external_contract(
             return MetaHttpResponse::internal_error(e.to_string());
         }
     };
+
+    // first try removing the billing members
+    if let Err(e) =
+        o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(&target_org_id)
+            .await
+    {
+        log::error!("error removing members of the billing group for org_id {target_org_id} : {e}");
+        return MetaHttpResponse::internal_error(format!(
+            "Failed to remove billing group members for {target_org_id} : {e}"
+        ));
+    }
 
     match o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(&target_org_id)
         .await
