@@ -1060,8 +1060,9 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         // v3 UI validates non-empty name — clear input and submit to trigger validation
+        // alertNameInput is the OInput wrapper <div>; alertNameInputField is the actual <input>
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).clear();
+        await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1089,7 +1090,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill('abc');
+        await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();
