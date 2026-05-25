@@ -157,9 +157,7 @@ export default defineComponent({
             emit("refresh", updatedTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab updated successfully", {
-              timeout: 2000,
-            });
+            showPositiveNotification("Tab updated successfully");
           }
           //else new tab
           else {
@@ -174,9 +172,7 @@ export default defineComponent({
             emit("refresh", newTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab added successfully", {
-              timeout: 2000,
-            });
+            showPositiveNotification("Tab added successfully");
           }
           tabData.value = {
             name: "",

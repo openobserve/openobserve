@@ -229,11 +229,11 @@ export default class DashboardLegendsCopy {
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
     const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
-    // Hover to reveal the copy button, then check icon state via data-icon attribute
+    // Hover to reveal the copy button, then check data-copied attribute
     await cell.hover({ force: true });
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
-    const iconAttr = await copyBtn.locator('[data-test="dashboard-table-cell-copy-icon"]').first().getAttribute('data-icon');
-    return iconAttr === 'check';
+    const copiedAttr = await copyBtn.getAttribute('data-copied');
+    return copiedAttr === 'true';
   }
 
   /**

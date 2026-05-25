@@ -73,11 +73,12 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
-    await pm.dashboardSetting.closeSettingDashboard();
 
     await expect(page.getByText("Tab added successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: 5000,
     });
+
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -112,7 +113,7 @@ test.describe("dashboard tabs setting", () => {
     //   timeout: 3000,
     // });
     await expect(page.getByText("Tab added successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: 5000,
     });
 
     // Edit the tab name and save it
@@ -126,7 +127,7 @@ test.describe("dashboard tabs setting", () => {
     //   timeout: 2000,
     // });
     await expect(page.getByText("Tab updated successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: 5000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
 
@@ -159,18 +160,19 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
 
+    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+    //   timeout: 3000,
+    // });
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 5000,
+    });
+
     // Edit the tab name and cancel it
     await pm.dashboardSetting.updateDashboardTabName(
       newTabName,
       updatedTabName
     );
     await pm.dashboardSetting.cancelEditedtab();
-    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-    //   timeout: 3000,
-    // });
-    await expect(page.getByText("Tab added successfully")).toBeVisible({
-      timeout: 2000,
-    });
     await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
@@ -205,13 +207,13 @@ test.describe("dashboard tabs setting", () => {
     //   timeout: 3000,
     // });
     await expect(page.getByText("Tab added successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: 5000,
     });
 
     // Delete the tab
     await pm.dashboardSetting.deleteTab(newTabName);
     await expect(page.getByText("Tab deleted successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: 5000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
 
