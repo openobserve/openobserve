@@ -88,10 +88,22 @@ export default class DashboardVariables {
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
 
-      // Wait for and interact with value input (OCombobox)
+      // Wait for and interact with value input (OCombobox).
+      // OCombobox debounces update:modelValue by 1000ms — typing via fill() and
+      // saving immediately leaves the model empty. Instead, type to filter the
+      // dropdown and click the matching option, which uses onSelect() and emits
+      // immediately (no debounce).
       const filterValueInput = this.page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
       await filterValueInput.waitFor({ state: "visible", timeout: 10000 });
       await filterValueInput.fill(filterConfig.value);
+
+      // Wait for the dropdown option and click it so the value is committed instantly.
+      // Options have data-test-value="${value}" (e.g. "$variablename").
+      const filterValueOption = this.page.locator(
+        `[data-test*="filter-value-selector"][data-test$="-option"][data-test-value="${filterConfig.value}"]`
+      );
+      await filterValueOption.waitFor({ state: "visible", timeout: 5000 });
+      await filterValueOption.click();
     }
 
     // Toggle show multiple values based on parameter
