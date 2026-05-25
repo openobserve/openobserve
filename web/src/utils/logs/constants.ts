@@ -172,6 +172,7 @@ export const DEFAULT_LOGS_CONFIG = {
       selectedFields: [] as string[],
       filterField: "",
       addToFilter: "",
+      addToFilterMode: "replace" as "replace" | "append",
       removeFilterField: "",
       functions: [] as any[],
       streamType: "logs",
