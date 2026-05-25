@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <DateTime
         style="height: 34px !important; border-radius: 3px"
+        menu-align="end"
         @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"
       />
       <OButton

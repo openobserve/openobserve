@@ -209,6 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="sm"
                               class="tw:mr-0.5"
                             />
+                            <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+                            <component v-else :is="group.icon" />
                             <span>{{ group.label }}</span>
                             <OBadge
                               variant="default"
@@ -306,7 +308,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex-none!"
                   >
                     <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                      <component :is="group.icon" />
+                      <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
+                      <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
                       <OBadge
                         :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
@@ -672,6 +675,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             class="tw:mr-0.5"
                           />
+                          <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+                          <component v-else :is="group.icon" />
                           <span>{{ group.label }}</span>
                           <OBadge
                             variant="default"
@@ -1032,6 +1037,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Group header -->
             <div class="metric-group-header">
               <div class="metric-group-label">
+                <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+                <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
                 <OBadge
                   variant="default"

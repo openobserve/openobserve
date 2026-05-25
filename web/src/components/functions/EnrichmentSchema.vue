@@ -28,8 +28,7 @@
         <div>
         <div
           v-if="loadingState"
-          class="tw:pt-3 tw:text-center q-w-md tw:mx-4 tw:flex tw:justify-center"
-          style="max-width: 450px"
+          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:w-full tw:py-10"
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
