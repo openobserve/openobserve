@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:overflow-hidden tw:h-full">
             <div class="tw:pt-[0.625rem] tw:px-1">
             <OInput
-              data-test="languages-list-search-input"
+              data-test="language-list-search-input"
               v-model="tabsFilter"
               clearable
               class="tw:w-full indexlist-search-input"
