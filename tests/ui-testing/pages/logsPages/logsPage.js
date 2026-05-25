@@ -8147,48 +8147,37 @@ export class LogsPage {
     }
 
     /**
-     * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses waitForFunction for reliable DOM detection that survives reactive re-renders.
+     * Verify a chart type is selected.
+     * data-selected is set directly on [data-test="selected-chart-${chartId}-item"] (inner div)
+     * by ChartSelection.vue — always present as "true" or "false".
+     * toHaveAttribute auto-retries, so no manual waitForFunction/polling needed.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 45000) {
-        // Use waitForFunction to directly check the DOM for the bg-grey class
-        // on the chart selection item. This survives Vue reactive re-renders better
-        // than Playwright's locator.toHaveClass polling.
+        // Uses data-test-selected attribute on <li> in ChartSelection.vue.
+        // Only the currently selected chart has this attribute set to its ID.
+        // Filters by offsetParent to skip elements hidden by v-show (display:none).
         try {
             await this.page.waitForFunction(
                 ({ chartId, shouldBeSelected }) => {
-                    // Find all visible chart selection sections for this chart type
-                    const sections = document.querySelectorAll(
-                        `[data-test="selected-chart-${chartId}-item"]`
+                    const items = document.querySelectorAll(
+                        `[data-test-selected="${chartId}"]`
                     );
-                    for (const section of sections) {
-                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
-                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
-                        // Check the parent q-item for the bg-grey selection class
-                        const parent = section.parentElement;
-                        if (!parent) continue;
-                        // Prefer data-selected attribute (added to ChartSelection.vue for clean
-                        // data-test-only selectors). Fall back to legacy bg-grey-3/5 (Quasar) and
-                        // tw:bg-gray-200/400 (Tailwind) classes for older builds.
-                        const dataSelected = parent.getAttribute('data-selected');
-                        if (dataSelected !== null) {
-                            const isSelected = dataSelected === 'true';
-                            if (isSelected === shouldBeSelected) return true;
-                            continue;
+                    let visibleFound = false;
+                    for (const item of items) {
+                        if (/** @type {HTMLElement} */ (item).offsetParent !== null) {
+                            visibleFound = true;
+                            break;
                         }
-                        const cls = parent.className || '';
-                        const hasBgGrey = /\bbg-grey-[35]\b/.test(cls) || /\btw:bg-gray-(?:200|400)\b/.test(cls);
-                        if (hasBgGrey === shouldBeSelected) return true;
                     }
-                    return false;
+                    return visibleFound === shouldBeSelected;
                 },
                 { chartId, shouldBeSelected },
                 { timeout, polling: 'raf' }
             );
             testLogger.info(
-                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
+                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected`
             );
         } catch (error) {
             throw new Error(

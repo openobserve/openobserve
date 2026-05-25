@@ -35,10 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           style="width: 50px"
           data-test="dashboard-addpanel-chart-selection-item"
-          :data-selected="selectedChartType === item.id ? 'true' : 'false'"
+          :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >
           <div
             :data-test="`selected-chart-${item.id}-item`"
+            :data-selected="selectedChartType === item.id ? 'true' : 'false'"
             class="tw:flex tw:flex-col tw:items-center tw:relative"
           >
             <img
