@@ -663,6 +663,15 @@ export class PipelinesPage {
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
+        // Defensive: in multi-select / listbox modes the Reka popper wrapper can
+        // remain attached after the named popover detaches, with a virtual list row
+        // (`data-vrow`) intercepting pointer events for the next click (Save). Press
+        // Escape and wait for ANY reka-popper-content-wrapper to be hidden.
+        const popper = this.page.locator('[data-reka-popper-content-wrapper]:visible');
+        if (await popper.count().catch(() => 0) > 0) {
+            await this.page.keyboard.press('Escape');
+            await popper.first().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        }
     }
 
     async saveInputNodeStream() {
@@ -1485,13 +1494,27 @@ export class PipelinesPage {
         await this.columnSelectSearch.fill(columnName);
         await this.columnSelectFirstOption.waitFor({ state: 'visible' });
         await this.columnSelectFirstOption.click();
+        // Wait specifically for the column popover to detach (named popover only —
+        // do NOT press Escape, which would close the topmost dismissable layer
+        // (the conditions dialog itself, making the operator trigger disappear).
+        await this.page.locator('[data-test="alert-conditions-select-column-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async selectOperatorFromMenu(operator) {
+        // Defensive: wait for the operator trigger to be in the DOM (the conditions
+        // form may still be settling after the column was filled).
+        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
         await this.operatorSelectTrigger.first().click();
         const option = this.page.locator(`[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`).first();
         await option.waitFor({ state: 'visible' });
         await option.click();
+        // Wait for the operator popover specifically (not via Escape, which would
+        // close the conditions dialog).
+        await this.page.locator('[data-test="alert-conditions-operator-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async verifyConfirmationDialog() {
@@ -2446,17 +2469,30 @@ export class PipelinesPage {
      */
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
-        // Open the OSelect popover via its trigger.
-        await this.scheduledStreamNameSelectTrigger.waitFor({ state: 'visible', timeout: 15000 });
-        await this.scheduledStreamNameSelectTrigger.click();
-        await this.scheduledStreamNameSelectPopover.waitFor({ state: 'visible', timeout: 10000 });
-        // Filter the listbox to the requested stream via the search input.
-        await this.scheduledStreamNameSelectSearch.waitFor({ state: 'visible', timeout: 10000 });
-        await this.scheduledStreamNameSelectSearch.fill(streamName);
-        // Click the per-value option emitted by OSelectItem.
-        const option = this.scheduledStreamNameOptionByValue(streamName);
-        await option.waitFor({ state: 'visible', timeout: 10000 });
-        await option.click();
+        // Two pipeline forms expose a stream-name OSelect with different data-tests:
+        //   - ScheduledPipeline.vue → "scheduled-pipeline-stream-name-select*"
+        //   - Stream.vue (input/realtime/metrics/traces) → "input-node-stream-name-select*"
+        // Detect which form is currently open and route accordingly.
+        const scheduledTrigger = this.scheduledStreamNameSelectTrigger;
+        const inputNodeWrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+
+        const scheduledVisible = await scheduledTrigger.isVisible().catch(() => false);
+        if (scheduledVisible) {
+            await scheduledTrigger.click();
+            await this.scheduledStreamNameSelectPopover.waitFor({ state: 'visible', timeout: 10000 });
+            await this.scheduledStreamNameSelectSearch.waitFor({ state: 'visible', timeout: 10000 });
+            await this.scheduledStreamNameSelectSearch.fill(streamName);
+            const option = this.scheduledStreamNameOptionByValue(streamName);
+            await option.waitFor({ state: 'visible', timeout: 10000 });
+            await option.click();
+        } else {
+            // input-node form path — open popover by clicking wrapper, fill search,
+            // click value-matched option, then ensure popper closes (defends against
+            // the next Save click being intercepted by virtual-list row).
+            await inputNodeWrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await this.enterStreamName(streamName);
+            await this.selectStreamOptionByName(streamName);
+        }
         testLogger.info(`Stream '${streamName}' selected`);
     }
 

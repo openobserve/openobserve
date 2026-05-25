@@ -336,6 +336,14 @@ test.describe("Unflattened testcases", () => {
           }
           break;
         }
+        // Close any leftover detail drawer from the previous attempt — it intercepts
+        // pointer events and blocks the table row expand-menu click. The drawer is a
+        // right-side dialog with data-test="logs-search-result-detail-dialog".
+        const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
+        if (await detailDialog.isVisible().catch(() => false)) {
+          await page.keyboard.press('Escape');
+          await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
         await applyQueryButton(page);
         await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
         await pageManager.unflattenedPage.logTableRowExpandMenu.click();
