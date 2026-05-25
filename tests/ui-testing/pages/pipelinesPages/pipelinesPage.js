@@ -15,7 +15,7 @@ export class PipelinesPage {
         this.pipelineMenuLink = page.locator(
           '[data-test="menu-link-\\/pipeline-item"]'
         );
-        this.pipelineTab = page.locator('[data-test="stream-pipelines-tab"]');
+        this.pipelineTab = page.locator('button[data-test="stream-pipelines-tab"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );

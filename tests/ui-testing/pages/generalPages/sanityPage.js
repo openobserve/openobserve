@@ -74,7 +74,7 @@ export class SanityPage {
         // ============================================================
         this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.realtimeTab = page.locator('[data-test="tab-realtime"]');
-        this.streamPipelinesTab = page.locator('[data-test="stream-pipelines-tab"]');
+        this.streamPipelinesTab = page.locator('button[data-test="stream-pipelines-tab"]');
         this.functionStreamTab = page.locator('[data-test="function-stream-tab"]');
         this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
