@@ -45,15 +45,14 @@ describe("AppTabs", () => {
   });
 
   it("should highlight active tab", () => {
-    // OToggleGroupItem renders a <span> wrapper around the reka-ui button;
-    // data-state="on" is set by reka-ui on the inner button element.
-    const activeTabBtn = wrapper.find('[data-test="tab-tab1"] button');
+    // OToggleGroupItem forwards $attrs (including data-test) to the reka-ui
+    // ToggleGroupItem which renders as a <button> — data-test is ON the button.
+    const activeTabBtn = wrapper.find('[data-test="tab-tab1"]');
     expect(activeTabBtn.attributes("data-state")).toBe("on");
   });
 
   it("should emit update:activeTab when non-disabled tab is clicked", async () => {
-    // Click the inner button; clicking the outer <span> does not trigger reka-ui's value update.
-    const tab2Btn = wrapper.find('[data-test="tab-tab2"] button');
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"]');
     await tab2Btn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
@@ -61,7 +60,7 @@ describe("AppTabs", () => {
   });
 
   it("should not emit when disabled tab is clicked", async () => {
-    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
     await disabledTabBtn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
@@ -75,8 +74,8 @@ describe("AppTabs", () => {
   });
 
   it("should apply disabled state to disabled tabs", () => {
-    // reka-ui sets data-disabled on the inner button, not the outer <span> wrapper.
-    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    // reka-ui sets data-disabled on the button; data-test is also on the button.
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
     expect(disabledTabBtn.attributes("data-disabled")).toBeDefined();
   });
 
@@ -117,13 +116,12 @@ describe("AppTabs", () => {
   });
 
   it("should handle changeTab function correctly", async () => {
-    // onSelect is internal and not exposed; test tab selection via inner button clicks
-    const tab2Btn = wrapper.find('[data-test="tab-tab2"] button');
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"]');
     await tab2Btn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
 
     // Disabled tab click should not add more emits
-    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"] button');
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
     await disabledTabBtn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1); // Still 1
 
