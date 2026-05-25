@@ -30,9 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-global-filter="false"
   >
     <template #empty>
-      <div class="tw:text-center tw:w-full full-height">
-        <NoData />
-      </div>
+      <NoData />
     </template>
     <template #cell-actions="{ row }">
       <OButton
@@ -174,6 +172,10 @@ export default defineComponent({
   :deep(.q-btn:before) {
     border: none !important;
   }
+}
+
+:deep(.no-data-image) {
+  margin-bottom: 0.5rem;
 }
 
 .label-container {

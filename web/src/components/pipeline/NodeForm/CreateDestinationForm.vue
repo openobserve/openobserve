@@ -313,14 +313,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <div class="tw:flex tw:flex-col tw:gap-3">
-            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
+          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-4">
+            <div class="o-input-label tw:leading-tight tw:flex tw:items-center">
               Headers
             </div>
+            <div class="tw:flex tw:flex-col tw:gap-2">
             <div
               v-for="(header, index) in apiHeaders"
               :key="header.uuid"
-              class="tw:flex tw:gap-1 tw:ml-1"
+              class="tw:flex tw:gap-1"
             >
               <div class="tw:w-5/12">
                 <OInput
@@ -358,6 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+            </div>
           </div>
 
           <div class="tw:w-full tw:mt-3 tw:inline-flex">
@@ -370,8 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card tw:mb-6 tw:mt-4"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'bg-blue-1'"
+            class="connection-notes-card tw:mb-6 tw:mt-4 tw:!bg-[var(--color-banner-info-bg)]"
           >
             <OCardSection role="body">
               <div class="tw:flex tw:items-center tw:mb-2">
@@ -398,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="connectionNotes.example"
                   class="tw:mt-2 tw:p-2 example-url"
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'bg-white'
+                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'
                   "
                 >
                   <strong>Example:</strong>

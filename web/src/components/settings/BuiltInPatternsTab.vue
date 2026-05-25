@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><OIcon name="refresh" size="xs"
+              ><OIcon name="refresh" size="sm"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>

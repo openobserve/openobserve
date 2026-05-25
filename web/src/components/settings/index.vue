@@ -220,14 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                >
-                <div class="tw:flex tw:items-center tw:w-full">
-                  <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-                  <span class="tw:text-sm tw:font-medium tw:ml-2"
-                  :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw:text-white' : 'tw:text-black'"
-                  >{{ t('regex_patterns.title') }}</span>
-                </div>
-              </ORouteTab>
+                  :icon="`img:${regexIcon}`"
+                  :label="t('regex_patterns.title')"
+                />
                 <ORouteTab
                   v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
                   data-test="correlation-settings-tab"
