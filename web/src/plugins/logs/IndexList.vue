@@ -543,15 +543,19 @@ export default defineComponent({
       return result;
     });
 
+    // `immediate` seeds streamOptions on every (re)mount. The old q-select
+    // re-seeded via its `@filter` handler on each open; that was lost in the
+    // OSelect migration, so without `immediate` the lazy watcher never fired
+    // after a v-if remount (streamList itself is unchanged) and the list stayed
+    // empty. OSelect handles search filtering internally over these options.
     watch(
       () => streamList.value,
       () => {
-        if (streamOptions.value.length === 0) {
           streamOptions.value = [...streamList.value];
-        }
       },
       {
         deep: true,
+        immediate: true,
       },
     );
 
