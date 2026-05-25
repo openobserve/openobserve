@@ -150,7 +150,7 @@ const getFormattedDestinations = computed(() => {
     return {
       label: destination.name,
       value: destination.name,
-      url: truncatedUrl,
+      subLabel: truncatedUrl,
     };
   });
 });
