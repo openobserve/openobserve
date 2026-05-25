@@ -80,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
                 "
                 name="close"
-                class="tw:ml-2 dashboard-query-remove-icon"
+                size="sm"
+                class="dashboard-query-remove-icon"
                 @click.stop="removeTab(index)"
                 style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
