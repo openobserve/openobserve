@@ -2,7 +2,6 @@
 //methods: addDashboardVariable, selectValueFromVariableDropDown
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
-import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 
 export default class DashboardVariables {
@@ -182,21 +181,21 @@ export default class DashboardVariables {
   // Usage: this function is used for select the variable value from dropdown
   // Dynamically fill input and select the same value from dropdown
   async selectValueFromVariableDropDown(label, value) {
-    const trigger = this.page.locator(`[data-test="variable-selector-${label}-inner-trigger"]`);
+    const trigger = this.variableTrigger(label);
     await trigger.waitFor({ state: "visible", timeout: 10000 });
 
-    const valuesStreamPromise = waitForValuesStreamComplete(this.page);
     await trigger.click();
-    await valuesStreamPromise;
+    // Wait for the popover to open before interacting with its contents
+    await this.variablePopover(label).waitFor({ state: "visible", timeout: 10000 });
 
-    const searchInput = this.page.locator(`[data-test="variable-selector-${label}-inner-search"]`);
+    const searchInput = this.variableSearchInput(label);
     const hasSearch = await searchInput.count() > 0;
     if (hasSearch) {
       await searchInput.waitFor({ state: "visible", timeout: 5000 });
       await searchInput.fill(value);
     }
 
-    const option = this.page.locator(`[data-test="variable-selector-${label}-inner-option"][data-test-value="${value}"]`);
+    const option = this.variableOptionByValue(label, value);
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
   }
