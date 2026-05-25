@@ -2460,6 +2460,11 @@ export class LogsPage {
             { selector: this.queryEditor, expected: substring },
             { timeout }
         );
+        // Monaco's onDidChangeModelContent fires a debounce (~100ms) before emitting
+        // update:query to the Vue store. Without this wait, runQueryAndWaitForResults
+        // clicks Run while the store still holds the old query, so the old (valid)
+        // query runs and no error element appears.
+        await this.page.waitForTimeout(200);
     }
 
     /**
