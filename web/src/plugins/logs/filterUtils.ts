@@ -110,34 +110,3 @@ export const replaceExistingFieldCondition = (
 
   return queryStr;
 };
-
-/**
- * Extracts the existing value/operator pairs for `fieldName` from `queryStr`.
- * Walks both single conditions and parenthesized multi-value groups.
- *
- * Returns each occurrence as { op, value, raw } where:
- *   - op is the normalized comparator: "=", "!=", "is", "is not"
- *   - value is the literal as it appeared in the query (quotes stripped for strings)
- *   - raw is the full matched expression (useful for regex replace)
- */
-export const extractFieldConditions = (
-  queryStr: string,
-  fieldName: string,
-): Array<{ op: string; value: string }> => {
-  if (!queryStr) return [];
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const condRegex = new RegExp(
-    `(?:"[^"]+"\\.)?${esc}\\s*(=|!=|is\\s+not|is)\\s*('[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`,
-    "gi",
-  );
-  const results: Array<{ op: string; value: string }> = [];
-  for (const match of queryStr.matchAll(condRegex)) {
-    const op = match[1].replace(/\s+/g, " ").toLowerCase();
-    let value = match[2];
-    if (value.startsWith("'") && value.endsWith("'")) {
-      value = value.slice(1, -1);
-    }
-    results.push({ op, value });
-  }
-  return results;
-};
