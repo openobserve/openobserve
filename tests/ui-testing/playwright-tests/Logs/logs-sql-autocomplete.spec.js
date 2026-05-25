@@ -178,18 +178,43 @@ test.describe("SQL Autocomplete — Logs", () => {
 
         await pm.logsPage.enableSqlModeIfNeeded();
 
-        // Type the partial stream with a double-quote (simulating what the user types)
-        // Monaco may auto-insert the closing " — the feature handles both cases
-        await pm.logsPage.clearQueryEditorAndType('SELECT * FROM "e2e');
+        // Retry loop mirrors TEST 2 — streamKeywords may not be populated on
+        // the very first trigger if Vue's watch hasn't processed the stream-list
+        // API response yet. Each attempt re-clears the editor and types the
+        // partial FROM phrase to retrigger the autocomplete provider. Once the
+        // stream list propagates, the FROM context branch in getSuggestions()
+        // injects contextKeywords (streams) instead of falling back to function
+        // suggestions.
+        let labels = [];
+        let hasStream = false;
+        const MAX_ATTEMPTS = 5;
 
-        const labels = await pm.logsPage.getSuggestionLabelsIfVisible(5000);
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            await pm.logsPage.dismissSuggestions();
+            if (attempt > 1) {
+                // Between retries, give the Vue watcher another chance to hydrate
+                await pm.logsPage.waitForStreamKeywordsHydration(3000);
+            }
+
+            // Type the partial stream with a double-quote (simulating what the user types)
+            // Monaco may auto-insert the closing " — the feature handles both cases
+            await pm.logsPage.clearQueryEditorAndType('SELECT * FROM "e2e');
+
+            labels = await pm.logsPage.getSuggestionLabelsIfVisible(5000);
+            hasStream = labels.some(l =>
+                l.toLowerCase().includes('e2e') || l.toLowerCase().includes(streamName)
+            );
+            testLogger.info(
+                `Attempt ${attempt}/${MAX_ATTEMPTS}: ${labels.length} suggestions ` +
+                `[${labels.slice(0, 5).join(', ')}], hasStream=${hasStream}`
+            );
+            if (hasStream) break;
+        }
+
         testLogger.info(`FROM "partial suggestions: ${labels.slice(0, 8).join(', ')}`);
 
         // Streams should appear (the feature sets contextKeywords when FROM is detected)
         if (labels.length > 0) {
-            const hasStream = labels.some(l =>
-                l.toLowerCase().includes('e2e') || l.toLowerCase().includes(streamName)
-            );
             expect(hasStream).toBe(true);
             testLogger.info(`Stream suggestion visible with open quote: ${hasStream}`);
         } else {

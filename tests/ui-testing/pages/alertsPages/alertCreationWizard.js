@@ -60,10 +60,10 @@ export class AlertCreationWizard {
                 await this.page.locator(this.locators.alertNameInput).click();
                 await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
 
-                // Re-select stream type
+                // Re-select stream type via OSelect popover pattern (§4)
                 await this.page.locator(this.locators.streamTypeDropdown).click();
-                await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-                await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+                await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+                await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
                 await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
             }
@@ -94,12 +94,14 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
         // Wait for stream list API call to complete after stream type selection
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -178,7 +180,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -204,10 +214,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -280,7 +292,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created alert with defaults', { alertName: randomAlertName });
 
         // Wait for navigation back to alerts list
@@ -310,10 +330,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -460,7 +482,15 @@ export class AlertCreationWizard {
             const btn = document.querySelector(selector);
             if (btn) btn.click();
         }, this.locators.alertSubmitButton);
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });
 
@@ -487,11 +517,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         // Select stream name
         await this.selectStreamByName(streamName);
@@ -616,7 +647,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created multi-condition alert', { alertName: randomAlertName });
 
         // Wait for page to navigate back to alerts list after creation
@@ -654,11 +693,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
@@ -836,7 +876,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -859,11 +907,12 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInputField).fill(alertName);
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         // Select stream
         await this.selectStreamByName(streamName);
@@ -1135,11 +1184,12 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (logs)
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: logs');
 
         // Select stream name
@@ -1315,7 +1365,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with deduplication for validation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1359,10 +1417,12 @@ export class AlertCreationWizard {
         await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
 
+        // Select stream type (logs) via OSelect popover pattern (§4)
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
 
         await this.selectStreamByName(streamName);
 
@@ -1512,7 +1572,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with aggregation', { alertName: randomAlertName });
 
         return randomAlertName;
@@ -1567,13 +1635,14 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.alertNameInputField).fill(randomAlertName);
         testLogger.info('Filled alert name', { alertName: randomAlertName });
 
-        // Select stream type (metrics) - IMPORTANT: Must be metrics for PromQL tab to appear
+        // Select stream type (metrics) via OSelect popover pattern (§4) — IMPORTANT: Must be metrics for PromQL tab to appear
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="metrics"]`).click();
         // Wait for stream listing API to complete after type change
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
         testLogger.info('Selected stream type: metrics');
 
         // Select metrics stream name
@@ -1710,7 +1779,15 @@ export class AlertCreationWizard {
 
         // ==================== SUBMIT ALERT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
-        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: this.locators.alertSuccessMessage })
+                .first()
+        ).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully created scheduled alert with PromQL query', { alertName: randomAlertName });
 
         return randomAlertName;

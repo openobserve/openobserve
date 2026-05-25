@@ -68,8 +68,13 @@ export class AlertsPage {
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
             // Step 1: Alert Setup selectors (v3 UI)
+            // OSelect: trigger wrapper + `${parent}-popover` + `${parent}-option` with `data-test-value="<value>"` (§4)
             streamTypeDropdown: '[data-test="add-alert-stream-type-select-dropdown"]',
+            streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
+            streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
+            streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
+            streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
             alertTypeSelect: '[data-test="add-alert-type-select-dropdown"]',
 
             // Step 2: Query/Conditions selectors
@@ -1054,16 +1059,27 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation
+        // v3 UI validates non-empty name — clear input and submit to trigger validation.
+        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
+        // fillable); the inner native <input> auto-derives `-field`. We click the
+        // wrapper to focus the field, then clear the `-field` variant.
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).clear();
+        await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
         // v3 shows a toast notification when name is empty
-        await expect(this.page.getByText('Alert name is required.')).toBeVisible({ timeout: 10000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: 'Alert name is required.' })
+                .first()
+        ).toBeVisible({ timeout: 10000 });
         testLogger.info('Invalid alert name validation working');
 
         // Close with robust handling for dialog backdrops
@@ -1076,7 +1092,9 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill('abc');
+        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
+        // fillable); the inner native <input> auto-derives `-field` — fill that variant.
+        await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1144,7 +1162,15 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.cloneSubmitButton).click();
-        await expect(this.page.getByText('Please select stream type')).toBeVisible({ timeout: 5000 });
+        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
+        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
+        // strict-mode violation per AGENT_RULES §2.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: 'Please select stream type' })
+                .first()
+        ).toBeVisible({ timeout: 5000 });
         testLogger.info('Clone validation working - stream type required');
 
         await this.page.locator(this.locators.cloneCancelButton).click();
@@ -2353,11 +2379,12 @@ export class AlertsPage {
 
     /**
      * Select stream type from dropdown
+     * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
      */
     async selectStreamType(streamType) {
         await this.page.locator(this.locators.streamTypeDropdown).click();
-        await this.page.getByRole('option', { name: streamType }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="${streamType}"]`).click();
         testLogger.info('Selected stream type', { streamType });
     }
 

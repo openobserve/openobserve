@@ -150,6 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OBadge
               :variant="getStatusVariant(row.status)"
               size="sm"
+              data-test="pipeline-history-status-badge"
+              :data-test-status="(row.status || '').toLowerCase()"
             >
               {{ row.status }}
             </OBadge>

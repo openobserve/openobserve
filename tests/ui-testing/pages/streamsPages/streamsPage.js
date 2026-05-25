@@ -314,8 +314,17 @@ export class StreamsPage {
     }
 
     async expectValidationErrorVisible() {
-        // Schema validation errors come from backend API and are shown via OToast
-        await expect(this.page.locator('[data-test="o-toast-error"]')).toBeVisible({ timeout: 10000 });
+        // Field-agnostic validation error - matches any field name.
+        // OToast renders the same message in 3 places (sr-only ARIA-live span,
+        // <title>, and the visible <div data-test="o-toast-message">). A plain
+        // text= regex hits all three → strict-mode violation. Scope to the
+        // toast-message inside the error/warning toast container.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: /Field\(s\) '.*' cannot have/ })
+                .first(),
+        ).toBeVisible({ timeout: 30000 });
     }
 
     async verifyIndexTypeOptions() {

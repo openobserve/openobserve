@@ -39,21 +39,20 @@ export class PipelinesPage {
           .locator("div")
           .nth(2);
         this.saveButton = page.locator('[data-test="input-node-stream-save-btn"]');
-        // Error toast / message shown when saving stream node without selecting a stream.
-        // Scoped to the input-node form via its routing-section data-test, then
-        // by ARIA role="alert" (q-field error). The new error string is
-        // "This field is required" (from t('validation.required')).
+        // Error message shown when saving the input/output stream node without
+        // selecting a stream. The OSelect on Stream.vue exposes the
+        // `:error-message="streamNameError"` via its auto-derived
+        // `${parent}-error` data-test (set on the wrapper `data-test`).
         this.selectStreamError = page.locator(
-          '[data-test="add-stream-input-stream-routing-section"] [role="alert"]'
+          '[data-test="input-node-stream-name-select-error"]'
         ).first();
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        // Pipeline name required error — PipelineEditor's OInput. The wrapper
-        // data-test was added in PipelineEditor.vue (source mod). OInput
-        // renders the error inside the wrapper with role="alert".
+        // Pipeline name required error — PipelineEditor's OInput. OInput
+        // renders the error inside the auto-derived `${parent}-error` element.
         this.pipelineNameRequiredMessage = page.locator(
-          '[data-test="pipeline-editor-name-input"] [role="alert"]'
+          '[data-test="pipeline-editor-name-input-error"]'
         ).first();
         // Pipeline name OInput - auto-derived `-field` for the native input.
         this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-field"]');
@@ -89,6 +88,9 @@ export class PipelinesPage {
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
         this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
+        // OInput inner native input — `.fill()` MUST target the `-field`
+        // variant per §4 (the wrapper isn't the input).
+        this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
         this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
@@ -99,19 +101,20 @@ export class PipelinesPage {
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
         this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
-        // Toasts use OToast's `data-test-message` attribute to expose the
-        // message string, scoped per-instance (§4 OToast convention).
+        // AddFunction's name field is an OInput — when the form is submitted
+        // empty, OInput renders the "Field is required!" message inside the
+        // auto-derived `${parent}-error` element with `data-test-error-text`.
         this.functionNameRequiredError = page.locator(
-          '[data-test-message="Function Name is required"]'
+          '[data-test="add-function-name-input-error"]'
         );
         this.functionRequiredError = page.locator(
           '[data-test-message="Function is required"]'
         );
-        // Stream-selection toast — appears when saving an input-node without
-        // selecting a stream from the dropdown.
-        this.streamSelectionError = page.locator(
-          '[data-test-message*="Stream"]'
-        );
+        // Stream-selection error — `selectStreamError` (above) already covers
+        // the OSelect-error case via the routing-section role=alert. Keep
+        // `streamSelectionError` as an alias of that for backwards-compat
+        // with existing PO callers.
+        this.streamSelectionError = this.selectStreamError;
         // FilterGroup selectors for new condition UI.
         // Post-OSelect migration the inner OSelect/OInput emits its OWN data-test
         // (forwarded from the wrapper) so auto-derived `-trigger`, `-popover`,
@@ -134,9 +137,14 @@ export class PipelinesPage {
             `[data-test="alert-conditions-select-column-option"][data-test-value="${name}"]`,
         ).first();
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
-        // OSelect renders its `:error-message` inside a `<span role="alert">`
-        // immediately after the trigger. Scope the alert under the parent OSelect.
-        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input"] [role="alert"]');
+        // OSelect renders its `:error-message` inside a `<span>` with
+        // `data-test="${parent}-error"` (auto-derived from the wrapper data-test).
+        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input-error"]');
+        // Condition node's "Please add at least one condition" toast — OToast
+        // exposes the message via `data-test-message`.
+        this.conditionRequiredToast = page.locator(
+          '[data-test-message="Please add at least one condition"]'
+        );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
@@ -203,9 +211,9 @@ export class PipelinesPage {
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
-        this.noteContainer = page.locator('.note-container');
-        this.noteHeading = page.locator('.note-heading');
-        this.noteInfo = page.locator('.note-info');
+        this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
+        this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
+        this.noteInfo = page.locator('[data-test="add-condition-note-info"]');
         this.qDialog = page.locator('[data-test*="dialog"]');
         this.qDialogBackdrop = page.locator('[role="dialog"]');
         this.qNotificationMessage = page.locator('[role="alert"]');
@@ -220,6 +228,9 @@ export class PipelinesPage {
         this.pipelineNodeDefaultOutputHandle = page.locator('[data-test="pipeline-node-default-output-handle"]');
         this.pipelineNodeOutputInputHandle = page.locator('[data-test="pipeline-node-output-input-handle"]');
         this.addPipelineBackBtn = page.locator('[data-test="add-pipeline-back-btn"]');
+        // Backfill jobs list locators — error indicator per row + error dialog.
+        this.backfillErrorIndicatorBtn = page.locator('[data-test="error-indicator-btn"]');
+        this.backfillErrorDialog = page.locator('[data-test="backfill-jobs-list-error-dialog"]');
 
         // Additional locators for raw selector fixes
         this.functionIcon = page.getByRole("img", { name: "Function", exact: true });
@@ -236,6 +247,16 @@ export class PipelinesPage {
         this.streamTypeDropdownTrigger = page.locator('[data-test="scheduled-pipeline-stream-type-select-trigger"]');
         this.streamTypeDropdownPopover = page.locator('[data-test="scheduled-pipeline-stream-type-select-popover"]');
         this.streamTypeLabel = page.getByLabel('Stream Type *');
+        // Scheduled-pipeline stream-name OSelect — searchable=true (default),
+        // so auto-derived `-trigger`, `-popover`, `-search`, and `-option`
+        // data-tests are available alongside the wrapper.
+        this.scheduledStreamNameSelect = page.locator('[data-test="scheduled-pipeline-stream-name-select"]');
+        this.scheduledStreamNameSelectTrigger = page.locator('[data-test="scheduled-pipeline-stream-name-select-trigger"]');
+        this.scheduledStreamNameSelectPopover = page.locator('[data-test="scheduled-pipeline-stream-name-select-popover"]');
+        this.scheduledStreamNameSelectSearch = page.locator('[data-test="scheduled-pipeline-stream-name-select-search"]');
+        this.scheduledStreamNameOptionByValue = (name) => page.locator(
+            `[data-test="scheduled-pipeline-stream-name-select-option"][data-test-value="${name}"]`,
+        ).first();
         this.sqlEditorViewLines = page.locator('[data-test="scheduled-pipeline-sql-editor"] .view-lines');
         this.invalidSqlQueryText = page.getByText("Invalid SQL Query");
         this.queryRoutingSection = page.locator('[data-test="add-stream-query-routing-section "]');
@@ -243,7 +264,12 @@ export class PipelinesPage {
         this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
         this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
         this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
-        this.connectAllNodesError = page.getByText("Please connect all nodes");
+        // PipelineEditor emits a toast "Please connect all nodes before saving"
+        // when the user clicks Save without joining nodes. OToast renders it via
+        // `data-test-message` on its root.
+        this.connectAllNodesError = page.locator(
+          '[data-test-message="Please connect all nodes before saving"]'
+        ).first();
         this.logsOptionRole = page.getByRole("option", { name: "logs" });
         this.fileInput = page.locator('input[type="file"]');
 
@@ -436,26 +462,33 @@ export class PipelinesPage {
      * Select metrics as the stream type in the pipeline node form
      */
     async selectMetrics() {
-        // Click the stream type dropdown - use first() to handle multiple elements
-        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeSelect.click();
-        await this.page.waitForTimeout(500);
-        // Select metrics option
-        await this.page.getByRole('option', { name: 'metrics', exact: true }).click();
-        await this.page.waitForTimeout(500);
+        // Open the OSelect popover for the input-node stream-type select.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `metrics` option — OSelectItem stamps `data-test-value`.
+        const metricsOption = this.page.locator(
+            '[data-test="input-node-stream-type-select-option"][data-test-value="metrics"]'
+        ).first();
+        await metricsOption.waitFor({ state: 'visible', timeout: 10000 });
+        await metricsOption.click();
     }
 
     /**
      * Select traces as the stream type in the pipeline node form
      */
     async selectTraces() {
-        // Click the stream type dropdown - use first() to handle multiple elements
-        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeSelect.click();
-        await this.page.waitForTimeout(500);
-        // Select traces option
-        await this.page.getByRole('option', { name: 'traces', exact: true }).click();
-        await this.page.waitForTimeout(500);
+        // Open the OSelect popover for the input-node stream-type select.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `traces` option — OSelectItem auto-derives the parent
+        // data-test, so each option stamps `<parent>-option` with `data-test-value`.
+        const tracesOption = this.page.locator(
+            '[data-test="input-node-stream-type-select-option"][data-test-value="traces"]'
+        ).first();
+        await tracesOption.waitFor({ state: 'visible', timeout: 10000 });
+        await tracesOption.click();
     }
 
     /**
@@ -579,6 +612,10 @@ export class PipelinesPage {
     }
 
     async enterPipelineName(pipelineName) {
+        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+            .first()
+            .waitFor({ state: 'detached', timeout: 10000 })
+            .catch(() => {});
         await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
         await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
@@ -606,22 +643,25 @@ export class PipelinesPage {
         await this.streamNameInput.fill(streamName);
     }
 
-    async selectStreamOption() {
-        await this.e2eAutomateOption.click();
-    }
-
     /**
      * Select a stream option by name from the dropdown
      * @param {string} streamName - The name of the stream to select
      */
     async selectStreamOptionByName(streamName) {
-        await this.page.waitForTimeout(1000);
-        const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
-        await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
+        // OSelect emits `<parent>-option` data-test + a per-value
+        // `data-test-value` for every ListboxItem. Match by value to avoid
+        // the prefix collision that a substring or role-name match would
+        // produce (e.g. "e2e_automate" vs "e2e_automate3").
+        const optionLocator = this.page.locator(
+            `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
+        ).first();
+        await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
         await optionLocator.click();
-        // Click away to close any open dropdown menus
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        await this.page.waitForTimeout(500);
+        // The popover closes on selection — wait for it to detach so the
+        // subsequent Save click isn't intercepted by the listbox.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async saveInputNodeStream() {
@@ -672,8 +712,9 @@ export class PipelinesPage {
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
-        await this.pipelineSearchInput.click();
-        await this.pipelineSearchInput.fill(pipelineName);
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.click();
+        await this.pipelineSearchInputField.fill(pipelineName);
     }
 
     /**
@@ -839,12 +880,10 @@ export class PipelinesPage {
     }
 
     async verifyConditionRequiredError() {
-        // OSelect renders its error message as a `<span role="alert">` under
-        // the wrapper with the parent's data-test.
-        const error = this.page
-            .locator('[data-test="alert-conditions-select-column"] [role="alert"]')
-            .first();
-        await error.waitFor({ state: 'visible' });
+        // Condition.saveCondition emits a toast "Please add at least one
+        // condition" when no condition row exists. OToast exposes the
+        // message as `data-test-message="<text>"` on its root.
+        await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToAddEnrichmentTable() {
@@ -2015,27 +2054,35 @@ export class PipelinesPage {
      * @param {string} streamName - Exact name of the stream option to select
      */
     async selectStreamOption(streamName) {
-        await this.page.waitForTimeout(2000);
-        // OSelect now forwards parent data-test to ListboxItems (`*-option`); we
-        // pick the matching option by its data-test container.
+        // When no name is supplied, fall back to the default e2e_automate
+        // option locator stored on the PO (legacy spec calls used no-arg).
+        if (!streamName) {
+            await this.e2eAutomateOption.waitFor({ state: 'visible', timeout: 15000 });
+            await this.e2eAutomateOption.click();
+            return;
+        }
+        // OSelect now forwards parent data-test to ListboxItems
+        // (`<parent>-option`) and stamps a per-value `data-test-value`. Match
+        // by value to avoid the substring match that an earlier hasText
+        // approach used (which collided with overlapping prefixes like
+        // `e2e_automate` vs `e2e_automate3`).
         const option = this.page
-            .locator('[data-test$="-option"]', { hasText: streamName })
+            .locator(`[data-test$="-option"][data-test-value="${streamName}"]`)
             .first();
-        // Wait for the option to not have disabled class
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the option to be enabled (not disabled) before clicking —
+        // pipeline source streams that are already in use are rendered
+        // disabled.
         await this.page.waitForFunction(
             (name) => {
-                const options = document.querySelectorAll('[data-test$="-option"]');
-                for (const opt of options) {
-                    if (opt.textContent?.includes(name) && !opt.classList.contains('disabled')) {
-                        return true;
-                    }
-                }
-                return false;
+                const opt = document.querySelector(
+                    `[data-test$="-option"][data-test-value="${name}"]`,
+                );
+                return !!opt && opt.getAttribute('aria-disabled') !== 'true';
             },
             streamName,
-            { timeout: 10000 }
+            { timeout: 10000 },
         ).catch(() => {
-            // If wait times out, try clicking anyway
             testLogger.debug('selectStreamOption: Wait for enabled option timed out, attempting click anyway');
         });
         await option.click();
@@ -2235,7 +2282,7 @@ export class PipelinesPage {
      * Verify connection error is displayed
      */
     async verifyConnectionError() {
-        await this.connectAllNodesError.click();
+        await this.connectAllNodesError.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -2396,17 +2443,22 @@ export class PipelinesPage {
     /**
      * Select stream name from dropdown
      * @param {string} streamName - Stream name to select
-     * Replaces: await page.getByLabel(/Stream Name/i).click(), fill, and option selection
+     * Drives the scheduled-pipeline stream-name OSelect via its auto-derived
+     * `-trigger` / `-search` / `-option` data-tests (popover-search pattern).
      */
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
-        await this.streamNameLabel.click();
-        // Wait briefly for dropdown to open
-        await this.page.waitForTimeout(500);
-        await this.streamNameLabel.fill(streamName);
-        // Wait for options to filter
-        await this.page.waitForTimeout(1000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        // Open the OSelect popover via its trigger.
+        await this.scheduledStreamNameSelectTrigger.waitFor({ state: 'visible', timeout: 15000 });
+        await this.scheduledStreamNameSelectTrigger.click();
+        await this.scheduledStreamNameSelectPopover.waitFor({ state: 'visible', timeout: 10000 });
+        // Filter the listbox to the requested stream via the search input.
+        await this.scheduledStreamNameSelectSearch.waitFor({ state: 'visible', timeout: 10000 });
+        await this.scheduledStreamNameSelectSearch.fill(streamName);
+        // Click the per-value option emitted by OSelectItem.
+        const option = this.scheduledStreamNameOptionByValue(streamName);
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -3052,9 +3104,11 @@ export class PipelinesPage {
     // Added to fix missing POM methods in pipeline-backfill.spec.js
     // ============================================================================
 
-    /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
+    /** @returns {import('@playwright/test').Locator} Status badges in pipeline-history table */
     get statusBadges() {
-        return this.page.locator('[data-test*="badge"], [data-test*="chip"], .status-badge, [data-test*="status"]');
+        // PipelineHistory.vue stamps `data-test="pipeline-history-status-badge"`
+        // on every row's OBadge (plus a per-row `data-test-status` value).
+        return this.page.locator('[data-test="pipeline-history-status-badge"]');
     }
 
     /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
@@ -3212,18 +3266,18 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of error indicators
      */
     async getErrorIndicatorCount() {
-        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .OIcon[color="negative"]').all();
-        return errorIndicators.length;
+        // Backfill rows render `data-test="error-indicator-btn"` per failed row.
+        return await this.backfillErrorIndicatorBtn.count();
     }
 
     /**
      * Click first error indicator
      */
     async clickFirstErrorIndicator() {
-        const errorIndicator = this.page.locator('[data-test*="error"], .error-indicator, .text-negative').first();
+        const errorIndicator = this.backfillErrorIndicatorBtn.first();
         if (await errorIndicator.isVisible().catch(() => false)) {
             await errorIndicator.click();
-            await this.page.waitForTimeout(500);
+            await this.backfillErrorDialog.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             testLogger.info('Clicked first error indicator');
         }
     }
@@ -3233,18 +3287,19 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('[data-test*="error-dialog"], [data-test*="dialog"]').first();
-        return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.backfillErrorDialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
      * Close error dialog
      */
     async closeErrorDialog() {
-        const closeBtn = this.page.locator('[data-test="o-dialog-primary-btn"], [data-test*="close"]').first();
+        // BackfillJobsList wires the dialog's primary button to close. The
+        // o-dialog-primary-btn lives inside the dialog data-test wrapper.
+        const closeBtn = this.backfillErrorDialog.locator('[data-test="o-dialog-primary-btn"]').first();
         if (await closeBtn.isVisible().catch(() => false)) {
             await closeBtn.click();
-            await this.page.waitForTimeout(300);
+            await this.backfillErrorDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             testLogger.info('Closed error dialog');
         }
     }
@@ -3381,9 +3436,19 @@ export class PipelinesPage {
      * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
      */
     async getStatusCounts() {
-        const successCount = await this.page.locator('[data-test*="badge"]:has-text("Success"), [data-test*="badge"]:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
-        const errorCount = await this.page.locator('[data-test*="badge"]:has-text("Error"), [data-test*="badge"]:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
-        const warningCount = await this.page.locator('[data-test*="badge"]:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        // Each status badge stamps `data-test-status="<status>"` (lowercased)
+        // — count rows by status family.
+        const successCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="completed"]'
+        ).count();
+        const errorCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"]'
+        ).count();
+        const warningCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
+        ).count();
         return {
             success: successCount,
             error: errorCount,

@@ -361,32 +361,60 @@ export class MetricsQueryEditorPage {
         // Target the dashboard panel editor by container data-test so we don't
         // hit a logs/VRL editor that may share the same page tree.
         await this.queryEditorContainer.first().waitFor({ state: 'visible', timeout: 5000 });
+
+        // Clear ALL existing content and focus the editor using Monaco's API +
+        // executeEdits so Monaco fires the model change event that the Vue
+        // editor wrapper listens to (keeps `queries[i].query` in sync).
+        // Pure setValue() bypasses the change event and `handleQueryUpdate`
+        // wouldn't fire — leaving stale Vue state behind. Keyboard select-all
+        // by itself can also fail to cover the full range if the editor was
+        // just (re)mounted, leaving the new typed text concatenated with the
+        // stale placeholder (e.g. `metric_b` + `cpu_count{}`).
         await this.page.evaluate(() => {
             const editors = window.monaco?.editor?.getEditors?.() || [];
             if (editors.length === 0) return;
             const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+            let target = null;
             for (const ed of editors) {
                 const dom = ed.getDomNode?.();
                 if (dom && dashContainer && dashContainer.contains(dom)) {
-                    ed.focus();
-                    return;
+                    target = ed;
+                    break;
                 }
             }
-            editors[0].focus();
+            target = target || editors[0];
+            target.focus();
+            // Clear via executeEdits to emit the onDidChangeModelContent event
+            // (which the wrapper's @update:query listener uses).
+            const model = target.getModel?.();
+            if (model) {
+                const fullRange = model.getFullModelRange();
+                target.executeEdits('clear', [{ range: fullRange, text: '', forceMoveMarkers: true }]);
+            }
         });
-
-        // Clear existing content
-        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-        await this.page.keyboard.press(selectAllKey);
 
         // Use insertText instead of type — keyboard.type() triggers Monaco
         // autocomplete on cloud which corrupts the query text
         await this.page.keyboard.insertText(query);
 
-        // Deterministic wait — verify model contains the query
+        // Deterministic wait — verify Monaco model contains the query
         await expect.poll(async () => {
             return await this.getCurrentQueryText();
         }, { timeout: 3000, intervals: [100, 250, 500] }).toContain(query);
+        let lastVal = '';
+        let stableCount = 0;
+        await expect.poll(async () => {
+            const v = await this.getCurrentQueryText();
+            if (v === lastVal && v.includes(query)) {
+                stableCount += 1;
+            } else {
+                stableCount = 0;
+                lastVal = v;
+            }
+            // 4 consecutive identical reads at 200ms intervals = 800ms of
+            // stability, comfortably past the 500ms debounce window.
+            return stableCount;
+        }, { timeout: 3000, intervals: [200] }).toBeGreaterThanOrEqual(4);
     }
 
     /**

@@ -45,13 +45,22 @@ export class DashboardPage {
 
     // Dashboard view/edit locators
     this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
-    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name"]');
+    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name-field"]');
     this.savePanelButton = page.locator('[data-test="dashboard-panel-save"]');
     this.applyButton = page.locator('[data-test="dashboard-apply"]');
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
 
     // Stream & field selection locators
+    // `index-dropdown-stream` is an OSelect (PanelFieldList.vue) — clicking the
+    // wrapper opens a popover that exposes `${parent}-popover`, `${parent}-search`
+    // (the filter input), and `${parent}-option` (with `data-test-value="<value>"`).
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
+    // OSelect popover surface — wait for visibility before interacting with the
+    // search input or option list.
+    this.streamDropdownPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
+    // OSelect inner filter input (ListboxFilter). Forward `${parent}-search`
+    // stream options.
+    this.streamDropdownSearch = page.locator('[data-test="index-dropdown-stream-search"]');
     // OInput wraps the stream-name filter; the wrapper carries
     // `index-dropdown-stream` and the inner native <input> exposes the
     // `-field` suffix (per AGENT_RULES §4). Always fill the `-field` variant.
@@ -62,17 +71,25 @@ export class DashboardPage {
     this.streamOptionE2eAutomate = page
       .locator('[data-test="index-dropdown-stream-option"][data-test-value="e2e_automate"]')
       .first();
-    this.fieldSearchInput = page.locator('[data-test="index-field-search-input"]');
+    // OFieldList (PanelFieldList.vue → OFieldList.vue) exposes its search box via an
+    // OInput wrapper: `o-field-list-search` is the wrapper, `o-field-list-search-field`
+    // is the inner native <input> (auto-derived `-field` suffix per AGENT_RULES §4 —
+    // always fill the `-field` variant). The legacy `index-field-search-input`
+    // / `data-cy` Cypress attribute no longer exists post-revamp.
+    this.fieldSearchInput = page.locator('[data-test="o-field-list-search-field"]');
     // Field-list "add to Y-axis / breakdown" buttons resolved by per-field
     // `data-test` prefix/suffix patterns (no element/text predicates).
+    // Post-revamp OFieldRow exposes per-field rows as
+    // `data-test="o-field-list-row-${field.name}"` (OFieldList.vue line ~66) —
+    // the legacy `field-list-item-` prefix no longer exists.
     this.kubernetesContainerHashYButton = page
       .locator(
-        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]',
+        '[data-test="o-field-list-row-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]',
       )
       .first();
     this.kubernetesContainerImageBButton = page
       .locator(
-        '[data-test^="field-list-item-"][data-test$="-kubernetes_container_image"] [data-test="dashboard-add-b-data"]',
+        '[data-test="o-field-list-row-kubernetes_container_image"] [data-test="dashboard-add-b-data"]',
       )
       .first();
 
@@ -137,10 +154,13 @@ export class DashboardPage {
 
     await this.addDashboardButton.click();
 
-    // Wait for dialog with retry mechanism
-    // Use deterministic waitFor — wait on the drawer dialog being attached
-    // (mounts in a portal); the wrapper + inner `-field` follow.
-    let isDialogOpen = await this.dashboardAddDialog
+    // Wait for dialog with retry mechanism.
+    // ODrawer keeps the panel mounted across open/close cycles — `state:
+    // 'attached'` alone is unreliable (resolves true even when the dialog is
+    // closed). Reka stamps `data-state="open"`/`"closed"` on the panel; gate
+    // the retry on the open-state attribute instead.
+    const openPanel = this.page.locator('[data-test="dashboard-add-dialog"][data-state="open"]');
+    let isDialogOpen = await openPanel
       .waitFor({ state: 'attached', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
@@ -148,7 +168,7 @@ export class DashboardPage {
     if (!isDialogOpen) {
       // First retry: click the button again
       await this.addDashboardButton.click();
-      isDialogOpen = await this.dashboardAddDialog
+      isDialogOpen = await openPanel
         .waitFor({ state: 'attached', timeout: 5000 })
         .then(() => true)
         .catch(() => false);
@@ -160,7 +180,11 @@ export class DashboardPage {
 
     // Wait for the input to be fully ready (use the inner `-field` input
     // — that's the actual fillable element).
-    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
+    // NOTE: `AddDashboard` is registered with `defineAsyncComponent(() => import(...))`
+    // in Dashboards.vue, so the inner form (OFormInput + OInput) only mounts after
+    // the dynamic import resolves. Under test load (ingestion in beforeEach can
+    // saturate the network) the import + mount can take >10s. Give it 30s.
+    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 30000 });
 
     // Fill the dashboard name
     await this.dashboardNameInput.fill(this.dashboardName);
@@ -195,15 +219,17 @@ export class DashboardPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(3000);
 
-    // Click on Stream dropdown - use data-test selector used in other dashboard tests
+    // Click on Stream dropdown — OSelect opens a popover with a search input
+    // and option list.
     await this.streamDropdown.click();
-    await this.page.waitForTimeout(500);
+    await this.streamDropdownPopover.waitFor({ state: "visible", timeout: 15000 });
 
-    // Type stream name to filter — fill the inner `-field` input (the wrapper
-    // is a div and cannot be .fill()'d per AGENT_RULES §4).
-    await this.streamDropdownInput.press("Control+a");
-    await this.streamDropdownInput.fill("e2e_automate");
-    await this.page.waitForTimeout(1500);
+    // Type stream name to filter — fill the OSelect inner search input
+    // (`${parent}-search`, per AGENT_RULES §4).
+    await this.streamDropdownSearch.waitFor({ state: "visible", timeout: 10000 });
+    await this.streamDropdownSearch.press("ControlOrMeta+a");
+    await this.streamDropdownSearch.press("Backspace");
+    await this.streamDropdownSearch.fill("e2e_automate");
 
     // Select e2e_automate stream option via the class-member locator.
     await this.streamOptionE2eAutomate.waitFor({ state: "visible", timeout: 15000 });
@@ -215,18 +241,20 @@ export class DashboardPage {
     // Search for kubernetes_container_hash and add to Y-axis
     await this.fieldSearchInput.click();
     await this.fieldSearchInput.fill('kubernetes_container_hash');
-    await this.page.waitForTimeout(1000);
-
+    const hashRow = this.page.locator('[data-test="o-field-list-row-kubernetes_container_hash"]').first();
+    await hashRow.waitFor({ state: 'visible', timeout: 10000 });
+    await hashRow.hover();
     await this.kubernetesContainerHashYButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.kubernetesContainerHashYButton.click();
+    await this.kubernetesContainerHashYButton.click({ force: true });
 
     // Clear search and add kubernetes_container_image to B-axis (breakdown)
     await this.fieldSearchInput.fill('');
     await this.fieldSearchInput.fill('kubernetes_container_image');
-    await this.page.waitForTimeout(1000);
-
+    const imageRow = this.page.locator('[data-test="o-field-list-row-kubernetes_container_image"]').first();
+    await imageRow.waitFor({ state: 'visible', timeout: 10000 });
+    await imageRow.hover();
     await this.kubernetesContainerImageBButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.kubernetesContainerImageBButton.click();
+    await this.kubernetesContainerImageBButton.click({ force: true });
 
     // Clear search
     await this.fieldSearchInput.fill('');
@@ -243,8 +271,10 @@ export class DashboardPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(5000);
 
-    // Search for the dashboard before deleting
-    await this.dashboardSearch.fill(this.dashboardName);
+    // Search for the dashboard before deleting. `dashboardSearch` is the
+    // OInput wrapper <div> (not fillable); fill the inner `-field` native
+    // input via `dashboardSearchInput` per AGENT_RULES §4.
+    await this.dashboardSearchInput.fill(this.dashboardName);
     await this.page.waitForTimeout(2000);
 
     await this.dashboardDelete.click({ force: true });
@@ -384,11 +414,10 @@ export class DashboardPage {
     // Wait for the dashboard add button to be visible
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Click on the search input
-    await this.dashboardSearch.click();
-
-    // Fill the search input with the dashboard name
-    await this.dashboardSearch.fill(this.dashboardName);
+    // Click on the search input — fill the inner `-field` native input per
+    // AGENT_RULES §4 (`dashboardSearch` is the OInput wrapper, non-fillable).
+    await this.dashboardSearchInput.click();
+    await this.dashboardSearchInput.fill(this.dashboardName);
 
     // Check that the dashboard table contains the text 'No data available'
     await expect(this.dashboardTable).toContainText('No data available');

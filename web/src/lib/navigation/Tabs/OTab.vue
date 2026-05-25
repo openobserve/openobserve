@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from './OTab.types'
 import { computed, inject, useAttrs, type ComputedRef } from 'vue'
-
-defineOptions({ inheritAttrs: false })
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import { iconRegistry } from '@/lib/core/Icon/OIcon.icons'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
+
+// Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
+// on the inner clickable TabsTrigger (Reka button) instead of the wrapper
+// <span class="tw:contents">. e2e tests can then locate and click the tab.
+defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
@@ -83,12 +86,15 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span v-bind="$attrs" :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
+  <span :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
       aria-disabled is passed explicitly for screen-reader compatibility.
-      data-test is forwarded so Playwright can reliably target the clickable button.
+      data-test is forwarded so Playwright can reliably target the clickable button —
+      `v-bind="$attrs"` forwards the consumer's data-test onto the inner Reka
+      button, which is where data-state="active" also lives so the
+      `[data-test="X"][data-state="active"]` composite selectors work.
     -->
     <TabsTrigger
       :value="name"
@@ -97,7 +103,7 @@ const heightClasses = computed<string>(() => {
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses]"
-      :data-test="parentDataTest"
+      v-bind="$attrs"
     >
       <!--
         If label or icon props are provided, render them (prop-driven mode).

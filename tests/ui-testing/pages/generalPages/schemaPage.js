@@ -59,8 +59,16 @@ class SchemaPage {
         this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
         this.logTableExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
 
-        // IndexList / stream picker (OSelect)
-        this.logSearchIndexSelectStream = page.locator('[data-test="log-search-index-list-select-stream"]');
+        // IndexList / stream picker (OSelect in listbox/multiple mode)
+        // OSelect uses `inheritAttrs: false` and forwards `data-test` onto the
+        // root wrapper <div>, while the actual clickable PopoverTrigger button
+        // is published as `${parent}-trigger`. Clicking the wrapper div does
+        // NOT open the popover — we must click the `-trigger` button.
+        this.logSearchIndexSelectStream = page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        // OSelect popover renders with `${parent}-popover`; the inner ListboxFilter
+        // is data-tested via `${parent}-search` (forwarded from OSelect.vue).
+        this.logSearchStreamPopover = page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+        this.logSearchStreamPopoverSearch = page.locator('[data-test="log-search-index-list-select-stream-search"]');
         this.logSearchIndexFieldSearchInput = page.locator('[data-test="log-search-index-list-field-search-input"]');
         this.logSearchIndexFieldsTable = page.locator('[data-test="log-search-index-list-fields-table"]');
         this.logsUserDefinedFieldsBtn = page.locator('[data-test="logs-user-defined-fields-btn"]');
@@ -133,7 +141,7 @@ class SchemaPage {
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
             fnEditor: '[data-test="logs-vrl-function-editor"]',
-            logSearchIndexSelectStream: '[data-test="log-search-index-list-select-stream"]',
+            logSearchIndexSelectStream: '[data-test="log-search-index-list-select-stream-trigger"]',
             logStreamRefreshStatsBtn: '[data-test="log-stream-refresh-stats-btn"]',
             deleteButton: 'Delete',
             okButton: 'Ok',
@@ -186,6 +194,17 @@ class SchemaPage {
     getStreamOption(stream) {
         return this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`,
+        );
+    }
+
+    // Get any OSelect option inside the stream selector popover. Used together
+    // with the popover-search input to narrow the list and click the first
+    // remaining option (works around an OSelect virtualizer bug where the
+    // rendered `data-test-value` attribute can lag behind the option's true
+    // value when DOM rows are reused on a filter narrow).
+    getStreamPopoverOptions() {
+        return this.page.locator(
+            '[data-test="log-search-index-list-select-stream-popover"] [data-test="log-search-index-list-select-stream-option"]',
         );
     }
 
@@ -420,10 +439,19 @@ class SchemaPage {
     }
 
     // Navigate home then logs
+    //
+    // Performs a hard reload after landing on /web/logs so the Vuex streams
+    // cache is dropped — without the reload, the OSelect dropdown pulls from
+    // the stale list that was fetched on the first /web/logs visit (before
+    // any stream created by this test existed). The reload triggers a fresh
+    // streams-list API call so the new blank stream appears as an option.
     async navigateHomeThenLogs() {
         testLogger.debug('Navigating home then to logs');
         await this.menuHomeItem.click();
         await this.menuLogsItem.click();
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.reload();
+        await this.page.waitForLoadState('domcontentloaded');
     }
 
     // Switch stream in logs
@@ -489,12 +517,42 @@ class SchemaPage {
     // Helper: open the OSelect stream popover and click the option whose
     // data-test-value matches the requested stream name. Used by switchStreamInLogs
     // (replaces the legacy fill + getByText pattern).
+    //
+    // Uses the OSelect popover-search pattern: open trigger → wait popover →
+    // clear search input (Ctrl/Meta+a, Backspace) → fill stream name → wait
+    // until the filtered popover narrows to >=1 option → click the first option.
+    // The first-option strategy works around an OSelect virtualizer bug where
+    // the rendered `data-test-value` attribute can lag behind the option's
+    // true value when DOM rows are reused on a filter narrow.
     async _pickStreamOption(stream) {
+        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
         await this.logSearchIndexSelectStream.click();
-        const option = this.getStreamOption(stream);
-        await option.first().waitFor({ state: 'visible', timeout: 10000 });
-        await option.first().click();
+        await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Defensive clear via Ctrl/Meta+A → Backspace handles reka-ui's
+        // ComboboxInput internal searchTerm state surviving a `.fill()` overwrite.
+        await this.logSearchStreamPopoverSearch.waitFor({ state: 'visible', timeout: 10000 });
+        await this.logSearchStreamPopoverSearch.press('ControlOrMeta+a');
+        await this.logSearchStreamPopoverSearch.press('Backspace');
+        await this.logSearchStreamPopoverSearch.fill(stream);
+
+        // Wait until the filtered popover has at least one option (the typed
+        // stream name should narrow the list to just our stream).
+        await expect.poll(
+            async () => await this.getStreamPopoverOptions().count().catch(() => -1),
+            { intervals: [500, 1000, 2000], timeout: 20000 },
+        ).toBeGreaterThanOrEqual(1);
+
+        const option = this.getStreamPopoverOptions().first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
+        // In multiple/listbox mode the popover stays open after option click —
+        // deterministically dismiss it and wait for the trigger to report
+        // `aria-expanded="false"` so the next _pickStreamOption call can safely
+        // open it again. Without this gate, the next trigger click toggles the
+        // still-open popover to closed and the popover-visible wait times out.
         await this.page.keyboard.press('Escape').catch(() => {});
+        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
     }
 
     // Refresh stream stats and delete

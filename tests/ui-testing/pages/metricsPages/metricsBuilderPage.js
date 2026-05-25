@@ -99,7 +99,7 @@ export class MetricsBuilderPage {
         // Options fields
         this.legendEl = page.locator(this.legendInput);
         // Legend is an OCombobox — inner input uses `-input` suffix per OCombobox convention.
-        this.legendFieldInput = page.locator(`${this.legendInput}-input`);
+        this.legendFieldInput = page.locator('[data-test="dashboard-promql-builder-legend-input"]');
         this.stepValueEl = page.locator(this.stepValueInput);
         this.queryTypeEl = page.locator(this.queryTypeSelect);
         this.queryTypePopover = page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
@@ -111,7 +111,8 @@ export class MetricsBuilderPage {
         this.addToDashboardBtn = page.locator(this.addToDashboardButton).first();
         this.dashboardDialogEl = page.locator(this.dashboardDialogTitle);
         this.dashboardPanelTitleEl = page.locator(this.dashboardPanelTitleInput);
-        this.dashboardPanelTitleFieldEl = page.locator(`${this.dashboardPanelTitleInput}-field`);
+        // OInput inner native input has the auto-derived `-field` data-test suffix.
+        this.dashboardPanelTitleFieldEl = page.locator('[data-test="metrics-new-dashboard-panel-title-field"]');
         this.dashboardCancelBtn = page.locator(this.dashboardCancelButton);
         this.dashboardAddBtn = page.locator(this.dashboardAddButton);
 
@@ -157,7 +158,7 @@ export class MetricsBuilderPage {
         this.confirmDeleteBtn = page.locator('[data-test="o-dialog-primary-btn"]');
 
         // Step value `-field` variant (OInput inner native input)
-        this.stepValueFieldInput = page.locator(`${this.stepValueInput}-field`);
+        this.stepValueFieldInput = page.locator('[data-test="dashboard-promql-builder-step-value-field"]');
 
         // MetricSelector component popover/option/field
         this.metricSelectorEl = page.locator('[data-test="metric-selector"]');
@@ -239,12 +240,14 @@ export class MetricsBuilderPage {
     }
 
     getPanelBarByTitle(title) {
-        return this.page.locator(`[data-test="dashboard-panel-bar-${title}"]`).first();
+        // PanelContainer exposes the panel title via `data-test-panel-title` attribute
+        // on the container; the bar is the first descendant with `data-test="dashboard-panel-bar"`.
+        return this.page.locator(`[data-test="dashboard-panel-container"][data-test-panel-title="${title}"] [data-test="dashboard-panel-bar"]`).first();
     }
 
     getPanelContainerByTitle(title) {
-        // Panel container has a per-name data-test; fall back to the bar's ancestor
-        return this.page.locator(`[data-test="dashboard-panel-container-${title}"]`).first();
+        // Panel container exposes title via `data-test-panel-title` attribute.
+        return this.page.locator(`[data-test="dashboard-panel-container"][data-test-panel-title="${title}"]`).first();
     }
 
     getPanelDropdownByTitle(title) {

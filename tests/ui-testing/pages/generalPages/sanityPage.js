@@ -143,7 +143,10 @@ export class SanityPage {
         this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
         this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
         this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
-        this.streamSelectDropdown = page.locator('[data-test="log-search-index-list-select-stream"]');
+        // OSelect (multiple) renders the wrapper div with the consumer-supplied
+        // data-test and the clickable PopoverTrigger as `${parent}-trigger`.
+        // Click the `-trigger` to actually open the popover.
+        this.streamSelectDropdown = page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
         this.e2eAutomateStreamOption = page.locator('[data-test="log-search-index-list-select-stream-option"][data-test-value="e2e_automate"]');
 
         // ============================================================
@@ -234,6 +237,28 @@ export class SanityPage {
     async clickHistogramToggle() {
         // Histogram toggle is now inside the utilities hamburger menu
         await this.histogramToggleButton.click();
+    }
+
+    // Returns true when the histogram OSwitch is currently ON.
+    // OSwitch surfaces its state via a nested `role="switch"` element carrying
+    // `aria-checked="true|false"` — query that rather than the wrapper div.
+    async isHistogramOn() {
+        await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 15000 });
+        const switchControl = this.histogramToggleButton.locator('[role="switch"]');
+        const aria = await switchControl.getAttribute('aria-checked');
+        return aria === 'true';
+    }
+
+    // Ensure the histogram toggle is ON before tests that expect the chart to render.
+    // After the UX revamp, histogram defaults to OFF when a stream is selected via the
+    // index-list dropdown (only direct ?stream=... URL navigation auto-enables it), so
+    // PO methods that assume the chart is visible must turn it on explicitly.
+    async ensureHistogramOn() {
+        if (!(await this.isHistogramOn())) {
+            await this.clickHistogramToggle();
+            await expect(this.histogramToggleButton.locator('[role="switch"]'))
+                .toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+        }
     }
 
     async toggleHistogramOffAndOn() {
@@ -472,6 +497,12 @@ export class SanityPage {
         } else {
             testLogger.info('createFunctionViaFunctionsPage: POST not detected');
         }
+
+        // Wait for the success toast — fired by AddFunction.onSubmit's .then() right
+        // alongside emit("update:list"), which the parent FunctionList listens to in
+        // order to flip showAddJSTransformDialog=false and re-render the list view.
+        // The toast is the most deterministic signal that the save chain completed.
+        await expect(this.toastSuccess.first()).toBeVisible({ timeout: 15000 });
 
         // Wait for the search input on the function list to be back in view, indicating
         // we navigated back from the AddFunction form to the list.
@@ -835,6 +866,12 @@ export class SanityPage {
         // First, ensure data is loaded by clicking the refresh button
         await expect(this.refreshButton).toBeVisible({ timeout: 15000 });
         await expect(this.refreshButton).toBeEnabled({ timeout: 10000 });
+
+        // After the UX revamp, histogram defaults to OFF when a stream is selected via the
+        // index-list dropdown (selectStream flow). The chart canvas only mounts when the
+        // OSwitch is ON, so flip it before triggering the search so the histogram payload is
+        // requested as part of the run-query call.
+        await this.ensureHistogramOn();
 
         try {
             await this.refreshButton.click({ timeout: 10000 });

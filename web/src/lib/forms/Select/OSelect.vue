@@ -538,7 +538,16 @@ function handleDropdownKeydown(e: KeyboardEvent) {
     return;
   }
 
-  if (nav.length === 0) return;
+  // Allow Enter to trigger create even when no options are visible.
+  // Otherwise creatable=true with an empty filtered list silently swallows
+  // the keystroke, breaking the "type a new name and press Enter" UX.
+  if (nav.length === 0) {
+    if (e.key === "Enter" && props.creatable) {
+      e.preventDefault();
+      handleCreateFromInput();
+    }
+    return;
+  }
 
   if (e.key === "ArrowDown") {
     e.preventDefault();
@@ -1441,6 +1450,7 @@ const fieldWidthClass = computed(() => {
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
+      :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
       class="tw:text-xs tw:text-select-error-text tw:leading-none"
       role="alert"
     >
