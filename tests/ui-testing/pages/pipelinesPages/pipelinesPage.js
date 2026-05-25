@@ -582,9 +582,9 @@ export class PipelinesPage {
      * @param {string} searchTerm - The search term to enter
      */
     async fillPipelineListSearch(searchTerm) {
-        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineSearchInput.fill(searchTerm);
-        await this.page.waitForTimeout(500);
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.fill(searchTerm);
+        await expect(this.pipelineSearchInputField).toHaveValue(searchTerm, { timeout: 5000 });
     }
 
     /**
@@ -657,7 +657,7 @@ export class PipelinesPage {
             `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
         ).first();
         await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
-        await optionLocator.click();
+        await optionLocator.click({ force: true });
         // The popover closes on selection — wait for it to detach so the
         // subsequent Save click isn't intercepted by the listbox.
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
@@ -1488,10 +1488,10 @@ export class PipelinesPage {
     }
 
     async selectOperatorFromMenu(operator) {
-        await this.operatorSelect.first().click();
-        await this.page.waitForTimeout(500);
-        const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        await this.operatorSelectTrigger.first().click();
+        const option = this.page.locator(`[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`).first();
+        await option.waitFor({ state: 'visible' });
+        await option.click();
     }
 
     async verifyConfirmationDialog() {
