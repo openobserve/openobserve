@@ -279,18 +279,19 @@ export default class DashboardPanelTime {
     // Wait for the DateTime dialog to open
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Select the time range within the dialog
+    // Select the time range within the dialog.
+    // Use force:true to skip Playwright's stability/actionability checks — the ODropdown
+    // portal animation can briefly mark the element as "not stable". force:true still
+    // dispatches the full pointer-event sequence (pointerdown → click) unlike evaluate(),
+    // so Vue/Reka UI event handlers fire correctly.
     const timeOptionLocator = this.timeRangeBtn(timeRange);
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
-    // Use evaluate(el.click()) to bypass Playwright's stability check — the ODropdown
-    // open animation can cause "element is not stable" / "element was detached" retries.
-    await timeOptionLocator.evaluate(el => el.click());
+    await timeOptionLocator.click({ force: true });
 
-    // Wait for the Apply button to be visible and stable before returning.
-    // With auto-apply-dashboard="false" the time button click does NOT emit (only the
-    // Apply button does), so the dropdown should stay open and stable here.
+    // Wait for the Apply button — with auto-apply-dashboard="false" the time button click
+    // does NOT emit; Apply button is still shown so we must click it.
     const applyBtnLocator = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
-    await applyBtnLocator.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+    await applyBtnLocator.waitFor({ state: "visible", timeout: 5000 });
 
     if (clickApply) {
       // Click apply button within the dialog

@@ -378,6 +378,14 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await page.keyboard.press('Escape');
     await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
+    // Wait for initial pt-period URL param to land before changing time — ensures
+    // panelsInitializing guard in RenderDashboardCharts has cleared.
+    await page.waitForFunction(
+      (pid) => window.location.href.includes(`pt-period.${pid}`),
+      panelAId,
+      { timeout: 10000 }
+    );
+
     // Step 6: Click picker again, select "Last 6 days" and apply
     await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", true);
     await assertPanelTimeInURL(page, panelAId, "6d");
@@ -481,6 +489,13 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       panelTimeEnabled: false
     });
 
+    // Wait for URL to be populated before asserting panel time params
+    await page.waitForFunction(
+      (pid) => window.location.href.includes(`pt-period.${pid}`),
+      panelAId,
+      { timeout: 10000 }
+    );
+
     // Step 2: Verify initial state
     // Panel A has custom time "1h" in URL
     await assertPanelTimeInURL(page, panelAId, "1h");
@@ -580,6 +595,12 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Step 5: Verify Panel A has panel time picker showing "1h"
     await assertPanelTimePickerVisible(page, panelAId);
+    // Wait for URL to be populated before asserting panel time params
+    await page.waitForFunction(
+      (pid) => window.location.href.includes(`pt-period.${pid}`),
+      panelAId,
+      { timeout: 10000 }
+    );
     await assertPanelTimeInURL(page, panelAId, "1h");
 
     // Step 6: Verify panel variable is visible
