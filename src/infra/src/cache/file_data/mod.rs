@@ -410,7 +410,6 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
     })
 }
 
-
 /// Batched range read across the cache ladder.
 ///
 /// `memory → disk → remote storage`, returning one `Bytes` per input
@@ -449,7 +448,6 @@ pub async fn get_ranges_opts(
         source: Box::new(std::io::Error::other(file)),
     })
 }
-
 
 /// get the file time from the file name
 ///

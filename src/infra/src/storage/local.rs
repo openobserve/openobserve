@@ -178,7 +178,7 @@ impl ObjectStore for Local {
     #[cfg(unix)]
     async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
         let start = std::time::Instant::now();
-         let file = location.to_string();
+        let file = location.to_string();
         let full_path = self.full_path(location);
         let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
 

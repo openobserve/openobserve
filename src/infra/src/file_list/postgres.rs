@@ -1338,7 +1338,7 @@ DO UPDATE SET
         ORDER BY num DESC
         LIMIT $2;"#
         };
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(&sql)
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
             .bind(super::FileListJobStatus::Pending)
             .bind(limit)
             .fetch_all(&mut *tx)

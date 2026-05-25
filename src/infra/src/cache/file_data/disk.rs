@@ -544,7 +544,6 @@ pub async fn get_size(file: &str) -> Option<usize> {
     files.get_size(file).await
 }
 
-
 /// Batched range read against the disk cache: one `File::open` followed
 /// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
 /// per input range, in input order. This is the hot path for the search
