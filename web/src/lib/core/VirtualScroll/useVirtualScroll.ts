@@ -18,8 +18,9 @@ export interface UseVirtualScrollOptions {
    * When true, enables per-element DOM measurement via ResizeObserver +
    * measureElement, so items with variable heights are tracked correctly.
    * When false (default), all items use the static estimateSize.
+   * Passed as a Ref so toggling at runtime is reactive.
    */
-  dynamicRowHeight?: boolean;
+  dynamicRowHeight?: Ref<boolean>;
 }
 
 /**
@@ -35,8 +36,9 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     scrollTarget,
     estimateSize = 40,
     overscan = 5,
-    dynamicRowHeight = false,
   } = options;
+
+  const dynamicRowHeight = options.dynamicRowHeight ?? ref(false);
 
   const scrollMargin = ref(0);
   const measuredHeights = ref<Record<number, number>>({});
@@ -67,43 +69,31 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     watch(scrollTarget, () => updateScrollMargin());
   }
 
-  // Reset measured heights when items array changes (stale heights
-  // from old items would misposition the virtualizer).
-  watch(
-    () => items.value.length,
-    () => {
-      measuredHeights.value = {};
-    },
-  );
-
   const virtualizerOptions = computed(() => ({
     count: items.value.length,
     getScrollElement: () =>
       (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
-    estimateSize: dynamicRowHeight
+    estimateSize: dynamicRowHeight.value
       ? (index: number) => measuredHeights.value[index] || estimateSize
       : () => estimateSize,
     overscan,
     scrollMargin: scrollMargin.value,
-    ...(dynamicRowHeight
-      ? {
-          indexAttribute: "data-virtual-index" as const,
-          measureElement:
-            typeof window !== "undefined"
-              ? (element: HTMLElement) => {
-                  const height = (element as HTMLElement).getBoundingClientRect().height;
-                  const index = parseInt(
-                    (element as HTMLElement).getAttribute("data-virtual-index") ?? "",
-                    10,
-                  );
-                  if (!isNaN(index)) {
-                    measuredHeights.value[index] = height;
-                  }
-                  return height;
-                }
-              : undefined,
-        }
-      : {}),
+    indexAttribute: "data-virtual-index" as const,
+    measureElement:
+      typeof window !== "undefined"
+        ? (element: HTMLElement) => {
+            const height = (element as HTMLElement).getBoundingClientRect().height;
+            const index = parseInt(
+              (element as HTMLElement).getAttribute("data-virtual-index") ?? "",
+              10,
+            );
+            if (!isNaN(index)) {
+              measuredHeights.value[index] = height;
+            }
+            return height;
+          }
+        : undefined,
+
   }));
 
   const virtualizer = useVirtualizer(virtualizerOptions);
@@ -112,6 +102,18 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
   const totalSize = computed(() => virtualizer.value.getTotalSize());
   /** Visible-only range (no overscan) as reported by the virtualizer. */
   const visibleRange = computed(() => virtualizer.value.range);
+
+  // Re-measure when dynamicRowHeight toggles so the virtualizer
+  // recalculates item positions with the new estimateSize strategy.
+  watch(dynamicRowHeight, () => {
+    virtualizer.value.measure();
+  });
+
+  // Re-measure when the items array is replaced with new data
+  // so the virtualizer picks up any height changes.
+  watch(items, () => {
+    virtualizer.value.measure();
+  });
 
   function scrollToIndex(
     index: number,
@@ -129,7 +131,7 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
   }
 
   function measureElement(node: any) {
-    if (!dynamicRowHeight) return;
+    if (!dynamicRowHeight.value) return;
     virtualizer.value.measureElement(node);
   }
   return {

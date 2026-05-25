@@ -44,6 +44,8 @@ const scrollTargetRef = computed(() => props.scrollTarget ?? null);
 
 const itemsRef = computed(() => props.items);
 
+const dynamicRowHeightRef = computed(() => props.dynamicRowHeight);
+
 const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measure, measureElement } =
   useVirtualScroll({
     items: itemsRef,
@@ -51,7 +53,7 @@ const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measu
     scrollTarget: scrollTargetRef,
     estimateSize: props.estimateSize,
     overscan: props.overscan,
-    dynamicRowHeight: props.dynamicRowHeight,
+    dynamicRowHeight: dynamicRowHeightRef,
   });
 
 // Emit virtual-scroll event on mount and whenever the rendered range changes.
