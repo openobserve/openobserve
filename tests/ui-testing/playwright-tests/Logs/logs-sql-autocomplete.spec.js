@@ -62,6 +62,10 @@ test.describe("SQL Autocomplete — Logs", () => {
         await streamsApiDone;
         // Deterministic gate for streamKeywords hydration via the Vue watcher.
         await pm.logsPage.waitForStreamKeywordsHydration(8000);
+        // Also wait for the stream schema (field list) to hydrate. Without this,
+        // WHERE-clause tests that check for specific field names (code, floatvalue, job)
+        // can fail because fieldKeywords is still empty when Ctrl+Space fires.
+        await pm.logsPage.waitForFieldKeywordsHydration(8000);
 
         testLogger.info('Logs SQL test setup completed');
     });

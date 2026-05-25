@@ -89,9 +89,17 @@ function makePipelineObj(overrides = {}) {
 // The real ODrawer is a portal/teleport; stubbing it keeps tests fast and isolated.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><slot /></div>',
+  props: [
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
 };
 
 function createWrapper(pipelineObjOverrides = {}) {
@@ -708,7 +716,7 @@ describe("Stream Component", () => {
       const wrapper = createWrapper({ isEditNode: true });
       await flushPromises();
       expect(
-        wrapper.find('[data-test="input-node-stream-delete-btn"]').exists()
+        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
       ).toBe(true);
     });
 
@@ -716,7 +724,7 @@ describe("Stream Component", () => {
       const wrapper = createWrapper({ isEditNode: false });
       await flushPromises();
       expect(
-        wrapper.find('[data-test="input-node-stream-delete-btn"]').exists()
+        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
       ).toBe(false);
     });
   });

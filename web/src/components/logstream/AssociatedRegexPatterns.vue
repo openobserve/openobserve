@@ -62,47 +62,27 @@
                 class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
-                <div style="height: 100%">
-                    <OTable
-                      style="height: 100%; overflow-y: auto"
-                      data-test="associated-regex-patterns-applied-patterns-table"
-                      :data="filteredAppliedPatterns"
-                      :columns="appliedFilterColumns"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'dark-associated-regex-patterns-table'
-                          : 'light-associated-regex-patterns-table'
-                      "
-                      pagination="none"
-                      :show-global-filter="false"
-                      row-key="pattern_id"
-                    >
-                      <template #cell-pattern_name="{ row }">
-                        <div
-                          :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
-                          class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center"
-                          :class="
-                            checkCurrentUserClickedPattern(row.pattern_name)
-                              ? 'selected-pattern-row'
-                              : ''
-                          "
-                          style="
-                            font-size: 14px;
-                            font-weight: 600;
-                            padding-top: 20px;
-                            padding-bottom: 20px;
-                          "
-                          @click="handlePatternClick(row)"
-                        >
-                          <span class="regex-pattern-name">{{
-                            row.pattern_name
-                          }}</span>
-                          <span><OIcon name="check" size="xs" /></span>
-                        </div>
-                      </template>
-                    </OTable>
-                  </div>
-                </OCollapsible>
+                <div
+                  v-if="filteredAppliedPatterns.length === 0"
+                  class="tw:py-3 tw:px-2 tw:text-[12px] tw:opacity-50"
+                  data-test="associated-regex-patterns-applied-patterns-table"
+                >
+                  No data available
+                </div>
+                <ul v-else class="tw:list-none tw:p-0 tw:m-0" data-test="associated-regex-patterns-applied-patterns-table">
+                  <li
+                    v-for="row in filteredAppliedPatterns"
+                    :key="row.pattern_id"
+                    :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
+                    class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2.5 tw:border-b tw:text-[13px] tw:font-[600]"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                    @click="handlePatternClick(row)"
+                  >
+                    <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                    <OIcon name="check" size="xs" />
+                  </li>
+                </ul>
+              </OCollapsible>
             </div>
             <OSeparator class="tw:mt-2" />
             <div class="pattern-list-wrapper">
@@ -112,63 +92,53 @@
                 class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
-                <div style="height: 100%">
-                    <OTable
-                      style="height: 100%; overflow-y: auto"
-                      data-test="associated-regex-patterns-all-patterns-table"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'dark-associated-regex-patterns-table'
-                          : 'light-associated-regex-patterns-table'
-                      "
-                      :data="filteredAllPatterns"
-                      :columns="filterColumns"
-                      pagination="none"
-                      :show-global-filter="false"
-                      row-key="pattern_id"
-                    >
-                      <template #cell-pattern_name="{ row }">
-                        <div
-                          :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
-                          class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center"
-                          :class="
-                            checkCurrentUserClickedPattern(row.pattern_name)
-                              ? 'selected-pattern-row'
-                              : ''
-                          "
-                          style="
-                            font-size: 14px;
-                            font-weight: 600;
-                            padding-top: 20px;
-                            padding-bottom: 20px;
-                          "
-                          @click="handlePatternClick(row)"
-                        >
-                          <span class="regex-pattern-name">{{
-                            row.pattern_name
-                          }}</span>
-                          <span v-if="checkIfPatternIsApplied(row.pattern_id)">
-                            <OIcon name="check" size="xs" />
-                          </span>
-                        </div>
-                      </template>
-                    </OTable>
-                  </div>
-                </OCollapsible>
+                <ul class="tw:list-none tw:p-0 tw:m-0" data-test="associated-regex-patterns-all-patterns-table">
+                  <li
+                    v-for="row in filteredAllPatterns"
+                    :key="row.pattern_id"
+                    :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
+                    class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2.5 tw:border-b tw:text-[13px] tw:font-[600]"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                    @click="handlePatternClick(row)"
+                  >
+                    <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                    <OIcon v-if="checkIfPatternIsApplied(row.pattern_id)" name="check" size="xs" />
+                  </li>
+                </ul>
+              </OCollapsible>
             </div>
           </div>
         </div>
       </div>
       <OSeparator vertical />
       <!-- here we will have the right side section -->
-      <div
-        class="tw:w-[75%] tw:flex tw:flex-col"
-        style="height: calc(100vh - 59px)"
-      >
+      <div class="tw:w-[75%] tw:flex tw:flex-col" style="height: calc(100vh - 59px)">
         <div class="tw:flex-1 tw:overflow-y-auto tw:pt-3">
           <div
-            v-if="userClickedPattern"
-            class="tw:flex tw:flex-col tw:gap-3 tw:px-3"
+            v-if="!userClickedPattern"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-4 tw:px-6 tw:py-12"
+          >
+            <img
+              data-test="associated-regex-patterns-no-pattern-image"
+              :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
+              style="width: 125px"
+              alt=""
+            />
+            <span
+              class="no-pattern-applied-title"
+              data-test="associated-regex-patterns-no-pattern-applied-title"
+              >No Patterns Applied Yet</span
+            >
+            <span
+              class="no-pattern-applied-subtitle tw:text-center"
+              data-test="associated-regex-patterns-no-pattern-applied-subtitle"
+              >Browse the pattern library to begin applying regular expressions
+              to your fields.</span
+            >
+          </div>
+          <div
+            v-else
+            class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:pb-4"
           >
             <!-- Pattern Info Card -->
             <div
@@ -180,11 +150,8 @@
               "
             >
               <div class="tw:flex tw:flex-col tw:gap-2">
-                <!-- pattern name section -->
                 <div class="tw:flex tw:flex-col tw:gap-1">
-                  <span
-                    class="individual-section-title tw:text-[10px] tw:uppercase tw:tracking-wider tw:opacity-50 tw:font-[600]"
-                  >
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
                     Pattern Name
                   </span>
                   <span
@@ -197,15 +164,12 @@
 
                 <OSeparator />
 
-                <!-- pattern description section -->
                 <div class="tw:flex tw:flex-col tw:gap-1">
-                  <span
-                    class="individual-section-title tw:text-[10px] tw:uppercase tw:tracking-wider tw:opacity-50 tw:font-[600]"
-                  >
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
                     Description
                   </span>
                   <span
-                    class="individual-section-value tw:text-[13px] tw:leading-[1.5]"
+                    class="individual-section-value tw:text-[15px] tw:font-[700]"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{
@@ -230,56 +194,37 @@
               <div class="tw:flex tw:gap-4">
                 <!-- when value matches -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:flex-1">
-                  <span
-                    class="individual-section-title tw:text-[12px] tw:font-[700]"
-                  >
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
                     When value matches
                   </span>
                   <ORadioGroup v-model="policy">
-                    <div class="tw:flex tw:flex-col tw:gap-0.5">
-                      <div class="tw:flex tw:items-center">
+                    <div class="tw:flex tw:flex-col tw:gap-1">
+                      <div class="tw:flex tw:items-center tw:gap-2">
                         <ORadio
                           value="Redact"
                           data-test="associated-regex-patterns-redact-radio"
-                          size="xs"
+                          size="sm"
                         />
-                        <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
-                          <span class="tw:font-[600] tw:text-[12px]"
-                            >Redact</span
-                          >
-                          <span
-                            class="tw:font-[400] tw:text-[10px] tw:opacity-60"
-                            >Replace with [REDACTED]</span
-                          >
-                        </div>
+                        <span class="tw:font-[600] tw:text-[13px]">Redact</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Replace with [REDACTED]</span>
                       </div>
-                      <div class="tw:flex tw:items-center">
+                      <div class="tw:flex tw:items-center tw:gap-2">
                         <ORadio
                           value="DropField"
                           data-test="associated-regex-patterns-drop-field-radio"
-                          size="xs"
+                          size="sm"
                         />
-                        <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
-                          <span class="tw:font-[600] tw:text-[12px]">Drop</span>
-                          <span
-                            class="tw:font-[400] tw:text-[10px] tw:opacity-60"
-                            >Drop the field completely</span
-                          >
-                        </div>
+                        <span class="tw:font-[600] tw:text-[13px]">Drop</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Drop the field completely</span>
                       </div>
-                      <div class="tw:flex tw:items-center">
+                      <div class="tw:flex tw:items-center tw:gap-2">
                         <ORadio
                           value="Hash"
                           data-test="associated-regex-patterns-hash-radio"
-                          size="xs"
+                          size="sm"
                         />
-                        <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
-                          <span class="tw:font-[600] tw:text-[12px]">Hash</span>
-                          <span
-                            class="tw:font-[400] tw:text-[10px] tw:opacity-60"
-                            >Replace with searchable hash</span
-                          >
-                        </div>
+                        <span class="tw:font-[600] tw:text-[13px]">Hash</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Replace with searchable hash</span>
                       </div>
                     </div>
                   </ORadioGroup>
@@ -289,34 +234,24 @@
 
                 <!-- detect at section -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:min-w-[120px]">
-                  <span
-                    class="individual-section-title tw:text-[12px] tw:font-[700]"
-                  >
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
                     Detect at
                   </span>
                   <div class="tw:flex tw:flex-col tw:gap-1.5">
                     <OCheckbox
-                      size="xs"
+                      size="sm"
                       v-model="apply_at"
                       val="AtIngestion"
+                      label="Ingestion"
                       data-test="associated-regex-patterns-ingestion-checkbox"
-                    >
-                      <span
-                        class="individual-section-sub-title tw:font-[600] tw:text-[12px]"
-                        >Ingestion</span
-                      >
-                    </OCheckbox>
+                    />
                     <OCheckbox
-                      size="xs"
+                      size="sm"
                       v-model="apply_at"
                       val="AtSearch"
+                      label="Query"
                       data-test="associated-regex-patterns-query-checkbox"
-                    >
-                      <span
-                        class="individual-section-sub-title tw:font-[600] tw:text-[12px]"
-                        >Query</span
-                      >
-                    </OCheckbox>
+                    />
                   </div>
                 </div>
               </div>
@@ -352,7 +287,7 @@
 
                 <div class="tw:flex tw:flex-col tw:gap-1">
                   <span
-                    class="individual-section-sub-title2 tw:text-[10px] tw:uppercase tw:tracking-wider tw:opacity-50 tw:font-[600]"
+                    class="individual-section-sub-title2 tw:text-[12px] tw:font-[500]"
                   >
                     Regex Pattern
                   </span>
@@ -484,12 +419,11 @@
               </div>
             </div>
 
-            <!-- remove or add pattern button  -->
-            <div class="tw:mb-4">
+            <!-- Add / Remove Pattern button — directly below Test Pattern card -->
+            <div>
               <OButton
                 variant="outline"
                 size="sm-action"
-                class="tw:mr-3"
                 :data-test="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'associated-regex-patterns-remove-pattern-btn' : 'associated-regex-patterns-add-pattern-btn'"
                 @click="handleAddOrRemovePattern"
                 :icon-left="
@@ -498,50 +432,16 @@
                     : 'add'
                 "
               >
-                <img
-                  data-test="associated-regex-patterns-no-pattern-image"
-                  :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-                  style="width: 125px"
-                  alt=""
-                />
-                <span class="no-pattern-applied-title" data-test="associated-regex-patterns-no-pattern-applied-title">No Patterns Applied Yet</span>
-                  <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">Browse the pattern library to begin </span> 
-                  <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">
-                    applying regular expressions to your fields.
-                  </span>
+                {{
+                  checkIfPatternIsApplied(userClickedPattern.pattern_id)
+                    ? "Remove Pattern"
+                    : "Add Pattern"
+                }}
               </OButton>
             </div>
           </div>
         </div>
-        <OSeparator />
-        <div
-          v-if="userClickedPattern"
-          :class="
-            store.state.theme === 'dark'
-              ? 'dark-regex-patterns-footer'
-              : 'light-regex-patterns-footer'
-          "
-          class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-2"
-        >
-          <OButton
-            @click="$emit('closeDialog')"
-            variant="outline"
-            size="sm-action"
-            data-test="associated-regex-patterns-cancel-btn"
-          >
-            Cancel
-          </OButton>
-          <OButton
-            data-test="associated-regex-patterns-update-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :disabled="!isFormDirty"
-            @click="updateRegexPattern"
-          >
-            Update Changes
-          </OButton>
-        </div>
+
       </div>
     </div>
   </div>
@@ -573,9 +473,7 @@ import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -599,7 +497,6 @@ export default defineComponent({
     ORadio,
     OCheckbox,
     OIcon,
-    OTable,
     OCollapsible,
   },
   props: {
@@ -623,22 +520,6 @@ export default defineComponent({
     const store = useStore();
     const filterPattern = ref("");
     const { t } = useI18n();
-    const appliedFilterColumns: OTableColumnDef[] = [
-      {
-        id: "pattern_name",
-        header: "",
-        accessorKey: "pattern_name",
-        meta: { align: "left" },
-      },
-    ];
-    const filterColumns: OTableColumnDef[] = [
-      {
-        id: "pattern_name",
-        header: "",
-        accessorKey: "pattern_name",
-        meta: { align: "left" },
-      },
-    ];
     const allPatterns = ref([]);
     const selectedPatterns = ref<any[]>([]);
     const listLoading = ref(false);
@@ -1019,7 +900,6 @@ export default defineComponent({
       store,
       closeDialog,
       filterPattern,
-      filterColumns,
       selectedPatterns,
       allPatterns,
       allPatternsExpanded,
@@ -1030,7 +910,6 @@ export default defineComponent({
       getRegexPatterns,
       appliedPatterns,
       appliedPatternsExpanded,
-      appliedFilterColumns,
       checkIfPatternIsApplied,
       handlePatternClick,
       userClickedPattern,
@@ -1129,10 +1008,11 @@ export default defineComponent({
   overflow-wrap: break-word;
 }
 
+.individual-section-title,
+.individual-section-sub-title2 {
+  color: var(--o2-text-secondary);
+}
 .light-regex-patterns {
-  .individual-section-title {
-    color: #000000;
-  }
   .individual-section-sub-title {
     color: #000000;
   }
@@ -1182,12 +1062,6 @@ export default defineComponent({
   .q-table__card {
     border-radius: 0px !important;
   }
-}
-.dark-regex-patterns-footer {
-  background-color: #1f1f1f !important;
-}
-.light-regex-patterns-footer {
-  background-color: #ffffff !important;
 }
 .regex-pattern-name {
   white-space: nowrap;

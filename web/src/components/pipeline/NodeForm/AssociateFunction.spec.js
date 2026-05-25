@@ -48,9 +48,17 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 // ODrawer stub — renders slot content so inner elements are accessible in tests.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><slot /></div>',
+  props: [
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
 };
 
 // ---------------------------------------------------------------------------
@@ -213,14 +221,14 @@ describe("AssociateFunction Component", () => {
         currentSelectedNodeData: { data: { name: "alpha" } },
       });
       await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
+      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
       expect(deleteBtn.exists()).toBe(true);
     });
 
     it("hides delete button when isEditNode is false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
+      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
       expect(deleteBtn.exists()).toBe(false);
     });
 
@@ -260,8 +268,8 @@ describe("AssociateFunction Component", () => {
     it("shows cancel and save buttons when createNewFunction is false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.find('[data-test="associate-function-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="associate-function-save-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(true);
     });
 
     it("hides select input and flattening toggle when createNewFunction is true", async () => {
