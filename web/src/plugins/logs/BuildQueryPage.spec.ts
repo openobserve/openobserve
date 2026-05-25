@@ -365,7 +365,7 @@ describe("BuildQueryPage Component", () => {
       expect(mockUpdateGroupedFields).toHaveBeenCalled();
     });
 
-    it("should emit 'initialized' and return early without running query for empty query", async () => {
+    it("should emit 'initialized' and call makeAutoSQLQuery for empty query with default fields", async () => {
       mockMakeAutoSQLQuery.mockClear();
 
       wrapper = createWrapper({
@@ -374,17 +374,16 @@ describe("BuildQueryPage Component", () => {
       });
       await flushPromises();
 
-      // Should emit "initialized" for empty query builder mode (PR #10758)
+      // Should emit "initialized" for empty query builder mode
       const emitted = wrapper.emitted("initialized");
       expect(emitted).toBeTruthy();
       expect(emitted!.length).toBeGreaterThanOrEqual(1);
 
-      // Should NOT attempt to generate/run auto SQL query during initialization
-      // because builder mode with empty query returns early to let user select fields
-      expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+      // PR #11586: Empty query now sets default histogram/count fields and auto-runs
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
     });
 
-    it("should not call makeAutoSQLQuery for empty query without selected stream", async () => {
+    it("should call makeAutoSQLQuery for empty query even without selected stream", async () => {
       mockMakeAutoSQLQuery.mockClear();
 
       wrapper = createWrapper({
@@ -393,8 +392,8 @@ describe("BuildQueryPage Component", () => {
       });
       await flushPromises();
 
-      // Even without a stream, empty query should not trigger auto SQL query
-      expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+      // PR #11586: Empty query sets default fields and calls makeAutoSQLQuery
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
     });
 
     it("should emit 'initialized' for whitespace-only query", async () => {
@@ -412,11 +411,14 @@ describe("BuildQueryPage Component", () => {
   });
 
   describe("Query Parsing", () => {
-    it("should try to parse SQL query when provided", async () => {
+    it("should try to parse SQL query when provided (non-SELECT* query)", async () => {
       const { parseSQL } = await import("@/utils/query/sqlQueryParser");
 
+      // PR #11586: SELECT * queries are treated as empty (default fields).
+      // Use a non-SELECT* query to test parse behavior.
       wrapper = createWrapper({
-        searchQuery: 'SELECT * FROM "test_stream"',
+        searchQuery:
+          'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
         selectedStream: "test_stream",
       });
       await flushPromises();
@@ -429,8 +431,11 @@ describe("BuildQueryPage Component", () => {
         await import("@/utils/query/sqlQueryParser");
       (shouldUseCustomMode as any).mockReturnValueOnce(true);
 
+      // PR #11586: SELECT * queries are treated as empty (default fields).
+      // Use a non-SELECT* subquery to test custom mode detection.
       wrapper = createWrapper({
-        searchQuery: 'SELECT * FROM (SELECT * FROM "test_stream")',
+        searchQuery:
+          'SELECT code, cnt FROM (SELECT code, count(*) as cnt FROM "test_stream" GROUP BY code) subq',
         selectedStream: "test_stream",
       });
       await flushPromises();

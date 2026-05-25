@@ -370,6 +370,17 @@ export class MetricsPage {
     }
 
     async enterMetricsQuery(query) {
+        // Ensure Custom mode is active so the editor is fully editable
+        const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
+        if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const dataState = await customBtn.getAttribute('data-state').catch(() => '');
+            if (dataState !== 'on') {
+                await customBtn.click();
+                // Wait for default query to be populated by the watcher (e.g. streamName{})
+                await this.page.waitForTimeout(2000);
+            }
+        }
+
         // Use the same pattern as logsPage.js which works reliably with Monaco editor
         // The key is to use the .inputarea selector inside the Monaco editor
         const editorSelectors = [
@@ -407,20 +418,15 @@ export class MetricsPage {
         }
         await this.page.waitForTimeout(200);
 
-        // Use platform-specific key combo for select all
+        // Select all existing content and delete it, then type the new query.
+        // Using keyboard.type instead of .fill() ensures Monaco triggers change
+        // events so the Vue data model stays in sync (critical for Custom mode).
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
-        await this.page.waitForTimeout(100);
-
-        // Use the .inputarea to fill the query (this is the hidden textarea Monaco uses)
-        const inputArea = editorContainer.locator('.inputarea').first();
-        if (await inputArea.count() > 0) {
-            await inputArea.fill(query);
-        } else {
-            // Fallback: type the query character by character
-            await this.page.keyboard.type(query, { delay: 10 });
-        }
+        await this.page.keyboard.press('Backspace');
         await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(query, { delay: 10 });
+        await this.page.waitForTimeout(500);
     }
 
     async waitForMetricsResults() {
@@ -1743,7 +1749,8 @@ export class MetricsPage {
             '.q-notification.bg-negative',         // Quasar notification with negative background
             '.q-banner--negative',                 // Quasar negative banner
             '[data-test="error-message"]',         // Explicit error message data-test
-            '.error-notification'                  // Explicit error notification class
+            '.error-notification',                 // Explicit error notification class
+            '[data-test="dashboard-error"]'          // Inline error list (DashboardErrors)
         ];
 
         for (const selector of errorSelectors) {
@@ -1769,6 +1776,7 @@ export class MetricsPage {
     async getErrorIndicators() {
         // Return the first visible error indicator
         const errorSelectors = [
+            '[data-test="dashboard-error"]',
             '.q-notification--negative',
             '.q-notification.bg-negative',
             '.q-banner--negative',
@@ -1785,7 +1793,7 @@ export class MetricsPage {
                 return element;
             }
         }
-        return this.page.locator('.q-notification--negative, .q-notification__message').first();
+        return this.page.locator('[data-test="dashboard-error"], .q-notification--negative, .q-notification__message').first();
     }
 
     // SQL mode methods
