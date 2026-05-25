@@ -356,7 +356,7 @@ export default defineComponent({
     },
     menuAlign: {
       type: String,
-      default: "start",
+      default: "end",
     },
   },
 
