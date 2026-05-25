@@ -1338,9 +1338,8 @@ export class AlertDestinationsPage {
      * Verify success notification appears
      */
     async expectSuccessNotification() {
-        // OToast variant `o-toast-success` is the precise data-test for success messages.
-        // Falling back to the o-toast-* prefix when the success variant isn't surfaced.
-        await expect(this.page.locator(this.toastSuccess).first()).toBeVisible({ timeout: 10000 });
+        // OToast renders data-test="o-toast-success" for success variant; this.successToast holds that selector
+        await expect(this.page.locator(this.successToast).first()).toBeVisible({ timeout: 10000 });
     }
 
     /**
