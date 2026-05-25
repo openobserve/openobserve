@@ -206,11 +206,10 @@ impl ObjectStore for Remote {
         self.client.list(Some(&prefix.into()))
     }
 
-    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented {
-            operation: "list_with_delimiter".to_string(),
-            implementer: Self::name().to_string(),
-        })
+    async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+        let key = prefix.map(|p| p.as_ref());
+        let prefix = self.format_key(key.unwrap_or(""));
+        self.client.list_with_delimiter(Some(&prefix.into())).await
     }
 
     async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
