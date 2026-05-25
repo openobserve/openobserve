@@ -22,8 +22,6 @@ pub(crate) mod stream_files;
 use std::cmp::max;
 
 use config::meta::sql::OrderBy;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::cache::streaming_agg::StreamingAggsPartitionStrategy;
 
 /// Generates partitions for search queries
 pub struct PartitionGenerator {
@@ -53,11 +51,9 @@ impl PartitionGenerator {
     /// * `step` - Regular partition step size in microseconds
     /// * `order_by` - Sort order for partitions
     /// * `is_complex_query` - Whether this query requires complex search handling
-    /// * `cache_strategy` - Optional cache-aware partition strategy
     ///
     /// # Returns
     /// Vector of [start, end] time ranges in microseconds
-    #[allow(clippy::too_many_arguments)]
     pub fn generate_partitions(
         &self,
         start_time: i64,
@@ -65,15 +61,7 @@ impl PartitionGenerator {
         step: i64,
         order_by: OrderBy,
         is_complex_query: bool,
-        #[cfg(feature = "enterprise")] cache_strategy: Option<StreamingAggsPartitionStrategy>,
     ) -> Vec<[i64; 2]> {
-        // If cache-aware strategy is provided, use it
-        #[cfg(feature = "enterprise")]
-        if let Some(strategy) = cache_strategy {
-            return strategy.to_time_partitions(order_by);
-        }
-
-        // Otherwise, use standard partition generation logic
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time, end_time, step, order_by,
@@ -327,8 +315,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -354,8 +340,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -397,8 +381,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -426,8 +408,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -470,8 +450,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -499,8 +477,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -541,8 +517,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -570,8 +544,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -612,8 +584,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -642,8 +612,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -689,8 +657,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -716,8 +682,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -760,8 +724,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -790,8 +752,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -837,8 +797,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -865,8 +823,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -910,8 +866,6 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -931,8 +885,6 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            #[cfg(feature = "enterprise")]
-            None,
         );
 
         println!("partitions: {partitions:#?}");
@@ -965,7 +917,7 @@ mod enterprise_tests {
         let step = 300000000; // 5 minutes
 
         let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true, None);
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
 
         let mut expected_partitions = vec![
             [1748527200000000, 1748528100000000], // 14:00 - 14:15
@@ -977,7 +929,7 @@ mod enterprise_tests {
         assert_eq!(partitions, expected_partitions);
 
         let partitions_asc =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true, None);
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true);
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
     }
@@ -996,7 +948,7 @@ mod enterprise_tests {
         let step = 300000000; // 5 minutes
 
         let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true, None);
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
 
         // Verify no empty partitions exist
         for [start, end] in &partitions {
