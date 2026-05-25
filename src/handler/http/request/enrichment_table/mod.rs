@@ -316,9 +316,7 @@ pub async fn save_enrichment_table_from_url(
 
     // RULE 3: Block duplicate URL in append mode
     // Reason: Adding the same URL twice would create duplicate data in the table
-    if append_data
-        && existing_jobs.iter().any(|j| j.url == request_body.url)
-    {
+    if append_data && existing_jobs.iter().any(|j| j.url == request_body.url) {
         return MetaHttpResponse::bad_request(format!(
             "URL already exists in table {}/{}. Cannot add the same URL again.",
             org_id, table_name
