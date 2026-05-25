@@ -2136,8 +2136,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
-            // Navigate explicitly instead of reloading — after save the page
-            // may not be on the enrichment tables list
+            // Dismiss any open form first (after Save the edit form stays open),
+            // then navigate explicitly to guarantee we're on the enrichment list
+            await this.navigateBackFromFormIfNeeded();
             await this.navigateToEnrichmentTable();
             await this.searchEnrichmentTableInList(tableName);
 
