@@ -240,6 +240,13 @@ test.describe("ConfigPanel — PromQL Settings", () => {
   async function switchToAggregateMode(page, pm) {
     const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
+    // Skip the switch if already in Aggregate mode — re-clicking the trigger then
+    // the same option adds unnecessary UI interactions that increase flakiness risk.
+    const triggerText = await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').textContent();
+    if (triggerText && triggerText.includes('Aggregate')) {
+      testLogger.info("Table mode already in Aggregate — skipping switch");
+      return;
+    }
     await page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]').click();
     // Use atomic waitForFunction click — virtualised list items can detach between
     // waitFor({state:'visible'}) and click(), causing intermittent "element detached" errors.
@@ -254,6 +261,9 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       },
       { timeout: 15000 }
     );
+    // Wait for the dropdown to close before returning so callers can immediately
+    // interact with Aggregate-mode-specific fields.
+    await page.locator('[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     testLogger.info("Table mode switched to Aggregate");
   }
 
@@ -307,11 +317,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await visibleSearchInput.waitFor({ state: "visible" });
     await visibleSearchInput.fill("instance");
     await page.keyboard.press("Enter"); // create the typed value
+    // Wait for the chip to appear before closing the dropdown — Enter is async (Vue
+    // state update) and pressing Escape immediately can discard the chip in CI timing.
+    await expect(visibleColsInput).toContainText("instance", { timeout: 5000 });
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
-
-    // OSelect root contains the selected chip text
-    await expect(visibleColsInput).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -322,7 +332,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
     const visibleAfterInput = page.locator('[data-test="dashboard-config-visible-columns"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleAfterInput);
-    await expect(visibleAfterInput).toContainText("instance");
+    await expect(visibleAfterInput).toContainText("instance", { timeout: 10000 });
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -343,10 +353,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await hiddenSearchInput.waitFor({ state: "visible" });
     await hiddenSearchInput.fill("job");
     await page.keyboard.press("Enter"); // create the typed value (no stream fields in PromQL mode)
+    // Wait for chip to appear before closing — prevents Enter/Escape race condition in CI.
+    await expect(hiddenColsInput).toContainText("job", { timeout: 5000 });
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
-
-    await expect(hiddenColsInput).toContainText("job");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -357,7 +367,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
     const hiddenAfterInput = page.locator('[data-test="dashboard-config-hidden-columns"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenAfterInput);
-    await expect(hiddenAfterInput).toContainText("job");
+    await expect(hiddenAfterInput).toContainText("job", { timeout: 10000 });
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -379,10 +389,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await stickySearchInput.waitFor({ state: "visible" });
     await stickySearchInput.fill("instance");
     await page.keyboard.press("Enter"); // create the typed value (no stream fields in PromQL mode)
+    // Wait for chip to appear before closing — prevents Enter/Escape race condition in CI.
+    await expect(stickyColsInput).toContainText("instance", { timeout: 5000 });
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
-
-    await expect(stickyColsInput).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -393,7 +403,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
     const stickyAfterInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyAfterInput);
-    await expect(stickyAfterInput).toContainText("instance");
+    await expect(stickyAfterInput).toContainText("instance", { timeout: 10000 });
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

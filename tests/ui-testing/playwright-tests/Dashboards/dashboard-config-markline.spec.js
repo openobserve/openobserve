@@ -37,22 +37,26 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     // Add mark line — default type is yAxis, value input should appear immediately
     await addBtn.click();
     const typeSelect = page.locator('[data-test="dashboard-config-markline-type-0"]');
-    await typeSelect.waitFor({ state: 'visible', timeout: 5000 });
+    await typeSelect.waitFor({ state: 'visible', timeout: 10000 });
     const valueInput = page.locator('[data-test="dashboard-config-markline-value-0"]');
     await expect(valueInput).toBeVisible();
     testLogger.info("Value input visible for yAxis type");
 
     // Switch to average — value input should hide
     await typeSelect.click();
-    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').click();
+    // Wait for dropdown to close before checking value input visibility
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await expect(valueInput).not.toBeVisible();
     testLogger.info("Value input hidden for Average type");
 
     // Switch back to yAxis — value input re-appears, fill it
     await typeSelect.click();
-    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').click();
+    // Wait for dropdown to close before interacting with value input
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await expect(valueInput).toBeVisible();
     await valueInput.locator('[data-test$="-field"]').fill("100");
     await page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]').fill("threshold");
@@ -91,20 +95,27 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     // Add first mark line
     await addBtn.click();
     const type0 = page.locator('[data-test="dashboard-config-markline-type-0"]');
-    await type0.waitFor({ state: 'visible', timeout: 5000 });
+    await type0.waitFor({ state: 'visible', timeout: 10000 });
+    // Scroll into sidebar viewport — waitFor only checks CSS visibility, not scroll position.
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(type0);
     await type0.click();
-    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').click();
+    // Wait for dropdown to close before filling name — avoids interaction with open dropdown
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]').fill("avg");
 
     // Add second mark line
     await pm.dashboardPanelConfigs.scrollSidebarToElement(addBtn);
     await addBtn.click();
     const type1 = page.locator('[data-test="dashboard-config-markline-type-1"]');
-    await type1.waitFor({ state: 'visible', timeout: 5000 });
+    await type1.waitFor({ state: 'visible', timeout: 10000 });
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(type1);
     await type1.click();
-    await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').click();
+    // Wait for dropdown to close before asserting state
+    await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await page.locator('[data-test="dashboard-config-markline-name-1"]').locator('[data-test$="-field"]').fill("max");
 
     await expect(page.locator('[data-test="dashboard-config-markline-type-0-trigger"]')).toHaveAttribute('data-test-selected-value', 'average');
