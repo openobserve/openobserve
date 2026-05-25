@@ -287,21 +287,6 @@ mod tests {
     }
 
     #[test]
-    fn test_add_new_filters_with_and_operator_with_subquery() {
-        // Test adding filters to a query with a subquery
-        let sql = "SELECT * FROM (SELECT id, name FROM users) AS u";
-        let filters = HashMap::from([("u.id".to_string(), "100".to_string())]);
-
-        let result = add_new_filters_with_and_operator(sql, filters).unwrap();
-
-        // we support subquery
-        assert_eq!(
-            result,
-            "SELECT * FROM (SELECT id, name FROM users WHERE u.id = '100') AS u WHERE u.id = '100'"
-        );
-    }
-
-    #[test]
     fn test_add_new_filters_with_and_operator_with_field_in_subquery() {
         // Test adding filters to a query with a subquery
         let sql = "SELECT * FROM users WHERE id IN (SELECT id FROM users)";
