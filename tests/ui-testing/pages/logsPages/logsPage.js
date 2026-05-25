@@ -8027,9 +8027,14 @@ export class LogsPage {
      * Click Custom SQL query type toggle
      */
     async clickCustomQueryType() {
-        await this.page.locator(this.customQueryType).click();
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        await expect(this.page.locator(`${this.customQueryType} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // OToggleGroupItem forwards data-test to the inner Reka button (inheritAttrs:false +
+        // v-bind="$attrs"), so data-test and data-state live on the SAME element. Use the
+        // AND-combinator selector, not the descendant selector (which would look for a child).
+        // Also scope with :visible — the SearchBar mounts twice on some routes (toolbar +
+        // collapsed-menu syntax-guide), so multiple data-test matches exist.
+        const toggle = this.page.locator(`${this.customQueryType}:visible`).first();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 
