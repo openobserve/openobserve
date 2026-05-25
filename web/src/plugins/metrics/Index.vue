@@ -146,6 +146,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -178,10 +179,10 @@ export default defineComponent({
     const {
       dashboardPanelData,
       resetDashboardPanelData,
-      resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
-      removeXYFilters,
+      updateGroupedFields,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref({
@@ -213,6 +214,33 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
+    /** Apply default SQL builder fields for metrics.
+     *  Uses avg(value) if the stream has a "value" field, otherwise count(_timestamp). */
+    const applyMetricsDefaults = () => {
+      const query = dashboardPanelData.data.queries[0];
+      query.customQuery = false;
+      query.fields.x = [DEFAULT_METRICS_X_FIELD()];
+
+      // Check if the current stream has a "value" field
+      const streamFields =
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
+      const hasValueField = streamFields.some((stream: any) =>
+        stream?.schema?.some((field: any) => field?.name === "value"),
+      );
+
+      query.fields.y = [
+        hasValueField
+          ? DEFAULT_METRICS_Y_FIELD()
+          : DEFAULT_METRICS_Y_FIELD_COUNT(),
+      ];
+      query.fields.breakdown = [];
+      query.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
+    };
+
     // Initialize state before any child components mount so FieldList.vue sees
     // stream_type = "metrics" from the start, preventing a spurious
     // streams?type=logs request and the double stream-list fetch that results
@@ -220,10 +248,19 @@ export default defineComponent({
     onBeforeMount(() => {
       errorData.errors = [];
       editMode.value = false;
-      resetDashboardPanelDataAndAddTimeField();
+      resetDashboardPanelData();
 
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+
+      if (store.state.zoConfig?.auto_query_enabled) {
+        const persisted = restoreMetricsStream(
+          store.state.selectedOrganization.identifier,
+        );
+        if (persisted) {
+          dashboardPanelData.data.queries[0].fields.stream = persisted;
+        }
+      }
       // need to remove the xy filters
       removeXYFilters();
 
@@ -265,6 +302,18 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
+      },
+    );
+
+    watch(
+      () => dashboardPanelData.data.queries[0]?.fields?.stream,
+      (stream: string) => {
+        if (store.state.zoConfig?.auto_query_enabled && stream) {
+          saveMetricsStream(
+            store.state.selectedOrganization.identifier,
+            stream,
+          );
+        }
       },
     );
 

@@ -1138,28 +1138,27 @@ export default defineComponent({
       if (type === "geomap" || type === "maps") {
         return "";
       }
-
-      // Sankey returns { options: null } when data is invalid.
-      if (type === "sankey") {
-        return panelData.value?.options != null ? "" : "No Data";
+      // A rendered chart is already on screen — suppress "No Data" even if
+      // the raw data buffer is momentarily empty. This prevents a flicker on
+      // refresh where the executor resets state.data = [] before loading
+      // flips to true, transiently firing this computed with empty data.
+      if (panelData.value?.options?.series?.length > 0) {
+        return "";
       }
-
-      // Metric/gauge series are always created by the converter
-      // (they use renderItem, not data arrays), so check the raw Y value.
-      if (type === "metric" || type === "gauge") {
-        const firstRow = data.value[0]?.[0];
-        const yAlias = panelSchema.value.queries[0].fields.y.map(
-          (it: any) => it.alias || [],
-        );
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          ? ""
-          : "No Data";
+      // Check if the queryType is 'promql'
+      if (panelSchema.value?.queryType == "promql") {
+        // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
+        return filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length)
+          ? "" // Return an empty string if there is data
+          : "No Data"; // Return "No Data" if there is no data
       }
-
-      // For all other chart types (line, area, bar, scatter, heatmap, etc.),
-      // the series filter in the conversion pipeline already excluded series
-      // whose data is entirely null. Just check what survived.
-      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
+      // The queryType is not 'promql'
+      return data.value.length &&
+        data.value[0]?.length &&
+        handleNoData(panelSchema.value.type)
+        ? ""
+        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
     });
 
     // when the error changes, emit the error

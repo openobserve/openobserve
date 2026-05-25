@@ -123,6 +123,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="layout-panel-container col"
                   :style="layoutPanelContainerStyle"
                 >
+                  <!-- Mode selection (left) + Add To Dashboard (right) row -->
+                  <div
+                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1"
+                  >
+                    <QueryTypeSelector
+                      v-if="pageType === 'build'"
+                      :showQueryType="false"
+                    />
+                    <div v-else />
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <q-btn
+                        v-if="resolvedConfig.showAddToDashboardButton"
+                        data-test="panel-editor-add-to-dashboard-btn"
+                        size="md"
+                        class="no-border"
+                        no-caps
+                        dense
+                        color="primary"
+                        style="padding: 2px 4px"
+                        @click="emit('addToDashboard')"
+                        :title="t('search.addToDashboard')"
+                      >
+                        {{ t("search.addToDashboard") }}
+                      </q-btn>
+                    </div>
+                  </div>
+
                   <!-- Query Builder -->
                   <DashboardQueryBuilder
                     v-if="resolvedConfig.showQueryBuilder"
@@ -132,14 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                   <q-separator v-if="resolvedConfig.showQueryBuilder" />
-
-                  <!-- Query Type Selector (build mode) - Auto/Custom toggle -->
-                  <div
-                    v-if="resolvedConfig.showQueryTypeSelector"
-                    class="tw:flex tw:justify-end tw:items-center tw:px-3 tw:py-2 tw:bg-gray-50 dark:tw:bg-gray-800"
-                  >
-                    <QueryTypeSelector />
-                  </div>
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -194,8 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
-                    <!-- Common error/warning buttons component -->
+                  <div
+                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
+                  >
                     <PanelErrorButtons
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
@@ -215,20 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :viewOnly="false"
                     />
 
-                    <!-- Add to Dashboard button (metrics/logs/build mode) -->
-                    <q-btn
-                      v-if="resolvedConfig.showAddToDashboardButton"
-                      size="md"
-                      class="no-border q-ml-sm"
-                      no-caps
-                      dense
-                      color="primary"
-                      style="padding: 2px 4px"
-                      @click="emit('addToDashboard')"
-                      :title="t('search.addToDashboard')"
-                    >
-                      {{ t("search.addToDashboard") }}
-                    </q-btn>
                   </div>
 
                   <!-- Chart Area -->
@@ -850,7 +856,7 @@ const chartAreaStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {};
   }
-  return { height: "calc(100vh - var(--navbar-height) - 464px)" };
+  return { height: "calc(100vh - var(--navbar-height) - 464px)", marginTop: '0px' };
 });
 
 // Main content area class - logs needs flat background without card styling

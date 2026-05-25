@@ -51,6 +51,8 @@ const mockValidatePanel = vi.fn((errors: any[]) => {
   /* default: no errors */
 });
 const mockRemoveXYFilters = vi.fn();
+const mockUpdateGroupedFields = vi.fn().mockResolvedValue(undefined);
+const mockMakeAutoSQLQuery = vi.fn().mockResolvedValue(undefined);
 
 // A minimal reactive dashboardPanelData object that the component modifies
 const mockDashboardPanelData: any = reactive({
@@ -61,7 +63,7 @@ const mockDashboardPanelData: any = reactive({
     queryType: "promql",
     queries: [
       {
-        fields: { stream_type: "" },
+        fields: { stream_type: "", stream: "", x: [], y: [], breakdown: [], filter: {} },
         customQuery: true,
         query: "",
       },
@@ -85,6 +87,8 @@ vi.mock("../../composables/dashboard/useDashboardPanel", () => ({
     resetAggregationFunction: mockResetAggregationFunction,
     validatePanel: mockValidatePanel,
     removeXYFilters: mockRemoveXYFilters,
+    updateGroupedFields: mockUpdateGroupedFields,
+    makeAutoSQLQuery: mockMakeAutoSQLQuery,
   }),
 }));
 
@@ -249,16 +253,10 @@ describe("Metrics Index — component initialization", () => {
     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
   });
 
-  it("calls resetDashboardPanelDataAndAddTimeField on mounted", async () => {
+  it("calls resetDashboardPanelData on mounted", async () => {
     createWrapper();
     await flushPromises();
-    expect(mockResetDashboardPanelDataAndAddTimeField).toHaveBeenCalled();
-  });
-
-  it("calls removeXYFilters on mounted", async () => {
-    createWrapper();
-    await flushPromises();
-    expect(mockRemoveXYFilters).toHaveBeenCalled();
+    expect(mockResetDashboardPanelData).toHaveBeenCalled();
   });
 
   it("sets stream_type to 'metrics' on mounted", async () => {
