@@ -363,6 +363,7 @@ pub async fn detect_anomalies(Path((org_id, anomaly_id)): Path<(String, String)>
         ("org_id" = String, Path, description = "Organization identifier"),
         ("anomaly_id" = String, Path, description = "Anomaly config identifier"),
         ("limit" = Option<i64>, Query, description = "Maximum number of results"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DetectionHistoryResponse),
