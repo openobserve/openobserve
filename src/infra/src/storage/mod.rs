@@ -144,6 +144,16 @@ pub async fn get_range(account: &str, file: &str, range: Range<u64>) -> Result<b
     MULTI_ACCOUNTS.get_range(account, &file.into(), range).await
 }
 
+pub async fn get_ranges(
+    account: &str,
+    file: &str,
+    ranges: &[Range<u64>],
+) -> Result<Vec<bytes::Bytes>> {
+    MULTI_ACCOUNTS
+        .get_ranges(account, &file.into(), ranges)
+        .await
+}
+
 pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
     MULTI_ACCOUNTS.head(account, &file.into()).await
 }
