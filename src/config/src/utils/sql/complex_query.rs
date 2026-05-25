@@ -17,14 +17,14 @@ use std::ops::ControlFlow;
 
 use sqlparser::{
     ast::{Expr, GroupByExpr, Query, SetExpr, Statement, TableFactor, Visit, Visitor},
-    dialect::GenericDialect,
+    dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::AGGREGATE_UDF_LIST;
 
 pub fn is_complex_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
-    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    let ast = Parser::parse_sql(&PostgreSqlDialect {}, query)?;
     Ok(ast.iter().any(is_complex_query_stmt))
 }
 
@@ -88,6 +88,12 @@ impl Visitor for ComplexityVisitor {
             }
             _ => {}
         }
+
+        if query.with.is_some() {
+            self.is_complex = true;
+            return ControlFlow::Break(());
+        }
+
         ControlFlow::Continue(())
     }
 
@@ -230,5 +236,15 @@ mod tests {
         let sql = "SELECT a FROM t1 JOIN t2 ON t1.id = t2.id";
         let ast = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
         assert!(is_complex_query_stmt(&ast[0]));
+    }
+
+    #[test]
+    fn test_is_complex_query_cte_with_simple_select() {
+        let sql = r#"WITH FilteredLogs AS (
+                        SELECT * FROM "default"
+                        WHERE str_match_ignore_case(log, 'err'))
+                        SELECT k8s_namespace_name, CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER)
+                        FROM FilteredLogs"#;
+        assert!(is_complex_query(sql).unwrap());
     }
 }
