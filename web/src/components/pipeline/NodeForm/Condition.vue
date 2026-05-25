@@ -20,9 +20,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="handleDrawerClose"
     :title="t('pipeline.conditionTitle')"
     :width="45"
-    :show-close="true"
+    :show-close="false"
+    primary-button-label="Save"
+    secondary-button-label="Cancel"
+    secondary-button-variant="outline"
+    :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutral-button-variant="outline-destructive"
+    @click:primary="saveCondition"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
     @keydown.stop
+    :persistent="true"
   >
+    <template #header-right>
+      <button
+        type="button"
+        aria-label="Close drawer"
+        data-test="o-drawer-close-btn"
+        @mousedown.prevent
+        @click="openCancelDialog"
+        class="tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:h-7 tw:w-7 tw:rounded-md tw:text-dialog-close-text tw:hover:bg-dialog-close-hover-bg tw:active:bg-dialog-close-active-bg tw:transition-colors tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring tw:cursor-pointer"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </template>
     <div
       data-test="add-condition-section"
       class="stream-routing-section tw:w-full"
@@ -30,10 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="stream-routing-container tw:px-3 tw:pt-3">
+    <div class="stream-routing-container tw:px-3">
       <div>
         <div
-          class="tw:pt-2 showLabelOnTop tw:font-bold text-h7"
+          class="showLabelOnTop tw:font-bold text-h7"
           data-test="add-condition-query-input-title"
         >
           <div></div>
@@ -59,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
           <div
-            class="note-container tw:rounded-md tw:p-3 tw:mt-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-container tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
             data-test="add-condition-note-container"
           >
             <div
@@ -105,30 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="tw:flex tw:gap-2 tw:mt-4">
-          <OButton
-            v-if="pipelineObj.isEditNode"
-            data-test="add-condition-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            type="button"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            data-test="add-condition-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            type="button"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            data-test="add-condition-save-btn"
-            variant="primary"
-            size="sm-action"
-            @click="saveCondition"
-          >{{ t('alerts.save') }}</OButton>
         </div>
       </div>
     </div>
@@ -229,10 +229,12 @@ const internalOpen = ref(!!props.open);
 watch(() => props.open, (v) => { internalOpen.value = !!v; });
 
 function handleDrawerClose(v: boolean) {
-  internalOpen.value = v;
   if (!v) {
-    setTimeout(() => emit("cancel:hideform"), 300);
+    // Intercept any programmatic close (e.g. Escape key) with confirmation too
+    openCancelDialog();
+    return;
   }
+  internalOpen.value = v;
 }
 
 const isUpdating = ref(false);
@@ -616,7 +618,8 @@ const closeDialog = () => {
   );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
-  emit("cancel:hideform");
+  internalOpen.value = false;
+  setTimeout(() => emit("cancel:hideform"), 300);
 };
 
 const openCancelDialog = () => {
