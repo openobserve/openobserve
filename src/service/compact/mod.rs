@@ -272,7 +272,12 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
 /// compactor merging
 pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let jobs = infra_file_list::get_pending_jobs(&LOCAL_NODE.uuid, cfg.compact.batch_size).await?;
+    let jobs = infra_file_list::get_pending_jobs(
+        &LOCAL_NODE.uuid,
+        cfg.compact.batch_size,
+        cfg.compact.fast_mode,
+    )
+    .await?;
     if jobs.is_empty() {
         return Ok(());
     }
