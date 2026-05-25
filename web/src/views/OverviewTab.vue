@@ -228,6 +228,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
+
+// Module-level cache for anomaly history — survives re-renders, cleared on org change
+const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const _anomalyCache = new Map<
+  string,
+  { ts: number; startTime: number; endTime: number; data: any[] }
+>();
 import { useI18n } from "vue-i18n";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -344,48 +351,84 @@ const loadAll = async () => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async () => {
   try {
-    // Get all anomaly configs for this org
-    const listRes = await anomalyService.list(orgId.value);
-    const configs: any[] = listRes.data ?? [];
-    if (!configs.length) {
-      anomalies.value = [];
+    const org = orgId.value;
+    const { startTime, endTime } = timeRange.value;
+    const cacheKey = org;
+    const cached = _anomalyCache.get(cacheKey);
+
+    let rawHits: Array<{ cfg: any; hits: any[] }>;
+
+    if (
+      cached &&
+      Date.now() - cached.ts < ANOMALY_CACHE_TTL_MS &&
+      cached.startTime === startTime &&
+      cached.endTime === endTime
+    ) {
+      // Serve from cache — no network calls
+      anomalies.value = cached.data;
       return;
     }
 
-    // Fetch history for each config in parallel, cap per-config at 20 hits
-    const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
-    const results = await Promise.allSettled(
-      configs.map((c) =>
-        anomalyService.getHistory(
-          orgId.value,
-          c.id ?? c.anomaly_id,
-          limitPerConfig,
+    // Fire list first; only fetch history if configs exist
+    try {
+      const listRes = await anomalyService.list(org);
+      const configs: any[] = listRes.data ?? [];
+      if (!configs.length) {
+        anomalies.value = [];
+        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
+        return;
+      }
+      const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
+      console.log("[OverviewTab] fetching bulk anomaly history", { org, configs: configs.length });
+      const bulkRes = await anomalyService.getAllHistory(org, 20);
+      console.log("[OverviewTab] bulk anomaly history response", bulkRes.data);
+      const bulkConfigs: any[] = bulkRes.data?.configs ?? [];
+      // Merge bulk history hits with config metadata
+      rawHits = bulkConfigs.map((entry: any) => ({
+        cfg: configById.get(entry.cfg?.id) ?? entry.cfg,
+        hits: entry.hits ?? [],
+      }));
+    } catch {
+      // Bulk endpoint not available — fall back to per-config requests
+      const listRes = await anomalyService.list(org);
+      const configs: any[] = listRes.data ?? [];
+      if (!configs.length) {
+        anomalies.value = [];
+        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
+        return;
+      }
+      const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
+      const results = await Promise.allSettled(
+        configs.map((c) =>
+          anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig),
         ),
-      ),
-    );
+      );
+      rawHits = configs.map((cfg, idx) => ({
+        cfg,
+        hits:
+          results[idx].status === "fulfilled"
+            ? (results[idx] as PromiseFulfilledResult<any>).value.data ?? []
+            : [],
+      }));
+    }
 
     const found: any[] = [];
-    results.forEach((r, idx) => {
-      if (r.status !== "fulfilled") return;
-      const hits: any[] = r.value.data ?? [];
-      const cfg = configs[idx];
-      hits.forEach((h) => {
-        // Only include hits within the selected time window (history API doesn't filter by time)
+    rawHits.forEach(({ cfg, hits }: { cfg: any; hits: any[] }) => {
+      hits.forEach((h: any) => {
         const tsMs = h.timestamp ? Math.floor(h.timestamp / 1000) : 0;
         if (
           tsMs &&
-          (tsMs < timeRange.value.startTime / 1000 ||
-            tsMs > timeRange.value.endTime / 1000)
+          (tsMs < startTime / 1000 || tsMs > endTime / 1000)
         )
           return;
         if ((h.anomaly_count ?? 0) > 0) {
           found.push({
-            id: h.id ?? `anm-${cfg.id}-${tsMs}`,
-            title: `Anomaly detected — ${cfg.name ?? cfg.alert_name ?? "unknown"}`,
-            description: `Stream: ${cfg.stream_name ?? "unknown"} · ${h.anomaly_count} anomalous point(s)`,
+            id: h.id ?? `anm-${cfg?.id}-${tsMs}`,
+            title: `Anomaly detected — ${cfg?.name ?? cfg?.alert_name ?? h.alert_name ?? "unknown"}`,
+            description: `Stream: ${cfg?.stream_name ?? h.stream_name ?? "unknown"} · ${h.anomaly_count} anomalous point(s)`,
             severity: "warning",
-            alertName: cfg.name ?? cfg.alert_name,
-            streamName: cfg.stream_name,
+            alertName: cfg?.name ?? cfg?.alert_name ?? h.alert_name,
+            streamName: cfg?.stream_name ?? h.stream_name,
             ts: tsMs,
           });
         }
@@ -399,9 +442,12 @@ const loadAnomalies = async () => {
       const ex = deduped.get(key);
       if (!ex || a.ts > ex.ts) deduped.set(key, a);
     });
-    anomalies.value = Array.from(deduped.values())
+    const result = Array.from(deduped.values())
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 5);
+
+    _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: result });
+    anomalies.value = result;
   } catch {
     anomalies.value = [];
   }
@@ -669,7 +715,10 @@ onMounted(loadAll);
 watch(
   () => store.state.selectedOrganization?.identifier,
   (val, old) => {
-    if (val && val !== old) loadAll();
+    if (val && val !== old) {
+      _anomalyCache.delete(old ?? "");
+      loadAll();
+    }
   },
 );
 

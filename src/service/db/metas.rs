@@ -80,7 +80,7 @@ pub mod tantivy_index {
                 .parse::<i64>()
                 .unwrap(),
             _ => {
-                let timestamp = config::utils::time::now_micros();
+                let timestamp = config::utils::time::BASE_TIME.timestamp_micros();
                 let data = bytes::Bytes::from(timestamp.to_string());
                 if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
                     log::warn!(
@@ -107,7 +107,7 @@ pub mod tantivy_index {
                 .parse::<i64>()
                 .unwrap(),
             _ => {
-                let timestamp = config::utils::time::now_micros();
+                let timestamp = config::utils::time::BASE_TIME.timestamp_micros();
                 let data = bytes::Bytes::from(timestamp.to_string());
                 if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
                     log::warn!("[db::metas] Error storing tantivy secondary index updated_at: {e}");

@@ -72,6 +72,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     // create datafusion context
     let ctx = DataFusionContextBuilder::new()
+        .trace_id("merge_parquet_files_with_downsampling")
         .sorted_by_time(true)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
