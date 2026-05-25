@@ -98,7 +98,7 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span v-bind="spanAttrs" :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
+  <span :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
@@ -115,7 +115,7 @@ const heightClasses = computed<string>(() => {
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses]"
-      :data-test="parentDataTest"
+      v-bind="$attrs"
     >
       <!--
         If label or icon props are provided, render them (prop-driven mode).

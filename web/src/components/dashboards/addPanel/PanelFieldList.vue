@@ -34,7 +34,7 @@
             data-test="index-dropdown-stream_type"
             class="tw:mb-1"
             label-position="inside"
-            :readonly="dashboardPanelDataPageKey === 'logs'"
+            :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
           <OSelect
@@ -48,7 +48,7 @@
             :icon-key="currentStreamType === 'metrics' ? '_icon' : undefined"
             searchable
             label-position="inside"
-            :readonly="dashboardPanelDataPageKey === 'logs'"
+            :disabled="dashboardPanelDataPageKey === 'logs'"
             :title="currentStream"
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -935,6 +935,7 @@ function onSearchChange(value: string) {
 function showStandardActions(row: FieldItem, _index: number): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
+  if (dashboardPanelDataPageKey === "logs") return false;
 
   const currentQuery =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
@@ -958,6 +959,7 @@ function showStandardActions(row: FieldItem, _index: number): boolean {
 function showGeomapActions(row: FieldItem, _index: number): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
+  if (dashboardPanelDataPageKey === "logs") return false;
 
   const currentQuery =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
@@ -971,6 +973,7 @@ function showGeomapActions(row: FieldItem, _index: number): boolean {
 function showMapsActions(row: FieldItem, _index: number): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
+  if (dashboardPanelDataPageKey === "logs") return false;
 
   const currentQuery =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
@@ -984,6 +987,7 @@ function showMapsActions(row: FieldItem, _index: number): boolean {
 function showSankeyActions(row: FieldItem, _index: number): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
+  if (dashboardPanelDataPageKey === "logs") return false;
 
   const currentQuery =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];

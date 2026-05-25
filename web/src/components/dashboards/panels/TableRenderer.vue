@@ -292,8 +292,16 @@ export default defineComponent({
   border-bottom: 2px solid rgba(0, 0, 0, 0.12);
 }
 
+.body--dark :deep(.pivot-group-header) {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
 :deep(.pivot-section-border) {
   border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+.body--dark :deep(.pivot-section-border) {
+  border-left-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 :deep(.pivot-value-header) {

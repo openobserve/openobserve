@@ -1060,9 +1060,8 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         // v3 UI validates non-empty name — clear input and submit to trigger validation
-        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
-        await this.page.locator(this.locators.alertNameInputField).click();
-        await this.page.locator(this.locators.alertNameInputField).clear();
+        await this.page.locator(this.locators.alertNameInput).click();
+        await this.page.locator(this.locators.alertNameInput).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1089,9 +1088,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
-        await this.page.locator(this.locators.alertNameInputField).click();
-        await this.page.locator(this.locators.alertNameInputField).fill('abc');
+        await this.page.locator(this.locators.alertNameInput).click();
+        await this.page.locator(this.locators.alertNameInput).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();

@@ -1294,24 +1294,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // Check panel name
     const panelNameInput = builder.getPanelNameInput();
     if (await panelNameInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // DEBUG: dump locator state + sibling inputs so CI logs show whether
-      // the input was just empty (Vue hadn't re-hydrated yet) or whether we
-      // grabbed the wrong element (e.g. the OFormInput wrapper).
       const panelNameValue = await panelNameInput.inputValue().catch(() => '');
-      if (!panelNameValue || !panelNameValue.includes(panelTitle)) {
-        const diag = await page.evaluate((expected) => {
-          const inputs = Array.from(document.querySelectorAll('[data-test*="dashboard-panel-name"]'));
-          return inputs.map((el) => ({
-            tag: el.tagName,
-            dt: el.getAttribute('data-test'),
-            value: (el.value !== undefined ? el.value : ''),
-            // For wrapper divs, also look at any inner native input value
-            innerInputValue: el.querySelector('input')?.value ?? null,
-            expected,
-          }));
-        }, panelTitle).catch(() => ({ error: 'evaluate-failed' }));
-        testLogger.warn('[panelNameValue empty/mismatch] diag', { panelNameValue, panelTitle, diag });
-      }
       expect(panelNameValue).toContain(panelTitle);
       testLogger.info(`Panel name: ${panelNameValue}`);
     }

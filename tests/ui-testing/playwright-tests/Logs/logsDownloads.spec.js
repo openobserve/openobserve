@@ -27,10 +27,18 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.clearQueryEditor();
     await pageManager.logsPage.fillQueryEditor('SELECT * FROM "e2e_automate" LIMIT 2000');
     await pageManager.logsPage.waitForQueryEditorValue('LIMIT 2000');
+    // Use runQueryAndWaitForResults: toggling SQL mode auto-fires a search, and the
+    // bare refresh-button click can cancel that in-flight search (the button is in
+    // "Cancel query" mode while the auto-search runs). runQueryAndWaitForResults
+    // waits for the Cancel state to clear before clicking and then waits for the
+    // new search to fully complete.
     await pageManager.logsPage.runQueryAndWaitForResults();
-    // Wait for any results to appear — the download reads the current hits page,
-    // not all LIMIT-N records, so we only need the query to return at least one row.
-    await pageManager.logsPage.expectPaginationRowCountVisible();
+    // Wait deterministically for the SQL results to fully load — the download click
+    // reads `searchObj.data.queryResults.hits` directly, so we must wait until the
+    // pagination title reports >= 2000 records before triggering the download.
+    // (HEAD's strict check kept — the lenient `expectPaginationRowCountVisible`
+    // from main would mask the documented §7a in-memory hits replace race.)
+    await pageManager.logsPage.expectPaginationTotalAtLeast(2000);
   }
 
   test.beforeEach(async ({ page }, testInfo) => {

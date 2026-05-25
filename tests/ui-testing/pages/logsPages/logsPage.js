@@ -7986,9 +7986,11 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        const builderStateBtn = this.page.locator(`${this.builderQueryType} [data-state]`);
-        await expect(builderStateBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
+        // Reka button) forwards the consumer's data-test to the inner button —
+        // SAME element as data-state. Use AND-combinator selector rather than
+        // descendant (`[data-test] [data-state]` would look for a child).
+        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -7998,9 +8000,11 @@ export class LogsPage {
     async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        const customStateBtn = this.page.locator(`${this.customQueryType} [data-state]`);
-        await expect(customStateBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
+        // Reka button) forwards the consumer's data-test to the inner button —
+        // SAME element as data-state. Use AND-combinator selector rather than
+        // descendant (`[data-test] [data-state]` would look for a child).
+        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
 
@@ -8187,31 +8191,6 @@ export class LogsPage {
                 `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
             );
         } catch (error) {
-            // DEBUG: dump the actual chart-selection DOM state so CI logs reveal
-            // WHY the expected chart wasn't selected (e.g., different chart was
-            // auto-selected, or no `data-selected="true"` attribute at all).
-            const diagnostic = await this.page.evaluate((cid) => {
-                const all = Array.from(
-                    document.querySelectorAll('[data-test^="selected-chart-"]')
-                ).map((el) => {
-                    const parent = el.parentElement;
-                    const r = el.getBoundingClientRect();
-                    return {
-                        dt: el.getAttribute('data-test'),
-                        parentDataSelected: parent?.getAttribute('data-selected'),
-                        parentClassNameHint: (parent?.className || '').slice(0, 120),
-                        offsetParent: !!(/** @type {HTMLElement} */ (el).offsetParent),
-                        rect: { w: r.width, h: r.height },
-                    };
-                });
-                return {
-                    targetChartId: cid,
-                    totalItems: all.length,
-                    items: all.slice(0, 20),
-                    selectedNow: all.find((i) => i.parentDataSelected === 'true')?.dt ?? null,
-                };
-            }, chartId).catch(() => ({ error: 'evaluate-failed' }));
-            testLogger.error('[verifyChartTypeSelected] timeout diagnostic', { diagnostic });
             throw new Error(
                 `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
                 `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
@@ -8611,27 +8590,6 @@ export class LogsPage {
         }, { intervals: [200, 200, 200, 500, 500, 1000, 1000], timeout: 5000 }).toBe('stable').catch(() => {});
         count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
-
-        // DEBUG (CI diagnostic): on count===0 dump candidate locators so we can
-        // confirm whether the source actually rendered zero filter rows OR the
-        // data-test pattern changed. Keep cost low — only fires when count===0.
-        if (count === 0) {
-            const diagnostic = await this.page.evaluate(() => {
-                const byPrefix = (p) => Array.from(document.querySelectorAll(`[data-test^="${p}"]`))
-                    .map(e => e.getAttribute('data-test')).slice(0, 20);
-                return {
-                    addConditionLabel: byPrefix('dashboard-add-condition-label-'),
-                    addCondition: byPrefix('dashboard-add-condition'),
-                    builderFilters: byPrefix('dashboard-builder-filter'),
-                    panelAddCondition: byPrefix('panel-add-condition'),
-                    groupRows: byPrefix('dashboard-add-condition-group'),
-                    // Any element with `dashboard-add-condition` substring
-                    allAddCondition: Array.from(document.querySelectorAll('[data-test*="dashboard-add-condition"]'))
-                        .map(e => e.getAttribute('data-test')).slice(0, 20),
-                };
-            }).catch(() => ({ error: 'evaluate-failed' }));
-            testLogger.warn('[getFilterConditionCount] count===0 diagnostic', { diagnostic });
-        }
         return count;
     }
 

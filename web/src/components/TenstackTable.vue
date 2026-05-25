@@ -2287,6 +2287,7 @@ defineExpose({
   padding-bottom: 5px;
   border-right: 1px solid rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  background-color: #E0E0E0;
 }
 
 .pivot-value-header {
@@ -2297,6 +2298,20 @@ defineExpose({
   padding-top: 5px;
   padding-bottom: 5px;
   border-right: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  background-color: #E0E0E0;
+}
+
+.body--dark .pivot-group-header {
+  background-color: #565656;
+  border-right-color: rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.body--dark .pivot-value-header {
+  background-color: #565656;
+  border-right-color: rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 // Column separator between pivot sections
