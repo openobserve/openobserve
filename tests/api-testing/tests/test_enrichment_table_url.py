@@ -200,16 +200,12 @@ class TestEnrichmentTableURL:
         time.sleep(5)
 
         # Try to append with the SAME URL - should be blocked (RULE 3)
-        response2 = self.enrichment_page.create_enrichment_table_from_url(
-            session=self.session,
-            base_url=self.base_url,
-            user_email=self.user_email,
-            user_password=self.user_password,
-            org_id=self.ORG_ID,
-            table_name=self.table_name,
-            csv_url=self.TEST_CSV_URL,
-            append=True
-        )
+        # Use direct HTTP request (not page object) because page object asserts 200
+        session = self.session
+        session.auth = (self.user_email, self.user_password)
+        url = f"{self.base_url}api/{self.ORG_ID}/enrichment_tables/{self.table_name}/url?append=true"
+        payload = {"url": self.TEST_CSV_URL, "replace_failed": False}
+        response2 = session.post(url, json=payload, headers={"Content-Type": "application/json"})
         assert response2.status_code == 400, \
             f"Expected 400 for duplicate URL append, got {response2.status_code}: {response2.text}"
         assert "URL already exists" in response2.text, \
