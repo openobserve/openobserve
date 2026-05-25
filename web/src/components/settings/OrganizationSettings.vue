@@ -130,7 +130,9 @@ const crossLinks = ref(
 watch(
   () => store.state?.organizationData?.organizationSettings?.cross_links,
   (newVal) => {
-    crossLinks.value = newVal || [];
+    if (!formDirty.value) {
+      crossLinks.value = newVal || [];
+    }
   },
 );
 const formDirty = ref(false);
@@ -200,6 +202,8 @@ const saveOrgSettings = async () => {
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
+
+    formDirty.value = false;
 
     toast({
       message: "Organization settings updated successfully",
