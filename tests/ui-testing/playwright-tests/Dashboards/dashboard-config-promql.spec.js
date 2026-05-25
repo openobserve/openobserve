@@ -311,12 +311,16 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleColsInput);
     await expect(visibleColsInput).toBeVisible();
 
-    // Open trigger → type the column name → press Enter (creatable select: no stream fields loaded in PromQL mode)
+    // Open trigger → type the column name → ArrowDown + Enter
+    // ArrowDown highlights the first matching option if the metric already has an
+    // "instance" label (CI backend). When no options are present (creatable path),
+    // ArrowDown is a no-op and Enter creates the value instead.
     await page.locator('[data-test="dashboard-config-visible-columns-trigger"]').click();
     const visibleSearchInput = page.locator('[data-test="dashboard-config-visible-columns-search"]');
     await visibleSearchInput.waitFor({ state: "visible" });
     await visibleSearchInput.fill("instance");
-    await page.keyboard.press("Enter"); // create the typed value
+    await page.keyboard.press("ArrowDown"); // highlight first match if dropdown has options
+    await page.keyboard.press("Enter"); // select highlighted option, or create if none
     // Wait for the chip to appear before closing the dropdown — Enter is async (Vue
     // state update) and pressing Escape immediately can discard the chip in CI timing.
     await expect(visibleColsInput).toContainText("instance", { timeout: 5000 });
@@ -388,7 +392,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const stickySearchInput = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
     await stickySearchInput.waitFor({ state: "visible" });
     await stickySearchInput.fill("instance");
-    await page.keyboard.press("Enter"); // create the typed value (no stream fields in PromQL mode)
+    await page.keyboard.press("ArrowDown"); // highlight first match if dropdown has options
+    await page.keyboard.press("Enter"); // select highlighted option, or create if none
     // Wait for chip to appear before closing — prevents Enter/Escape race condition in CI.
     await expect(stickyColsInput).toContainText("instance", { timeout: 5000 });
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
