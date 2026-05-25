@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 
+
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
   getLanguage: vi.fn(() => "en-gb"),

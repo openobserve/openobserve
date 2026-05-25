@@ -965,7 +965,22 @@ export class TracesPage {
       this.page.locator(this.searchResultItem).first().waitFor({ state: 'visible', timeout: 8000 }),
       this.page.locator(this.errorMessage).waitFor({ state: 'visible', timeout: 8000 }),
     ]).catch(() => {});
-    return await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 500 }).catch(() => false);
+
+    // Primary: explicit "no results" text element
+    if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 500 }).catch(() => false)) {
+      return true;
+    }
+
+    // Secondary: traces may not render a "no results" text when 0 results are
+    // returned — instead only the count badge updates (showing "0 traces").
+    // Treat badge-visible + zero result rows as the "no results" terminal state.
+    const badgeVisible = await this.page.locator(this.tracesCountBadge).isVisible({ timeout: 500 }).catch(() => false);
+    if (badgeVisible) {
+      const rowCount = await this.page.locator(this.searchResultItem).count();
+      if (rowCount === 0) return true;
+    }
+
+    return false;
   }
 
   /**

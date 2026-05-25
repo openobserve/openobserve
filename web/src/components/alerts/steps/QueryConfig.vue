@@ -777,6 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="numericOperators"
                   :searchable="false"
                   class="alert-v3-select"
+                  data-test="alert-trigger-operator-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />

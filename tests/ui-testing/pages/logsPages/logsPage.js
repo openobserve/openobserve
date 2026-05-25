@@ -2411,6 +2411,33 @@ export class LogsPage {
         return await this.page.keyboard.type(text);
     }
 
+    /**
+     * Set the Monaco query editor to exactly `text`, replacing any existing content.
+     * Uses the Monaco API (same as clickQueryEditor) for reliable focus + value set.
+     * Falls back to click → Ctrl+A → Backspace → keyboard.type on failure.
+     */
+    async setQueryEditorValue(text) {
+        const set = await this.page.evaluate(
+            ({ selector, value }) => {
+                const host = document.querySelector(selector);
+                if (!host || !window.monaco?.editor?.getEditors) return false;
+                const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+                if (!ed) return false;
+                ed.setValue(value);
+                ed.focus();
+                return true;
+            },
+            { selector: this.queryEditor, value: text }
+        ).catch(() => false);
+
+        if (!set) {
+            await this.page.locator(this.queryEditor).click();
+            await this.page.keyboard.press('ControlOrMeta+a');
+            await this.page.keyboard.press('Backspace');
+            await this.page.keyboard.type(text);
+        }
+    }
+
     async clickRefreshButton() {
         return await this.page.locator(this.queryButton).click({ force: true });
     }
@@ -4190,6 +4217,19 @@ export class LogsPage {
     async expectLogTableColumnSourceVisible() {
         const element = this.page.locator(this.logTableColumnSource);
         // Wait for the element to be visible with a timeout
+        await element.waitFor({ state: 'visible', timeout: 30000 });
+        return await expect(element).toBeVisible();
+    }
+
+    /**
+     * Wait for a specific column cell in the first result row to be visible.
+     * Use this for SQL queries that return named columns (e.g. aggregate CTEs)
+     * where the built-in "source" column is not present.
+     * @param {string} columnName - The column/field name (e.g. 'level', 'kubernetes_pod_name')
+     * @param {number} rowIndex - Row index (default 0 = first row)
+     */
+    async expectLogTableColumnVisible(columnName, rowIndex = 0) {
+        const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
         await element.waitFor({ state: 'visible', timeout: 30000 });
         return await expect(element).toBeVisible();
     }
@@ -7986,10 +8026,8 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
-        // Reka button) forwards the consumer's data-test to the inner button —
-        // SAME element as data-state. Use AND-combinator selector rather than
-        // descendant (`[data-test] [data-state]` would look for a child).
+        // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
+        // so data-test and data-state land on the same element — no descendant combinator needed.
         await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
@@ -8000,10 +8038,8 @@ export class LogsPage {
     async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
-        // Reka button) forwards the consumer's data-test to the inner button —
-        // SAME element as data-state. Use AND-combinator selector rather than
-        // descendant (`[data-test] [data-state]` would look for a child).
+        // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
+        // so data-test and data-state land on the same element — no descendant combinator needed.
         await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
@@ -8028,8 +8064,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        await expect(this.page.locator(`${this.customQueryType} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // Same element carries data-state (attrs forwarded to inner Reka button)
+        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 

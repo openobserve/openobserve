@@ -543,7 +543,8 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     }
 
     // Cleanup - delete the test pipeline
-    await pipelinePage.searchPipeline(pipelineName);
+    // Navigate to pipeline list to ensure clean state (dismisses any open dialogs)
+    await pipelinePage.openPipelineMenu();
     await pipelinePage.deletePipelineByName(pipelineName);
 
     testLogger.info('Pipeline toggle test completed');

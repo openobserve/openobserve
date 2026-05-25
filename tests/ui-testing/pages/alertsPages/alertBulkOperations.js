@@ -324,7 +324,7 @@ export class AlertBulkOperations {
 
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.alertDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertDeletedMessage })).toBeVisible();
         await this.page.waitForTimeout(1000);
     }
 }
