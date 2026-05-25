@@ -8,6 +8,7 @@ import OTableBodyRow from "./OTableBodyRow.vue";
 const props = defineProps<{
   rows: Row<any>[];
   table: Table<any>;
+  clickable?: boolean;
   selectionEnabled?: boolean;
   selectionMultiple?: boolean;
   isRowSelectedFn?: (row: any) => boolean;
@@ -74,6 +75,7 @@ function getRowForIndex(index: number) {
       :key="row.id"
       :row="row"
       :table="table"
+      :clickable="clickable"
       :selection-enabled="selectionEnabled"
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(row.original)"
@@ -132,6 +134,7 @@ function getRowForIndex(index: number) {
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :table="table"
+      :clickable="clickable"
       :selection-enabled="selectionEnabled"
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(getRowForIndex(virtualRow.index)?.original)"

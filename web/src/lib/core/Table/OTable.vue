@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
+import { computed, getCurrentInstance, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
@@ -58,6 +58,18 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+// A row only gets the pointer cursor when it's actually interactive — i.e. the
+// parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
+// Otherwise rows are display-only and keep the default cursor.
+const instance = getCurrentInstance();
+const isRowClickable = computed(() => {
+  const listeners = instance?.vnode.props ?? {};
+  const hasRowClick = !!(listeners.onRowClick || listeners.onRowDblclick);
+  const expandOnClick =
+    typeof props.expandOnRowClick === "function" ? true : !!props.expandOnRowClick;
+  return hasRowClick || expandOnClick;
+});
 
 // Only forward cell-slot templates for columns whose cell slot the parent actually provides.
 // If we forward an empty slot for every column, OTableBodyCell sees $slots.default as truthy
@@ -500,6 +512,7 @@ defineExpose({
           v-else-if="!showEmpty && !showError"
           :rows="displayRows"
           :table="table"
+          :clickable="isRowClickable"
           :selection-enabled="selection.isEnabled.value"
           :selection-multiple="selection.isMultiple.value"
           :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
