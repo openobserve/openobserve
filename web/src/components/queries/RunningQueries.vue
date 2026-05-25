@@ -17,10 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="running-queries-page tw:rounded-md tw:p-0"
-    style="min-height: inherit; height: calc(100vh - var(--navbar-height));"
+    class="running-queries-page tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
-    <div>
+    <div class="tw:flex-none">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:flex-col tw:px-4 tw:py-3 tw:border-b-[1px]"
@@ -115,11 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div>
+    <div class="tw:flex-1 tw:min-h-0">
       <div class="tw:w-full tw:h-full">
-        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+        <div class="card-container tw:h-full">
           <div
             v-show="selectedQueryTypeTab === 'all'"
+            class="tw:h-full"
             data-test="running-queries-all-queries-list"
           >
             <RunningQueriesList
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="selectedQueryTypeTab === 'summary'"
+            class="tw:h-full"
             data-test="running-queries-summary-list"
           >
             <SummaryList
