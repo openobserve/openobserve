@@ -151,6 +151,9 @@ test.describe("Service Catalog testcases", () => {
   }, async ({ page }) => {
     testLogger.info('=== Testing row click / side panel ===');
 
+    const hasEmpty = await pm.servicesCatalogPage.isEmptyStateVisible();
+    test.skip(hasEmpty, 'no services in this environment — row click requires data');
+
     const firstService = await pm.servicesCatalogPage.getFirstServiceName();
     testLogger.info(`Clicking service: ${firstService}`);
 
@@ -167,6 +170,9 @@ test.describe("Service Catalog testcases", () => {
     tag: ['@serviceCatalog', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Testing default rows per page ===');
+
+    const hasEmpty = await pm.servicesCatalogPage.isEmptyStateVisible();
+    test.skip(hasEmpty, 'no services in this environment — pagination control requires data');
 
     const rowsPerPage = await pm.servicesCatalogPage.getRowsPerPage();
     testLogger.info(`Rows per page: ${rowsPerPage}`);
@@ -200,6 +206,9 @@ test.describe("Service Catalog testcases", () => {
   }, async ({ page }) => {
     testLogger.info('=== Testing page navigation ===');
 
+    const hasEmpty = await pm.servicesCatalogPage.isEmptyStateVisible();
+    test.skip(hasEmpty, 'no services in this environment — pagination requires data');
+
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
     const pageCount = await pm.servicesCatalogPage.getPageCount();
@@ -226,6 +235,9 @@ test.describe("Service Catalog testcases", () => {
   }, async ({ page }) => {
     testLogger.info('=== Testing prev/next buttons ===');
 
+    const hasEmpty = await pm.servicesCatalogPage.isEmptyStateVisible();
+    test.skip(hasEmpty, 'no services in this environment — pagination requires data');
+
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
     const pageCount = await pm.servicesCatalogPage.getPageCount();
@@ -247,6 +259,10 @@ test.describe("Service Catalog testcases", () => {
     tag: ['@serviceCatalog', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Testing last page next button disabled ===');
+
+    // Pagination bar only renders when services.length > 0
+    const hasEmpty = await pm.servicesCatalogPage.isEmptyStateVisible();
+    test.skip(hasEmpty, 'no services in this environment — pagination requires data');
 
     await pm.servicesCatalogPage.setRowsPerPage(10);
 

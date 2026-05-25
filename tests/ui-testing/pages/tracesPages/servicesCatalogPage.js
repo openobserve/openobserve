@@ -619,6 +619,15 @@ export class ServicesCatalogPage {
   }
 
   async isEmptyStateVisible() {
-    return await this.emptyState.isVisible().catch(() => false);
+    // Use waitFor instead of a point-in-time isVisible() snapshot.
+    // The empty state v-if="!isLoading && services.length === 0" renders only
+    // after isLoading flips to false AND Vue flushes the DOM update. An instant
+    // snapshot taken immediately after waitForLoad() can land in that
+    // microtask gap and return false even when there is no data, causing
+    // test.skip guards to not fire and subsequent sortByColumn calls to timeout.
+    return await this.emptyState
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
   }
 }
