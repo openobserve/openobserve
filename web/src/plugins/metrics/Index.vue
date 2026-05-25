@@ -184,7 +184,6 @@ export default defineComponent({
       dashboardPanelData,
       resetDashboardPanelData,
       resetAggregationFunction,
-      removeXYFilters,
       validatePanel,
       updateGroupedFields,
       makeAutoSQLQuery,
@@ -257,9 +256,6 @@ export default defineComponent({
 
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
-
-      // need to remove the xy filters
-      removeXYFilters();
 
       // set default chart type as line
       dashboardPanelData.data.type = "line";
