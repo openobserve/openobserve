@@ -7984,12 +7984,12 @@ export class LogsPage {
      * Expect Builder mode (Auto mode) to be active
      */
     async expectBuilderModeActive(timeout = 15000) {
-        const builderTypeBtn = this.page.locator(this.builderQueryType);
+        // OToggleGroupItem (inheritAttrs:false + v-bind="$attrs" on inner Reka button)
+        // forwards data-test to the inner button — SAME element as data-state. Read the
+        // attribute directly on the data-test locator (NOT a descendant). Scope with
+        // :visible to dodge SearchBar/collapsed-menu duplicates on some routes.
+        const builderTypeBtn = this.page.locator(`${this.builderQueryType}:visible`).first();
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
-        // Reka button) forwards the consumer's data-test to the inner button —
-        // SAME element as data-state. Use AND-combinator selector rather than
-        // descendant (`[data-test] [data-state]` would look for a child).
         await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
@@ -7998,12 +7998,9 @@ export class LogsPage {
      * Expect Custom SQL mode to be active
      */
     async expectCustomModeActive(timeout = 15000) {
-        const customTypeBtn = this.page.locator(this.customQueryType);
+        // Same OToggleGroupItem inner-button pattern as expectBuilderModeActive — see above.
+        const customTypeBtn = this.page.locator(`${this.customQueryType}:visible`).first();
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem (with inheritAttrs:false + v-bind="$attrs" on inner
-        // Reka button) forwards the consumer's data-test to the inner button —
-        // SAME element as data-state. Use AND-combinator selector rather than
-        // descendant (`[data-test] [data-state]` would look for a child).
         await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
