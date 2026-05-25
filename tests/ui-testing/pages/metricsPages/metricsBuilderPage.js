@@ -14,7 +14,7 @@ export class MetricsBuilderPage {
 
         // Metric/Stream Selector (in the sidebar FieldList, not a separate MetricSelector component)
         this.streamSelector = '[data-test="index-dropdown-stream"]';
-        this.fieldSearchInput = '[data-test="index-field-search-input"]';
+        this.fieldSearchInput = '[data-test="o-field-list-search-field"]';
 
         // Label Filter selectors
         this.addLabelFilterButton = '[data-test="promql-add-label-filter"]';

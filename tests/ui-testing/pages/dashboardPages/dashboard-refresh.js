@@ -7,7 +7,7 @@ export default class DashboardTimeRefresh {
       '[data-test="menu-link-\\/dashboards-item"]'
     );
     this.defaultTab = page.locator(
-      '[data-test="dashboard-folder-tab-default"]'
+      'button[data-test="dashboard-folder-tab-default"]'
     );
     this.timeTab = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');

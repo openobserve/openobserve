@@ -23,7 +23,7 @@ export default class DashboardCreate {
     this.applyQueryBtn = this.page.locator('[data-test="dashboard-apply"]');
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
     this.defaultFolderTab = this.page.locator(
-      '[data-test="dashboard-folder-tab-default"]'
+      'button[data-test="dashboard-folder-tab-default"]'
     );
   }
 
@@ -119,7 +119,7 @@ export default class DashboardCreate {
   //Search the Folder
   async searchDashboard(dashboardName) {
     await this.page
-      .locator('[data-test="dashboard-folder-tab-default"]')
+      .locator('button[data-test="dashboard-folder-tab-default"]')
       .waitFor({ state: "visible" });
 
     await this.searchDash.locator('input').click();
@@ -129,7 +129,7 @@ export default class DashboardCreate {
   //Delete Dashboard
   async deleteDashboard() {
     await this.page
-      .locator('[data-test="dashboard-folder-tab-default"]')
+      .locator('button[data-test="dashboard-folder-tab-default"]')
       .waitFor({ state: "visible" });
     const dashboardRow = this.page.locator('[data-test="dashboard-table"]');
     await dashboardRow.waitFor({ state: "visible" });

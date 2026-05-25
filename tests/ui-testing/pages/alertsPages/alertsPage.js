@@ -1193,7 +1193,7 @@ export class AlertsPage {
         await this.page.locator('[data-test="folder-search"]').fill(folderName);
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
-        await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
+        await expect(this.page.locator('button[data-test="dashboard-folder-tab-default"]')).toBeVisible();
     }
 
     // ==================== ALERTS / INCIDENTS NAVIGATION ====================
