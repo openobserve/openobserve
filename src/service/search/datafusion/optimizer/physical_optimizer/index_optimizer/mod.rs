@@ -57,16 +57,19 @@ use crate::service::search::datafusion::{
 pub struct FollowerIndexOptimizerRule {
     time_range: (i64, i64),
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    index_fields: HashSet<String>,
 }
 
 impl FollowerIndexOptimizerRule {
     pub fn new(
         time_range: (i64, i64),
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+        index_fields: HashSet<String>,
     ) -> Self {
         Self {
             time_range,
             index_optimizer_mode,
+            index_fields,
         }
     }
 }
@@ -81,8 +84,11 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
             return Ok(plan);
         }
 
-        let mut rewriter =
-            FollowerIndexOptimizer::new(self.time_range, self.index_optimizer_mode.clone());
+        let mut rewriter = FollowerIndexOptimizer::new(
+            self.time_range,
+            self.index_optimizer_mode.clone(),
+            self.index_fields.clone(),
+        );
         let plan = plan.rewrite(&mut rewriter)?.data;
         Ok(plan)
     }
@@ -99,16 +105,19 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
 struct FollowerIndexOptimizer {
     time_range: (i64, i64),
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    index_fields: HashSet<String>,
 }
 
 impl FollowerIndexOptimizer {
     pub fn new(
         time_range: (i64, i64),
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+        index_fields: HashSet<String>,
     ) -> Self {
         Self {
             time_range,
             index_optimizer_mode,
+            index_fields,
         }
     }
 }
@@ -408,6 +417,7 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
                 index_optimizer_mode.clone(),
+                HashSet::new(),
             )))
             .with_default_features()
             .build();
@@ -439,6 +449,7 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
                 index_optimizer_mode.clone(),
+                HashSet::new(),
             )))
             .with_default_features()
             .build();
