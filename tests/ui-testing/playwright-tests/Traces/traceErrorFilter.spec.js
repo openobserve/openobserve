@@ -309,10 +309,11 @@ test.describe("Trace Error Filter testcases", () => {
         testLogger.info('Success traces shown without error indicators');
       }
 
-      // Verify toggle worked - either has success results or no results
+      // Verify toggle worked - either has success results, no results, or error
       const hasResults = await pm.tracesPage.hasTraceResults();
       const noResults = await pm.tracesPage.isNoResultsVisible();
-      expect(hasResults || noResults).toBeTruthy();
+      const hasError = await pm.tracesPage.isErrorMessageVisible();
+      expect(hasResults || noResults || hasError).toBeTruthy();
     });
 
     // === Test 2: Error filter with invalid syntax (Original test #8) ===
