@@ -69,32 +69,35 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     watch(scrollTarget, () => updateScrollMargin());
   }
 
-  const virtualizerOptions = computed(() => ({
-    count: items.value.length,
-    getScrollElement: () =>
-      (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
-    estimateSize: dynamicRowHeight.value
-      ? (index: number) => measuredHeights.value[index] || estimateSize
-      : () => estimateSize,
-    overscan,
-    scrollMargin: scrollMargin.value,
-    indexAttribute: "data-virtual-index" as const,
-    measureElement:
-      typeof window !== "undefined"
-        ? (element: HTMLElement) => {
-            const height = (element as HTMLElement).getBoundingClientRect().height;
-            const index = parseInt(
-              (element as HTMLElement).getAttribute("data-virtual-index") ?? "",
-              10,
-            );
-            if (!isNaN(index)) {
-              measuredHeights.value[index] = height;
-            }
-            return height;
-          }
-        : undefined,
+  const virtualizerOptions = computed(() => {
+    const base: Record<string, any> = {
+      count: items.value.length,
+      getScrollElement: () =>
+        (scrollTarget?.value as HTMLElement | null) ?? parentRef.value,
+      estimateSize: dynamicRowHeight.value
+        ? (index: number) => measuredHeights.value[index] || estimateSize
+        : () => estimateSize,
+      overscan,
+      scrollMargin: scrollMargin.value,
+    };
 
-  }));
+    if (dynamicRowHeight.value && typeof window !== "undefined") {
+      base.indexAttribute = "data-virtual-index";
+      base.measureElement = (element: HTMLElement) => {
+        const height = (element as HTMLElement).getBoundingClientRect().height;
+        const index = parseInt(
+          (element as HTMLElement).getAttribute("data-virtual-index") ?? "",
+          10,
+        );
+        if (!isNaN(index)) {
+          measuredHeights.value[index] = height;
+        }
+        return height;
+      };
+    }
+
+    return base as any;
+  });
 
   const virtualizer = useVirtualizer(virtualizerOptions);
 
