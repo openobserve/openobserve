@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<ToastProps>(), {
   variant: "default",
   position: "bottom-right",
   open: true,
+  count: 1,
 })
 
 const emit = defineEmits<ToastEmits>()
@@ -74,6 +75,15 @@ const iconColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   default: "tw:text-toast-fg",
 }
 
+const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
+  success: "tw:bg-toast-success-icon tw:text-white",
+  error: "tw:bg-toast-error-icon tw:text-white",
+  warning: "tw:bg-toast-warning-icon tw:text-white",
+  info: "tw:bg-toast-info-icon tw:text-white",
+  loading: "tw:bg-toast-loading-icon tw:text-white",
+  default: "tw:bg-toast-default-border tw:text-toast-fg",
+}
+
 // ── Computed ─────────────────────────────────────────────────────────────────
 
 const rootRole = computed<"alert" | "status">(() =>
@@ -92,7 +102,7 @@ const screenReaderTitle = computed(() =>
     :open="open"
     :duration="0"
     :class="[
-      'tw:flex tw:gap-3 tw:items-start tw:w-80 tw:max-w-sm tw:rounded-lg tw:p-4 tw:shadow-toast',
+      'tw:relative tw:pointer-events-auto tw:flex tw:gap-3 tw:items-start tw:w-80 tw:max-w-sm tw:rounded-lg tw:p-4 tw:shadow-toast',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-4',
       variantClasses[variant ?? 'default'],
@@ -102,6 +112,17 @@ const screenReaderTitle = computed(() =>
     :data-test-message="message"
     @update:open="(val) => emit('openChange', val)"
   >
+    <!-- Count badge — shown when identical toasts are collapsed together -->
+    <span
+      v-if="count > 1"
+      :class="[
+        'tw:absolute tw:-top-2 tw:-right-2 tw:z-10 tw:flex tw:items-center tw:justify-center',
+        'tw:min-w-5 tw:h-5 tw:px-1.5 tw:rounded-full tw:text-xs tw:font-semibold tw:shadow',
+        badgeColorClasses[variant ?? 'default'],
+      ]"
+      :data-test="`o-toast-count-${count}`"
+      aria-hidden="true"
+    >{{ count > 99 ? "99+" : count }}</span>
     <!-- Icon -->
     <div
       v-if="hasIcon"

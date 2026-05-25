@@ -220,8 +220,8 @@ const http = ({ headers } = {} as any) => {
               toast({
                 message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
-                color: "negative", // Customize color as needed
-                position: "top-center",
+                variant: "error",
+                position: "bottom-right",
               });
             }
             console.log(

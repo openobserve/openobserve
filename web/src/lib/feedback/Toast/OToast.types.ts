@@ -38,6 +38,8 @@ export interface ToastOptions {
 export interface ToastProps extends ToastOptions {
   id: string
   open: boolean
+  /** Number of identical toasts collapsed into this one; badge shown when > 1 */
+  count?: number
 }
 
 export interface ToastEmits {
