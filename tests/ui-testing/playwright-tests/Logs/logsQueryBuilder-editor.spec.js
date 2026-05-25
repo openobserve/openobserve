@@ -553,6 +553,13 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await setupQueryAndSwitchToBuild(pm, page, 'SELECT kubernetes_container_name, kubernetes_host FROM "e2e_automate"');
         await pm.logsPage.clickCustomQueryType();
 
+        // After switching to custom mode the app re-parses the SELECT to populate
+        // customQueryFields (async). Wait for at least one +X button to appear in
+        // the unfiltered list before applying the search filter, otherwise
+        // customFieldNames is still empty and showStandardActions returns false for
+        // every row (0 buttons counted after the filter).
+        await page.locator('[data-test="dashboard-add-x-data"]').first().waitFor({ state: 'visible', timeout: 10000 });
+
         await pm.logsPage.searchFieldInBuilder('kubernetes');
 
         const buttonCount = await pm.logsPage.getAddXButtonCount();
