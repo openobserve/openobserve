@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       data-test="dashboard-dashboard-new-add"
       variant="outline"
-      size="icon-sm"
+      size="icon-xs-sq"
+      class="tw:h-8! tw:w-8!"
       @click="
         () => {
           showAddDashboardDialog = true;
