@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
     class="tw:flex tw:flex-wrap tw:mt-1 tw:ml-1"
   >
     <div
