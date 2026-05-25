@@ -188,7 +188,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 let mainLayoutMixin: any = null;
@@ -231,6 +231,9 @@ export default defineComponent({
     },
     signout() {
       this.closeSocket();
+
+      // Clear any open notifications so they don't carry over past logout.
+      dismissAll();
 
       // Stop session replay recording on logout
       if (this.store.state.zoConfig?.rum?.enabled) {
@@ -1171,6 +1174,8 @@ export default defineComponent({
     async changeOrganizationIdentifier() {
       this.isLoading = false;
       this.resetStreams();
+      // Clear notifications from the previous org — they no longer apply.
+      dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 

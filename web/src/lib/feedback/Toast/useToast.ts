@@ -117,20 +117,34 @@ function dismiss(id: string): void {
   }
 }
 
+// Remove every toast immediately. Used when the context changes (org switch,
+// logout) and lingering notifications would be stale.
+function dismissAll(): void {
+  for (const record of toastRecords) {
+    if (record.timer) {
+      clearTimeout(record.timer)
+      record.timer = undefined
+    }
+  }
+  toastRecords.splice(0, toastRecords.length)
+}
+
 // ── useToast composable — for use inside Vue components ─────────────────────
 
 export interface UseToastReturn {
   toast: (options: ToastOptions) => DismissFn
   toasts: ToastRecord[]
+  dismissAll: () => void
 }
 
 export function useToast(): UseToastReturn {
   return {
     toast,
     toasts: toastRecords,
+    dismissAll,
   }
 }
 
 // ── Direct export — for use outside Vue tree (services, main.ts) ─────────────
-export { toast, toastRecords }
+export { toast, toastRecords, dismissAll }
 export type { ToastRecord, DismissFn }
