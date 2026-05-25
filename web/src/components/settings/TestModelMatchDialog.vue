@@ -474,11 +474,7 @@ function formatRate(rate: number) {
 .tmm-label {
   font-size: 13px;
   font-weight: 600;
-  color: #1a1a1a;
-
-  .body--dark & {
-    color: rgba(255, 255, 255, 0.87);
-  }
+  color: var(--color-text-primary);
 }
 
 .tmm-required {

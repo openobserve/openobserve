@@ -1078,11 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-3 tw:shrink-0">
               <div
                 class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-white'
-                    : 'tw:text-black'
-                "
+                style="color: var(--color-text-primary)"
               >
                 Stream Sources
               </div>
