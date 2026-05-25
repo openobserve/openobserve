@@ -27,7 +27,7 @@ use super::sql_context::PartitionSqlContext;
 /// online querier nodes are summed.
 pub(crate) async fn estimated_secs(
     trace_id: &str,
-    ctx: &PartitionSqlContext,
+    _ctx: &PartitionSqlContext,
     is_http_req: bool,
     original_size: usize,
 ) -> Result<usize, Error> {
@@ -46,9 +46,9 @@ pub(crate) async fn estimated_secs(
 
     #[cfg(feature = "enterprise")]
     let cpu_cores = {
-        let stream_key = ctx.sql.get_first_stream_key();
+        let stream_key = _ctx.sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            &ctx.sql.org_id,
+            &_ctx.sql.org_id,
             &stream_key,
             nodes,
             role_group,
