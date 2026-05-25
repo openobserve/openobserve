@@ -8362,19 +8362,15 @@ export class LogsPage {
             return false;
         }
 
-        // Phase 2: Wait for async initializeBuild() to complete.
+        // Phase 2: Wait for async initializeBuild() to render something.
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
-        // The chart-type selection (ChartSelection.vue → data-selected="true" on the <li>)
-        // is set synchronously during initializeBuild() before the chart renderer mounts.
-        // Use waitForFunction to accept EITHER signal — chart/table/no-data visible OR any
-        // chart-type item already marked data-selected="true". This short-circuits Phase 2
-        // when chart-type has been auto-set but the renderer DOM hasn't appeared yet, which
-        // is the common case for Custom-mode CTE/subquery → table chart on CI where the
-        // chart-renderer can lag behind the chart-type selection by several seconds.
+        // Accept EITHER signal:
+        //   - chart/table/no-data renderer present
+        //   - any chart-selection <li> already carries data-test-selected (only set on the
+        //     currently-selected chart — the source-side selection signal).
         try {
             await this.page.waitForFunction(
                 () => {
-                    // Chart/table/no-data renderer present (the original signal)
                     if (
                         document.querySelector('[data-test="chart-renderer"]') ||
                         document.querySelector('[data-test="dashboard-panel-table"]') ||
@@ -8382,15 +8378,10 @@ export class LogsPage {
                     ) {
                         return true;
                     }
-                    // OR any chart-selection item already marked data-selected="true"
-                    // (chart-type auto-selection completed even if renderer is still mounting)
-                    const items = document.querySelectorAll(
-                        '[data-test="dashboard-addpanel-chart-selection-item"]'
+                    // Any chart item with data-test-selected attribute → chart type assigned
+                    return !!document.querySelector(
+                        '[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]'
                     );
-                    for (const item of items) {
-                        if (item.getAttribute('data-selected') === 'true') return true;
-                    }
-                    return false;
                 },
                 undefined,
                 { timeout, polling: 'raf' }
@@ -8561,24 +8552,40 @@ export class LogsPage {
      * @returns {Promise<number>} Number of filter conditions found
      */
     async getFilterConditionCount() {
-        // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        const filterItems = this.page.locator(this.filterConditionLabelItems);
-        // Wait for the builder filter parsing to attach at least one condition (deterministic).
-        // initializeBuild() in BuildQueryPage.vue is fully async — parseSQL → parsedQueryToPanelFields →
-        // updateGroupedFields → makeAutoSQLQuery. On slow CI the chain can take 20+ seconds before the
-        // filter rows mount. Some queries genuinely have zero filters — fall through to 0 after the wait.
-        await filterItems.first().waitFor({ state: 'attached', timeout: 30000 }).catch(() => {});
-        // Poll for count stability so we don't read mid-render before all rows mount (multiple AND/OR
-        // conditions render the rows in sequence as the v-for materializes).
-        let count = await filterItems.count();
+        // DashboardFiltersOption.vue exposes the recursive leaf-condition count as
+        // [data-test="dashboard-filter-layout"] data-condition-count="N" — set by a Vue
+        // computed that traverses the filter tree, so the attribute matches the DOM rows
+        // 1:1 and updates atomically with the reactive state. This eliminates the race
+        // where v-for mounts rows sequentially on slow CI.
+        //
+        // IMPORTANT: `data-test="dashboard-filter-layout"` is reused by BOTH the Filters
+        // section (DashboardFiltersOption.vue) AND the JOINs section (DashboardJoinsOption.vue).
+        // The JOIN copy is rendered without `data-condition-count`, so we discriminate via
+        // attribute presence. Also scope inside the Build container — the shared filter
+        // component is mounted in both Build and Visualize tabs (Visualize uses v-show, so
+        // it stays in DOM hidden when Build is active).
+        const layout = this.page
+            .locator('[data-test="logs-build-query-page"] [data-test="dashboard-filter-layout"][data-condition-count]:visible')
+            .first();
+        // If no visible layout exists (e.g., custom-mode path hides it), conditions = 0.
+        const visibleCount = await layout.count().catch(() => 0);
+        if (visibleCount === 0) {
+            testLogger.info('Filter layout not visible (custom-mode path) — 0 conditions');
+            return 0;
+        }
+        // Wait for data-condition-count to settle (attribute is always present once mounted,
+        // but the value updates reactively as conditions are populated by parseSQL chain).
+        let raw = '0';
         await expect.poll(async () => {
-            const next = await filterItems.count();
-            if (next === count && next > 0) return 'stable';
-            count = next;
-            return 'changing';
-        }, { intervals: [200, 200, 200, 500, 500, 1000, 1000], timeout: 5000 }).toBe('stable').catch(() => {});
-        count = await filterItems.count();
-        testLogger.info(`Filter has ${count} condition(s)`);
+            raw = (await layout.getAttribute('data-condition-count').catch(() => '0')) ?? '0';
+            return raw;
+        }, { timeout: 15000, intervals: [100, 100, 200, 200, 500, 500, 1000, 1000] })
+            .not.toBe('0')
+            .catch(() => {
+                // Stable at 0 is a valid outcome — query may genuinely have no filters.
+            });
+        const count = Number.parseInt(raw, 10) || 0;
+        testLogger.info(`Filter has ${count} condition(s) (via data-condition-count)`);
         return count;
     }
 

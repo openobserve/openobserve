@@ -91,7 +91,7 @@ export class PipelinesPage {
         // OInput inner native input — `.fill()` MUST target the `-field`
         // variant per §4 (the wrapper isn't the input).
         this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
-        this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
+        this.deletionSuccessMessage = page.locator('[data-test-message="Pipeline deleted successfully"]')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
         this.sqlQueryInput = page.locator('.monaco-editor').last();
@@ -123,6 +123,7 @@ export class PipelinesPage {
         this.columnSelectTrigger = page.locator('[data-test="alert-conditions-select-column-trigger"]');
         this.columnSelectPopover = page.locator('[data-test="alert-conditions-select-column-popover"]');
         this.columnSelectSearch = page.locator('[data-test="alert-conditions-select-column-search"]');
+        this.columnSelectFirstOption = page.locator('[data-test="alert-conditions-select-column-option"]').first();
         this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
         this.operatorSelectTrigger = page.locator('[data-test="alert-conditions-operator-select-trigger"]');
         this.operatorSelectPopover = page.locator('[data-test="alert-conditions-operator-select-popover"]');
@@ -193,9 +194,9 @@ export class PipelinesPage {
         this.containsOption = page.getByText("Contains", { exact: true });
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
-        this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
+        this.pipelineSavedMessage = page.locator('[data-test-message="Pipeline saved successfully"]');
         this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
-        this.deletedSuccessfullyText = page.getByText('deleted successfully');
+        this.deletedSuccessfullyText = page.locator('[data-test-message*="deleted successfully"]');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
 
@@ -1175,14 +1176,13 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.streamButton);
         await this.selectLogs();
         await this.enterStreamName(sourceStream);
-        await this.page.waitForTimeout(2000);
-        await this.page.getByRole("option", { name: sourceStream, exact: true }).click();
+        await this.selectStreamOptionByName(sourceStream);
         await this.saveInputNodeStream();
-        await this.page.waitForTimeout(2000);
-        // Use new hover-based delete approach with data-test locator
-        await this.page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
-        await this.page.waitForTimeout(500);
-        await this.page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
+        // Delete auto-created output stream node
+        await this.pipelineNodeOutputStreamNode.first().waitFor({ state: 'visible' });
+        await this.pipelineNodeOutputStreamNode.first().hover();
+        await this.pipelineNodeOutputDeleteBtn.first().waitFor({ state: 'visible' });
+        await this.pipelineNodeOutputDeleteBtn.first().click();
         await this.confirmDeleteButton.click();
     }
 
@@ -1286,12 +1286,11 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.streamButton);
         await this.selectLogs();
         await this.enterStreamName(streamName);
-        await this.page.waitForTimeout(2000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        await this.selectStreamOptionByName(streamName);
         await this.saveInputNodeStream();
-        await this.page.waitForTimeout(2000);
 
         // Remove default output stream node
+        await this.pipelineNodeOutputStreamNode.first().waitFor({ state: 'visible' });
         await this.pipelineNodeOutputStreamNode.first().hover();
         await this.page.waitForTimeout(500);
         await this.pipelineNodeOutputDeleteBtn.first().click();
@@ -1480,13 +1479,12 @@ export class PipelinesPage {
     }
 
     async fillPartialCondition(columnName) {
-        await this.columnSelect.first().locator('input').click();
-        await this.columnSelect.first().locator('input').fill(columnName);
-        await this.page.waitForTimeout(300);
-        const options = this.qMenu.locator('.q-item');
-        if (await options.count() > 0) {
-            await options.first().click();
-        }
+        // OSelect: click trigger to open, then type in the search input
+        await this.columnSelectTrigger.first().click();
+        await this.columnSelectSearch.waitFor({ state: 'visible' });
+        await this.columnSelectSearch.fill(columnName);
+        await this.columnSelectFirstOption.waitFor({ state: 'visible' });
+        await this.columnSelectFirstOption.click();
     }
 
     async selectOperatorFromMenu(operator) {
