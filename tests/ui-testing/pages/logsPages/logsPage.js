@@ -4041,7 +4041,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('[data-test="function-stream-tab"]').click();
+        return await this.page.locator('button[data-test="function-stream-tab"]').click();
     }
 
     async clickSearchFunctionInput() {

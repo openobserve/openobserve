@@ -7,7 +7,7 @@ export class PipelinesEP {
         this.page = page;
 
         this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        this.functionStreamTab = '[data-test="function-stream-tab"]';
+        this.functionStreamTab = 'button[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
         this.functionNameInput = '[data-test="add-function-name-input-input"]';

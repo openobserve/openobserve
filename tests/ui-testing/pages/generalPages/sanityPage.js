@@ -75,7 +75,7 @@ export class SanityPage {
         this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.realtimeTab = page.locator('[data-test="tab-realtime"]');
         this.streamPipelinesTab = page.locator('button[data-test="stream-pipelines-tab"]');
-        this.functionStreamTab = page.locator('[data-test="function-stream-tab"]');
+        this.functionStreamTab = page.locator('button[data-test="function-stream-tab"]');
         this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
@@ -124,7 +124,7 @@ export class SanityPage {
         // ============================================================
         this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
         // general-settings-tab data-test added in settings/index.vue this pass.
-        this.generalSettingsTab = page.locator('[data-test="general-settings-tab"]');
+        this.generalSettingsTab = page.locator('button[data-test="general-settings-tab"]');
         // OInput auto-generates `-field` for the native input.
         this.scrapeIntervalInputField = page.locator('[data-test="general-settings-scrape-interval-field"]');
         this.settingsSaveButton = page.locator('[data-test="dashboard-add-submit"]');

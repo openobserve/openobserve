@@ -148,13 +148,13 @@ export class PipelinesPage {
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
-        this.pipelineDestinationsTab = page.locator('[data-test="pipeline-destinations-tab"]');
+        this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
         // Table OButton — prefer the data-test locator; fall back to the
         // legacy getByRole locator for older specs still using the old PO copy.
@@ -165,7 +165,7 @@ export class PipelinesPage {
         this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
-        this.enrichmentTableTabLocator = page.locator('[data-test="function-enrichment-table-tab"]');
+        this.enrichmentTableTabLocator = page.locator('button[data-test="function-enrichment-table-tab"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -968,7 +968,7 @@ export class PipelinesPage {
 
     async navigateToEnrichmentTableTab() {
         await this.pipelineMenuLink.click();
-        await this.enrichmentTableTab.click();
+        await this.page.locator(this.enrichmentTableTab).click();
     }
 
     async deleteDestination(randomNodeName) {
