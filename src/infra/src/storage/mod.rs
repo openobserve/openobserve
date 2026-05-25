@@ -121,6 +121,24 @@ pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     Ok(files)
 }
 
+/// List the immediate child "directories" (common prefixes) under `prefix`
+/// using a `/` delimiter, without recursing into them. This is cheap compared
+/// to [`list`] for large prefixes because it only returns directory names, not
+/// every object underneath.
+///
+/// Returned prefixes are full storage keys (they may carry the
+/// `ZO_S3_BUCKET_PREFIX`) and do not include a trailing slash.
+pub async fn list_dirs(account: &str, prefix: &str) -> Result<Vec<String>> {
+    let res = MULTI_ACCOUNTS
+        .list_with_delimiter(account, Some(&prefix.into()))
+        .await?;
+    Ok(res
+        .common_prefixes
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect())
+}
+
 pub fn get_account(org_id: &str, file: &str) -> Option<String> {
     MULTI_ACCOUNTS.get_account(org_id, file)
 }
