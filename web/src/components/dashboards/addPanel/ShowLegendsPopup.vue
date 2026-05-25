@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="legend-color-box"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
               ></div>
-              <div class="legend-text">
+              <div class="legend-text" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
               </div>
               <OButton
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon"
                 class="tw:ml-1"
                 data-test="dashboard-legend-copy-btn"
+                :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"
               >
                 <template #icon-left

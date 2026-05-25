@@ -11,9 +11,6 @@ const testLogger = require('../utils/test-logger.js');
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard general setting", () => {
-  const randomDashboardName =
-    "Dashboard_" + Math.random().toString(36).slice(2, 11);
-
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await navigateToBase(page);
@@ -29,6 +26,8 @@ test.describe("dashboard general setting", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName =
+      "Dashboard_" + Math.random().toString(36).slice(2, 11);
     const newDashboardName =
       pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
     const newTabName = pm.dashboardSetting.generateUniqueTabnewName("new-tab");
@@ -49,7 +48,7 @@ test.describe("dashboard general setting", () => {
     // Fix: Use relativeTimeSelection from pm.dashboardSetting POM
     await pm.dashboardSetting.relativeTimeSelection("3", "h");
     await pm.dashboardSetting.saveSetting();
-    await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
+    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
       timeout: 30000,
     });
     // add tab in dashboard
@@ -65,6 +64,8 @@ test.describe("dashboard general setting", () => {
   test("should verify that dynamic toggle is disabled", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName =
+      "Dashboard_" + Math.random().toString(36).slice(2, 11);
     const newDashboardName =
       pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
 
@@ -86,7 +87,7 @@ test.describe("dashboard general setting", () => {
     //verify that dynamic toggle is disabled
     await pm.dashboardSetting.showDynamicFilter();
     await pm.dashboardSetting.saveSetting();
-    await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
+    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
       timeout: 30000,
     });
     await pm.dashboardSetting.closeSettingDashboard();
