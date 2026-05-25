@@ -408,6 +408,19 @@ pub async fn create_org(
                     "{oid} org itself is part of another billing group, and thus cannot make a new org its member",
                 ));
             }
+
+            // check if the super org is in the allowlist
+            if o2cfg
+                .cloud
+                .billing_group_allowed_orgs
+                .split(",")
+                .find(|v| *v == oid)
+                .is_none()
+            {
+                return Err(anyhow::anyhow!(
+                    "Billing groups is not enabled for org {oid}",
+                ));
+            }
         }
 
         // if for some reason the "super" org was not part of user's org

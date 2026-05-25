@@ -108,6 +108,18 @@ pub async fn invite(
         return HttpResponse::bad_request(format!("a org cannot send invite to itself"));
     }
 
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+
+    if o2cfg
+        .cloud
+        .billing_group_allowed_orgs
+        .split(",")
+        .find(|v| *v == &org_id)
+        .is_none()
+    {
+        return HttpResponse::bad_request(format!("billing group is not enabled for this org"));
+    }
+
     if let Err(e) = billing_invites::invite_org(&user, &org_id, &req.org_id).await {
         return HttpResponse::bad_request(format!("error in creating invite: {e}"));
     }
