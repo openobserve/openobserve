@@ -36,14 +36,12 @@ const baseId = computed(() => props.id ?? _fallbackId);
 
 const current = computed<RangeValue>(() => {
   const v = props.modelValue;
-  if (
-    v &&
-    typeof v.min === "number" &&
-    typeof v.max === "number" &&
-    !Number.isNaN(v.min) &&
-    !Number.isNaN(v.max)
-  ) {
-    return { min: v.min, max: v.max };
+  if (v != null) {
+    const minVal = Number(v.min);
+    const maxVal = Number(v.max);
+    if (!Number.isNaN(minVal) && !Number.isNaN(maxVal)) {
+      return { min: minVal, max: maxVal };
+    }
   }
   return { min: props.min, max: props.max };
 });
@@ -54,20 +52,35 @@ const effectiveError = computed(
 const hasError = computed(() => !!effectiveError.value);
 
 const range = computed(() => props.max - props.min);
+const hasRange = computed(() => range.value > 0);
+
+// Raw drag positions for smooth visual rendering — decoupled from the
+// snapped values that are emitted to the parent.
+const dragVisualMin = ref<number | null>(null);
+const dragVisualMax = ref<number | null>(null);
+
+// During a drag use the raw (float) position so the thumb glides smoothly;
+// at rest fall back to the parent-driven snapped value.
+const renderMin = computed(() =>
+  dragVisualMin.value !== null ? dragVisualMin.value : current.value.min,
+);
+const renderMax = computed(() =>
+  dragVisualMax.value !== null ? dragVisualMax.value : current.value.max,
+);
 
 const minPercent = computed(() => {
   if (range.value <= 0) return 0;
   return Math.max(
     0,
-    Math.min(100, ((current.value.min - props.min) / range.value) * 100),
+    Math.min(100, ((renderMin.value - props.min) / range.value) * 100),
   );
 });
 
 const maxPercent = computed(() => {
-  if (range.value <= 0) return 100;
+  if (range.value <= 0) return 0;
   return Math.max(
     0,
-    Math.min(100, ((current.value.max - props.min) / range.value) * 100),
+    Math.min(100, ((renderMax.value - props.min) / range.value) * 100),
   );
 });
 
@@ -269,6 +282,106 @@ function onVertUp(e: PointerEvent) {
   emit("change", next);
   dragging = null;
 }
+
+function onVertCancel() {
+  dragging = null;
+}
+
+// ── Horizontal mode pointer handling ─────────────────────────────────────
+// All pointer interactions (track clicks AND native thumb drags) are handled
+// here so we can decouple the smooth visual position from the snapped value
+// that gets emitted to the parent.  Keyboard arrow-key events still reach
+// handleMin / handleMax through the native inputs unchanged.
+
+const hTrackRef = ref<HTMLElement | null>(null);
+let hDragging: "min" | "max" | null = null;
+
+/** Raw (un-snapped) value from a horizontal clientX position. */
+function hToValue(clientX: number): number {
+  const el = hTrackRef.value;
+  if (!el) return props.min;
+  const rect = el.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  return clamp(props.min + pct * range.value);
+}
+
+/** Round a raw value to the nearest step for emitting. */
+function snapToStep(v: number): number {
+  const stepped =
+    Math.round((v - props.min) / props.step) * props.step + props.min;
+  return clamp(stepped);
+}
+
+function onHorizDown(e: PointerEvent) {
+  if (props.disabled) return;
+  // Prevent native range behaviour for pointer events so we control the drag.
+  // Keyboard arrow-key events are unaffected by this.
+  e.preventDefault();
+  const raw = hToValue(e.clientX);
+  const snapped = snapToStep(raw);
+  const distToMin = Math.abs(raw - current.value.min);
+  const distToMax = Math.abs(raw - current.value.max);
+  if (distToMin <= distToMax) {
+    hDragging = "min";
+    dragVisualMin.value = Math.min(raw, current.value.max);
+    emit("update:modelValue", {
+      min: clamp(Math.min(snapped, current.value.max)),
+      max: current.value.max,
+    });
+  } else {
+    hDragging = "max";
+    dragVisualMax.value = Math.max(raw, current.value.min);
+    emit("update:modelValue", {
+      min: current.value.min,
+      max: clamp(Math.max(snapped, current.value.min)),
+    });
+  }
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onHorizMove(e: PointerEvent) {
+  if (!hDragging || props.disabled) return;
+  const raw = hToValue(e.clientX);
+  const snapped = snapToStep(raw);
+  if (hDragging === "min") {
+    // Visual position clamps to max so the min thumb never passes max visually
+    dragVisualMin.value = Math.min(raw, current.value.max);
+    emit("update:modelValue", {
+      min: clamp(Math.min(snapped, current.value.max)),
+      max: current.value.max,
+    });
+  } else {
+    dragVisualMax.value = Math.max(raw, current.value.min);
+    emit("update:modelValue", {
+      min: current.value.min,
+      max: clamp(Math.max(snapped, current.value.min)),
+    });
+  }
+}
+
+function onHorizUp(e: PointerEvent) {
+  // Always clear visual overrides so the thumb snaps to the final value
+  dragVisualMin.value = null;
+  dragVisualMax.value = null;
+  if (!hDragging || props.disabled) {
+    hDragging = null;
+    return;
+  }
+  const snapped = snapToStep(hToValue(e.clientX));
+  const next: RangeValue =
+    hDragging === "min"
+      ? { min: clamp(Math.min(snapped, current.value.max)), max: current.value.max }
+      : { min: current.value.min, max: clamp(Math.max(snapped, current.value.min)) };
+  emit("update:modelValue", next);
+  emit("change", next);
+  hDragging = null;
+}
+
+function onHorizCancel() {
+  dragVisualMin.value = null;
+  dragVisualMax.value = null;
+  hDragging = null;
+}
 </script>
 
 <template>
@@ -303,11 +416,12 @@ function onVertUp(e: PointerEvent) {
       <div
         ref="vertTrackRef"
         class="tw:relative tw:h-full tw:flex tw:justify-center tw:shrink-0"
-        :class="disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer'"
+        :class="disabled ? 'tw:cursor-not-allowed tw:opacity-60' : hasRange ? 'tw:cursor-pointer' : 'tw:cursor-default'"
         :style="{ width: thumbSizePx[resolvedSize] }"
         @pointerdown="onVertDown"
         @pointermove="onVertMove"
         @pointerup="onVertUp"
+        @pointercancel="onVertCancel"
       >
         <!-- Background track strip -->
         <div
@@ -341,7 +455,7 @@ function onVertUp(e: PointerEvent) {
             'tw:left-1/2 tw:-translate-x-1/2 tw:touch-none tw:select-none',
             thumbSize[resolvedSize],
             vertMinZClass,
-            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : 'tw:bg-slider-thumb tw:cursor-grab',
+            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : hasRange ? 'tw:bg-slider-thumb tw:cursor-grab' : 'tw:bg-slider-thumb tw:cursor-default',
           ]"
           :style="{ top: `calc(${vertMinTop}% - ${thumbHalf[resolvedSize]})` }"
           role="slider"
@@ -359,7 +473,7 @@ function onVertUp(e: PointerEvent) {
             'tw:left-1/2 tw:-translate-x-1/2 tw:touch-none tw:select-none',
             thumbSize[resolvedSize],
             vertMaxZClass,
-            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : 'tw:bg-slider-thumb tw:cursor-grab',
+            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : hasRange ? 'tw:bg-slider-thumb tw:cursor-grab' : 'tw:bg-slider-thumb tw:cursor-default',
           ]"
           :style="{ top: `calc(${vertMaxTop}% - ${thumbHalf[resolvedSize]})` }"
           role="slider"
@@ -421,10 +535,15 @@ function onVertUp(e: PointerEvent) {
     </div>
 
     <div
+      ref="hTrackRef"
       :class="[
         'tw:relative tw:flex tw:items-center tw:w-full',
-        disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+        disabled ? 'tw:cursor-not-allowed tw:opacity-60' : hasRange ? 'tw:cursor-pointer' : 'tw:cursor-default',
       ]"
+      @pointerdown="onHorizDown"
+      @pointermove="onHorizMove"
+      @pointerup="onHorizUp"
+      @pointercancel="onHorizCancel"
     >
       <!-- Background track -->
       <div
@@ -468,7 +587,7 @@ function onVertUp(e: PointerEvent) {
           minZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
-          disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+          disabled ? 'tw:cursor-not-allowed' : hasRange ? 'tw:cursor-pointer' : 'tw:cursor-default',
         ]"
         @input="handleMin"
         @change="handleMin"
@@ -492,7 +611,7 @@ function onVertUp(e: PointerEvent) {
           maxZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
-          disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+          disabled ? 'tw:cursor-not-allowed' : hasRange ? 'tw:cursor-pointer' : 'tw:cursor-default',
         ]"
         @input="handleMax"
         @change="handleMax"

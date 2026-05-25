@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTable>
                   </div>
                 </OCollapsible>
+                <OSeparator v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.region" class="tw:my-2" />
 
                 <OCollapsible
                   v-if="
@@ -97,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="sectionOpen.cluster"
                   @update:model-value="(v) => (sectionOpen.cluster = v)"
                   :label="t('nodes.cluster')"
-                  class="tw:mt-2"
                 >
                   <div class="tw:p-0">
                     <OInput
@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTable>
                   </div>
                 </OCollapsible>
+                <OSeparator v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.cluster" class="tw:my-2" />
 
                 <OCollapsible
                   v-if="nodetypeRows.length > 0"
@@ -140,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="sectionOpen.nodetype"
                   @update:model-value="(v) => (sectionOpen.nodetype = v)"
                   :label="t('nodes.nodetype')"
-                  class="tw:mt-2"
                 >
                   <div class="tw:px-1">
                     <OTable
@@ -164,7 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="sectionOpen.status"
                   @update:model-value="(v) => (sectionOpen.status = v)"
                   :label="t('nodes.status')"
-                  class="tw:mt-2"
                 >
                   <div class="tw:px-1">
                     <OTable
@@ -182,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #cell-name="{ row }">
                         <span
                           :class="`status-${row.name.toLowerCase()}`"
-                          class="tw:mr-1"
+                          class="tw:self-stretch tw:mr-1"
                         ></span
                         >{{ row.name }}
                       </template>
@@ -195,9 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="sectionOpen.cpu"
                   @update:model-value="(v) => (sectionOpen.cpu = v)"
                   :label="t('nodes.cpuusage')"
-                  class="tw:mt-2"
                 >
-                  <div class="tw:px-1">
+                  <div class="tw:px-1 tw:pb-2">
                     <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
@@ -220,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ORange
                       data-test="nodes-filter-cpuusage-range-slider"
                       :model-value="cpuUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           cpuUsage = val;
                         }
@@ -231,15 +229,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </OCollapsible>
+                <OSeparator v-if="sectionOpen.cpu" class="tw:my-2" />
 
                 <OCollapsible
                   variant="sidebar"
                   :model-value="sectionOpen.memory"
                   @update:model-value="(v) => (sectionOpen.memory = v)"
                   :label="t('nodes.memoryusage')"
-                  class="tw:mt-2"
                 >
-                  <div class="tw:px-1">
+                  <div class="tw:px-1 tw:pb-2">
                     <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
@@ -262,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ORange
                       data-test="nodes-filter-memoryusage-range-slider"
                       :model-value="memoryUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           memoryUsage = val;
                         }
@@ -273,15 +271,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </OCollapsible>
+                <OSeparator v-if="sectionOpen.memory" class="tw:my-2" />
 
                 <OCollapsible
                   variant="sidebar"
                   :model-value="sectionOpen.tcp"
                   @update:model-value="(v) => (sectionOpen.tcp = v)"
                   :label="t('nodes.tcpusage')"
-                  class="tw:mt-2"
                 >
-                  <div class="tw:px-1">
+                  <div class="tw:px-1 tw:pb-2">
                     <OCheckbox
                       type="checkbox"
                       v-model="establishedToggle"
@@ -312,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="!establishedToggle"
                       data-test="nodes-filter-tcp-established-range-slider"
                       :model-value="establishedUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           establishedUsage = val;
                         }
@@ -324,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <OCheckbox
                       type="checkbox"
-                      class="tw:mt-2"
+                      class="tw:mt-6"
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
@@ -353,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="!closewaitToggle"
                       data-test="nodes-filter-tcp-closewait-range-slider"
                       :model-value="closewaitUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           closewaitUsage = val;
                         }
@@ -365,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <OCheckbox
                       type="checkbox"
-                      class="tw:mt-2"
+                      class="tw:mt-6"
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
@@ -394,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="!waittimeToggle"
                       data-test="nodes-filter-tcp-waittime-range-slider"
                       :model-value="waittimeUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           waittimeUsage = val;
                         }
@@ -550,6 +548,7 @@ import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -566,6 +565,7 @@ export default defineComponent({
     OIcon,
     OBadge,
     OCollapsible,
+    OSeparator,
     OSplitter,
     OTable,
   },
