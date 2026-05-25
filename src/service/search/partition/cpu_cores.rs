@@ -16,7 +16,7 @@
 use config::{get_config, meta::cluster::RoleGroup};
 use infra::{cluster::get_cached_online_querier_nodes, errors::Error};
 
-use super::super::sql::Sql;
+use super::sql_context::PartitionSqlContext;
 
 /// Resolves the effective CPU core count for the querier nodes that will
 /// actually handle this query, then estimates the total seconds required.
@@ -27,7 +27,7 @@ use super::super::sql::Sql;
 /// online querier nodes are summed.
 pub(crate) async fn estimated_secs(
     trace_id: &str,
-    _sql: &Sql,
+    ctx: &PartitionSqlContext,
     is_http_req: bool,
     original_size: usize,
 ) -> Result<usize, Error> {
@@ -46,9 +46,9 @@ pub(crate) async fn estimated_secs(
 
     #[cfg(feature = "enterprise")]
     let cpu_cores = {
-        let stream_key = _sql.get_first_stream_key();
+        let stream_key = ctx.sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            &_sql.org_id,
+            &ctx.sql.org_id,
             &stream_key,
             nodes,
             role_group,

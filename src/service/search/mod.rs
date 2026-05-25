@@ -625,7 +625,7 @@ pub async fn search_partition(
         non_ts_order_by_cols: vec![],
     };
 
-    let total_secs = estimated_secs(trace_id, &ctx.sql, is_http_req, resp.original_size).await?;
+    let total_secs = estimated_secs(trace_id, &ctx, is_http_req, resp.original_size).await?;
 
     if ctx.use_single_partition
         || (ctx.is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
@@ -658,23 +658,14 @@ pub async fn search_partition(
     let partition_settings = calculate_partition_settings(
         trace_id,
         total_secs,
-        &ctx.sql,
-        ctx.is_complex_query,
-        ctx.ts_column.is_some(),
+        &ctx,
         skip_max_query_range,
         stream_files.max_query_range,
     );
 
     #[cfg(feature = "enterprise")]
     let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
-        prepare_streaming_aggregate(
-            trace_id,
-            req,
-            &ctx.sql,
-            ctx.is_streaming_aggregate,
-            use_cache,
-        )
-        .await?;
+        prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
     #[cfg(feature = "enterprise")]
     {
         resp.streaming_output = streaming_aggs;
