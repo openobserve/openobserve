@@ -22,6 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="30"
     :show-close="true"
     @keydown.stop
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
+    :neutralButtonLabel="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveLlmEvaluationNode"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
       data-test="llm-evaluation-node-section"
@@ -105,28 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Action Buttons -->
-        <div class="tw:flex tw:gap-2 tw:mt-2">
-          <OButton
-            v-if="pipelineObj.isEditNode"
-            data-test="llm-evaluation-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            data-test="llm-evaluation-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            data-test="llm-evaluation-save-btn"
-            variant="primary"
-            size="sm-action"
-            @click="saveLlmEvaluationNode"
-          >{{ t('alerts.save') }}</OButton>
-        </div>
+
     </div>
     </div>
   </ODrawer>

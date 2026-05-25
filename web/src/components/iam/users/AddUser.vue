@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop"
             maxlength="100"
             data-test="user-email-field"
             :error="!!emailError"
