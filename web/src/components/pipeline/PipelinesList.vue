@@ -172,21 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
                 <OButton
-                  :data-test="`pipeline-list-${row.name}-pause-start-alert`"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-sm"
-                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                  @click.stop="togglePipeline(row)"
-                />
-                <OButton
-                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
-                  variant="ghost"
-                  size="icon-sm"
-                  @click.stop="editPipeline(row)"
-                  icon-left="edit"
-                />
-                <OButton
                   :data-test="`pipeline-list-${row.name}-view-pipeline`"
                   variant="ghost"
                   size="icon-sm"
@@ -199,6 +184,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     /></template>
                   </OTooltip>
                 </OButton>
+                <OButton
+                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click.stop="editPipeline(row)"
+                  icon-left="edit"
+                />
+                <OButton
+                  :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('pipeline.delete')"
+                  icon-left="delete"
+                  @click.stop="openDeleteDialog(row)"
+                />
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
@@ -209,6 +209,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="more-vert"
                     />
                   </template>
+                  <ODropdownItem
+                    :data-test="`pipeline-list-${row.name}-pause-start-action`"
+                    @select="togglePipeline(row)"
+                  >
+                    <template #icon-left>
+                      <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                    </template>
+                    {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                  </ODropdownItem>
+                  <ODropdownSeparator />
                   <ODropdownItem
                     :data-test="`pipeline-list-${row.name}-export-action`"
                     @select="exportPipeline(row)"
@@ -236,17 +246,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon size="sm" name="refresh" />
                     </template>
                     Create Backfill
-                  </ODropdownItem>
-                  <ODropdownSeparator />
-                  <ODropdownItem
-                    :data-test="`pipeline-list-${row.name}-delete-action`"
-                    variant="destructive"
-                    @select="openDeleteDialog(row)"
-                  >
-                    <template #icon-left>
-                      <OIcon name="delete" size="sm" />
-                    </template>
-                    {{ t("pipeline.delete") }}
                   </ODropdownItem>
                   <ODropdownSeparator v-if="row.last_error" />
                   <ODropdownItem
