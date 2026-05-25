@@ -1351,6 +1351,18 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
+        // Ensure we're on the "all" tab so realtime + scheduled pipelines are
+        // both visible regardless of how the list was previously filtered.
+        const allTab = this.page.locator('[data-test="tab-all"]');
+        if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await allTab.click().catch(() => {});
+            await this.page.waitForTimeout(300);
+        }
+        // Clear any leftover search filter before searching again so the row
+        // can render even if a previous search left the input populated.
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.fill('');
+        await this.page.waitForTimeout(300);
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
         // Click on more options (three-dot menu) then delete
