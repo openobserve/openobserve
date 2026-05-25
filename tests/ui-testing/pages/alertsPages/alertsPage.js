@@ -809,9 +809,9 @@ export class AlertsPage {
      * @param {string} name - Alert name
      */
     async fillAlertName(name) {
-        const input = this.page.locator(this.locators.alertNameInput);
-        await input.waitFor({ state: 'visible', timeout: 3000 });
-        await input.fill(name);
+        // OInput renders data-test on outer <div>; wait on wrapper for visibility, fill on inner -field input
+        await this.page.locator(this.locators.alertNameInput).waitFor({ state: 'visible', timeout: 3000 });
+        await this.page.locator(this.locators.alertNameInputField).fill(name);
         testLogger.info(`Filled alert name: ${name}`);
     }
 
@@ -1059,12 +1059,9 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation.
-        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
-        // fillable); the inner native <input> auto-derives `-field`. We click the
-        // wrapper to focus the field, then clear the `-field` variant.
+        // v3 UI validates non-empty name — clear input and submit to trigger validation
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInputField).clear();
+        await this.page.locator(this.locators.alertNameInput).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1092,9 +1089,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
-        // OInput convention §4: wrapper carries the parent data-test (a <div>, not
-        // fillable); the inner native <input> auto-derives `-field` — fill that variant.
-        await this.page.locator(this.locators.alertNameInputField).fill('abc');
+        await this.page.locator(this.locators.alertNameInput).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1178,7 +1173,7 @@ export class AlertsPage {
 
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForTimeout(1000);
-        await this.page.locator(this.locators.alertBackButton).click();
+        await this.page.locator(this.locators.cloneCancelButton).click();
         testLogger.info('Clone dialog cancel/back working');
     }
 
@@ -1196,7 +1191,7 @@ export class AlertsPage {
         await this.page.locator('[data-test="folder-search"]').fill(folderName);
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
-        await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
+        await expect(this.page.locator('button[data-test="dashboard-folder-tab-default"]')).toBeVisible();
     }
 
     // ==================== ALERTS / INCIDENTS NAVIGATION ====================
@@ -2373,7 +2368,8 @@ export class AlertsPage {
      * Fill the alert name input
      */
     async fillAlertName(alertName) {
-        await this.page.locator(this.locators.alertNameInput).fill(alertName);
+        // OInput renders data-test on outer <div>; use -field suffix for the native input
+        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
         testLogger.info('Filled alert name', { alertName });
     }
 

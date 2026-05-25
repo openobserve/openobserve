@@ -188,6 +188,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const windowQuery = 'SELECT *, ROW_NUMBER() OVER (ORDER BY _timestamp DESC) as rn FROM "e2e_automate" LIMIT 10';
         await setupQueryAndSwitchToBuild(pm, page, windowQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Window function → table chart - PASSED');
@@ -201,6 +202,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const multiGroupByQuery = 'SELECT code, method, level, count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY code, method, level';
         await setupQueryAndSwitchToBuild(pm, page, multiGroupByQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Case 7: >2 GROUP BY → table chart - PASSED');

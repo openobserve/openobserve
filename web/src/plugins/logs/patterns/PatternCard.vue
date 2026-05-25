@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ backgroundColor: statusColor }"
     />
     <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
         class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"

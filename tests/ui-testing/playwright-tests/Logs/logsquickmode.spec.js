@@ -125,6 +125,10 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing error handling with random text in histogram mode');
 
+    // Enable SQL mode so "oooo" is invalid SQL and triggers a backend parse error
+    // (in quick/FTS mode "oooo" is a valid full-text search term that returns empty results, not an error)
+    await pm.logsPage.enableSqlModeIfNeeded();
+
     // Wait deterministically for the Monaco editor textbox before clicking
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.clickQueryEditor();

@@ -117,6 +117,7 @@ const hasLabel = computed(
       :aria-checked="isChecked"
       :aria-labelledby="hasLabel ? labelId : undefined"
       :data-state="isChecked ? 'checked' : 'unchecked'"
+      :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
       :class="[
         'tw:relative tw:inline-flex tw:shrink-0 tw:rounded-full',

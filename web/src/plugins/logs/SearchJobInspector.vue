@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md search-job-inspector tw:p-0">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+    <div class="tw:w-full tw:flex tw:flex-col tw:h-[calc(100vh_-_var(--navbar-height))] tw:overflow-hidden tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
-      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
+      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:shrink-0">
         <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
           <div class="tw:flex tw:items-center tw:gap-3">
             <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="inspector-title">
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="tw:mb-[0.625rem]">
+      <div v-if="!loading" class="tw:mb-[0.625rem] tw:shrink-0">
         <div class="tw:grid tw:gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
           <!-- Results Returned -->
           <div class="stat-tile">
@@ -260,13 +260,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         icon="error"
         :content="errorMessage"
-        class="tw:mb-[0.625rem]"
+        class="tw:mb-[0.625rem] tw:shrink-0"
         data-test="inspector-error-banner"
       />
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
-      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-242px)]">
+      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:flex-1 tw:min-h-0">
+        <div class="tw:h-full card-container">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             tree
             tree-column-id="index"
-            style="width: 100%; height: calc(100vh - 242px)"
+            style="width: 100%;"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
           >

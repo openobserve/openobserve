@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch
                 :model-value="searchObj.meta.quickMode"
                 size="sm"
-                data-test="logs-search-bar-quick-mode-toggle"
+                data-test="logs-search-bar-quick-mode-switch"
                 @click.stop="handleQuickMode"
               />
             </template>
@@ -3765,7 +3765,7 @@ export default defineComponent({
           savedViewNameError.value = "This field is required";
           return;
         }
-        if (!/^[-A-Za-z0-9 /@/_]+$/.test(savedViewName.value)) {
+        if (!/^[A-Za-z0-9 _-]+$/.test(savedViewName.value)) {
           savedViewNameError.value = "Input must be alphanumeric";
           return;
         }

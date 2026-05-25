@@ -61,6 +61,9 @@ export class AlertDestinationsPage {
         this.destinationListSearchInputField = '[data-test="destination-list-search-input-field"]';
         this.destinationsListTable = '[data-test="alert-destinations-list-table"]';
 
+        // Dialog/drawer title anchor for clickNewDestination (anchors on dialog open)
+        this.addDestinationTitle = '[data-test="add-destination-title"]';
+
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
         this.destinationTypeCard = '[data-test="destination-type-card"]';
@@ -518,8 +521,9 @@ export class AlertDestinationsPage {
      */
     async searchDestinations(searchText) {
         await this.page.locator(this.destinationListSearchInput).click();
-        await this.page.locator(this.destinationListSearchInput).fill('');
-        await this.page.locator(this.destinationListSearchInput).fill(searchText);
+        // OInput renders data-test on outer <div>; use -field suffix for fill
+        await this.page.locator(this.destinationListSearchInputField).fill('');
+        await this.page.locator(this.destinationListSearchInputField).fill(searchText);
         await this.page.waitForTimeout(2000); // Wait for search results
         testLogger.debug('Searched for destinations', { searchText });
     }
@@ -1334,9 +1338,8 @@ export class AlertDestinationsPage {
      * Verify success notification appears
      */
     async expectSuccessNotification() {
-        // OToast variant `o-toast-success` is the precise data-test for success messages.
-        // Falling back to the o-toast-* prefix when the success variant isn't surfaced.
-        await expect(this.page.locator(this.toastSuccess).first()).toBeVisible({ timeout: 10000 });
+        // OToast renders data-test="o-toast-success" for success variant; this.successToast holds that selector
+        await expect(this.page.locator(this.successToast).first()).toBeVisible({ timeout: 10000 });
     }
 
     /**

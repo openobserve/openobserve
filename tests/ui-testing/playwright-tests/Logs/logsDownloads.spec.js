@@ -36,6 +36,8 @@ test.describe("Logs Downloads testcases", () => {
     // Wait deterministically for the SQL results to fully load — the download click
     // reads `searchObj.data.queryResults.hits` directly, so we must wait until the
     // pagination title reports >= 2000 records before triggering the download.
+    // (HEAD's strict check kept — the lenient `expectPaginationRowCountVisible`
+    // from main would mask the documented §7a in-memory hits replace race.)
     await pageManager.logsPage.expectPaginationTotalAtLeast(2000);
   }
 

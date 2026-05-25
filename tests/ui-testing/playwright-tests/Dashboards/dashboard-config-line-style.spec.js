@@ -46,7 +46,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol No persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show_symbol"]')).toContainText("No");
+    await expect(page.locator('[data-test="dashboard-config-show_symbol-trigger"]')).toHaveAttribute('data-test-selected-value', 'false');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -71,7 +71,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line interpolation Step After persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-line_interpolation"]')).toContainText("Step After");
+    await expect(page.locator('[data-test="dashboard-config-line_interpolation-trigger"]')).toHaveAttribute('data-test-selected-value', 'step-end');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -92,7 +92,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line thickness persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-line_thickness"]')).toHaveValue("3");
+    await expect(page.locator('[data-test="dashboard-config-line_thickness"]').locator('[data-test$="-field"]')).toHaveValue("3");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -114,7 +114,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying connect null values enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-connect-null-values"]')).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator('[data-test="dashboard-config-connect-null-values"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

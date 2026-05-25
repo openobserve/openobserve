@@ -1505,8 +1505,9 @@ export class LogsPage {
     async getQuickModeState() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        // OSwitch exposes data-state="checked|unchecked" on its inner toggle button
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        // OSwitch inner button carries data-test="logs-search-bar-quick-mode-switch-btn"
+        // and data-state="checked|unchecked".
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isOn = state === 'checked';
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -2563,11 +2564,26 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        return await this.page.locator(this.searchBarRefreshButton).click({ force: true });
+        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
+        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
+        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
+        // making force-click on a loading button a silent no-op.
+        return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
     async waitForSearchBarRefreshButton() {
-        return await this.page.locator(this.searchBarRefreshButton).waitFor({ state: "visible" });
+        const btn = this.page.locator(this.searchBarRefreshButton).first();
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        // OButton renders <button disabled> while loading. Wait for the button to be enabled
+        // before clicking — OButton.handleClick() guards on loading and won't emit if disabled.
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                return el != null && !el.hasAttribute('disabled');
+            },
+            this.searchBarRefreshButton,
+            { timeout: 15000 }
+        );
     }
 
     async clickSQLModeToggle() {
@@ -3280,9 +3296,13 @@ export class LogsPage {
     }
 
     async expectErrorMessageVisible() {
-        // Search execution + render of the error template can lag on the pentest backend.
-        // Use a longer explicit timeout instead of the default 5s.
-        return await expect(this.page.locator(this.errorMessage).first()).toBeVisible({ timeout: 30000 });
+        // Covers two error display paths in Index.vue:
+        // - errorMsg path: data-test="logs-search-error-message" (query/backend error)
+        // - filterErrMsg path: data-test="logs-search-filter-error-message" (quickmode filter parse error)
+        const errorLocator = this.page.locator(
+            `[data-test="logs-search-error-message"], [data-test="logs-search-filter-error-message"]`
+        ).first();
+        return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
     /**
@@ -4037,7 +4057,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('[data-test="function-stream-tab"]').click();
+        return await this.page.locator('button[data-test="function-stream-tab"]').click();
     }
 
     async clickSearchFunctionInput() {
@@ -4572,10 +4592,10 @@ export class LogsPage {
 
         // Quick Mode is off — open the utilities dropdown and enable the OSwitch.
         // Post-migration: the trigger is an ODropdownItem (data-test="logs-search-bar-quick-mode-toggle-btn")
-        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-toggle"). The switch reads its state
-        // from data-state="checked|unchecked".
+        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-switch"). The inner button carries
+        // data-test="logs-search-bar-quick-mode-switch-btn" and data-state="checked|unchecked".
         const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
-        const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
+        const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]');
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
             await this.page.keyboard.press('Escape').catch(() => {});
@@ -4586,12 +4606,9 @@ export class LogsPage {
 
             if (!menuOpened) continue;
 
-            // Read OSwitch state via data-state attribute on the inner role="switch" button
-            // (the wrapper div doesn't expose data-state in this OSwitch implementation).
+            // Read OSwitch state via data-test on the inner button.
             const state = await quickModeSwitch
-                .first()
-                .locator('[data-state]')
-                .first()
+                .locator('[data-test$="-btn"]')
                 .getAttribute('data-state')
                 .catch(() => null);
             if (state === 'checked') {
@@ -4797,13 +4814,13 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isQuickModeOn = state === 'checked';
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]').click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
@@ -5073,19 +5090,19 @@ export class LogsPage {
         // Wait for the menu to render the quick mode toggle before reading or clicking
         const quickModeBtn = this.page.locator(this.quickModeToggle);
         await quickModeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        // OSwitch exposes data-state="checked|unchecked" on its inner toggle button.
-        // Wrapper data-test="logs-search-bar-quick-mode-toggle"; descendant [data-state] is the button.
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]').first();
+        // OSwitch inner button carries data-test="logs-search-bar-quick-mode-switch-btn"
+        // and data-state="checked|unchecked".
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
-            await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]').click();
             // Wait for OSwitch data-state to flip to the desired value
             const expectedState = desiredState ? 'checked' : 'unchecked';
             await this.page.waitForFunction(
                 (expected) => {
-                    const el = document.querySelector('[data-test="logs-search-bar-quick-mode-toggle"] [data-state]');
+                    const el = document.querySelector('[data-test="logs-search-bar-quick-mode-switch-btn"]');
                     return el && el.getAttribute('data-state') === expected;
                 },
                 expectedState,
@@ -7492,7 +7509,8 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        await expect(this.page.locator(this.patternsToggle)).toHaveAttribute('data-state', 'on');
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        await expect(this.page.locator(`${this.patternsToggle} [data-state]`)).toHaveAttribute('data-state', 'on');
         testLogger.info('Patterns toggle is in selected state');
     }
 
@@ -7968,8 +7986,9 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
-        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        const builderStateBtn = this.page.locator(`${this.builderQueryType} [data-state]`);
+        await expect(builderStateBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -7979,8 +7998,9 @@ export class LogsPage {
     async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // Verify "Custom" button is active (OToggleGroupItem uses data-state="on")
-        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        const customStateBtn = this.page.locator(`${this.customQueryType} [data-state]`);
+        await expect(customStateBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
 
@@ -8004,8 +8024,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        // Wait for the toggle group to reflect the Custom selection (OToggleGroupItem data-state="on")
-        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+        await expect(this.page.locator(`${this.customQueryType} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 

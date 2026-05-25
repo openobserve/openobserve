@@ -96,7 +96,7 @@ export class ReportFoldersPage {
         `[data-test="dashboard-folder-tab-__missing__:${folderName}"]`
       );
     }
-    return this.page.locator(`[data-test="dashboard-folder-tab-${folderId}"]`);
+    return this.page.locator(`button[data-test="dashboard-folder-tab-${folderId}"]`);
   }
 
   // Move button per report row — `data-test="report-list-${name}-move-report"`.
@@ -199,7 +199,7 @@ export class ReportFoldersPage {
     // store) then the tab is definitively absent.
     const folderId = await this.resolveFolderIdByName(folderName);
     if (!folderId) return;
-    const tab = this.page.locator(`[data-test="dashboard-folder-tab-${folderId}"]`);
+    const tab = this.page.locator(`button[data-test="dashboard-folder-tab-${folderId}"]`);
     await expect(tab).not.toBeVisible({ timeout: 5000 });
   }
 
@@ -356,7 +356,7 @@ export class ReportFoldersPage {
   async getFolderCount() {
     // Every OTab in the sidebar carries a `data-test="dashboard-folder-tab-<id>"`.
     return await this.page
-      .locator('[data-test^="dashboard-folder-tab-"]')
+      .locator('button[data-test^="dashboard-folder-tab-"]')
       .count();
   }
 
@@ -375,7 +375,7 @@ export class ReportFoldersPage {
     const folderId = await this.resolveFolderIdByName(folderName);
     if (!folderId) return false;
     return await this.page
-      .locator(`[data-test="dashboard-folder-tab-${folderId}"]`)
+      .locator(`button[data-test="dashboard-folder-tab-${folderId}"]`)
       .isVisible({ timeout: 2000 })
       .catch(() => false);
   }

@@ -159,7 +159,7 @@ export default class LogsVisualise {
   //search and add fields
   async searchAndAddField(fieldName, target) {
     const searchInput = this.page.locator(
-      '[data-test="index-field-search-input"]'
+      '[data-test="o-field-list-search-field"]'
     );
     await searchInput.waitFor({ state: "visible", timeout: 5000 });
     await searchInput.click();

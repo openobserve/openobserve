@@ -170,6 +170,26 @@ export default class ChartTypeSelector {
     await searchInput.fill(""); // Clear the search input
   }
 
+  /**
+   * Search for a field by name without adding it to any axis.
+   * Useful for checking +P / +X button visibility after searching.
+   * @param {string} fieldName
+   */
+  async searchField(fieldName) {
+    const searchInput = this.page.locator('[data-test="o-field-list-search"] input');
+    await searchInput.click();
+    await searchInput.fill(fieldName);
+  }
+
+  /**
+   * Clear the field search input.
+   */
+  async clearFieldSearch() {
+    const searchInput = this.page.locator('[data-test="o-field-list-search"] input');
+    await searchInput.click();
+    await searchInput.fill('');
+  }
+
   //remove fields from the dashboard
   // Remove field by type (x, y, breakdown, etc.)
   // @param alias - The field alias (e.g., "x_axis_1", "y_axis_1", "breakdown_1")
