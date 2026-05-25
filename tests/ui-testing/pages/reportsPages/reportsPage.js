@@ -53,12 +53,11 @@ export class ReportsPage {
     this.scheduleNowBtn = page.locator('[data-test="add-report-schedule-scheduleNow-btn"]');
     this.scheduleLaterBtn = page.locator('[data-test="add-report-schedule-scheduleLater-btn"]');
 
-    // Schedule-later inputs — the `-field` data-test is stamped on BOTH the
-    // OFormInput wrapper div AND the inner datepicker `role="group"` element.
-    // Scope to the actual datepicker via `[role="group"]` to disambiguate the
-    // strict-mode collision (wrapper is not clickable, the group is).
-    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"][role="group"]');
-    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"][role="group"]');
+    // ODate / OTime forward $attrs to their outer wrapper <div>; `role="group"`
+    // is on the inner wrapper div (not the same element). Use a descendant
+    // combinator to find the interactive group inside the data-test wrapper.
+    this.scheduleStartDateField = page.locator('[data-test="add-report-schedule-start-date-field"] [role="group"]');
+    this.scheduleStartTimeField = page.locator('[data-test="add-report-schedule-start-time-field"] [role="group"]');
     this.scheduleTimezoneSelect = page.locator('[data-test="add-report-schedule-start-timezone-select"]');
     this.scheduleTimezoneTrigger = page.locator('[data-test="add-report-schedule-start-timezone-select"] [data-test-selected-value]');
     this.scheduleTimezonePopover = page.locator('[data-test="add-report-schedule-start-timezone-select-popover"]');
