@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rum-date-time-picker"
               ref="dateTimePicker"
               v-model="selectedDate"
+              menu-align="end"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"

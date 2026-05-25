@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            <syntax-guide />
             <date-time
               auto-apply
+              menu-align="end"
               :default-type="sessionState.data.datetime.valueType"
               :default-absolute-time="{
                 startTime: sessionState.data.datetime.startTime,

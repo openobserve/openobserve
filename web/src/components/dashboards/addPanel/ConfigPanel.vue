@@ -155,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="pickerValue"
                   :auto-apply-dashboard="true"
                   :hide-relative-timezone="true"
+                  menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
                 />
                 <OTooltip :content="formattedPickerValue" max-width="320px" />

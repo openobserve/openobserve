@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :initialTimezone="initialTimezone"
     :disable="disable"
     :hide-relative-timezone="hideRelativeTimezone"
+    :menu-align="menuAlign"
     @hide="onHide"
     @show="onShow"
   >
@@ -68,6 +69,11 @@ export default defineComponent({
       required: false,
       default: false,
       type: Boolean,
+    },
+    menuAlign: {
+      required: false,
+      default: "start",
+      type: String,
     },
   },
   emits: ["update:modelValue", "hide", "show"],

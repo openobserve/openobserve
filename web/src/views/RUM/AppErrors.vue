@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page">
+  <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
     <div class="tw:pb-[0.625rem]">
       <div class="card-container">
         <div
@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <syntax-guide />
           <date-time
             auto-apply
+            menu-align="end"
             :default-type="errorTrackingState.data.datetime?.valueType"
             :default-absolute-time="{
               startTime: errorTrackingState.data.datetime.startTime,
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <OSplitter
-      class="logs-horizontal-splitter tw:flex-1"
+      class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"

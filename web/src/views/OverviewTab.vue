@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DateTime
           ref="dateTimeRef"
           auto-apply
+          menu-align="end"
           :default-type="dateTimeType"
           :default-absolute-time="{ startTime: absoluteTime.startTime, endTime: absoluteTime.endTime }"
           :default-relative-time="relativeTime"
