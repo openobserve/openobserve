@@ -317,3 +317,80 @@ class TestEnrichmentTableURL:
         # Job should fail for invalid URL - distinguish from timeout
         assert job_result == "failed", \
             f"Expected job to fail for invalid URL, got: {job_result}"
+
+    def test_reload_enrichment_table_url(self):
+        """Test reloading enrichment table URLs with retry=true.
+
+        Regression test for the bug where retry mode was blocked by URL validation
+        (commit 85d261b5d0 removed the !retry guard). The frontend sends an empty URL
+        with retry=true to reprocess existing URLs from the database.
+        """
+        # Step 1: Create the enrichment table
+        self.enrichment_page.create_enrichment_table_from_url(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            csv_url=self.TEST_CSV_URL,
+            append=False
+        )
+
+        # Step 2: Wait for initial job to complete
+        result = self.enrichment_page.wait_for_url_enrichment_job(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            max_retries=24,
+            delay=5
+        )
+        assert result == "completed", f"Initial job did not complete: {result}"
+
+        # Step 3: Reload with retry=true and empty URL
+        # This is the key test - before the fix, this would return 400 with
+        # "URL cannot be empty". After the fix, it should return 200.
+        response = self.enrichment_page.create_enrichment_table_from_url(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            csv_url="",  # Empty URL is valid for retry mode
+            append=False,
+            retry=True
+        )
+        assert response.status_code == 200, \
+            f"Reload (retry=true) should return 200. Got {response.status_code}: {response.text}"
+
+        # Step 4: Wait for reload job to complete
+        reload_result = self.enrichment_page.wait_for_url_enrichment_job(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            max_retries=24,
+            delay=5
+        )
+        assert reload_result == "completed", f"Reload job did not complete: {reload_result}"
+
+    def test_empty_url_without_retry_fails(self):
+        """Test that empty URL without retry=true still returns 400.
+
+        Ensures the URL validation is still enforced for non-retry modes.
+        Only retry mode should allow an empty URL.
+        """
+        url = f"{self.base_url}api/{self.ORG_ID}/enrichment_tables/{self.table_name}/url?append=false"
+        payload = {"url": "", "replace_failed": False}
+
+        response = self.session.post(url, json=payload)
+        assert response.status_code == 400, \
+            f"Empty URL without retry should return 400. Got {response.status_code}: {response.text}"
+        assert "URL cannot be empty" in response.text, \
+            f"Expected 'URL cannot be empty' in response. Got: {response.text}"
