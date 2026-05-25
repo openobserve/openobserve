@@ -5428,9 +5428,6 @@ html.dark .file-type label,
   object-fit: contain;
 }
 
-.body--dark .toolbar-icon {
-  filter: invert(1);
-}
 
 .toolbar-icon-in-toggle {
   font-size: 0.9rem; // ~14.4px
