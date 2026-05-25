@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
     class="tw:flex tw:flex-wrap tw:mt-1 tw:ml-1"
   >
     <div
@@ -2497,56 +2496,21 @@ export default defineComponent({
 
       const variableName = variableItem.name;
 
-      // If variables are still loading (either manager-level or local), defer search until loading finishes
-      const managerLoading =
-        useManager &&
-        manager &&
-        (manager as any).isLoading &&
-        (manager as any).isLoading.value;
-      const localLoading = variablesData.values.some(
-        (v: any) => v.isLoading === true || v.isVariablePartialLoaded === false,
-      );
-
-      if (managerLoading || localLoading) {
-        const stop = watch(
-          () =>
-            useManager && manager && (manager as any).isLoading
-              ? (manager as any).isLoading.value
-              : variablesData.values.some(
-                  (v: any) =>
-                    v.isLoading === true || v.isVariablePartialLoaded === false,
-                ),
-          (val) => {
-            if (!val) {
-              stop();
-              // Re-run the search once loading has completed
-              cancelAllVariableOperations(variableName);
-              loadSingleVariableDataByName(
-                variableItem,
-                false,
-                filterText,
-              ).catch(() => {});
-            }
-          },
-        );
-        return;
-      }
-
-      // If there's no filter text (user did not type), treat this as an open event.
-      // In that case, only load options if they are not already present/loaded.
-      if (
-        !filterText ||
-        (typeof filterText === "string" && filterText.trim() === "")
-      ) {
-        // Delegate to loadVariableOptions which contains the logic to avoid unnecessary fetches
-        cancelAllVariableOperations(variableName);
-        await loadVariableOptions(variableItem);
-        return;
-      }
-
-      // Cancel any previous API calls for this variable immediately
+      // For both search (non-empty filterText) and clear (empty filterText) events,
+      // cancel any ongoing operations and fire the values API immediately.
+      // - non-empty: fires a filtered query (str_match) for typeahead
+      // - empty: fires an unfiltered query to reload all options
+      // We never defer here — the user is actively interacting with an open dropdown
+      // and expects immediate feedback. Deferring causes the API to either never fire
+      // or fire with stale text when a previous streaming request is still running.
       cancelAllVariableOperations(variableName);
-      await loadSingleVariableDataByName(variableItem, false, filterText);
+      await loadSingleVariableDataByName(
+        variableItem,
+        false,
+        filterText && typeof filterText === "string" && filterText.trim() !== ""
+          ? filterText
+          : undefined,
+      );
     };
 
     return {
