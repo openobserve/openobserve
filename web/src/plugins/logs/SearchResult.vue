@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination"
+            class="select-pagination tw:min-w-[4.5rem]"
             size="sm"
             :disable="searchObj.loading"
             @update:model-value="getPageData('recordsPerPage')"
