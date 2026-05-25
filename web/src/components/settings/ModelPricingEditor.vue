@@ -286,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="tpl.name"
                     variant="pricing-chip"
                     :active="isTemplateActive(tier, tpl.keys)"
+                    class="tw:!rounded-[1.25rem] tw:!h-auto tw:!py-[0.3125rem] tw:!px-[0.875rem] tw:!text-xs tw:!font-medium tw:!gap-[0.375rem]"
                     @click="applyTemplate(tier, tpl.keys)"
                   >
                     <template #icon-left>
