@@ -19,8 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
-    :width="createNewFunction ? '97' : '30'"
+    :width="createNewFunction ? 97 : 30"
     @keydown.stop
+    :primaryButtonLabel="!createNewFunction ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewFunction && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveFunction"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
       data-test="add-function-node-routing-section"
@@ -156,29 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:flex tw:gap-2">
-          <OButton
-            v-if="pipelineObj.isEditNode && !createNewFunction"
-            data-test="associate-function-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            v-if="!createNewFunction"
-            data-test="associate-function-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            v-if="!createNewFunction"
-            data-test="associate-function-save-btn"
-            variant="primary"
-            size="sm-action"
-            @click="saveFunction"
-          >{{ createNewFunction ? t('alerts.createFunction') : t('alerts.save') }}</OButton>
-        </div>
+
       </div>
     </div>
     </div>
@@ -205,7 +190,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";

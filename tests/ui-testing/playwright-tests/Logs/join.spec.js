@@ -78,12 +78,17 @@ test.describe("Join for logs", () => {
   test("Run query after selecting two streams, SQL Mode On and entering join queries", { tag: ['@join', '@innerJoin', '@functional', '@P1'] }, async ({ page }) => {
     testLogger.info('Testing join queries with SQL Mode enabled');
 
+    // Use unique streams to avoid schema-mismatch / stale-index failures on shared
+    // default + e2e_automate streams when multiple tests run in parallel.
+    const testRunId = Date.now().toString(36);
+    const { streamA, streamB } = await pm.ingestionPage.ingestionJoinUnion(testRunId);
+    testLogger.info(`Created streams: ${streamA}, ${streamB}`);
+
     await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
-    await pm.logsPage.kubernetesContainerNameJoin();
+    await pm.logsPage.selectIndexAndStreamJoinUnion(streamA, streamB);
+    await pm.logsPage.kubernetesContainerNameJoin(streamA, streamB);
     await pm.logsPage.enableSQLMode();
     await pm.logsPage.selectRunQuery();
-    await pm.logsPage.displayCountQuery();
     await pm.logsPage.validateResult();
 
     testLogger.info('Join queries execution and validation completed');

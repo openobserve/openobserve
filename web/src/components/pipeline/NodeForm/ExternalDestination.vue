@@ -22,6 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     :show-close="true"
     @keydown.stop
+    :primaryButtonLabel="!createNewDestination ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewDestination ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewDestination && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveDestination"
+    @click:secondary="handleCancel"
+    @click:neutral="openDeleteDialog"
   >
     <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
       <OSwitch
@@ -48,29 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="destination-method-select"
           tabindex="0"
         />
-
-        <!-- Action buttons for existing destination selection -->
-        <div class="tw:flex tw:gap-2">
-          <OButton
-            v-if="pipelineObj.isEditNode"
-            data-test="add-destination-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            data-test="add-destination-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="handleCancel"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            data-test="add-destination-save-btn"
-            variant="primary"
-            size="sm-action"
-            @click="saveDestination"
-          >{{ t('alerts.save') }}</OButton>
-        </div>
       </template>
     </div>
   </ODrawer>
@@ -88,7 +72,6 @@ import { ref, computed, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

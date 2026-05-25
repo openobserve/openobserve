@@ -22,6 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :show-close="true"
     @keydown.stop
+    :primaryButtonLabel="!createNewStream ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewStream ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveStream"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
       data-test="add-stream-input-stream-routing-section"
@@ -105,27 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:flex tw:gap-2 tw:mt-2">
-            <OButton
-              v-if="pipelineObj.isEditNode"
-              data-test="input-node-stream-delete-btn"
-              variant="outline-destructive"
-              size="sm"
-              @click="openDeleteDialog"
-            >{{ t("pipeline.deleteNode") }}</OButton>
-            <OButton
-              data-test="input-node-stream-cancel-btn"
-              variant="outline"
-              size="sm"
-              @click="openCancelDialog"
-            >{{ t('alerts.cancel') }}</OButton>
-            <OButton
-              data-test="input-node-stream-save-btn"
-              variant="primary"
-              size="sm"
-              @click="saveStream"
-            >{{ t('alerts.save') }}</OButton>
-          </div>
+
         </div>
         <div v-else class="pipeline-add-stream">
           <AddStream
@@ -154,7 +141,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
