@@ -146,7 +146,6 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
-import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -180,6 +179,7 @@ export default defineComponent({
       dashboardPanelData,
       resetDashboardPanelData,
       resetAggregationFunction,
+      removeXYFilters,
       validatePanel,
       updateGroupedFields,
       makeAutoSQLQuery,
@@ -253,14 +253,6 @@ export default defineComponent({
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
 
-      if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization.identifier,
-        );
-        if (persisted) {
-          dashboardPanelData.data.queries[0].fields.stream = persisted;
-        }
-      }
       // need to remove the xy filters
       removeXYFilters();
 
@@ -302,18 +294,6 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
-      },
-    );
-
-    watch(
-      () => dashboardPanelData.data.queries[0]?.fields?.stream,
-      (stream: string) => {
-        if (store.state.zoConfig?.auto_query_enabled && stream) {
-          saveMetricsStream(
-            store.state.selectedOrganization.identifier,
-            stream,
-          );
-        }
       },
     );
 
