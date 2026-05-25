@@ -79,9 +79,17 @@ import LlmEvaluation from "./LlmEvaluation.vue";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><slot /></div>',
+  props: [
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
 };
 
 function createWrapper(overrides: Record<string, any> = {}): VueWrapper<any> {
@@ -148,13 +156,13 @@ describe("LlmEvaluation - rendering", () => {
 
   it("renders the save button", () => {
     expect(
-      wrapper.find('[data-test="llm-evaluation-save-btn"]').exists()
+      wrapper.find('[data-test="o-drawer-primary-btn"]').exists()
     ).toBe(true);
   });
 
   it("renders the cancel button", () => {
     expect(
-      wrapper.find('[data-test="llm-evaluation-cancel-btn"]').exists()
+      wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()
     ).toBe(true);
   });
 });
@@ -439,7 +447,7 @@ describe("LlmEvaluation - edit mode", () => {
     const w = createWrapper();
     await flushPromises();
     expect(
-      w.find('[data-test="llm-evaluation-delete-btn"]').exists()
+      w.find('[data-test="o-drawer-neutral-btn"]').exists()
     ).toBe(true);
     w.unmount();
   });
