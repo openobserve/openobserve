@@ -503,13 +503,11 @@ export default defineComponent({
               variant: "success",
               message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
               timeout: 5000,
-              actions: [
-                {
-                  label: "View Dashboard",
-                  handler: () =>
-                    router.push(`/dashboards?org_identifier=${orgId}`),
-                },
-              ],
+              action: {
+                label: "View Dashboard",
+                handler: () =>
+                  router.push(`/dashboards?org_identifier=${orgId}`),
+              },
             });
 
             // Track analytics
@@ -544,12 +542,10 @@ export default defineComponent({
           variant: "success",
           message: `Dashboard for ${props.integration.displayName} imported successfully!`,
           timeout: 5000,
-          actions: [
-            {
-              label: "View Dashboard",
-              handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
-            },
-          ],
+          action: {
+            label: "View Dashboard",
+            handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
+          },
         });
 
         // Track analytics

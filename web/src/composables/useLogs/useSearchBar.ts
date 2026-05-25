@@ -897,7 +897,7 @@ export const useSearchBar = () => {
               searchObj.data.isOperationCancelled = false;
               toast({
                 message: "Running query cancelled successfully",
-                position: "bottom-center",
+                position: "bottom-right",
                 timeout: 4000,
               });
             }
@@ -907,7 +907,7 @@ export const useSearchBar = () => {
               message:
                 error.response?.data?.message ||
                 "Failed to cancel running query",
-              position: "bottom-center",
+              position: "bottom-right",
               timeout: 1500,
             });
           })
@@ -921,7 +921,7 @@ export const useSearchBar = () => {
       } catch (error) {
         toast({
           message: "Failed to cancel running query",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 1500,
         });
         resolve(true);

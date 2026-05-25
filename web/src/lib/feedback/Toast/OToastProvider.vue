@@ -25,16 +25,12 @@ import OToast from "./OToast.vue"
 
 const { toasts } = useToast()
 
-// Collect distinct positions from active toasts.
-// NOTE: For the initial implementation a single bottom-right viewport is used.
-// Multi-position support (one viewport per position bucket) will be added in a
-// follow-up once the full Quasar migration is complete. See toast.md § 4.
+// Distinct positions among active toasts (plus the default), one viewport each.
 const activePositions = computed<ToastPosition[]>(() => {
   const seen = new Set<ToastPosition>()
   for (const t of toasts) {
     seen.add(t.position)
   }
-  // Always show at least the default position so the viewport is mounted
   seen.add("bottom-right")
   return [...seen]
 })

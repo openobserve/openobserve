@@ -250,7 +250,7 @@ export default defineComponent({
     const onSignIn = () => {
       if (name.value == "" || password.value == "") {
         toast({
-          position: "top-center",
+          variant: "warning",
           message: "Please input valid username or password.",
         });
       } else {
@@ -398,6 +398,7 @@ export default defineComponent({
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
                 toast({
+                  variant: "error",
                   message: res.data.message,
                 });
               }
@@ -406,6 +407,7 @@ export default defineComponent({
               //if any error occurs, show error message and reset form.
               submitting.value = false;
               toast({
+                variant: "error",
                 message: "Invalid username or password",
                 timeout: 4000,
               });
@@ -414,6 +416,7 @@ export default defineComponent({
         } catch (e) {
           submitting.value = false;
           toast({
+            variant: "warning",
             message: "Please fill all the fields and try again.",
           });
           console.log(e);

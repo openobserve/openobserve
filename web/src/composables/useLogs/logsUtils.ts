@@ -563,7 +563,7 @@ export const logsUtils = () => {
   const showCancelSearchNotification = () => {
     toast({
       message: "Running query cancelled successfully",
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 4000,
     });
   };

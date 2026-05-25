@@ -719,6 +719,7 @@ export default defineComponent({
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
+        loading.value = true;
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -733,6 +734,7 @@ export default defineComponent({
               "Failed to load dashboards for the selected folder.",
           );
         } finally {
+          loading.value = false;
           dismiss();
           searchAcrossFolders.value = false;
           router.push({

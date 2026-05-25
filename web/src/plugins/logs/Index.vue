@@ -296,7 +296,7 @@ size="md" />
                         @run-query="searchData"
                       />
                     </div>
-                    <div class="tw:text-center tw:w-5/6 tw:m-0">
+                    <div class="tw:text-center tw:w-5/6 tw:mx-auto">
                       <h5 class="tw:my-none">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer

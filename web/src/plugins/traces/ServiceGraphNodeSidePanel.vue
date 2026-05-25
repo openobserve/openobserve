@@ -1968,7 +1968,7 @@ export default defineComponent({
             variant: "warning",
             message: t("traces.noLogsAvailableForService"),
             timeout: 3000,
-            position: "bottom-center",
+            position: "bottom-right",
           });
           return;
         }
@@ -1977,7 +1977,7 @@ export default defineComponent({
           variant: "warning",
           message: t("traces.noLogsAvailableForService"),
           timeout: 3000,
-          position: "bottom-center",
+          position: "bottom-right",
         });
         return;
       }
@@ -2010,7 +2010,7 @@ export default defineComponent({
           variant: "warning",
           message: correlationError.value,
           timeout: 3000,
-          position: "bottom-center",
+          position: "bottom-right",
         });
       }
     };

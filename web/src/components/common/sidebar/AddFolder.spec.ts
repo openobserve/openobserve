@@ -78,6 +78,7 @@ const OFormStub = {
       validateField: vi.fn().mockResolvedValue(undefined),
       getFieldMeta: vi.fn().mockReturnValue({ errors: [] }),
       setFieldMeta: vi.fn(),
+      setFieldValue: vi.fn(),
       handleSubmit: vi.fn(),
       reset: vi.fn(),
     };
@@ -629,6 +630,11 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: { name: "  My Folder  ", description: "desc" },
+          },
+        },
       };
 
       await vm.submit();
@@ -732,6 +738,11 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: { name: "Name", description: "" },
+          },
+        },
       };
 
       await vm.submit();
@@ -787,6 +798,11 @@ describe("AddFolder.vue", () => {
       vm.addFolderForm = {
         validate: vi.fn().mockResolvedValue(true),
         resetValidation: vi.fn().mockResolvedValue(undefined),
+        form: {
+          state: {
+            values: { name: "Name", description: "" },
+          },
+        },
       };
 
       await vm.submit();

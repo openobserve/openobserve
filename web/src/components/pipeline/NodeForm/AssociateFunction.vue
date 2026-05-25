@@ -363,7 +363,7 @@ const saveFunction = () => {
     if (addFunctionRef.value.formData.name == "") {
       toast({
         message: "Function Name is required",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 2000,
       });
       return;
