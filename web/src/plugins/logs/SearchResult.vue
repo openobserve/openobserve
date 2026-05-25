@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination"
+            class="select-pagination tw:min-w-[4.5rem]"
             size="sm"
             :disable="searchObj.loading"
             @update:model-value="getPageData('recordsPerPage')"
@@ -1374,6 +1374,11 @@ export default defineComponent({
         field_value,
         action,
       );
+      // Clicks on log-row include/exclude should always append (AND) to the
+      // existing query, never replace an existing condition for the same field
+      // — unlike the field-sidebar checkboxes which represent the full set of
+      // selected values for that field.
+      searchObj.data.stream.addToFilterMode = "append";
       searchObj.data.stream.addToFilter = searchExpression;
     };
 

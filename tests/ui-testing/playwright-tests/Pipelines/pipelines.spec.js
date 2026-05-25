@@ -497,6 +497,8 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     const pipelineName = `toggle-pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
+    // Wait for the save toast so the pipeline is committed before navigating away
+    await pipelinePage.waitForPipelineSaved();
 
     // Navigate to pipeline list
     await pipelinePage.exploreStreamAndNavigateToPipeline('toggle_test_dest');

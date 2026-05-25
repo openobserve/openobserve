@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    data-test="associate-function-drawer"
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
@@ -362,7 +363,7 @@ const saveFunction = () => {
     if (addFunctionRef.value.formData.name == "") {
       toast({
         message: "Function Name is required",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 2000,
       });
       return;

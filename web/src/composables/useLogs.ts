@@ -161,12 +161,10 @@ const useLogs = () => {
               variant: "success",
               message: "Job Added Succesfully",
               timeout: 2000,
-              actions: [
-                {
-                  label: "Go To Job Scheduler",
-                  handler: () => routeToSearchSchedule(),
-                },
-              ],
+              action: {
+                label: "Go To Job Scheduler",
+                handler: () => routeToSearchSchedule(),
+              },
             });
           });
       } else {
@@ -233,7 +231,6 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            position: "top-center",
             timeout: 1000,
           });
         }

@@ -358,6 +358,66 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
       expect(wrapper.vm.cursorPosition).toBe(15);
     });
+
+    it("inserts SQL filters before GROUP BY", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" where service=\'api\' GROUP BY histogram(_timestamp)',
+      );
+    });
+
+    it("appends SQL filters inside existing WHERE before GROUP BY", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+      );
+    });
+
+    it("removes SQL field filters instead of adding the field name", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("remove-field", "service");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+      );
+    });
   });
 
   describe("Function Management", () => {
@@ -722,4 +782,3 @@ describe("ScheduledPipeline Component", () => {
     });
   });
 });
-

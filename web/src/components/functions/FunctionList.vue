@@ -474,14 +474,12 @@ export default defineComponent({
               message:
                 "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
               timeout: 10000,
-              actions: [
-                {
-                  label: "View",
-                  handler: () => {
-                    forceRemoveFunction(err.response.data["message"]);
-                  },
+              action: {
+                label: "View",
+                handler: () => {
+                  forceRemoveFunction(err.response.data["message"]);
                 },
-              ],
+              },
             });
             return;
           }

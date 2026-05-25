@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('pipeline.conditionTitle')"
     :width="45"
     :show-close="false"
+    data-test="add-condition-drawer"
     primary-button-label="Save"
     secondary-button-label="Cancel"
     secondary-button-variant="outline"

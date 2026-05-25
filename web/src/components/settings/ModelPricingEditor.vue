@@ -820,7 +820,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  toast({ variant: "error", message, position: "bottom-center", timeout: 4000 });
+  toast({ variant: "error", message, position: "bottom-right", timeout: 4000 });
 }
 
 /** Show error notification only for non-403 errors.
@@ -832,7 +832,7 @@ function notifyError(prefix: string, e: any) {
   toast({
     variant: "error",
     message: `${prefix}: ${msg}`,
-    position: "bottom-center",
+    position: "bottom-right",
     timeout: 5000,
   });
 }
@@ -918,14 +918,14 @@ async function save() {
       toast({
         variant: "warning",
         message: t("modelPricing.saveShadowedWarning", { winner }),
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 8000,
       });
     } else {
       toast({
         variant: "success",
         message: t("modelPricing.modelPricingSaved"),
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     }

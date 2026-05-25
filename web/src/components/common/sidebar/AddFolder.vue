@@ -116,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (isOpen) => {
           if (isOpen) loadFolderData();
           else folderData.value = defaultValue();
-        }
+        },
+        { immediate: true }
       );
 
       watch(

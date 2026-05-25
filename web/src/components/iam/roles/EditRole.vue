@@ -476,7 +476,7 @@ const getRoleDetails = () => {
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       router.push({
