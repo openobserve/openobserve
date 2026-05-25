@@ -927,11 +927,11 @@ pub async fn get_all_anomaly_history(
         };
 
         // Skip configs the user has no access to
-        if let Some(ref allowed) = permitted_config_ids 
-            && !allowed.contains(&config_id) {
-                continue;
-            }
-        
+        if let Some(ref allowed) = permitted_config_ids
+            && !allowed.contains(&config_id)
+        {
+            continue;
+        }
 
         let bucket = grouped.entry(config_id).or_default();
         if bucket.len() >= limit as usize {
