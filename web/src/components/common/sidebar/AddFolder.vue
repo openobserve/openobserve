@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </template>
   
   <script lang="ts">
-  import { defineComponent, ref } from "vue";
+  import { defineComponent, ref, watch } from "vue";
   import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
   import OForm from "@/lib/forms/Form/OForm.vue";
   import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -93,17 +93,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const store: any = useStore();
       const addFolderForm: any = ref(null);
       const disableColor: any = ref("");
-      const folderData: any = ref(
-        props.editMode
-          ? JSON.parse(
-              JSON.stringify(
-                store.state.organizationData.foldersByType[props.type].find(
-                  (item: any) => item.folderId === props.folderId
-                )
-              )
-            )
-          : defaultValue()
+      const folderData: any = ref(defaultValue());
+
+      // The drawer mounts its form lazily and OForm reads `defaultValues` only
+      // once, so refresh local state from the store every time the drawer opens
+      // and push the values into the form fields.
+      const loadFolderData = () => {
+        if (props.editMode) {
+          const found = store.state.organizationData.foldersByType[
+            props.type
+          ]?.find((item: any) => item.folderId === props.folderId);
+          folderData.value = found
+            ? JSON.parse(JSON.stringify(found))
+            : defaultValue();
+        } else {
+          folderData.value = defaultValue();
+        }
+      };
+
+      watch(
+        () => props.open,
+        (isOpen) => {
+          if (isOpen) loadFolderData();
+          else folderData.value = defaultValue();
+        }
       );
+
+      watch(
+        () => folderData.value.name,
+        (name) => addFolderForm.value?.form.setFieldValue("name", name ?? "")
+      );
+      watch(
+        () => folderData.value.description,
+        (description) =>
+          addFolderForm.value?.form.setFieldValue("description", description ?? "")
+      );
+
       const isValidIdentifier: any = ref(true);
       const { t } = useI18n();
       const { showPositiveNotification, showErrorNotification } =

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:gap-3">
             <div class="tw:w-1/2">
               <OCard
-                class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="tw:bg-[var(--o2-card-bg-solid)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <OCardSection class="tw:p-[0.375rem]">
                   <div
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCard>
             </div>
             <div class="tw:w-1/2">
-              <OCard class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+              <OCard class="tw:bg-[var(--o2-card-bg-solid)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
                 <OCardSection class="tw:p-[0.375rem]">
                   <div
                     class="tw:text-xs"

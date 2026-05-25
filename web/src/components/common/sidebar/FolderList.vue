@@ -63,23 +63,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap">
+          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row">
               <span class="folder-name" :title="tab.name">{{
               tab.name
               }}</span>
-              <div class="hover-actions">
+              <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">
               <ODropdown
                 v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                side="bottom"
+                align="start"
               >
                 <template #trigger>
                   <OButton
+                    size="icon"
                     variant="ghost"
-                    size="icon-circle-sm"
-                    style="cursor: pointer; justify-self: end; height: 0.5rem"
+                    icon-left="more-vert"
+                    class="tw:h-6 tw:w-6"
                     data-test="dashboard-more-icon"
-                  >
-                    <OIcon name="more-vert" size="sm" />
-                  </OButton>
+                  />
                 </template>
                 <ODropdownItem
                   data-test="dashboard-edit-folder-icon"
@@ -365,30 +366,10 @@ export default defineComponent({
     border-radius: 0.25rem;
     transition: background-color 0.3s;
 
-    &:hover {
-      .hover-actions {
-        display: flex;
-      }
-    }
-
-    // .folder-name {
-    //   white-space: nowrap;
-    //   overflow: hidden;
-    //   text-overflow: ellipsis;
-    // }
-
-    .hover-actions {
-      display: none;
-      align-items: center;
-      // No background change on hover — the button appears inside a folder item
-      // which already has its own hover/active state. Any fill here looks like
-      // a white or grey artifact over the item background.
-      --color-button-ghost-hover-bg: transparent;
-
-      .q-btn {
-        margin-left: 0.5rem;
-      }
-    }
+    // No background change on the action button hover — it sits inside a folder
+    // item that already has its own hover/active state, so any fill looks like
+    // a stray artifact over the item background.
+    --color-button-ghost-hover-bg: transparent;
   }
 
   .o-tabs {

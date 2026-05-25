@@ -1108,6 +1108,7 @@ export default defineComponent({
     margin: 0 0 16px 0;
     line-height: 1.2;
     text-align: center;
+    color: white; // override global h1-h6 { color: var(--o2-text-heading) } from app.scss
   }
 
   .offer-text {
@@ -1116,6 +1117,7 @@ export default defineComponent({
     line-height: 1.6;
     opacity: 0.95;
     text-align: center;
+    color: white;
   }
 
   .hero-offer {

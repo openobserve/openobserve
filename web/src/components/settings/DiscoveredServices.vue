@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Filter bar -->
           <div class="tw:flex tw:items-center tw:gap-2">
-            <span class="tw:text-md tw:text-gray-400">{{
+            <span class="tw:text-md tw:text-gray-400 tw:whitespace-nowrap">{{
               t("settings.correlation.filterBy")
             }}</span>
             <OSelect
@@ -176,10 +176,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default-columns="false"
             :show-global-filter="false"
             expansion="single"
-            :get-sub-rows="getSubRows"
+            :expand-on-row-click="(row: any) => row.__type === 'group'"
+            :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky services-table"
-            :class="filteredGroups.length > 0 ? 'services-table-full-height' : ''"
+            :class="filteredGroupCount > 0 ? 'services-table-full-height' : ''"
             data-test="services-list-table"
+            @update:expanded-ids="syncExpansion"
             @row-click="handleRowClick"
           >
             <template #cell-service_name="{ row }">
@@ -194,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </span>
               </div>
-              <div v-else class="tw:pl-7 tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+              <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                 <span class="set-id-badge">{{ row.set_id }}</span>
                 <span
                   v-for="[key, value] in Object.entries(
@@ -291,13 +293,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </template>
 
-            <!-- Loading state -->
-            <template #loading>
-              <div class="tw:flex tw:items-center tw:justify-center tw:pb-40">
-                <OSpinner size="lg" data-test="discovered-services-table-loading-indicator" />
-              </div>
-            </template>
-
             <!-- Bottom -->
             <template #bottom>
               <div
@@ -305,12 +300,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="o2-table-footer-title tw:w-[15.625rem] tw:mr-md">
                   {{
-                    filteredGroups.length === 1
+                    filteredGroupCount === 1
                       ? t("settings.correlation.serviceCountSingular", {
-                          count: filteredGroups.length,
+                          count: filteredGroupCount,
                         })
                       : t("settings.correlation.serviceCountPlural", {
-                          count: filteredGroups.length,
+                          count: filteredGroupCount,
                         })
                   }}
                   {{
@@ -635,7 +630,7 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.serviceName"),
     accessorKey: "service_name",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "telemetry",
@@ -650,34 +645,16 @@ const columns: OTableColumnDef[] = [
     accessorKey: "lastSeen",
     sortable: true,
     size: 120,
-    meta: { align: "right" },
+    meta: { align: "left" },
   },
 ];
 
-// Manage expansion manually since we need to sync expandedGroupNames
-function toggleGroup(serviceName: string) {
-  const newSet = new Set(expandedGroupNames.value);
-  if (newSet.has(serviceName)) {
-    newSet.delete(serviceName);
-  } else {
-    newSet.add(serviceName);
-  }
-  expandedGroupNames.value = newSet;
-}
-
-function getSubRows(row: any): any[] {
-  // Always declare children so OTable can show the single expand chevron.
-  // Visibility is controlled by OTable's internal expansion state.
-  if (row.__type === 'group' && Array.isArray(row._instances)) {
-    return row._instances;
-  }
-  return [];
+function syncExpansion(ids: string[]) {
+  expandedGroupNames.value = new Set(ids);
 }
 
 function handleRowClick(row: any) {
-  if (row.__type === 'group') {
-    toggleGroup(row.service_name);
-  } else {
+  if (row.__type !== 'group') {
     selectedService.value = row;
   }
 }
@@ -820,28 +797,41 @@ const filteredGroups = computed((): any[] => {
     });
   }
 
-  // Flatten to OTable-compatible rows with __type marker
-  return groups.map((g) => ({
-    id: g.service_name,
-    __type: 'group',
-    service_name: g.service_name,
-    totalLogs: g.totalLogs,
-    totalTraces: g.totalTraces,
-    totalMetrics: g.totalMetrics,
-    lastSeen: g.lastSeen,
-    correlationScore: g.correlationScore,
-    instances: g.instances,
-    _instances: g.instances.map((inst) => ({
-      ...inst,
-      id: inst.id,
-      __type: 'instance',
-      lastSeen: inst.last_seen,
-    })),
-  }));
+  // Manually flatten: group rows + instance rows when expanded
+  const result: any[] = [];
+  for (const g of groups) {
+    const groupRow = {
+      id: g.service_name,
+      __type: 'group',
+      service_name: g.service_name,
+      totalLogs: g.totalLogs,
+      totalTraces: g.totalTraces,
+      totalMetrics: g.totalMetrics,
+      lastSeen: g.lastSeen,
+      correlationScore: g.correlationScore,
+      instances: g.instances,
+    };
+    result.push(groupRow);
+    if (expandedGroupNames.value.has(g.service_name)) {
+      for (const inst of g.instances) {
+        result.push({
+          ...inst,
+          id: inst.id,
+          __type: 'instance',
+          lastSeen: inst.last_seen,
+        });
+      }
+    }
+  }
+  return result;
 });
 
+const filteredGroupCount = computed(() =>
+  filteredGroups.value.filter((r: any) => r.__type === 'group').length,
+);
+
 const totalInstances = computed(() =>
-  filteredGroups.value.reduce((sum: number, g: any) => sum + g.instances.length, 0),
+  filteredGroups.value.filter((r: any) => r.__type === 'group').reduce((sum: number, g: any) => sum + g.instances.length, 0),
 );
 
 const getDimensionColorClass = (key: string): string => {
@@ -1309,4 +1299,6 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
+
+
 </style>
