@@ -103,7 +103,7 @@ export class PipelinesPage {
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"]');
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
-        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
+        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-drawer"] [data-test="o-drawer-primary-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
         // AddFunction's name field is an OInput — when the form is submitted
         // empty, OInput renders the "Field is required!" message inside the
@@ -157,7 +157,7 @@ export class PipelinesPage {
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
-        this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+        this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
@@ -210,8 +210,8 @@ export class PipelinesPage {
         this.toggleOperatorBtn = page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
         this.deleteConditionBtn = page.locator('[data-test="alert-conditions-delete-condition-btn"]');
         this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
-        this.addConditionCancelBtn = page.locator('[data-test="add-condition-cancel-btn"]');
-        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-delete-btn"]');
+        this.addConditionCancelBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-secondary-btn"]');
+        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');

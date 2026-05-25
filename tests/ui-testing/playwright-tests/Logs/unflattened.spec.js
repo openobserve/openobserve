@@ -147,46 +147,25 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Expanding first log row');
-    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-
-    testLogger.info('Opening log source details');
-    await pageManager.unflattenedPage.logSourceColumn.waitFor();
-    await pageManager.unflattenedPage.logSourceColumn.click();
-    await page.waitForTimeout(1500);
-
-    testLogger.info('Waiting for _o2_id field to appear in log details');
-    // Retry with query refresh if _o2_id not found (data may not be indexed yet).
+    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
+    // The `_o2_id` field only appears on rows ingested AFTER the schema
+    // change. Older rows may still be the most recent in the time window, so
+    // we scan the first N rows per attempt instead of relying on row 0. Between
+    // attempts we refresh the query to give the indexer a chance to surface
+    // freshly-ingested data.
     let o2idFound = false;
     for (let attempt = 1; attempt <= 5; attempt++) {
-      try {
-        await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 15000 });
-        testLogger.info(`Successfully found _o2_id field (attempt ${attempt})`);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      if (matchedRow !== -1) {
+        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
-      } catch (error) {
-        testLogger.warn(`_o2_id not found on attempt ${attempt}, refreshing search`);
-        // Close the open log detail dialog before refreshing — it intercepts
-        // clicks. The drawer carries data-state="open"; close via Escape too as
-        // a fallback when the close button is itself intercepted.
-        const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
-        if (await detailDialog.isVisible().catch(() => false)) {
-          await pageManager.unflattenedPage.closeDialog.click().catch(async () => {
-            await page.keyboard.press('Escape');
-          });
-          await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        }
-        // Give the indexer a chance to catch up between attempts (3s per retry).
-        await page.waitForTimeout(3000);
+      }
+      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      if (attempt < 5) {
         await applyQueryButton(page);
-        // Re-expand log row
-        await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-        await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-        await pageManager.unflattenedPage.logSourceColumn.waitFor();
-        await pageManager.unflattenedPage.logSourceColumn.click();
-        await page.waitForTimeout(1500);
       }
     }
     if (!o2idFound) {
@@ -315,52 +294,31 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Expanding first log row from SELECT * results');
-    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-
-    testLogger.info('Opening log source details');
-    await pageManager.unflattenedPage.logSourceColumn.waitFor();
-    await pageManager.unflattenedPage.logSourceColumn.click();
-    await page.waitForTimeout(1500);
-
-    testLogger.info('Waiting for _o2_id field to appear in log details');
-    // Retry with query refresh if _o2_id not found (data may not be indexed yet)
+    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
+    // Older rows from before the schema change won't carry `_o2_id`; scan the
+    // first N rows per attempt and refresh the query between attempts so the
+    // indexer can surface freshly-ingested data.
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ timeout: 5000 });
-        await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 15000 });
-        testLogger.info(`Successfully found _o2_id field (attempt ${attempt})`);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      if (matchedRow !== -1) {
+        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
-      } catch (error) {
-        testLogger.warn(`_o2_id not found on attempt ${attempt}, refreshing search`);
-        if (attempt === 3) {
-          try {
-            const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
-            testLogger.error('Available fields in log detail', { fields: allKeys });
-          } catch (e) {
-            testLogger.error('Could not retrieve available fields');
-          }
-          break;
-        }
-        // Close any leftover detail drawer from the previous attempt — it intercepts
-        // pointer events and blocks the table row expand-menu click. The drawer is a
-        // right-side dialog with data-test="logs-search-result-detail-dialog".
-        const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
-        if (await detailDialog.isVisible().catch(() => false)) {
-          await page.keyboard.press('Escape');
-          await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        }
-        await applyQueryButton(page);
-        await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-        await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-        await pageManager.unflattenedPage.logSourceColumn.waitFor();
-        await pageManager.unflattenedPage.logSourceColumn.click();
-        await page.waitForTimeout(1500);
       }
+      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      if (attempt === 3) {
+        try {
+          const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
+          testLogger.error('Available fields in log detail', { fields: allKeys });
+        } catch (e) {
+          testLogger.error('Could not retrieve available fields');
+        }
+        break;
+      }
+      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      await applyQueryButton(page);
     }
     if (!o2idFound) {
       throw new Error('Failed to find _o2_id field in log details after 3 attempts');
