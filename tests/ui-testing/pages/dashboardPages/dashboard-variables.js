@@ -91,10 +91,7 @@ export default class DashboardVariables {
     // Toggle show multiple values based on parameter
     if (showMultipleValues) {
       await this.page
-        .locator(
-          '[data-test="dashboard-query_values-show_multiple_values"] div'
-        )
-        .nth(2)
+        .locator('[data-test="dashboard-query_values-show_multiple_values-btn"]')
         .click();
     }
 
