@@ -314,6 +314,29 @@ pub async fn save_enrichment_table_from_url(
         ));
     }
 
+    // RULE 3: Block duplicate URL in append mode
+    // Reason: Adding the same URL twice would create duplicate data in the table
+    if append_data
+        && existing_jobs.iter().any(|j| j.url == request_body.url)
+    {
+        return MetaHttpResponse::bad_request(format!(
+            "URL already exists in table {}/{}. Cannot add the same URL again.",
+            org_id, table_name
+        ));
+    }
+
+    // RULE 4: Block creating a table that already exists
+    // When append=false (default), the user is trying to create a new table.
+    // Silently replacing an existing table is confusing and potentially destructive.
+    // Allow only when the user explicitly intends to modify existing data:
+    // append (add to existing), retry (re-run), resume (continue), replace_failed (fix URL).
+    if !existing_jobs.is_empty() && !append_data && !retry && !resume && !replace_failed {
+        return MetaHttpResponse::bad_request(format!(
+            "Enrichment table {} already exists in organization {}",
+            table_name, org_id
+        ));
+    }
+
     // ===== RETRY vs UPDATE vs RESUME LOGIC =====
     // Three scenarios:
     // 1. resume=true: Resume a specific failed job from last byte position
