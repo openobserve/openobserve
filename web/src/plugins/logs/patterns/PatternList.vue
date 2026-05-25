@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :items="patterns"
         :overscan="5"
         :scroll-target="scrollTarget ?? null"
+        :dynamic-row-height="wrap"
       >
         <template #default="{ item: pattern, index }">
           <PatternCard
@@ -155,7 +156,7 @@ import useWildcardHover from "./useWildcardHover";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 
-defineProps<{
+const props = defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
