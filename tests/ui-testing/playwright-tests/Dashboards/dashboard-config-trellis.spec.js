@@ -108,6 +108,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     const groupByYAxisToggle = page.locator('[data-test="dashboard-config-trellis-group-by-y-axis"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(groupByYAxisToggle);
     await expect(groupByYAxisToggle).toBeVisible();
     await groupByYAxisToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();

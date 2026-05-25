@@ -1089,7 +1089,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         await this.page.locator(this.locators.alertNameInput).click();
-        await this.page.locator(this.locators.alertNameInput).fill('abc');
+        await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
         await this.page.locator(this.locators.alertSubmitButton).click();
@@ -1187,8 +1187,8 @@ export class AlertsPage {
     }
 
     async verifyFolderSearch(folderName) {
-        await this.page.locator('[data-test="folder-search"]').click();
-        await this.page.locator('[data-test="folder-search"]').fill(folderName);
+        await this.page.locator('[data-test="folder-search-field"]').click();
+        await this.page.locator('[data-test="folder-search-field"]').fill(folderName);
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
         await expect(this.page.locator('button[data-test="dashboard-folder-tab-default"]')).toBeVisible();

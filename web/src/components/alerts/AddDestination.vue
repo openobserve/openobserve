@@ -550,7 +550,7 @@ import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import { isPrebuiltType } from "@/utils/prebuilt-templates";
+import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
@@ -798,10 +798,13 @@ const setupDestinationData = () => {
       ) {
         formData.value.destination_type = "email";
       } else if (props.destination.type === "http" && props.destination.url) {
-        // Check if URL matches known prebuilt patterns
-        const detectedType = detectPrebuiltType(props.destination);
-        if (detectedType) {
-          formData.value.destination_type = detectedType;
+        // Use URL-only detection here — detectPrebuiltType also checks the template
+        // name, which would always match since we're already inside the
+        // system-prebuilt-* branch. A custom destination can have any template,
+        // so the URL is the only reliable signal at this point.
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+        if (urlType && isPrebuiltType(urlType)) {
+          formData.value.destination_type = urlType;
         } else {
           // Has system template but URL doesn't match prebuilt patterns - it's custom
           formData.value.destination_type = "custom";

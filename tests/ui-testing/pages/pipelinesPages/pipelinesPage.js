@@ -800,7 +800,7 @@ export class PipelinesPage {
 
     // Method to verify deletion success message
     async verifyPipelineDeleted() {
-        await this.deletionSuccessMessage.click();
+        await this.deletionSuccessMessage.waitFor({ state: 'visible' });
     }
 
     async clickSqlEditor() {

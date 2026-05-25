@@ -262,41 +262,41 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowPost",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPost'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPost'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.create')),
     ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
-    size: 72,
-    minSize: 60,
-    maxSize: 84,
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
     meta: { align: "left" },
   },
   {
     id: "AllowPut",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPut'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPut'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.update')),
     ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
-    size: 72,
-    minSize: 60,
-    maxSize: 84,
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
     meta: { align: "left" },
   },
   {
     id: "AllowDelete",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowDelete'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowDelete'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.delete')),
     ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
-    size: 72,
-    minSize: 60,
-    maxSize: 84,
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
     meta: { align: "left" },
   },
 ]);

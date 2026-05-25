@@ -29,6 +29,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
     const symbolDropdown = page.locator('[data-test="dashboard-config-show_symbol"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(symbolDropdown);
     await expect(symbolDropdown).toBeVisible();
 
     await pm.dashboardPanelConfigs.selectSymbols("Yes");
@@ -58,6 +59,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
     const interpolationDropdown = page.locator('[data-test="dashboard-config-line_interpolation"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(interpolationDropdown);
     await expect(interpolationDropdown).toBeVisible();
 
     for (const mode of ["Smooth", "Linear", "Step After"]) {

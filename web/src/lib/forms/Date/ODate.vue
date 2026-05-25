@@ -163,6 +163,7 @@ const wrapperClasses = computed(() => [
         :class="wrapperClasses"
         :aria-invalid="hasError || undefined"
         role="group"
+        :data-test="parentDataTest ? `${parentDataTest}-group` : undefined"
         @focusin="onFocusIn"
         @focusout="onFocusOut"
       >

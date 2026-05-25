@@ -97,6 +97,13 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const panelAId = panelIds[0];
     const panelBId = panelIds[1];
 
+    // Wait for URL to be populated with panel time params before asserting
+    await page.waitForFunction(
+      (ids) => ids.every(pid => window.location.href.includes(`pt-period.${pid}`)),
+      [panelAId, panelBId],
+      { timeout: 10000 }
+    );
+
     // Step 2: Verify initial URL contains both panel times
     await assertPanelTimeInURL(page, panelAId, "1h");
     await assertPanelTimeInURL(page, panelBId, "6d");

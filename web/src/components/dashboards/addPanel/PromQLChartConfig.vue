@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           creatable
           class="showLabelOnTop"
           data-test="dashboard-config-sticky-columns"
-          :disable="stickyFirstColumn"
+          :disabled="stickyFirstColumn"
           @create="addToStickyColumns"
         >
           <template #tooltip>

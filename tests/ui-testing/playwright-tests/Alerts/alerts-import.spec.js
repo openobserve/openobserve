@@ -85,7 +85,7 @@ test.describe("Alerts Import/Export", () => {
     await expect.poll(
       async () => {
         const resp = await page.request.get(
-          `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/${process.env.ORGNAME || 'default'}/alerts?folder=${encodeURIComponent(folderName)}`,
+          `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/${process.env.ORGNAME || 'default'}/alerts`,
           { failOnStatusCode: false }
         ).catch(() => null);
         if (!resp || !resp.ok()) return false;

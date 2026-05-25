@@ -163,9 +163,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    // Use POM method for stream option selection
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -218,9 +217,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    // Use POM method for stream option selection
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -290,9 +288,8 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    // Use POM method for stream option selection
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
