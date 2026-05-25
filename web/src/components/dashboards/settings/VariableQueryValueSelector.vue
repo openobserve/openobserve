@@ -66,19 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OSeparator />
           <div
-            v-if="currentSearchTerm"
+            v-if="currentSearchTerm && !isSearchTermExistingOption"
             class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
             <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
           </div>
-          <OSeparator v-if="currentSearchTerm" />
+          <OSeparator v-if="currentSearchTerm && !isSearchTermExistingOption" />
         </template>
       </template>
       <template #empty>
         <div
-          v-if="currentSearchTerm"
+          v-if="currentSearchTerm && !isSearchTermExistingOption"
           class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
@@ -182,6 +182,25 @@ export default defineComponent({
     // Cleanup debounce timeout when component is unmounted
     onUnmounted(() => {
       updateSearch.cancel();
+    });
+
+    // True when the typed search term already exists as a regular or custom option,
+    // so the #before-options "Custom" suggestion is suppressed to avoid duplicates.
+    const isSearchTermExistingOption = computed(() => {
+      const term = currentSearchTerm.value?.trim();
+      if (!term) return false;
+      return availableOptions.value.some((opt: any) => {
+        if (typeof opt.label === "string" && opt.label.trim() === term)
+          return true;
+        if (
+          typeof opt.value === "string" &&
+          opt.value.endsWith(`${CUSTOM_VALUE}`)
+        ) {
+          const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
+          if (base === term) return true;
+        }
+        return false;
+      });
     });
 
     const isAllSelected = computed(() => {
@@ -392,6 +411,7 @@ export default defineComponent({
       computedOptions,
       onSearch,
       currentSearchTerm,
+      isSearchTermExistingOption,
       isAllSelected,
       toggleSelectAll,
       displayValue,

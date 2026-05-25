@@ -24,17 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-full el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
+            <div class="tw:pt-[0.625rem] tw:px-1">
             <OInput
               data-test="security-list-search-input"
               v-model="tabsFilter"
               clearable
-              class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
+              class="tw:w-full indexlist-search-input"
               :placeholder="t('common.search')"
             >
               <template #icon-left>
                 <OIcon name="search" size="sm" class="tw:cursor-pointer" />
               </template>
             </OInput>
+            </div>
             <OTabs
               v-model="ingestTabType"
               orientation="vertical"

@@ -51,9 +51,9 @@ fn create_cli_app() -> Command {
         .subcommands(&[
             Command::new("reset")
                 .about("reset openobserve data")
-                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs", true))
-                .arg(arg!("time", 't', "time", "timestamp in microseconds, only used by file-list-jobs (default: 0)"))
-                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, only used by file-list-jobs (default: all streams)")),
+                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs, index-updated-at", true))
+                .arg(arg!("time", 't', "time", "timestamp in microseconds, used by file-list-jobs (default: 0) and index-updated-at (default: stream min data date)"))
+                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by file-list-jobs and index-updated-at (default: all streams)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -296,6 +296,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         "reset {rows} file_list_jobs to pending (offsets >= {time}, stream: {})",
                         stream.unwrap_or("*")
                     );
+                }
+                "index-updated-at" => {
+                    let time = command
+                        .get_one::<String>("time")
+                        .map(|s| s.parse::<i64>().unwrap_or(0));
+                    let stream = command
+                        .get_one::<String>("stream")
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    super::stream::reset_index_updated_at(stream, time).await?;
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -938,6 +948,54 @@ mod tests {
             sub_sub_matches.get_one::<String>("group_size").unwrap(),
             "5"
         );
+    }
+
+    #[test]
+    fn test_reset_index_updated_at_component_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "reset",
+                "--component",
+                "index-updated-at",
+                "--stream",
+                "default/logs/test",
+                "--time",
+                "1700000000000000",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "index-updated-at"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("stream").unwrap(),
+            "default/logs/test"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("time").unwrap(),
+            "1700000000000000"
+        );
+    }
+
+    #[test]
+    fn test_reset_index_updated_at_component_defaults() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "reset", "--component", "index-updated-at"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "index-updated-at"
+        );
+        // stream and time are unset: all streams, use min date
+        assert!(sub_matches.get_one::<String>("stream").is_none());
+        assert!(sub_matches.get_one::<String>("time").is_none());
     }
 
     #[test]

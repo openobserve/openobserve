@@ -693,6 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <date-time
             ref="dateTimeRef"
             auto-apply
+            menu-align="end"
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,

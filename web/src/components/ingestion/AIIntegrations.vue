@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:h-full tw:gap-0">
     <div class="tw:w-[200px] tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 el-border-radius">
+      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
         <div class="tw:overflow-y-auto tw:h-full">
           <OTabs
             v-model="selectedCategory"
@@ -36,19 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:w-[250px] tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 el-border-radius">
+      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
+          <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
           <OInput
             data-test="ai-integrations-search-input"
             v-model="integrationFilter"
             clearable
-            class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
+            class="tw:w-full indexlist-search-input"
             :placeholder="t('common.search')"
           >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:cursor-pointer" />
             </template>
           </OInput>
+          </div>
           <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
             <OTabs
               v-model="selectedIntegration"
@@ -69,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:flex-1 tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 el-border-radius">
+      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
           <div class="tw:flex-1 tw:overflow-auto tw:min-h-0">
             <router-view />

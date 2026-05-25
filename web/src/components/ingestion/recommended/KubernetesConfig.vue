@@ -37,7 +37,7 @@
           <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <OIcon name="info" size="xs" class="tw:mr-1" />
+            <OIcon name="info" size="sm" class="tw:mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>
