@@ -1951,6 +1951,12 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
     #[env_config(
+        name = "ZO_COMPACT_PENDING_FILES_TRIGGER",
+        default = 0,
+        help = "If > 0, an ingester enqueues an incremental merge of the still-open current hour once it has uploaded this many files for a (stream, hour). 0 disables incremental merge (only the per-hour scheduled merge runs)."
+    )]
+    pub pending_files_trigger: usize,
+    #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"

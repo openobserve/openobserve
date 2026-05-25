@@ -1175,6 +1175,23 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    async fn del_jobs(&self, ids: &[i64]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let sql = format!(
+            "DELETE FROM file_list_jobs WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql).execute(&*client).await?;
+        Ok(())
+    }
+
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;

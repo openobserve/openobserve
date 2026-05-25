@@ -37,6 +37,7 @@ use crate::service::db;
 pub mod deleted;
 pub mod dump;
 pub mod flatten;
+pub mod incremental;
 pub mod merge;
 pub mod retention;
 pub mod stats;

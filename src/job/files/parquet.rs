@@ -538,6 +538,7 @@ async fn move_files(
         }
 
         // write file list to storage
+        let new_file_min_ts = new_file_meta.min_ts;
         if let Err(e) =
             db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
         {
@@ -550,6 +551,16 @@ async fn move_files(
             }
             return Ok(());
         };
+
+        // trigger an incremental merge of the current hour once enough files have piled up
+        // (no-op unless ZO_COMPACT_PENDING_FILES_TRIGGER > 0)
+        crate::service::compact::incremental::incr_pending_file(
+            &org_id,
+            stream_type,
+            &stream_name,
+            new_file_min_ts,
+        )
+        .await;
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {

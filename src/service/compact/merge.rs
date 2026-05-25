@@ -32,7 +32,7 @@ use config::{
         parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
-        time::{day_micros, hour_micros},
+        time::{day_micros, hour_micros, now_micros},
     },
 };
 use hashbrown::{HashMap, HashSet};
@@ -382,6 +382,29 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     Ok(())
 }
 
+/// Retire a finished merge job. Re-checks at completion whether the job's hour is still
+/// the current (open) hour. If so, it's an incremental round: delete the job row so the
+/// unique (stream, offsets) key is freed for the next round and the dump path never picks
+/// it up. Otherwise the hour has ended: hand off to the normal done (+ dump) path.
+///
+/// The re-check at completion (rather than at start) closes a boundary race: the scheduled
+/// `generate_job_by_stream` advances its per-stream offset cursor unconditionally after
+/// `add_job` (even on an `ON CONFLICT` no-op), so if we deleted a job after the cursor had
+/// already moved past its hour, that hour would never get a done+dump pass. By only
+/// deleting while the hour is still open, a job that straddles the boundary falls through
+/// to `set_job_done` and is dumped normally.
+async fn finish_merge_job(job_id: i64, offset: i64) {
+    let now = now_micros();
+    let is_current_hour = offset >= now - now % hour_micros(1);
+    if is_current_hour {
+        if let Err(e) = infra_file_list::del_jobs(&[job_id]).await {
+            log::error!("[COMPACTOR] del incremental job [{job_id}] failed: {e}");
+        }
+    } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+        log::error!("[COMPACTOR] set_job_done [{job_id}] failed: {e}");
+    }
+}
+
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
 /// 4. read last compacted offset: year/month/day/hour
@@ -407,15 +430,22 @@ pub async fn merge_by_stream(
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if schema == Schema::empty() {
         // the stream was deleted, mark the job as done
-        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACTOR] set_job_done failed: {e}");
-        }
+        finish_merge_job(job_id, offset).await;
         return Ok(());
     }
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
+
+    // A job whose offset hour has not yet fully passed is an incremental round on the
+    // still-open current hour (enqueued by the ingester, see service::compact::incremental):
+    // only seal full-size groups and carry the remainder, so each file is merged into a
+    // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
+    let is_incremental = {
+        let now = now_micros();
+        offset >= now - now % hour_micros(1)
+    };
 
     // check offset
     let partition_time_level = get_partition_time_level(stream_type);
@@ -443,9 +473,7 @@ pub async fn merge_by_stream(
 
     if files.is_empty() {
         // update job status
-        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACTOR] set_job_done failed: {e}");
-        }
+        finish_merge_job(job_id, offset).await;
         return Ok(());
     }
 
@@ -538,7 +566,12 @@ pub async fn merge_by_stream(
                     new_file_size += file.meta.original_size;
                     new_file_list.push(file.clone());
                 }
-                if new_file_list.len() > 1 {
+                // The trailing batch is always below max_file_size (the loop flushes a group
+                // only when adding the next file would exceed it). In incremental mode we do
+                // NOT seal this remainder: more files will arrive in the still-open hour, and
+                // sealing now would force re-merging it later (write amplification). Carry it
+                // to the next round; the scheduled hour-end pass seals whatever is left.
+                if new_file_list.len() > 1 && !is_incremental {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),
@@ -628,10 +661,9 @@ pub async fn merge_by_stream(
         task.await??;
     }
 
-    // update job status
-    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-        log::error!("[COMPACTOR] set_job_done failed: {e}");
-    }
+    // update job status: incremental (current-hour) jobs are deleted so the next round can
+    // re-trigger and dump skips them; ended hours go through the normal done (+ dump) path
+    finish_merge_job(job_id, offset).await;
 
     // metrics
     let time = start.elapsed().as_secs_f64();

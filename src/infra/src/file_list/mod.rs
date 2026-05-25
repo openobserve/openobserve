@@ -186,6 +186,10 @@ pub trait FileList: Sync + Send + 'static {
     async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
     -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
+    /// Delete merge jobs by id. Used to retire incremental (current-hour) merge jobs
+    /// so the unique (stream, offsets) key is freed for the next round and the job is
+    /// never picked up by the dump path.
+    async fn del_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
@@ -541,6 +545,11 @@ pub async fn set_job_pending(ids: &[i64], offsets: i64, stream: Option<&str>) ->
 #[inline]
 pub async fn set_job_done(ids: &[i64]) -> Result<()> {
     CLIENT.set_job_done(ids).await
+}
+
+#[inline]
+pub async fn del_jobs(ids: &[i64]) -> Result<()> {
+    CLIENT.del_jobs(ids).await
 }
 
 #[inline]
