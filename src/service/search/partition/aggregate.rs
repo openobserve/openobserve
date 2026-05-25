@@ -70,7 +70,6 @@ pub(crate) fn is_streaming_aggregate(
 ///
 /// Returns `(streaming_aggs, streaming_id, partition_strategy)`.
 #[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
 pub(crate) async fn prepare_streaming_aggregate(
     trace_id: &str,
     req: &SearchPartitionRequest,

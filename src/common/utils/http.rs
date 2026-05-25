@@ -34,14 +34,6 @@ pub(crate) fn get_stream_type_from_request(query: &HashMap<String, String>) -> O
 }
 
 #[inline(always)]
-pub(crate) fn get_enable_align_histogram_from_request(query: &HashMap<String, String>) -> bool {
-    query
-        .get("enable_align_histogram")
-        .and_then(|s| s.parse::<bool>().ok())
-        .unwrap_or_default()
-}
-
-#[inline(always)]
 pub(crate) fn get_ts_from_request_with_key(
     query: &HashMap<String, String>,
     key: &str,
@@ -479,24 +471,6 @@ mod tests {
 
         let work_groups = vec![None];
         assert_eq!(get_work_group(work_groups), None);
-    }
-
-    #[test]
-    fn test_get_enable_align_histogram_from_request() {
-        let mut query = Query::<HashMap<String, String>>(Default::default());
-        query.insert("enable_align_histogram".to_string(), "true".to_string());
-        assert!(get_enable_align_histogram_from_request(&query));
-
-        let mut query = Query::<HashMap<String, String>>(Default::default());
-        query.insert("enable_align_histogram".to_string(), "false".to_string());
-        assert!(!get_enable_align_histogram_from_request(&query));
-
-        let mut query = Query::<HashMap<String, String>>(Default::default());
-        query.insert("enable_align_histogram".to_string(), "invalid".to_string());
-        assert!(!get_enable_align_histogram_from_request(&query));
-
-        let query = Query::<HashMap<String, String>>(Default::default());
-        assert!(!get_enable_align_histogram_from_request(&query));
     }
 
     #[test]
