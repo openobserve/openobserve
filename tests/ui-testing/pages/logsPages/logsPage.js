@@ -6356,8 +6356,8 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
-        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // Verify "Builder" button is active (uses "selected" class in Quasar buttons)
+        await expect(builderTypeBtn).toHaveClass(/selected/, { timeout });
         testLogger.info('Builder mode is active');
     }
 
